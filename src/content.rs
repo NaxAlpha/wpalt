@@ -342,6 +342,11 @@ pub async fn publish_due(app: &App) -> Result<usize> {
             let snapshot =
                 serde_json::json!({"post":p,"categories":names("category"),"tags":names("tag")});
             sqlx::query("INSERT INTO revisions(id,post_id,version,snapshot,created_at) VALUES($1,$2,$3,$4,$5)").bind(uuid::Uuid::new_v4().to_string()).bind(&p.id).bind(p.version).bind(snapshot.to_string()).bind(now()).execute(&mut *tx).await?;
+            sqlx::query("DELETE FROM revisions WHERE post_id=$1 AND version<=$2")
+                .bind(&p.id)
+                .bind(p.version - app.config.revision_retention)
+                .execute(&mut *tx)
+                .await?;
             n += 1;
         }
     }

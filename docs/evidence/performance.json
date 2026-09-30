@@ -235,5 +235,7 @@
       "rss_after_load_bytes": 32768000,
       "site_files_bytes": 0
     }
-  }
+  },
+  "source_revision": "4c617eeeaadd6f7bbc73167262e2b33f1eaf4c06",
+  "later_changes": "Compatible derive dependency lock, Ink contrast correction and scheduled revision-retention bound; measured public query/render paths unchanged."
 }

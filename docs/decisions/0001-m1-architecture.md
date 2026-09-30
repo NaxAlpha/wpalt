@@ -10,7 +10,7 @@ Use Rust/Axum/Tokio, SQLx with SQLite/PostgreSQL drivers, Maud server-rendered e
 
 A bundled server/UI provides a usable installation without a JavaScript build chain or vendor runtime. Progressive enhancement supports autosave while ordinary forms remain usable. M2 can introduce richer interactive authoring without preserving this initial editor's internals. Database capabilities are adapted explicitly rather than pretending SQLite and PostgreSQL are interchangeable distributed engines.
 
-SQLx 0.8.6 is the locked, tested baseline for the declared Rust 1.85 dependency floor; compilation evidence currently uses Rust 1.96. SQLx 0.9 requires a newer compiler. Dependency/security checks and guidance records govern later updates. Do not imply the oldest declared compiler is verified until CI checks it.
+SQLx 0.8.6 is the locked, tested baseline for the declared Rust 1.85 dependency floor; local compilation uses Rust 1.96 and independent CI verifies Rust 1.85. SQLx 0.9 requires a newer compiler. Dependency/security checks and guidance records govern later updates. The compiler-floor CI check is a required release gate.
 
 ## Integrity and concurrency
 

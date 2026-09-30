@@ -23,7 +23,7 @@ Before starting a milestone, we may refactor or optimize previously delivered ca
 - Move these requirements, the development methodology and the milestone roadmap into the repository's `docs/` directory when development starts. Commit them before application implementation and use the repository copies as the maintained source of truth.
 - Carry the supporting research/catalog into an appropriate repository location and update relative links. Commit the evolving feature-parity matrix so the agreed scope survives long development sessions.
 - Create a pull request for every milestone, containing its substantial end-user delivery, verification evidence, documentation and applicable migration/change notes.
-- Development was authorized after the planning documents were agreed. The public repository now exists and M1 is active; these repository documents are canonical. Licensing remains undecided before public adoption.
+- Development was authorized after the planning documents were agreed. The public repository now exists and M1 is delivered for review; these repository documents are canonical. Licensing remains undecided before public adoption.
 
 ## 3. Product principles
 

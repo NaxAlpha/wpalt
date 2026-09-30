@@ -360,9 +360,19 @@ async fn publication_schedule_survives_reopening_and_runs_only_once() {
         let site = Site::new(pg, true).await;
         let mut p = input("tomorrow", "schedule");
         p.publish_at = wpalt::now() + 60;
-        let p = content::save(&site.app, site.session(), None, p)
+        let mut p = content::save(&site.app, site.session(), None, p)
             .await
             .unwrap();
+        // A scheduled story can keep changing before publication. On restart,
+        // the configured retention bound applies to the publication revision too.
+        for revision in 0..5 {
+            let mut edit = input("tomorrow", "autosave");
+            edit.version = p.version;
+            edit.body = format!("Scheduled working revision {revision}");
+            p = content::save(&site.app, site.session(), Some(&p.id), edit)
+                .await
+                .unwrap();
+        }
         assert_eq!(content::publish_due(&site.app).await.unwrap(), 0);
         assert_eq!(
             get(&site.app, "/tomorrow", None).await.0,
@@ -376,13 +386,24 @@ async fn publication_schedule_survives_reopening_and_runs_only_once() {
             .await
             .unwrap();
         site.app.db.pool.close().await;
-        let reopened = App::open(site.app.config.as_ref().clone()).await.unwrap();
+        let mut config = site.app.config.as_ref().clone();
+        config.revision_retention = 5;
+        let reopened = App::open(config).await.unwrap();
         assert_eq!(content::publish_due(&reopened).await.unwrap(), 1);
         assert_eq!(content::publish_due(&reopened).await.unwrap(), 0);
         assert_eq!(get(&reopened, "/tomorrow", None).await.0, StatusCode::OK);
         assert_eq!(
             content::get(&reopened, &p.id).await.unwrap().version,
             p.version + 1
+        );
+        let kept: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM revisions WHERE post_id=$1")
+            .bind(&p.id)
+            .fetch_one(&reopened.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            kept, 5,
+            "scheduled publication must honor the revision limit"
         );
         reopened.db.pool.close().await;
         site.close().await;

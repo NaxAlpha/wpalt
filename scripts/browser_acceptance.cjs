@@ -91,6 +91,8 @@ async function freePort() {
   await page.goto(origin+'/admin/settings');await page.getByLabel('Theme',{exact:true}).selectOption('ink');
   await submit(page,page.getByRole('button',{name:'Save site settings',exact:true}));await page.waitForURL(origin+'/admin/settings');
   await visitor.goto(origin);assert.equal(await visitor.locator('body').getAttribute('class'),'ink');
+  const inkColors=await visitor.evaluate(()=>({background:getComputedStyle(document.body).backgroundColor,text:getComputedStyle(document.body).color}));
+  assert.deepEqual(inkColors,{background:'rgb(20, 35, 40)',text:'rgb(233, 243, 237)'},'Ink must apply its background and readable text to the rendered body');
   await visitor.screenshot({path:path.join(output,'public-ink.png'),fullPage:true});
   await page.setViewportSize({width:390,height:844});await page.goto(editorUrl);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Admin has mobile body overflow');
