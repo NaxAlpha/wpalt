@@ -66,3 +66,13 @@ M1–M8 have no public production support promise. Keep meaningful data backed u
 Offline demo seeding and restore run PostgreSQL `VACUUM (ANALYZE) posts` or SQLite `PRAGMA optimize` after committing content. PostgreSQL autovacuum remains enabled; operators should monitor it normally. Failure to run this maintenance is logged as a warning because imported data has already committed. Retry maintenance through your database tooling; do not repeat a completed restore into a populated target. The database statement timeout also bounds this maintenance.
 
 See [PostgreSQL GIN behavior](https://www.postgresql.org/docs/17/gin.html), [VACUUM](https://www.postgresql.org/docs/17/sql-vacuum.html) and [SQLite PRAGMA optimize](https://www.sqlite.org/pragma.html#pragma_optimize).
+
+## Automatic clean builds after merge
+
+Each push to `main`, including a merged PR, runs application/dual-database/browser/security checks and the compiler-floor check. Only when both jobs pass does `clean-build` compile the exact pushed commit on a new Ubuntu 24.04 runner, using empty Cargo/target directories without restored dependency/build caches. The build uses locked dependencies and the recorded Rust 1.98.1 compiler. Earlier PR builds do not substitute for this post-merge verification. Main runs are grouped by commit so a later merge does not cancel an earlier merged commit's build; updated PR runs can still replace old PR runs.
+
+Open the successful **Application verification and builds** run under GitHub Actions and download `wpalt-clean-linux-x86_64-<commit>`. It contains a tar.gz preserving executable permissions, `SHA256SUMS`, the bundled server, example config, operations notes and `BUILD.json` identifying source/toolchain/lock/binary hashes. Artifacts are retained for 90 days (subject to repository policy); this is development distribution, not automatic versioned GitHub Releases. Verify the archive checksum before extraction. The binary targets Linux x86_64/glibc; other target archives can be added with their own verification.
+
+“Clean” means no restored compilation/dependency cache or old workspace artifacts. It does not claim byte-identical reproducible builds across toolchains/hosts. A failed check/build produces a failed run rather than a successful clean artifact.
+
+Protocol checked 2026-10-01 against [GitHub push events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push), [job dependencies](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds) and [artifact downloads](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/download-workflow-artifacts).
