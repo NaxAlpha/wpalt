@@ -1,0 +1,61 @@
+Engine: PostgreSQL
+
+public keyset
+SELECT id,published_title FROM posts WHERE status='published' AND (published_at,id)<(2000000000,'ffffffff') ORDER BY published_at DESC,id DESC LIMIT 21
+Limit  (cost=0.28..14.33 rows=21 width=80) (actual time=0.033..0.053 rows=21 loops=1)
+  Buffers: shared hit=22
+  ->  Index Scan using public_posts on posts  (cost=0.28..670.42 rows=1001 width=80) (actual time=0.032..0.050 rows=21 loops=1)
+        Index Cond: ((status = 'published'::text) AND (ROW(published_at, id) < ROW(2000000000, 'ffffffff'::text)))
+        Buffers: shared hit=22
+Planning:
+  Buffers: shared hit=222 dirtied=5
+Planning Time: 1.114 ms
+Execution Time: 0.114 ms
+
+due schedule
+SELECT * FROM posts WHERE status='scheduled' AND publish_at<=2000000000 ORDER BY publish_at LIMIT 50
+Limit  (cost=0.12..4.14 rows=1 width=1853) (actual time=0.015..0.015 rows=0 loops=1)
+  Buffers: shared hit=1
+  ->  Index Scan using scheduled_posts on posts  (cost=0.12..4.14 rows=1 width=1853) (actual time=0.014..0.014 rows=0 loops=1)
+        Index Cond: (publish_at <= 2000000000)
+        Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=283
+Planning Time: 0.966 ms
+Execution Time: 0.046 ms
+
+session
+SELECT u.id,u.email,u.name,u.role,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash='verification-missing' AND s.expires_at>0 AND u.role<>'disabled'
+Nested Loop  (cost=0.30..16.38 rows=1 width=160) (actual time=0.017..0.017 rows=0 loops=1)
+  Buffers: shared hit=2
+  ->  Index Scan using sessions_pkey on sessions s  (cost=0.15..8.17 rows=1 width=64) (actual time=0.016..0.016 rows=0 loops=1)
+        Index Cond: (token_hash = 'verification-missing'::text)
+        Filter: (expires_at > 0)
+        Buffers: shared hit=2
+  ->  Index Scan using users_pkey on users u  (cost=0.15..8.17 rows=1 width=128) (never executed)
+        Index Cond: (id = s.user_id)
+        Filter: (role <> 'disabled'::text)
+Planning:
+  Buffers: shared hit=101 dirtied=1
+Planning Time: 0.464 ms
+Execution Time: 0.030 ms
+
+search
+SELECT id,published_title FROM posts WHERE status='published' AND to_tsvector('simple',published_title || ' ' || published_body) @@ plainto_tsquery('simple','publishing') ORDER BY published_at DESC,id DESC LIMIT 21
+Limit  (cost=32.12..32.14 rows=5 width=80) (actual time=1.398..1.401 rows=21 loops=1)
+  Buffers: shared hit=259
+  ->  Sort  (cost=32.12..32.14 rows=5 width=80) (actual time=1.397..1.398 rows=21 loops=1)
+        Sort Key: published_at DESC, id DESC
+        Sort Method: top-N heapsort  Memory: 30kB
+        Buffers: shared hit=259
+        ->  Bitmap Heap Scan on posts  (cost=12.83..32.07 rows=5 width=80) (actual time=0.138..1.099 rows=1000 loops=1)
+              Recheck Cond: ((to_tsvector('simple'::regconfig, ((published_title || ' '::text) || published_body)) @@ '''publishing'''::tsquery) AND (status = 'published'::text))
+              Heap Blocks: exact=250
+              Buffers: shared hit=253
+              ->  Bitmap Index Scan on public_search  (cost=0.00..12.83 rows=5 width=0) (actual time=0.111..0.111 rows=1000 loops=1)
+                    Index Cond: (to_tsvector('simple'::regconfig, ((published_title || ' '::text) || published_body)) @@ '''publishing'''::tsquery)
+                    Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=33
+Planning Time: 0.352 ms
+Execution Time: 1.437 ms

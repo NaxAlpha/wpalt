@@ -1,0 +1,47 @@
+{
+  "conditions": "macOS native release; 1000 stories + About; debug SQL enabled; 50 warm admin reads; latency includes Python localhost client, excludes browser render; no timing assertions.",
+  "idle_initialized_rss_bytes": 32292864,
+  "routes": [
+    {
+      "route": "/",
+      "p50_ms": 0.451,
+      "p95_ms": 0.569,
+      "sql_queries_per_request": [
+        2
+      ]
+    },
+    {
+      "route": "/journal-1",
+      "p50_ms": 0.514,
+      "p95_ms": 0.659,
+      "sql_queries_per_request": [
+        4
+      ]
+    },
+    {
+      "route": "/search?q=publishing",
+      "p50_ms": 2.701,
+      "p95_ms": 19.438,
+      "sql_queries_per_request": [
+        2
+      ]
+    },
+    {
+      "route": "/admin/posts",
+      "p50_ms": 0.64,
+      "p95_ms": 0.755,
+      "sql_queries_per_request": [
+        3
+      ]
+    },
+    {
+      "route": "/admin/posts/{id}",
+      "p50_ms": 0.529,
+      "p95_ms": 0.64,
+      "sql_queries_per_request": [
+        5
+      ]
+    }
+  ],
+  "rss_after_authoring_reads_bytes": 37748736
+}

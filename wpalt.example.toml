@@ -1,0 +1,18 @@
+# CLI > WPALT_* environment variables > this TOML file > defaults.
+# Run from the directory containing this file, or use absolute filesystem paths.
+database_url = "sqlite://data/wpalt.db?mode=rwc"
+data_dir = "data"
+listen = "127.0.0.1:3000"
+base_url = "http://127.0.0.1:3000"
+debug = false
+database_connections = 4
+scheduler_seconds = 5
+session_seconds = 28800
+max_upload_bytes = 8388608
+max_backup_bytes = 268435456
+revision_retention = 50
+request_concurrency = 32
+worker_concurrency = 2
+request_timeout_seconds = 30
+# For PostgreSQL, prefer WPALT_DATABASE_URL so credentials stay out of version control.
+# Non-local sites require an HTTPS base_url and a TLS reverse proxy.

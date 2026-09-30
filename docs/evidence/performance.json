@@ -1,0 +1,241 @@
+{
+  "machine": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "cpu": "arm",
+    "logical_cpus": 8
+  },
+  "posts_requested": 1000,
+  "requests_per_scenario": 200,
+  "binary_bytes": 9899600,
+  "conditions": "Full uncompressed HTML document; warm application; no browser asset/render timing; no application response cache; localhost; Python HTTP client overhead included.",
+  "profiles": [
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 0.455,
+      "p95_ms": 0.55,
+      "p99_ms": 0.639,
+      "requests_per_second": 1992.9,
+      "document_bytes": 9542
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 2.17,
+      "p95_ms": 3.216,
+      "p99_ms": 3.659,
+      "requests_per_second": 4275.8,
+      "document_bytes": 9542
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 0.328,
+      "p95_ms": 0.484,
+      "p99_ms": 0.635,
+      "requests_per_second": 2790.3,
+      "document_bytes": 2423
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 1.617,
+      "p95_ms": 2.715,
+      "p99_ms": 3.203,
+      "requests_per_second": 5409.1,
+      "document_bytes": 2423
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 2.297,
+      "p95_ms": 2.831,
+      "p99_ms": 3.316,
+      "requests_per_second": 417.3,
+      "document_bytes": 9571
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 20.684,
+      "p95_ms": 27.539,
+      "p99_ms": 27.842,
+      "requests_per_second": 436.8,
+      "document_bytes": 9571
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "home",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 1.382,
+      "p95_ms": 1.515,
+      "p99_ms": 1.823,
+      "requests_per_second": 710.5,
+      "document_bytes": 9534
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "home",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 5.403,
+      "p95_ms": 7.093,
+      "p99_ms": 12.366,
+      "requests_per_second": 1730.5,
+      "document_bytes": 9534
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "story",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 2.016,
+      "p95_ms": 2.301,
+      "p99_ms": 2.541,
+      "requests_per_second": 486.2,
+      "document_bytes": 2423
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "story",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 10.017,
+      "p95_ms": 11.101,
+      "p99_ms": 11.278,
+      "requests_per_second": 982.6,
+      "document_bytes": 2423
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "search",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 2.642,
+      "p95_ms": 2.954,
+      "p99_ms": 3.049,
+      "requests_per_second": 376.4,
+      "document_bytes": 9563
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "search",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 9.241,
+      "p95_ms": 10.372,
+      "p99_ms": 11.141,
+      "requests_per_second": 1065.1,
+      "document_bytes": 9563
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "home",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 38.78,
+      "p95_ms": 41.131,
+      "p99_ms": 42.946,
+      "requests_per_second": 25.5,
+      "document_bytes": 101595
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "home",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 117.835,
+      "p95_ms": 144.594,
+      "p99_ms": 196.737,
+      "requests_per_second": 84.9,
+      "document_bytes": 101595
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "story",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 45.613,
+      "p95_ms": 48.812,
+      "p99_ms": 73.596,
+      "requests_per_second": 21.5,
+      "document_bytes": 69979
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "story",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 131.672,
+      "p95_ms": 170.472,
+      "p99_ms": 186.643,
+      "requests_per_second": 75.4,
+      "document_bytes": 69979
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "search",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 43.08,
+      "p95_ms": 45.345,
+      "p99_ms": 47.129,
+      "requests_per_second": 23.0,
+      "document_bytes": 110520
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "search",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 123.735,
+      "p95_ms": 175.643,
+      "p99_ms": 186.096,
+      "requests_per_second": 78.7,
+      "document_bytes": 110520
+    }
+  ],
+  "runtime": {
+    "sqlite": {
+      "rss_after_load_bytes": 47988736,
+      "site_files_bytes": 13562320
+    },
+    "postgres": {
+      "rss_after_load_bytes": 32768000,
+      "site_files_bytes": 0
+    }
+  },
+  "source_revision": "4c617eeeaadd6f7bbc73167262e2b33f1eaf4c06",
+  "later_changes": "Compatible derive dependency lock, Ink contrast correction and scheduled revision-retention bound; measured public query/render paths unchanged."
+}

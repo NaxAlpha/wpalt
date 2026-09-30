@@ -1,0 +1,239 @@
+{
+  "machine": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "cpu": "arm",
+    "logical_cpus": 8
+  },
+  "posts_requested": 1000,
+  "requests_per_scenario": 200,
+  "binary_bytes": 9899312,
+  "conditions": "Full uncompressed HTML document; warm application; no browser asset/render timing; no application response cache; localhost; Python HTTP client overhead included.",
+  "profiles": [
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 0.32,
+      "p95_ms": 0.427,
+      "p99_ms": 0.526,
+      "requests_per_second": 2666.5,
+      "document_bytes": 9702
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 2.323,
+      "p95_ms": 3.211,
+      "p99_ms": 3.966,
+      "requests_per_second": 4094.5,
+      "document_bytes": 9702
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 0.467,
+      "p95_ms": 0.543,
+      "p99_ms": 0.6,
+      "requests_per_second": 2076.7,
+      "document_bytes": 2423
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 6.537,
+      "p95_ms": 8.473,
+      "p99_ms": 9.209,
+      "requests_per_second": 1493.3,
+      "document_bytes": 2423
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 1.213,
+      "p95_ms": 1.419,
+      "p99_ms": 1.565,
+      "requests_per_second": 803.3,
+      "document_bytes": 9731
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 9.009,
+      "p95_ms": 13.502,
+      "p99_ms": 15.546,
+      "requests_per_second": 1029.8,
+      "document_bytes": 9731
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "home",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 2.641,
+      "p95_ms": 3.023,
+      "p99_ms": 3.439,
+      "requests_per_second": 371.5,
+      "document_bytes": 9672
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "home",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 9.13,
+      "p95_ms": 10.511,
+      "p99_ms": 14.435,
+      "requests_per_second": 1058.8,
+      "document_bytes": 9672
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "story",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 2.537,
+      "p95_ms": 3.303,
+      "p99_ms": 3.652,
+      "requests_per_second": 375.9,
+      "document_bytes": 2423
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "story",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 11.273,
+      "p95_ms": 12.931,
+      "p99_ms": 13.412,
+      "requests_per_second": 885.4,
+      "document_bytes": 2423
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "search",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 43.558,
+      "p95_ms": 44.615,
+      "p99_ms": 45.219,
+      "requests_per_second": 22.9,
+      "document_bytes": 9701
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "search",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 122.48,
+      "p95_ms": 145.371,
+      "p99_ms": 154.936,
+      "requests_per_second": 82.4,
+      "document_bytes": 9701
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "home",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 38.732,
+      "p95_ms": 41.018,
+      "p99_ms": 42.13,
+      "requests_per_second": 25.6,
+      "document_bytes": 101595
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "home",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 111.241,
+      "p95_ms": 151.922,
+      "p99_ms": 166.17,
+      "requests_per_second": 86.9,
+      "document_bytes": 101595
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "story",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 45.33,
+      "p95_ms": 48.038,
+      "p99_ms": 49.735,
+      "requests_per_second": 21.8,
+      "document_bytes": 69979
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "story",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 130.573,
+      "p95_ms": 160.07,
+      "p99_ms": 179.07,
+      "requests_per_second": 76.1,
+      "document_bytes": 69979
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "search",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 42.407,
+      "p95_ms": 47.43,
+      "p99_ms": 56.259,
+      "requests_per_second": 22.8,
+      "document_bytes": 110520
+    },
+    {
+      "system": "wordpress-reference",
+      "database": "mariadb",
+      "endpoint": "search",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 126.442,
+      "p95_ms": 166.081,
+      "p99_ms": 182.521,
+      "requests_per_second": 77.7,
+      "document_bytes": 110520
+    }
+  ],
+  "runtime": {
+    "sqlite": {
+      "rss_after_load_bytes": 46530560,
+      "site_files_bytes": 13911368
+    },
+    "postgres": {
+      "rss_after_load_bytes": 33013760,
+      "site_files_bytes": 0
+    }
+  }
+}

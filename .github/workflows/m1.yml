@@ -1,0 +1,71 @@
+name: M1 verification
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: wpalt
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: wpalt
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wpalt"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://wpalt:ci-only-password@localhost:5432/wpalt
+      WPALT_REQUIRE_POSTGRES: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable branch
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: python3 scripts/check_protocols.py
+      - run: cargo fmt --all --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - run: cargo install cargo-audit --locked --version 0.22.2 --root work/tooling
+      - run: python3 scripts/audit_dependencies.py --audit-binary work/tooling/bin/cargo-audit
+      - run: cargo build --release --locked
+      - run: python3 scripts/cli_acceptance.py --binary target/release/wpalt
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - run: npm install --prefix work/browser playwright@1.62.1
+      - run: work/browser/node_modules/.bin/playwright install --with-deps chromium
+      - run: WPALT_BINARY="$PWD/target/release/wpalt" PLAYWRIGHT_MODULE="$PWD/work/browser/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: browser-review
+          path: work/browser-evidence/*.png
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wpalt-linux-x86_64
+          path: target/release/wpalt
+          retention-days: 7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: dependency-audit
+          path: work/dependency-audit.json
+  compiler-floor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.85.0
+      - run: cargo check --locked

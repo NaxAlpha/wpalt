@@ -1,0 +1,21 @@
+Engine: SQLite
+
+public keyset
+SELECT id,published_title FROM posts WHERE status='published' AND (published_at,id)<(2000000000,'ffffffff') ORDER BY published_at DESC,id DESC LIMIT 21
+SEARCH posts USING INDEX public_posts (status=? AND (published_at,id)<(?,?))
+
+due schedule
+SELECT * FROM posts WHERE status='scheduled' AND publish_at<=2000000000 ORDER BY publish_at LIMIT 50
+SEARCH posts USING INDEX scheduled_posts (publish_at<?)
+
+session
+SELECT u.id,u.email,u.name,u.role,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash='verification-missing' AND s.expires_at>0 AND u.role<>'disabled'
+SEARCH s USING INDEX sqlite_autoindex_sessions_1 (token_hash=?)
+SCAN u
+
+search
+SELECT id,published_title FROM posts WHERE status='published' AND id IN (SELECT id FROM post_search WHERE post_search MATCH 'publishing') ORDER BY published_at DESC,id DESC LIMIT 21
+SEARCH posts USING INDEX sqlite_autoindex_posts_1 (id=?)
+LIST SUBQUERY 1
+SCAN post_search VIRTUAL TABLE INDEX 0:M3
+USE TEMP B-TREE FOR ORDER BY

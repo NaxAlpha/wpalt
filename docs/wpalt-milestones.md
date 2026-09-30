@@ -6,7 +6,7 @@ Companions: [Product goals](wpalt-product-goals.md) · [Development methodology]
 
 ## Delivery rules
 
-Every milestone delivers a substantial end-user system, building on the previous release. The roadmap describes proposed delivery boundaries, not completed functionality or a fixed schedule. All milestones are currently planned.
+Every milestone delivers a substantial end-user system, building on the previous release. The roadmap describes proposed delivery boundaries, not completed functionality or a fixed schedule. M1 is delivered in PR #1 and awaits user review/merge; M2–M9 are planned.
 
 Each milestone follows the same process: prepare and, where useful, refactor the preceding system; define the milestone contract; make each functional step work; verify and optimize each step; integrate and optimize the complete system; deliver a runnable release with evidence. Working correctly includes baseline security and data integrity from the outset.
 
@@ -195,8 +195,12 @@ Final review is a release gate across the cumulative system, not an internal-onl
 
 ## Change and progress record
 
-Maintain each milestone's status as planned, active, functional, hardening or complete. Track functional steps separately so working functionality is not confused with finished optimization. A completed milestone has the required delivery PR and verification evidence; PR review and merge remain separately recorded states. Record releases, PRs and evidence when those records exist; none exists yet.
+Maintain each milestone's status as planned, active, functional, hardening or complete. Track functional steps separately so working functionality is not confused with finished optimization. A completed milestone has the required delivery PR and verification evidence; PR review and merge remain separately recorded states. Record releases, PRs and evidence as they are produced; see the active milestone contract and verification record for current status.
 
 For a proposed change, record the affected requirement/milestone, reason, options, consequences and resulting decision. Realign material scope or direction changes with the user. Routine refactors and implementation choices within the agreed goal can proceed with documented reasoning. Update all affected documents after the decision.
 
 Milestone boundaries may be refined or reordered when dependencies are understood. They must continue to deliver substantial end-user outcomes and remain traceable to the final goal.
+
+### M1 delivery record — 2026-09-30
+
+M1 is complete as a reviewable delivery: functional publishing steps and hardening are verified. [Primary delivery PR #1](https://github.com/NaxAlpha/wpalt/pull/1) is open; current-head CI must be green before marking the PR ready. Independent Linux application and Rust 1.85 compiler-floor jobs have passed; their current results remain visible on the PR. See [M1 contract](m1-contract.md) and [verification evidence](evidence/m1-verification.md). User review and merge are pending. M2–M9 remain planned; no material product-scope change was needed. Architecture, deployment limits and the compiler dependency correction are documented in ADR 0001.
