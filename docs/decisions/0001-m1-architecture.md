@@ -29,3 +29,7 @@ Public lists select summaries, never drafts or complete body blobs, and use keys
 M1 has a simple editor, primitive fields and two built-in themes. Backups are bounded logical JSON and unencrypted. Image decode and password verification use bounded blocking workers. TLS is provided by an operator-configured reverse proxy. These limitations are explicit in the contract; full composition, advanced media, automated resilience and distributed execution remain their planned milestones.
 
 No pre-M9 legacy API/config/theme compatibility layer is introduced. Schema version mismatches fail explicitly. Meaningful data needs a migration or deliberate preservation decision when the model changes.
+
+## Compiler-floor verification correction
+
+The first Rust 1.85 CI run found `yoke-derive 0.8.3` using `str::from_utf8`, unavailable on that compiler despite its parent dependency's older declared floor. The lockfile selects compatible `yoke-derive 0.8.2`, whose implementation uses `core::str::from_utf8`, while retaining `yoke 0.8.3`. Locked builds and the compiler-floor CI gate preserve this verified selection. Reassess with a future dependency upgrade rather than adding application compatibility code or assuming dependency metadata proves compiler support.
