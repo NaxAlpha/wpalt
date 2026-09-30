@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "journeys": [
+    "public rendering",
+    "login/admin",
+    "draft/publish",
+    "isolated autosave",
+    "revision restore",
+    "private/public image",
+    "comment moderation",
+    "theme switch",
+    "responsive layout"
+  ],
+  "external_requests": 0,
+  "script_errors": 0
+}

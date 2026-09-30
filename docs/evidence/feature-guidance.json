@@ -1,0 +1,284 @@
+{
+  "protocol_version": 1,
+  "records": [
+    {
+      "feature_id": "M1-01",
+      "area": "Installation/configuration",
+      "scope": "M1",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.rs/axum/0.8.9/axum/",
+        "https://docs.rs/sqlx/0.8.6/sqlx/"
+      ],
+      "applicable_versions": [
+        "Axum 0.8.9",
+        "SQLx 0.8.6",
+        "wpalt schema 1"
+      ],
+      "last_checked": "2026-09-30",
+      "next_review": "2026-12-29",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Validate configuration and redact secrets; document supported deployment modes."
+      ],
+      "tests": [
+        "configuration_and_composition_reject_unsafe_or_ambiguous_inputs",
+        "CLI acceptance"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M1-02",
+      "area": "Authentication/authorization",
+      "scope": "M1",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "Argon2id default parameters: m=19456 KiB, t=2, p=1",
+        "M1 fixed roles"
+      ],
+      "last_checked": "2026-09-30",
+      "next_review": "2026-10-30",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Adaptive password hashes; random sessions stored by digest; HttpOnly/SameSite cookies, HTTPS Secure flag; CSRF and Origin checks; no sensitive logging."
+      ],
+      "tests": [
+        "permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M1-03",
+      "area": "Publishing/revisions/composition",
+      "scope": "M1",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developer.wordpress.org/rest-api/reference/posts/",
+        "https://www.w3.org/WAI/standards-guidelines/wcag/"
+      ],
+      "applicable_versions": [
+        "Current WordPress REST contract",
+        "M1 working/public snapshot contract"
+      ],
+      "last_checked": "2026-09-30",
+      "next_review": "2026-12-29",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Drafts and revisions are private; meaningful labels, keyboard paths and escaped output. WCAG reference guides review, not a certification claim."
+      ],
+      "tests": [
+        "author_preview_publish_autosave_and_restore_without_leaking_drafts",
+        "concurrent_editors_never_silently_overwrite_each_other",
+        "browser acceptance"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M1-04",
+      "area": "Durable scheduling",
+      "scope": "M1",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developer.wordpress.org/rest-api/reference/posts/"
+      ],
+      "applicable_versions": [
+        "wpalt persisted schedule contract"
+      ],
+      "last_checked": "2026-09-30",
+      "next_review": "2026-12-29",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Future publication persists across restarts; due work must not double-publish."
+      ],
+      "tests": [
+        "publication_schedule_survives_reopening_and_runs_only_once"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M1-05",
+      "area": "Media",
+      "scope": "M1",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developer.wordpress.org/rest-api/reference/media/",
+        "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "image crate 0.25.9",
+        "PNG/JPEG/WebP/GIF"
+      ],
+      "last_checked": "2026-09-30",
+      "next_review": "2026-10-30",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Allowlist formats; decode with limits; generated filenames; private media permission checks; no executable uploads."
+      ],
+      "tests": [
+        "images_and_comments_obey_visibility_validation_and_moderation"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M1-06",
+      "area": "Search/navigation/public output",
+      "scope": "M1",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.sqlite.org/fts5.html",
+        "https://www.postgresql.org/docs/17/textsearch-indexes.html",
+        "https://developers.google.com/search/docs/appearance/title-link",
+        "https://www.postgresql.org/docs/17/gin.html",
+        "https://www.postgresql.org/docs/17/sql-vacuum.html",
+        "https://www.sqlite.org/pragma.html"
+      ],
+      "applicable_versions": [
+        "SQLite FTS5",
+        "PostgreSQL 17",
+        "M1 basic metadata only"
+      ],
+      "last_checked": "2026-09-30",
+      "next_review": "2026-12-29",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Search live snapshots only; keyset listing; meaningful page titles. Full SEO guideline implementation remains M3.",
+        "Run bounded planner/index maintenance after offline seed/restore; committed content remains committed if maintenance fails."
+      ],
+      "tests": [
+        "published_library_paginates_without_duplicates_and_searches_only_live_content",
+        "browser/feed acceptance"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M1-07",
+      "area": "Comments/moderation",
+      "scope": "M1",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "M1 moderation contract"
+      ],
+      "last_checked": "2026-09-30",
+      "next_review": "2026-10-30",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Default pending; output escaped; bounded submissions and direct-peer rate limit; moderator permission."
+      ],
+      "tests": [
+        "images_and_comments_obey_visibility_validation_and_moderation"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M1-08",
+      "area": "Backup/restore",
+      "scope": "M1",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.sqlite.org/wal.html",
+        "https://www.postgresql.org/docs/17/transaction-iso.html"
+      ],
+      "applicable_versions": [
+        "wpalt-backup-v1",
+        "SQLite WAL",
+        "PostgreSQL repeatable read"
+      ],
+      "last_checked": "2026-09-30",
+      "next_review": "2026-12-29",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Consistent logical capture coordinated with writes; trusted-path restore into empty target; no restored sessions; reject corruption."
+      ],
+      "tests": [
+        "backup_restores_content_users_media_and_revisions_into_a_fresh_engine"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M1-09",
+      "area": "Observability/security diagnostics",
+      "scope": "M1",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "Structured M1 JSON log contract"
+      ],
+      "last_checked": "2026-09-30",
+      "next_review": "2026-10-30",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Correlated route/timing logs exclude secrets and content; keep debug data owner-controlled."
+      ],
+      "tests": [
+        "CLI/log acceptance",
+        "permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed"
+    }
+  ],
+  "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."
+}

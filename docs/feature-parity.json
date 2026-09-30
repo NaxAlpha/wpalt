@@ -1,0 +1,1327 @@
+{
+  "schema": 1,
+  "core_baseline": "m1-contract.md; WordPress core gaps are refined at milestone specification.",
+  "milestone": "M1",
+  "capabilities": [
+    {
+      "id": "F001",
+      "cluster": "content",
+      "capability": "Custom types and taxonomies",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F002",
+      "cluster": "content",
+      "capability": "Typed custom fields and relationships",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F003",
+      "cluster": "content",
+      "capability": "Repeaters, galleries and clone groups",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F004",
+      "cluster": "content",
+      "capability": "Flexible content / reusable block schemas",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F005",
+      "cluster": "content",
+      "capability": "Global options / settings pages",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F006",
+      "cluster": "content",
+      "capability": "Content revisions and rollback",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F007",
+      "cluster": "content",
+      "capability": "Drafts, preview and editorial approval",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F008",
+      "cluster": "content",
+      "capability": "Manual language variants and strings",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F009",
+      "cluster": "content",
+      "capability": "Translation duplication / synchronization",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F010",
+      "cluster": "content",
+      "capability": "Multilingual slugs and metadata",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F011",
+      "cluster": "content",
+      "capability": "Automatic translation with local models",
+      "deployment": "W",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F012",
+      "cluster": "content",
+      "capability": "Vendor automatic translation / human network",
+      "deployment": "E",
+      "milestone": "M2",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F013",
+      "cluster": "design",
+      "capability": "Responsive blocks and layout primitives",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F014",
+      "cluster": "design",
+      "capability": "Theme-wide templates and dynamic field bindings",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F015",
+      "cluster": "design",
+      "capability": "Reusable patterns and design tokens",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F016",
+      "cluster": "design",
+      "capability": "Header, footer and navigation builder",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F017",
+      "cluster": "design",
+      "capability": "Tabs, accordions, galleries and carousels",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F018",
+      "cluster": "design",
+      "capability": "Conditional / protected presentation",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F019",
+      "cluster": "design",
+      "capability": "Custom CSS and approved asset insertion",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F020",
+      "cluster": "design",
+      "capability": "Template import/export and cross-site reuse",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F021",
+      "cluster": "design",
+      "capability": "Collaborative notes and assignments",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F022",
+      "cluster": "design",
+      "capability": "Cloud template marketplace/library",
+      "deployment": "E",
+      "milestone": "M2",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F023",
+      "cluster": "design",
+      "capability": "AI layout/content generation locally",
+      "deployment": "W",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F024",
+      "cluster": "design",
+      "capability": "Exact Elementor template/widget compatibility",
+      "deployment": "L",
+      "milestone": "M2",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F025",
+      "cluster": "seo",
+      "capability": "SEO titles, metadata and social previews",
+      "deployment": "L",
+      "milestone": "M3",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F026",
+      "cluster": "seo",
+      "capability": "Canonical, robots and indexing rules",
+      "deployment": "L",
+      "milestone": "M3",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F027",
+      "cluster": "seo",
+      "capability": "XML, image, video and news sitemaps",
+      "deployment": "L",
+      "milestone": "M3",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F028",
+      "cluster": "seo",
+      "capability": "Schema graph and custom schema builder",
+      "deployment": "L",
+      "milestone": "M3",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F029",
+      "cluster": "seo",
+      "capability": "Local business / multiple location schema",
+      "deployment": "L",
+      "milestone": "M3",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F030",
+      "cluster": "seo",
+      "capability": "Redirects, regex rules and 404 reports",
+      "deployment": "L",
+      "milestone": "M3",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F031",
+      "cluster": "seo",
+      "capability": "Internal-link graph / orphan detection",
+      "deployment": "L",
+      "milestone": "M3",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F032",
+      "cluster": "seo",
+      "capability": "Internal broken-link checks",
+      "deployment": "L",
+      "milestone": "M3",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F033",
+      "cluster": "seo",
+      "capability": "External broken-link checks",
+      "deployment": "E",
+      "milestone": "M3",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F034",
+      "cluster": "seo",
+      "capability": "Readability and keyword heuristics",
+      "deployment": "L",
+      "milestone": "M3",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F035",
+      "cluster": "seo",
+      "capability": "Search Console / search index data",
+      "deployment": "E",
+      "milestone": "M3",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F036",
+      "cluster": "seo",
+      "capability": "SERP ranking / competitive keyword datasets",
+      "deployment": "I",
+      "milestone": "M3",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F037",
+      "cluster": "forms",
+      "capability": "Form designer and reusable field schema",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F038",
+      "cluster": "forms",
+      "capability": "Conditional fields / notification routing",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F039",
+      "cluster": "forms",
+      "capability": "Multi-step forms and repeatable inputs",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F040",
+      "cluster": "forms",
+      "capability": "Entry storage, search, CSV export and permissions",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F041",
+      "cluster": "forms",
+      "capability": "File uploads and protected attachments",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F042",
+      "cluster": "forms",
+      "capability": "Calculations and pricing logic",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F043",
+      "cluster": "forms",
+      "capability": "Signatures and signed-document records",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F044",
+      "cluster": "forms",
+      "capability": "Surveys, polls and scoring",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F045",
+      "cluster": "forms",
+      "capability": "Save/resume, partial entries and abandonment",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F046",
+      "cluster": "forms",
+      "capability": "Offline capture and later synchronization",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F047",
+      "cluster": "forms",
+      "capability": "User registration and post creation",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F048",
+      "cluster": "forms",
+      "capability": "Webhook and CRM/marketing handoff",
+      "deployment": "E",
+      "milestone": "M4",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F049",
+      "cluster": "forms",
+      "capability": "Payment fields / gateway checkout",
+      "deployment": "E",
+      "milestone": "M4",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F050",
+      "cluster": "forms",
+      "capability": "External CAPTCHA service",
+      "deployment": "E",
+      "milestone": "M4",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F051",
+      "cluster": "identity",
+      "capability": "Local users, roles and granular permissions",
+      "deployment": "L",
+      "milestone": "M5",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F052",
+      "cluster": "identity",
+      "capability": "Content and download access rules",
+      "deployment": "L",
+      "milestone": "M5",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F053",
+      "cluster": "identity",
+      "capability": "Membership state and entitlement administration",
+      "deployment": "L",
+      "milestone": "M5",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F054",
+      "cluster": "identity",
+      "capability": "Content drip and timed unlocks",
+      "deployment": "L",
+      "milestone": "M5",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F055",
+      "cluster": "identity",
+      "capability": "Course lessons and learner progress",
+      "deployment": "L",
+      "milestone": "M5",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F056",
+      "cluster": "identity",
+      "capability": "Quizzes, assignments, certificates and gradebook",
+      "deployment": "L",
+      "milestone": "M5",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F057",
+      "cluster": "identity",
+      "capability": "Corporate subaccounts and gifting",
+      "deployment": "L",
+      "milestone": "M5",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F058",
+      "cluster": "identity",
+      "capability": "Community profiles and discussion groups",
+      "deployment": "L",
+      "milestone": "M5",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F059",
+      "cluster": "identity",
+      "capability": "Affiliate referral and commission records",
+      "deployment": "L",
+      "milestone": "M5",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F060",
+      "cluster": "identity",
+      "capability": "Enterprise identity / social-login provider",
+      "deployment": "E",
+      "milestone": "M5",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F061",
+      "cluster": "commerce",
+      "capability": "Catalog, variants and digital products",
+      "deployment": "L",
+      "milestone": "M6",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F062",
+      "cluster": "commerce",
+      "capability": "Cart, checkout state and orders",
+      "deployment": "L",
+      "milestone": "M6",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F063",
+      "cluster": "commerce",
+      "capability": "Inventory and reservation locks",
+      "deployment": "L",
+      "milestone": "M6",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F064",
+      "cluster": "commerce",
+      "capability": "Coupons, discounts and member pricing",
+      "deployment": "L",
+      "milestone": "M6",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F065",
+      "cluster": "commerce",
+      "capability": "Booking calendars, staff/resources and group capacity",
+      "deployment": "L",
+      "milestone": "M6",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F066",
+      "cluster": "commerce",
+      "capability": "Local appointment confirmations and reminder scheduling",
+      "deployment": "L",
+      "milestone": "M6",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F067",
+      "cluster": "commerce",
+      "capability": "Subscription schedules, proration and dunning state",
+      "deployment": "L",
+      "milestone": "M6",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F068",
+      "cluster": "commerce",
+      "capability": "Refund/admin transaction workflow",
+      "deployment": "L",
+      "milestone": "M6",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F069",
+      "cluster": "commerce",
+      "capability": "Card settlement and recurring collection",
+      "deployment": "E",
+      "milestone": "M6",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F070",
+      "cluster": "commerce",
+      "capability": "Shipping rates/labels and calendar sync",
+      "deployment": "E",
+      "milestone": "M6",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F071",
+      "cluster": "commerce",
+      "capability": "Current tax/compliance datasets",
+      "deployment": "I",
+      "milestone": "M6",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F072",
+      "cluster": "media",
+      "capability": "Page caching, invalidation and preload",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F073",
+      "cluster": "media",
+      "capability": "Browser-cache headers and compression settings",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F074",
+      "cluster": "media",
+      "capability": "Object-cache integration",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F075",
+      "cluster": "media",
+      "capability": "Asset minification and loading controls",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F076",
+      "cluster": "media",
+      "capability": "Lazy loading, dimensions and preload hints",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F077",
+      "cluster": "media",
+      "capability": "Resize, compress and WebP/AVIF derivatives",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F078",
+      "cluster": "media",
+      "capability": "Native image binary / imgproxy worker",
+      "deployment": "W",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F079",
+      "cluster": "media",
+      "capability": "Unused/critical CSS generation",
+      "deployment": "W",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F080",
+      "cluster": "media",
+      "capability": "Unused-image and database cleanup",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F081",
+      "cluster": "media",
+      "capability": "Geolocation / role-aware cache variants",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F082",
+      "cluster": "media",
+      "capability": "Video transcoding on own server",
+      "deployment": "W",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F083",
+      "cluster": "media",
+      "capability": "Global image/video CDN and edge WAF",
+      "deployment": "D",
+      "milestone": "M7",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F084",
+      "cluster": "analytics",
+      "capability": "First-party pageviews, events and conversions",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F085",
+      "cluster": "analytics",
+      "capability": "Forms/store funnels and custom dimensions",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F086",
+      "cluster": "analytics",
+      "capability": "Local dashboards and reports",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F087",
+      "cluster": "analytics",
+      "capability": "Heatmaps and masked session replay",
+      "deployment": "W",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F088",
+      "cluster": "analytics",
+      "capability": "A/B experiments and variant allocation",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F089",
+      "cluster": "analytics",
+      "capability": "Exit-intent, device and referrer popups",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F090",
+      "cluster": "analytics",
+      "capability": "Scheduled/cookie/visitor-based targeting",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F091",
+      "cluster": "analytics",
+      "capability": "On-site coupon wheels / offer campaigns",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F092",
+      "cluster": "analytics",
+      "capability": "Google/ad-platform reporting datasets",
+      "deployment": "E",
+      "milestone": "M4",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F093",
+      "cluster": "analytics",
+      "capability": "Cross-site audience / advertiser identity graph",
+      "deployment": "I",
+      "milestone": "M4",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F094",
+      "cluster": "communications",
+      "capability": "SMTP settings and connection routing",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F095",
+      "cluster": "communications",
+      "capability": "Mail logs, resend, failure alerts and fallback",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F096",
+      "cluster": "communications",
+      "capability": "Transactional templates and notification rules",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F097",
+      "cluster": "communications",
+      "capability": "Mailing lists, consent records and segmentation",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F098",
+      "cluster": "communications",
+      "capability": "Newsletter design, queue and automation",
+      "deployment": "L",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F099",
+      "cluster": "communications",
+      "capability": "Self-operated outbound mail server",
+      "deployment": "W",
+      "milestone": "M4",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F100",
+      "cluster": "communications",
+      "capability": "Chosen SMTP/transactional mail provider",
+      "deployment": "E",
+      "milestone": "M4",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F101",
+      "cluster": "communications",
+      "capability": "Gmail/Microsoft or remote CRM connectors",
+      "deployment": "E",
+      "milestone": "M4",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F102",
+      "cluster": "communications",
+      "capability": "Global inbox deliverability / shared reputation service",
+      "deployment": "I",
+      "milestone": "M4",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F103",
+      "cluster": "security",
+      "capability": "TOTP/passkeys and local login protections",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F104",
+      "cluster": "security",
+      "capability": "Security headers and hardening",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F105",
+      "cluster": "security",
+      "capability": "Local request rule engine and rate limits",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F106",
+      "cluster": "security",
+      "capability": "File-integrity / known-pattern malware scans",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F107",
+      "cluster": "security",
+      "capability": "Audit logs and privileged action history",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F108",
+      "cluster": "security",
+      "capability": "Honeypots, proof-of-work and basic spam heuristics",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F109",
+      "cluster": "security",
+      "capability": "Cookie banner and consent/script enforcement",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F110",
+      "cluster": "security",
+      "capability": "Consent records and data-request workflows",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F111",
+      "cluster": "security",
+      "capability": "Cookie scan on own pages",
+      "deployment": "W",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F112",
+      "cluster": "security",
+      "capability": "Fresh vulnerability/reputation/signature datasets",
+      "deployment": "I",
+      "milestone": "M7",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F113",
+      "cluster": "security",
+      "capability": "Akismet-style shared spam classification",
+      "deployment": "I",
+      "milestone": "M7",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F114",
+      "cluster": "security",
+      "capability": "DDoS absorption and managed incident response",
+      "deployment": "D",
+      "milestone": "M7",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F115",
+      "cluster": "resilience",
+      "capability": "Consistent files + database snapshot",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F116",
+      "cluster": "resilience",
+      "capability": "Schedules, retention and pre-update backups",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F117",
+      "cluster": "resilience",
+      "capability": "Encrypted backup packages and recovery keys",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F118",
+      "cluster": "resilience",
+      "capability": "Incremental/deduplicated backup worker",
+      "deployment": "W",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F119",
+      "cluster": "resilience",
+      "capability": "Selective restore, clone and URL-aware migration",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F120",
+      "cluster": "resilience",
+      "capability": "Portable restore utility independent of CMS",
+      "deployment": "L",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F121",
+      "cluster": "resilience",
+      "capability": "Off-site copy to owner SFTP/NAS/secondary host",
+      "deployment": "D",
+      "milestone": "M7",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F122",
+      "cluster": "resilience",
+      "capability": "Point-in-time recovery and continuous replication",
+      "deployment": "W",
+      "milestone": "M7",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F123",
+      "cluster": "resilience",
+      "capability": "Vendor vault / off-site disaster recovery service",
+      "deployment": "D",
+      "milestone": "M7",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F124",
+      "cluster": "operations",
+      "capability": "One module registry and ownership resolver",
+      "deployment": "L",
+      "milestone": "M9",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F125",
+      "cluster": "operations",
+      "capability": "Unified settings/schema export and import",
+      "deployment": "L",
+      "milestone": "M9",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F126",
+      "cluster": "operations",
+      "capability": "Background jobs, retries and health history",
+      "deployment": "L",
+      "milestone": "M9",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F127",
+      "cluster": "operations",
+      "capability": "Reliable system-scheduled worker",
+      "deployment": "W",
+      "milestone": "M9",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F128",
+      "cluster": "operations",
+      "capability": "Local safe-mode and rollback controls",
+      "deployment": "L",
+      "milestone": "M9",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F129",
+      "cluster": "operations",
+      "capability": "Authorized snippets and developer hooks",
+      "deployment": "L",
+      "milestone": "M9",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F130",
+      "cluster": "operations",
+      "capability": "Owner-hosted fleet controller",
+      "deployment": "W",
+      "milestone": "M9",
+      "status": "planned",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F131",
+      "cluster": "operations",
+      "capability": "Uptime alerts while origin is down",
+      "deployment": "D",
+      "milestone": "M9",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    },
+    {
+      "id": "F132",
+      "cluster": "operations",
+      "capability": "Vendor license renewal / cloud quotas",
+      "deployment": "E",
+      "milestone": "M9",
+      "status": "optional-connector-or-external-boundary",
+      "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
+      "reference": "research/local-first-plugin-and-cms-data.json"
+    }
+  ]
+}

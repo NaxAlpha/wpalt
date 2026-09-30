@@ -1,0 +1,31 @@
+{
+  "checked": "2026-09-30",
+  "source": "GitHub official repository release/tag APIs",
+  "actions": [
+    {
+      "repo": "actions/checkout",
+      "version": "v7.0.1",
+      "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1"
+    },
+    {
+      "repo": "actions/setup-node",
+      "version": "v7.0.0",
+      "sha": "820762786026740c76f36085b0efc47a31fe5020"
+    },
+    {
+      "repo": "actions/upload-artifact",
+      "version": "v7.0.1",
+      "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+    },
+    {
+      "repo": "Swatinem/rust-cache",
+      "version": "v2.9.2",
+      "sha": "6323deb102c322ba6fcbdcafc7e3dddab59af2b6"
+    },
+    {
+      "repo": "dtolnay/rust-toolchain",
+      "version": "stable branch",
+      "sha": "6bed0761d98439e5a578e2877258200ad565ba87"
+    }
+  ]
+}
