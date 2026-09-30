@@ -1,0 +1,61 @@
+{
+  "format": 1,
+  "name": "Paper",
+  "tokens": {
+    "background": "#f5f6f8",
+    "panel": "#ffffff",
+    "text": "#17282b",
+    "muted": "#657577",
+    "accent": "#14785f",
+    "font": "system"
+  },
+  "components": {},
+  "header": {
+    "id": "header",
+    "kind": "navigation"
+  },
+  "footer": {
+    "id": "footer",
+    "kind": "text",
+    "text": {
+      "bind": "site.description"
+    }
+  },
+  "templates": {
+    "home": {
+      "id": "home-layout",
+      "kind": "section",
+      "children": [
+        {
+          "id": "hero-title",
+          "kind": "heading",
+          "text": {
+            "bind": "site.title"
+          },
+          "level": 1
+        },
+        {
+          "id": "hero-description",
+          "kind": "text",
+          "text": {
+            "bind": "site.description"
+          }
+        },
+        {
+          "id": "home",
+          "kind": "collection",
+          "source": "listing"
+        }
+      ]
+    },
+    "search": {
+      "id": "search",
+      "kind": "collection",
+      "source": "listing"
+    },
+    "content": {
+      "id": "content",
+      "kind": "body"
+    }
+  }
+}

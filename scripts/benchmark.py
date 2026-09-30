@@ -4,7 +4,7 @@ Optional PostgreSQL URL MUST identify an empty, isolated test database.
 """
 import argparse,concurrent.futures,json,math,os,platform,secrets,socket,subprocess,tempfile,time,urllib.request
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--binary',default='target/release/wpalt');p.add_argument('--posts',type=int,default=1000);p.add_argument('--requests',type=int,default=200);p.add_argument('--postgres-url');p.add_argument('--wordpress-url');p.add_argument('--output',default='work/benchmark.json');args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--binary',default='target/release/wpalt');p.add_argument('--posts',type=int,default=1000);p.add_argument('--requests',type=int,default=200);p.add_argument('--postgres-url');p.add_argument('--wordpress-url');p.add_argument('--composed',action='store_true');p.add_argument('--output',default='work/benchmark.json');args=p.parse_args()
 binary=Path(args.binary).resolve();results={'machine':{'platform':platform.platform(),'cpu':platform.processor(),'logical_cpus':os.cpu_count()},'posts_requested':args.posts,'requests_per_scenario':args.requests,'binary_bytes':binary.stat().st_size,'conditions':'Full uncompressed HTML document; warm application; no browser asset/render timing; no application response cache; localhost; Python HTTP client overhead included.','profiles':[]}
 def percentile(values,p):return sorted(values)[max(0,math.ceil(len(values)*p)-1)]
 def load(url,concurrency):
@@ -28,6 +28,11 @@ with tempfile.TemporaryDirectory(prefix='wpalt-benchmark-') as temporary:
             r=subprocess.run([str(binary),'--config',str(cfg),*arguments],input=input,text=True,capture_output=True)
             assert r.returncode==0,(arguments,r.stderr)
         run('init','--admin-email','benchmark@example.test',input=secrets.token_urlsafe(24)+'\n');run('seed-demo','--posts',str(args.posts))
+        if args.composed:
+            package=json.loads((Path(__file__).resolve().parents[1]/'assets/themes/paper.json').read_text())
+            package['components']={'benchmark-card':{'parameters':{'title':'string','subtitle':'string','url':'string'},'root':{'id':'benchmark-card-root','kind':'section','style':{'padding':24},'children':[{'id':'benchmark-title','kind':'heading','text':{'bind':'params.title'}},{'id':'benchmark-subtitle','kind':'text','text':{'bind':'params.subtitle'}},{'id':'benchmark-link','kind':'link','text':'Read project','href':{'bind':'params.url'}}]}}}
+            package['templates']['home']['children'][-1]={'id':'benchmark-collection','kind':'collection','source':'post','limit':20,'children':[{'id':'benchmark-instance','kind':'component','component':'benchmark-card','arguments':{'title':{'bind':'item.title'},'subtitle':{'bind':'item.fields.subtitle'},'url':{'bind':'item.url'}}}]}
+            package_path=directory/'benchmark-theme.json';package_path.write_text(json.dumps(package));run('theme','import','paper',str(package_path),'--publish')
         log=(directory/'server.log').open('w');server=subprocess.Popen([str(binary),'--config',str(cfg),'serve'],stdout=log,stderr=log)
         try:
             for _ in range(100):
@@ -36,6 +41,13 @@ with tempfile.TemporaryDirectory(prefix='wpalt-benchmark-') as temporary:
                 except Exception:assert server.poll() is None;time.sleep(.1)
             else:raise AssertionError('Server readiness timeout')
             paths={'home':'/','story':'/journal-1','search':'/search?q=publishing'}
+            started=time.perf_counter()
+            with urllib.request.urlopen(origin) as r:r.read()
+            results.setdefault('cold_first_request_ms',{})[engine]=round((time.perf_counter()-started)*1000,3)
+            with urllib.request.urlopen(origin+'/assets/builder.js') as r:assets=r.read()
+            import gzip
+            results['studio_asset_bytes']={'raw':len(assets),'gzip':len(gzip.compress(assets))}
+            results['composition_fixture']='20 dynamic cards with typed field bindings and three explicit reusable component parameters' if args.composed else 'default theme'
             for endpoint,path in paths.items():
                 for _ in range(10):
                     with urllib.request.urlopen(origin+path) as r:r.read()

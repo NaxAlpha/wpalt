@@ -1,0 +1,101 @@
+{
+  "id": "project-template",
+  "kind": "section",
+  "children": [
+    {
+      "id": "client-name",
+      "kind": "text",
+      "text": {
+        "bind": "post.fields.client.title"
+      }
+    },
+    {
+      "id": "project-options",
+      "kind": "text",
+      "text": {
+        "bind": "options.announcement"
+      }
+    },
+    {
+      "id": "project-steps",
+      "kind": "repeater",
+      "source": "post.fields.steps",
+      "limit": 5,
+      "children": [
+        {
+          "id": "step-label",
+          "kind": "component",
+          "component": "card",
+          "arguments": {
+            "title": {
+              "bind": "item.label"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "project-gallery",
+      "kind": "gallery",
+      "image": {
+        "bind": "post.fields.gallery"
+      }
+    },
+    {
+      "id": "project-photo",
+      "kind": "image",
+      "image": {
+        "bind": "post.fields.photo"
+      }
+    },
+    {
+      "id": "flexible-sections",
+      "kind": "repeater",
+      "source": "post.fields.sections",
+      "limit": 3,
+      "children": [
+        {
+          "id": "hero-condition",
+          "kind": "condition",
+          "condition": {
+            "op": "eq",
+            "left": {
+              "bind": "item.type"
+            },
+            "right": "hero"
+          },
+          "children": [
+            {
+              "id": "hero-headline",
+              "kind": "text",
+              "text": {
+                "bind": "item.values.headline"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shared-group",
+      "kind": "text",
+      "text": {
+        "bind": "post.fields.shared.headline"
+      }
+    },
+    {
+      "id": "object-count",
+      "kind": "text",
+      "text": {
+        "bind": "post.fields.details.count"
+      }
+    },
+    {
+      "id": "public-identifier",
+      "kind": "text",
+      "text": {
+        "bind": "post.fields.subtitle"
+      }
+    }
+  ]
+}

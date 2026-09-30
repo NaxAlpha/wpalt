@@ -1,0 +1,16 @@
+{
+  "name": "wpalt-admin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "format:check": "prettier --check builder.jsx build.mjs package.json"
+  },
+  "dependencies": {
+    "preact": "11.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "prettier": "3.9.9"
+  }
+}

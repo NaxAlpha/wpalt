@@ -6,6 +6,7 @@ p=argparse.ArgumentParser();p.add_argument('--binary',required=True);p.add_argum
 root=Path(__file__).resolve().parents[1];out=root/args.output;out.mkdir(parents=True,exist_ok=True)
 sha=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
 metadata={'source_commit':sha,'target':args.target,'rustc':subprocess.check_output(['rustc','--version'],text=True).strip(),'cargo':subprocess.check_output(['cargo','--version'],text=True).strip(),'lockfile_sha256':hashlib.sha256((root/'Cargo.lock').read_bytes()).hexdigest(),'binary_sha256':hashlib.sha256(Path(args.binary).read_bytes()).hexdigest(),'workflow_run':os.environ.get('GITHUB_RUN_ID'),'workflow_attempt':os.environ.get('GITHUB_RUN_ATTEMPT'),'build_policy':('fresh runner; empty Cargo and target directories; cargo build --release --locked; no restored build/dependency cache' if os.environ.get('GITHUB_ACTIONS')=='true' else 'local packaging verification; build cleanliness not asserted')}
+metadata['frontend']={'node':subprocess.check_output(['node','--version'],text=True).strip(),'npm':subprocess.check_output(['npm','--version'],text=True).strip(),'lockfile_sha256':hashlib.sha256((root/'frontend/package-lock.json').read_bytes()).hexdigest(),'studio_sha256':hashlib.sha256((root/'assets/generated/builder.js').read_bytes()).hexdigest(),'policy':'npm ci --ignore-scripts; regenerate bundled asset; reject differences from committed generated output'}
 (out/'BUILD.json').write_text(json.dumps(metadata,indent=2)+'\n')
 (out/'INSTALL.md').write_text('''# wpalt development build
 
@@ -21,6 +22,6 @@ compiler. SHA256SUMS verifies archive integrity, not a signature or provenance a
 ''')
 archive=out/f'wpalt-{args.target}-{sha[:12]}.tar.gz'
 with tarfile.open(archive,'w:gz') as tar:
- for source,name in [(Path(args.binary),'wpalt'),(root/'wpalt.example.toml','wpalt.example.toml'),(root/'docs/operations.md','operations.md'),(out/'BUILD.json','BUILD.json'),(out/'INSTALL.md','INSTALL.md')]:tar.add(source,arcname=name)
+ for source,name in [(Path(args.binary),'wpalt'),(root/'wpalt.example.toml','wpalt.example.toml'),(root/'docs/operations.md','operations.md'),(root/'docs/theme-authoring.md','theme-authoring.md'),(out/'BUILD.json','BUILD.json'),(out/'INSTALL.md','INSTALL.md'),(root/'THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:tar.add(source,arcname=name)
 (out/'SHA256SUMS').write_text(hashlib.sha256(archive.read_bytes()).hexdigest()+'  '+archive.name+'\n')
 print('Packaged clean source',sha,'as',archive.name)

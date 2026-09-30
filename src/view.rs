@@ -18,13 +18,13 @@ pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body:
         a class="skip" href="#main" {"Skip to content"}
         @if let Some(s)=session {
             aside class="sidebar" {
-                a class="brand" href="/admin" {span class="brand-mark" {"w"} "wpalt" span class="badge" {"M1"}}
+                a class="brand" href="/admin" {span class="brand-mark" {"w"} "wpalt" span class="badge" {"M2"}}
                 p class="sidebar-note" {"Your site. Your server."}
                 nav aria-label="Administration" {
                     a href="/admin" {"Overview"}
                     @if s.can_edit() {a href="/admin/posts" {"Content"} a href="/admin/media" {"Media library"}}
                     @if s.can_moderate() {a href="/admin/comments" {"Comments"}}
-                    @if s.is_admin() {a href="/admin/settings" {"Site & theme"} a href="/admin/operations" {"Operations"}}
+                    @if s.is_admin() {a href="/admin/builder" {"Design studio"} a href="/admin/settings" {"Site settings"} a href="/admin/operations" {"Operations"}}
                     a href="/" {"View website ↗"}
                 }
                 div class="account" {strong {(s.user.name)} span {(s.user.role)}

@@ -58,6 +58,7 @@ pub async fn initialize(app: &App, email: &str, name: &str, password: &str) -> a
     let s = Settings::default();
     sqlx::query("INSERT INTO settings(id,title,description,theme,navigation,field_schema) VALUES(1,$1,$2,$3,$4,$5)").bind(s.title).bind(s.description).bind(s.theme).bind(s.navigation).bind(s.field_schema).execute(&mut *tx).await?;
     sqlx::query("INSERT INTO users(id,email,name,role,password_hash,created_at) VALUES($1,$2,$3,'admin',$4,$5)").bind(uuid::Uuid::new_v4().to_string()).bind(email.to_ascii_lowercase()).bind(name.trim()).bind(hash).bind(now()).execute(&mut *tx).await?;
+    crate::migrations::initialize_design(&mut tx).await?;
     tx.commit().await?;
     Ok(())
 }

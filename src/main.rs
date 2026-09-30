@@ -55,10 +55,36 @@ enum Command {
         #[arg(long, default_value = "editor")]
         role: String,
     },
+    /// Offline portable theme operations, using the same validation as the studio.
+    Theme {
+        #[command(subcommand)]
+        command: ThemeCommand,
+    },
     /// Populate an initialized empty site with reviewable example content.
     SeedDemo {
         #[arg(long, default_value_t = 8)]
         posts: u32,
+    },
+}
+#[derive(Subcommand)]
+enum ThemeCommand {
+    Import {
+        id: String,
+        input: PathBuf,
+        #[arg(long)]
+        publish: bool,
+    },
+    Export {
+        id: String,
+        output: PathBuf,
+        #[arg(long)]
+        draft: bool,
+    },
+    Publish {
+        id: String,
+    },
+    Activate {
+        id: String,
     },
 }
 fn password() -> anyhow::Result<String> {
@@ -164,6 +190,48 @@ async fn main() -> anyhow::Result<()> {
             auth::add_user(&app, &email, &name, &role, &password()?).await?;
             println!("Account created.");
         }
+        Command::Theme { command } => {
+            use wpalt::{schema, theme};
+            let result: wpalt::error::Result<()> = async {
+                match command {
+                    ThemeCommand::Import { id, input, publish } => {
+                        let file = std::fs::File::open(input)?;
+                        if file.metadata()?.len() > 256 * 1024 {
+                            return Err(wpalt::error::Error::invalid(
+                                "Theme package exceeds 256 KiB.",
+                            ));
+                        }
+                        let mut raw = String::new();
+                        file.take(256 * 1024 + 1).read_to_string(&mut raw)?;
+                        let package =
+                            theme::Package::parse(&raw, &schema::Registry::load(&app).await?)?;
+                        let version: Option<i64> =
+                            sqlx::query_scalar("SELECT version FROM themes WHERE id=$1")
+                                .bind(&id)
+                                .fetch_optional(&app.db.pool)
+                                .await?;
+                        theme::save(&app, &id, package, version.unwrap_or(0), publish).await?;
+                    }
+                    ThemeCommand::Export { id, output, draft } => {
+                        let stored = theme::load(&app, &id, draft).await?;
+                        let bytes = serde_json::to_vec_pretty(&stored.package)
+                            .map_err(|_| wpalt::error::Error::invalid("Invalid theme."))?;
+                        backup::write_private(&output, &bytes).map_err(|_| {
+                            wpalt::error::Error::invalid("Cannot create a new private export file.")
+                        })?;
+                    }
+                    ThemeCommand::Publish { id } => {
+                        let stored = theme::load(&app, &id, true).await?;
+                        theme::save(&app, &id, stored.package, stored.version, true).await?;
+                    }
+                    ThemeCommand::Activate { id } => theme::activate(&app, &id).await?,
+                }
+                Ok(())
+            }
+            .await;
+            result.map_err(|e| anyhow::anyhow!(e.1))?;
+            println!("Theme operation completed.");
+        }
         Command::SeedDemo { posts } => seed(&app, posts).await?,
         Command::Serve => {
             app.db.settings().await.map_err(|_| {
@@ -267,9 +335,9 @@ async fn seed(app: &App, count: u32) -> anyhow::Result<()> {
     sqlx::query("UPDATE settings SET title='The Local Journal',description='Ideas, field notes and a quieter corner of the independent web.',navigation=$1 WHERE id=1").bind(r#"[{"label":"About","url":"/about"}]"#).execute(&app.db.pool).await?;
     for i in 0..count {
         let (title, lead) = stories[i as usize % stories.len()];
-        content::save(app,&s,None,PostInput{title:if i<4{title.into()}else{format!("{title} · {}",i+1)},slug:format!("journal-{}",i+1),kind:"post".into(),body:format!("{lead}\n\n## Room to think\n\nThis is a working wpalt example: structured content, a shared theme and a publishing workflow you can run on your own server.\n\n- Draft and preview before publishing.\n- Keep unfinished changes away from your live pages.\n- Back up your content and take it with you.\n\n> Useful tools should make good work easier.\n\n### What comes next\n\nExplore the administration panel, edit this story, and switch between the Paper and Ink themes."),fields:serde_json::json!({"subtitle":lead,"reading_minutes":3,"featured":i==0}).to_string(),blocks:r#"[{"kind":"callout","text":"Your content. Your server. No vendor account."}]"#.into(),categories:"Field notes".into(),tags:"Independent web, Publishing".into(),version:0,action:"publish".into(),publish_at:0,csrf:String::new()}).await.map_err(|e|anyhow::anyhow!(e.1))?;
+        content::save(app,&s,None,PostInput{title:if i<4{title.into()}else{format!("{title} · {}",i+1)},slug:format!("journal-{}",i+1),kind:"post".into(),body:format!("{lead}\n\n## Room to think\n\nThis is a working wpalt example: structured content, a shared theme and a publishing workflow you can run on your own server.\n\n- Draft and preview before publishing.\n- Keep unfinished changes away from your live pages.\n- Back up your content and take it with you.\n\n> Useful tools should make good work easier.\n\n### What comes next\n\nExplore the administration panel, edit this story, and switch between the Paper and Ink themes."),fields:serde_json::json!({"subtitle":lead,"reading_minutes":3,"featured":i==0}).to_string(),blocks:r#"[{"kind":"callout","text":"Your content. Your server. No vendor account."}]"#.into(),categories:"Field notes".into(),tags:"Independent web, Publishing".into(),taxonomies:"{}".into(),version:0,action:"publish".into(),publish_at:0,csrf:String::new()}).await.map_err(|e|anyhow::anyhow!(e.1))?;
     }
-    content::save(app,&s,None,PostInput{title:"About the journal".into(),slug:"about".into(),kind:"page".into(),body:"# A home for our ideas\n\nThis journal is an example website running entirely on wpalt. It is small by design, with room to grow.\n\nUse the admin panel to change the navigation, theme and content. Everything here stays on your server.".into(),fields:"{}".into(),blocks:"[]".into(),categories:String::new(),tags:String::new(),version:0,action:"publish".into(),publish_at:0,csrf:String::new()}).await.map_err(|e|anyhow::anyhow!(e.1))?;
+    content::save(app,&s,None,PostInput{title:"About the journal".into(),slug:"about".into(),kind:"page".into(),body:"# A home for our ideas\n\nThis journal is an example website running entirely on wpalt. It is small by design, with room to grow.\n\nUse the admin panel to change the navigation, theme and content. Everything here stays on your server.".into(),fields:"{}".into(),blocks:"[]".into(),categories:String::new(),tags:String::new(),taxonomies:"{}".into(),version:0,action:"publish".into(),publish_at:0,csrf:String::new()}).await.map_err(|e|anyhow::anyhow!(e.1))?;
     optimize_bulk(app).await;
     println!("Created {count} stories and an about page.");
     Ok(())

@@ -1,0 +1,26 @@
+
+CREATE TABLE IF NOT EXISTS schema_version(id BIGINT PRIMARY KEY CHECK(id=1), version BIGINT NOT NULL);
+INSERT INTO schema_version(id,version) VALUES(1,1) ON CONFLICT(id) DO NOTHING;
+CREATE TABLE IF NOT EXISTS settings(id BIGINT PRIMARY KEY CHECK(id=1),title TEXT NOT NULL,description TEXT NOT NULL,theme TEXT NOT NULL CHECK(theme IN ('paper','ink')),navigation TEXT NOT NULL,field_schema TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,name TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('admin','editor','moderator','disabled')),password_hash TEXT NOT NULL,created_at BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,csrf TEXT NOT NULL,expires_at BIGINT NOT NULL);
+CREATE INDEX IF NOT EXISTS user_sessions ON sessions(user_id,expires_at);
+CREATE INDEX IF NOT EXISTS session_expiry ON sessions(expires_at);
+CREATE TABLE IF NOT EXISTS posts(id TEXT PRIMARY KEY,slug TEXT NOT NULL UNIQUE,kind TEXT NOT NULL CHECK(kind IN ('post','page')),title TEXT NOT NULL,body TEXT NOT NULL,fields TEXT NOT NULL,blocks TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('draft','published','scheduled')),version BIGINT NOT NULL,published_slug TEXT NOT NULL,published_title TEXT NOT NULL,published_body TEXT NOT NULL,published_fields TEXT NOT NULL,published_blocks TEXT NOT NULL,publish_at BIGINT NOT NULL,published_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,author_id TEXT NOT NULL REFERENCES users(id));
+CREATE UNIQUE INDEX IF NOT EXISTS published_slugs ON posts(published_slug) WHERE published_slug<>'';
+CREATE INDEX IF NOT EXISTS public_posts ON posts(status,published_at DESC,id DESC);
+CREATE INDEX IF NOT EXISTS admin_posts ON posts(updated_at DESC,id DESC);
+CREATE INDEX IF NOT EXISTS scheduled_posts ON posts(publish_at) WHERE status='scheduled';
+CREATE TABLE IF NOT EXISTS revisions(id TEXT PRIMARY KEY,post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,version BIGINT NOT NULL,snapshot TEXT NOT NULL,created_at BIGINT NOT NULL, UNIQUE(post_id,version));
+CREATE INDEX IF NOT EXISTS revision_history ON revisions(post_id,version DESC);
+CREATE TABLE IF NOT EXISTS terms(id TEXT PRIMARY KEY,name TEXT NOT NULL,slug TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('category','tag')),UNIQUE(kind,slug));
+CREATE TABLE IF NOT EXISTS post_terms(post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,term_id TEXT NOT NULL REFERENCES terms(id) ON DELETE CASCADE,PRIMARY KEY(post_id,term_id));
+CREATE TABLE IF NOT EXISTS published_post_terms(post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,term_id TEXT NOT NULL REFERENCES terms(id) ON DELETE CASCADE,PRIMARY KEY(post_id,term_id));
+CREATE INDEX IF NOT EXISTS published_term_posts ON published_post_terms(term_id,post_id);
+CREATE INDEX IF NOT EXISTS term_posts ON post_terms(term_id,post_id);
+CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY,filename TEXT NOT NULL UNIQUE,original_name TEXT NOT NULL,mime TEXT NOT NULL,alt TEXT NOT NULL,visibility TEXT NOT NULL CHECK(visibility IN ('public','private')),size BIGINT NOT NULL,sha256 TEXT NOT NULL,created_at BIGINT NOT NULL);
+CREATE INDEX IF NOT EXISTS recent_media ON media(created_at DESC,id DESC);
+CREATE TABLE IF NOT EXISTS comments(id TEXT PRIMARY KEY,post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,name TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected')),created_at BIGINT NOT NULL);
+CREATE INDEX IF NOT EXISTS public_comments ON comments(post_id,status,created_at);
+CREATE INDEX IF NOT EXISTS pending_comments ON comments(status,created_at);
+CREATE TABLE IF NOT EXISTS comment_limits(client_hash TEXT PRIMARY KEY,last_at BIGINT NOT NULL);

@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-diagnostics-') as tmp:
    opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
    opener.open(urllib.request.Request(origin+'/login',data=urllib.parse.urlencode({'email':'review@example.test','password':password}).encode(),headers={'Origin':origin})).read()
    items=json.load(opener.open(origin+'/api/content'))['items'];id=items[0]['id']
-   for route in ['/','/journal-1','/search?q=publishing','/admin/posts',f'/admin/posts/{id}']:
+   for route in ['/','/journal-1','/search?q=publishing','/admin/posts',f'/admin/posts/{id}','/admin/builder','/api/admin/design']:
     times=[];request_ids=[]
     for _ in range(50):
      start=time.perf_counter()

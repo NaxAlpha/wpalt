@@ -1,0 +1,61 @@
+{
+  "format": 1,
+  "name": "Ink",
+  "tokens": {
+    "background": "#142328",
+    "panel": "#1c3036",
+    "text": "#e9f3ed",
+    "muted": "#afc4bc",
+    "accent": "#88d8b4",
+    "font": "system"
+  },
+  "components": {},
+  "header": {
+    "id": "header",
+    "kind": "navigation"
+  },
+  "footer": {
+    "id": "footer",
+    "kind": "text",
+    "text": {
+      "bind": "site.description"
+    }
+  },
+  "templates": {
+    "home": {
+      "id": "home-layout",
+      "kind": "section",
+      "children": [
+        {
+          "id": "hero-title",
+          "kind": "heading",
+          "text": {
+            "bind": "site.title"
+          },
+          "level": 1
+        },
+        {
+          "id": "hero-description",
+          "kind": "text",
+          "text": {
+            "bind": "site.description"
+          }
+        },
+        {
+          "id": "home",
+          "kind": "collection",
+          "source": "listing"
+        }
+      ]
+    },
+    "search": {
+      "id": "search",
+      "kind": "collection",
+      "source": "listing"
+    },
+    "content": {
+      "id": "content",
+      "kind": "body"
+    }
+  }
+}

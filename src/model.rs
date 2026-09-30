@@ -61,8 +61,7 @@ impl Default for Settings {
             description: "A place for ideas, built on your own server.".into(),
             theme: "paper".into(),
             navigation: "[]".into(),
-            field_schema:
-                r#"{"subtitle":"string","reading_minutes":"number","featured":"boolean"}"#.into(),
+            field_schema: serde_json::to_string(&crate::schema::Definition::initial()).unwrap(),
         }
     }
 }
@@ -117,6 +116,8 @@ pub struct PostInput {
     pub categories: String,
     #[serde(default)]
     pub tags: String,
+    #[serde(default = "empty_object")]
+    pub taxonomies: String,
     #[serde(default)]
     pub version: i64,
     #[serde(default = "save_action")]

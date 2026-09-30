@@ -20,13 +20,6 @@ pub fn valid_slug(slug: &str) -> bool {
         ]
         .contains(&slug)
 }
-fn valid_field_name(name: &str) -> bool {
-    !name.is_empty()
-        && name.len() <= 64
-        && name
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
-}
 pub fn markdown(text: &str) -> String {
     let mut rendered = String::new();
     pulldown_cmark::html::push_html(
@@ -38,7 +31,7 @@ pub fn markdown(text: &str) -> String {
     );
     ammonia::Builder::default().clean(&rendered).to_string()
 }
-fn safe_nav_url(value: &str) -> bool {
+pub(crate) fn safe_nav_url(value: &str) -> bool {
     if value.contains('\\') || value.chars().any(char::is_control) {
         return false;
     }
@@ -56,7 +49,7 @@ pub fn validate_settings(s: &Settings) -> Result<()> {
     if s.title.trim().is_empty()
         || s.title.len() > 200
         || s.description.len() > 1000
-        || !["paper", "ink"].contains(&s.theme.as_str())
+        || !crate::schema::identifier(&s.theme)
     {
         return Err(Error::invalid(
             "Provide a site title, a short description and a supported theme.",
@@ -76,33 +69,19 @@ pub fn validate_settings(s: &Settings) -> Result<()> {
             "Navigation requires safe local paths or HTTP(S) URLs and short labels.",
         ));
     }
-    let schema: Value = serde_json::from_str(&s.field_schema)
-        .map_err(|_| Error::invalid("Field schema must be a JSON object."))?;
-    let Some(schema) = schema.as_object() else {
-        return Err(Error::invalid("Field schema must be an object."));
-    };
-    if schema.len() > 32
-        || schema.iter().any(|(k, v)| {
-            !valid_field_name(k)
-                || !v
-                    .as_str()
-                    .is_some_and(|t| ["string", "number", "boolean"].contains(&t))
-        })
-    {
-        return Err(Error::invalid(
-            "Define up to 32 fields with slug names and string, number or boolean types.",
-        ));
-    }
+    let _: crate::schema::Definition = serde_json::from_str(&s.field_schema)
+        .map_err(|_| Error::invalid("Field definitions must follow the current typed schema."))?;
     Ok(())
 }
 pub fn validate_input(p: &PostInput, s: &Settings) -> Result<()> {
     if p.title.trim().is_empty()
         || p.title.len() > 300
         || !valid_slug(&p.slug)
-        || !["post", "page"].contains(&p.kind.as_str())
+        || !crate::schema::identifier(&p.kind)
         || p.body.len() > 512 * 1024
         || p.fields.len() > 32 * 1024
         || p.blocks.len() > 64 * 1024
+        || p.taxonomies.len() > 16 * 1024
         || p.tags.len() > 2000
         || p.categories.len() > 2000
         || !["save", "autosave", "publish", "schedule", "unpublish"].contains(&p.action.as_str())
@@ -119,23 +98,10 @@ pub fn validate_input(p: &PostInput, s: &Settings) -> Result<()> {
     }
     let fields: Value = serde_json::from_str(&p.fields)
         .map_err(|_| Error::invalid("Fields must be valid JSON."))?;
-    let fields = fields
-        .as_object()
-        .ok_or(Error::invalid("Fields must be an object."))?;
-    let schema: Value = serde_json::from_str(&s.field_schema)
-        .map_err(|_| Error::invalid("Site field schema is invalid."))?;
-    for (name, value) in fields {
-        if !match schema.get(name).and_then(Value::as_str) {
-            Some("string") => value.is_string() && value.as_str().unwrap().len() <= 8000,
-            Some("number") => value.is_number(),
-            Some("boolean") => value.is_boolean(),
-            _ => false,
-        } {
-            return Err(Error::invalid(
-                "A custom field is unknown or does not match its defined type.",
-            ));
-        }
+    if !fields.is_object() {
+        return Err(Error::invalid("Fields must be an object."));
     }
+    let _ = s;
     let blocks: Vec<Block> = serde_json::from_str(&p.blocks)
         .map_err(|_| Error::invalid("Blocks must be a JSON array of kind and text objects."))?;
     if blocks.len() > 100
@@ -176,6 +142,29 @@ pub async fn save(
     let _guard = app.mutations.lock().await;
     let settings = app.db.settings().await?;
     validate_input(&input, &settings)?;
+    let registry = crate::schema::Registry::load(app).await?;
+    let values: Value = serde_json::from_str(&input.fields)
+        .map_err(|_| Error::invalid("Fields must be valid JSON."))?;
+    let fields = registry.fields_for(&input.kind)?;
+    registry.validate_values(&fields, &values)?;
+    registry.validate_references(app, &fields, &values).await?;
+    let custom: std::collections::BTreeMap<String, Vec<String>> =
+        serde_json::from_str(&input.taxonomies)
+            .map_err(|_| Error::invalid("Taxonomies must be an object of term-name arrays."))?;
+    let model = &registry.models[&input.kind];
+    if custom.len() > 16
+        || custom.iter().any(|(kind, names)| {
+            !model.taxonomies.contains_key(kind)
+                || ["category", "tag"].contains(&kind.as_str())
+                || names.len() > 30
+                || names.iter().any(|n| n.trim().is_empty() || n.len() > 100)
+        })
+    {
+        return Err(Error::invalid(
+            "Use declared custom taxonomies with up to 30 short term names.",
+        ));
+    }
+
     let mut tx = app.db.pool.begin().await?;
     let old = if let Some(id) = id {
         Some(
@@ -256,22 +245,37 @@ pub async fn save(
         .bind(&post.id)
         .execute(&mut *tx)
         .await?;
+    let mut all_terms = custom.clone();
     for (kind, names) in [("category", &input.categories), ("tag", &input.tags)] {
-        for name in names.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+        if !names.trim().is_empty() && !model.taxonomies.contains_key(kind) {
+            return Err(Error::invalid("This model does not define that taxonomy."));
+        }
+        all_terms.insert(
+            kind.into(),
+            names
+                .split(',')
+                .map(str::trim)
+                .filter(|n| !n.is_empty())
+                .map(String::from)
+                .collect(),
+        );
+    }
+    for (kind, names) in &all_terms {
+        for name in names {
             let slug = term_slug(name);
             if slug.is_empty() {
                 return Err(Error::invalid(
-                    "Categories and tags need at least one ASCII letter or digit in M1.",
+                    "Term names need at least one ASCII letter or digit.",
                 ));
             }
-            sqlx::query("INSERT INTO terms(id,name,slug,kind) VALUES($1,$2,$3,$4) ON CONFLICT(kind,slug) DO NOTHING").bind(uuid::Uuid::new_v4().to_string()).bind(name).bind(&slug).bind(kind).execute(&mut *tx).await?;
+            sqlx::query("INSERT INTO terms(id,name,slug,kind) VALUES($1,$2,$3,$4) ON CONFLICT(kind,slug) DO NOTHING").bind(uuid::Uuid::new_v4().to_string()).bind(name.trim()).bind(&slug).bind(kind).execute(&mut *tx).await?;
             sqlx::query("INSERT INTO post_terms(post_id,term_id) SELECT $1,id FROM terms WHERE kind=$2 AND slug=$3 ON CONFLICT DO NOTHING").bind(&post.id).bind(kind).bind(slug).execute(&mut *tx).await?;
         }
     }
     if input.action == "publish" {
         copy_terms(&mut tx, &post.id).await?;
     }
-    let snapshot = serde_json::json!({"post":post,"categories":input.categories,"tags":input.tags});
+    let snapshot = serde_json::json!({"post":post,"categories":input.categories,"tags":input.tags,"taxonomies":custom});
     sqlx::query(
         "INSERT INTO revisions(id,post_id,version,snapshot,created_at) VALUES($1,$2,$3,$4,$5)",
     )
@@ -339,8 +343,14 @@ pub async fn publish_due(app: &App) -> Result<usize> {
                     .collect::<Vec<_>>()
                     .join(", ")
             };
-            let snapshot =
-                serde_json::json!({"post":p,"categories":names("category"),"tags":names("tag")});
+            let mut custom = std::collections::BTreeMap::<String, Vec<String>>::new();
+            for row in &terms {
+                let kind: String = row.get("kind");
+                if !["category", "tag"].contains(&kind.as_str()) {
+                    custom.entry(kind).or_default().push(row.get("name"));
+                }
+            }
+            let snapshot = serde_json::json!({"post":p,"categories":names("category"),"tags":names("tag"),"taxonomies":custom});
             sqlx::query("INSERT INTO revisions(id,post_id,version,snapshot,created_at) VALUES($1,$2,$3,$4,$5)").bind(uuid::Uuid::new_v4().to_string()).bind(&p.id).bind(p.version).bind(snapshot.to_string()).bind(now()).execute(&mut *tx).await?;
             sqlx::query("DELETE FROM revisions WHERE post_id=$1 AND version<=$2")
                 .bind(&p.id)
@@ -390,6 +400,10 @@ pub async fn restore_revision(
             blocks: p.blocks,
             categories: v["categories"].as_str().unwrap_or("").into(),
             tags: v["tags"].as_str().unwrap_or("").into(),
+            taxonomies: v
+                .get("taxonomies")
+                .ok_or(Error::invalid("Revision lacks current taxonomy data."))?
+                .to_string(),
             version,
             action: "save".into(),
             publish_at: 0,

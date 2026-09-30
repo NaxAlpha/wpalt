@@ -56,6 +56,19 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     run(config,'init','--admin-email','owner@example.test',password=secret+'\n')
     run(config,'init','--admin-email','owner@example.test',password=secret+'\n',ok=False)
     run(config,'seed-demo','--posts','3')
+    # Portable themes use the same validator and explicit publication as the studio.
+    package_file=root/'paper.json';run(config,'theme','export','paper',str(package_file),'--draft')
+    package=json.loads(package_file.read_text());assert package['format']==1
+    package['name']='Local variant';package['tokens']['accent']='#6c3ce6'
+    imported=root/'variant.json';imported.write_text(json.dumps(package))
+    run(config,'theme','import','variant',str(imported))
+    run(config,'theme','activate','variant',ok=False)
+    run(config,'theme','publish','variant');run(config,'theme','activate','variant')
+    exported=root/'variant-live.json';run(config,'theme','export','variant',str(exported))
+    assert json.loads(exported.read_text())['tokens']['accent']=='#6c3ce6'
+    assert exported.stat().st_mode & 0o077 == 0,'Theme exports must be private'
+    run(config,'theme','activate','paper')
+
     log=root/'server.log'
     with log.open('w') as log_file:
         process=subprocess.Popen([str(binary),'--config',str(config),'serve'],stdout=log_file,stderr=log_file)
@@ -99,4 +112,4 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     logs=log.read_text();assert secret not in logs;assert csrf not in logs
     for cookie in jar:assert cookie.value not in logs
     assert 'request_completed' in logs and 'elapsed_us' in logs and 'login_succeeded' in logs
-    print('PASS: configuration precedence, initialization, process lock, real login, persisted scheduler/restart, RSS XML, private backup, fresh restore and redacted debug logs.')
+    print('PASS: configuration precedence, initialization, process lock, real login, persisted scheduler/restart, RSS XML, portable theme import/export/publication, private backup, fresh restore and redacted debug logs.')

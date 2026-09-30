@@ -76,3 +76,11 @@ Open the successful **Application verification and builds** run under GitHub Act
 “Clean” means no restored compilation/dependency cache or old workspace artifacts. It does not claim byte-identical reproducible builds across toolchains/hosts. A failed check/build produces a failed run rather than a successful clean artifact.
 
 Protocol checked 2026-10-01 against [GitHub push events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push), [job dependencies](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds) and [artifact downloads](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/download-workflow-artifacts).
+
+## M1 to M2 data upgrade
+
+Stop the server and take an independent M1 backup with the M1 executable before replacing it. M2 automatically performs a one-off transactional schema-1 to schema-2 migration on startup/offline commands: working/live content, users, media, terms and revisions remain, typed definitions are converted, themes/options/models are initialized, and SQLite foreign keys/search are checked. PostgreSQL constraints are updated transactionally. After success, only schema 2 is used by ordinary requests. Test the upgrade on a restored copy before applying it to meaningful data.
+
+M2 snapshots use `wpalt-backup-v2` and include models, shared draft/live options, themes and revision histories. Restore into an empty database/data directory only. M1 snapshots must first be restored with M1, then opened by M2. A downgrade is restoration of the independent M1 backup into a fresh target, not opening a schema-2 database with M1. Only explicitly disposable fixtures may be reset. No old-format runtime compatibility parser was added.
+
+Theme package import/export/publication/activation also works through the offline CLI; see [authoring guide](theme-authoring.md). Node/npm are needed to rebuild studio assets during development, never to run a packaged server. Both normal verification and uncached builds regenerate locked frontend assets and reject uncommitted differences before packaging. Packages preserve the binary's executable bit and commit/toolchain/checksum manifest.

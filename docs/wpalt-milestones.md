@@ -6,7 +6,7 @@ Companions: [Product goals](wpalt-product-goals.md) · [Development methodology]
 
 ## Delivery rules
 
-Every milestone delivers a substantial end-user system, building on the previous release. The roadmap describes proposed delivery boundaries, not completed functionality or a fixed schedule. M1 was merged in PR #1; M2–M9 are planned.
+Every milestone delivers a substantial end-user system, building on the previous release. The roadmap describes proposed delivery boundaries, not completed functionality or a fixed schedule. M1 was merged in PR #1; M2 is implemented with local release verification; current-head CI/review status is on PR #3; M3–M9 are planned.
 
 Each milestone follows the same process: prepare and, where useful, refactor the preceding system; define the milestone contract; make each functional step work; verify and optimize each step; integrate and optimize the complete system; deliver a runnable release with evidence. Working correctly includes baseline security and data integrity from the outset.
 
@@ -208,3 +208,11 @@ M1 is complete as a reviewable delivery: functional publishing steps and hardeni
 ### M1 merge and M2 preparation — 2026-10-01
 
 The user authorized merging M1 and proceeding to M2, with automatic clean post-merge builds first. PR #1 merged as `674651d73e178a4f8aca20ab17488059211275f2`. Build-pipeline preparation is documented in operations.md; it supports the milestone delivery process rather than becoming a separate product milestone. M2 starts after its merged-source build is verified.
+
+### M2 active — 2026-10-01
+
+[Build preparation PR #2](https://github.com/NaxAlpha/wpalt/pull/2) merged as `0cce274912ada0e92d51be3e2874088916dbea05`. Its [actual main run](https://github.com/NaxAlpha/wpalt/actions/runs/36778736692) passed all three jobs; the clean archive was downloaded and its source identity/checksums/permissions verified. M2 is active under [its contract](m2-contract.md). M3–M9 remain planned. [M2 delivery PR #3](https://github.com/NaxAlpha/wpalt/pull/3) is open. Its initial implementation passed all three GitHub jobs; final refinements and evidence require current-head verification before ready-for-review status.
+
+### M2 verified local delivery — 2026-10-01
+
+The composable studio, typed authoring, published-data bindings, theme/options publication/history, portable packages and schema-2 upgrade/recovery are implemented. Twelve readable acceptance journeys pass on SQLite and PostgreSQL 17; native release browser/CLI checks pass. Performance, SQL plans, security/data boundaries and remaining capability limits are recorded in [M2 evidence](evidence/m2-verification.md). Final-head CI and user review/merge remain distinct delivery states. M3–M9 remain planned.

@@ -1,0 +1,32 @@
+                                                            QUERY PLAN                                                            
+----------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.28..13.76 rows=20 width=255) (actual time=0.018..0.045 rows=20 loops=1)
+   Buffers: shared hit=22
+   ->  Index Scan using public_posts on posts  (cost=0.28..674.42 rows=1000 width=255) (actual time=0.017..0.043 rows=20 loops=1)
+         Index Cond: (status = 'published'::text)
+         Filter: (kind = 'post'::text)
+         Buffers: shared hit=22
+ Planning:
+   Buffers: shared hit=246
+ Planning Time: 0.662 ms
+ Execution Time: 0.062 ms
+(10 rows)
+
+                                                            QUERY PLAN                                                            
+----------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.28..8.29 rows=1 width=255) (actual time=0.015..0.016 rows=1 loops=1)
+   Buffers: shared hit=3
+   ->  Index Scan using public_model_posts on posts  (cost=0.28..8.29 rows=1 width=255) (actual time=0.015..0.015 rows=1 loops=1)
+         Index Cond: ((kind = 'page'::text) AND (status = 'published'::text))
+         Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=2
+ Planning Time: 0.041 ms
+ Execution Time: 0.023 ms
+(9 rows)
+
+ database_bytes 
+----------------
+       16922291
+(1 row)
+

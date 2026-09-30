@@ -49,15 +49,21 @@ impl Db {
         Ok(Self { pool, postgres })
     }
     pub async fn migrate(&self) -> anyhow::Result<()> {
+        sqlx::query("CREATE TABLE IF NOT EXISTS schema_version(id BIGINT PRIMARY KEY CHECK(id=1),version BIGINT NOT NULL)").execute(&self.pool).await?;
+        let version: Option<i64> =
+            sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
+                .fetch_optional(&self.pool)
+                .await?;
+        if version == Some(1) {
+            crate::migrations::from_m1(self).await?;
+        } else {
+            anyhow::ensure!(
+                version.is_none() || version == Some(2),
+                "unsupported schema version; use the documented migration/reset path"
+            );
+        }
         let mut tx = self.pool.begin().await?;
         sqlx::raw_sql(SCHEMA).execute(&mut *tx).await?;
-        let v: i64 = sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
-            .fetch_one(&mut *tx)
-            .await?;
-        anyhow::ensure!(
-            v == 1,
-            "unsupported schema version; use the documented migration/reset path"
-        );
         if self.postgres {
             sqlx::query("CREATE INDEX IF NOT EXISTS public_search ON posts USING GIN(to_tsvector('simple',published_title || ' ' || published_body)) WHERE status='published'").execute(&mut *tx).await?;
         } else {
@@ -123,20 +129,21 @@ impl Db {
 
 pub const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS schema_version(id BIGINT PRIMARY KEY CHECK(id=1), version BIGINT NOT NULL);
-INSERT INTO schema_version(id,version) VALUES(1,1) ON CONFLICT(id) DO NOTHING;
-CREATE TABLE IF NOT EXISTS settings(id BIGINT PRIMARY KEY CHECK(id=1),title TEXT NOT NULL,description TEXT NOT NULL,theme TEXT NOT NULL CHECK(theme IN ('paper','ink')),navigation TEXT NOT NULL,field_schema TEXT NOT NULL);
+INSERT INTO schema_version(id,version) VALUES(1,2) ON CONFLICT(id) DO NOTHING;
+CREATE TABLE IF NOT EXISTS settings(id BIGINT PRIMARY KEY CHECK(id=1),title TEXT NOT NULL,description TEXT NOT NULL,theme TEXT NOT NULL,navigation TEXT NOT NULL,field_schema TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,name TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('admin','editor','moderator','disabled')),password_hash TEXT NOT NULL,created_at BIGINT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,csrf TEXT NOT NULL,expires_at BIGINT NOT NULL);
 CREATE INDEX IF NOT EXISTS user_sessions ON sessions(user_id,expires_at);
 CREATE INDEX IF NOT EXISTS session_expiry ON sessions(expires_at);
-CREATE TABLE IF NOT EXISTS posts(id TEXT PRIMARY KEY,slug TEXT NOT NULL UNIQUE,kind TEXT NOT NULL CHECK(kind IN ('post','page')),title TEXT NOT NULL,body TEXT NOT NULL,fields TEXT NOT NULL,blocks TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('draft','published','scheduled')),version BIGINT NOT NULL,published_slug TEXT NOT NULL,published_title TEXT NOT NULL,published_body TEXT NOT NULL,published_fields TEXT NOT NULL,published_blocks TEXT NOT NULL,publish_at BIGINT NOT NULL,published_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,author_id TEXT NOT NULL REFERENCES users(id));
+CREATE TABLE IF NOT EXISTS posts(id TEXT PRIMARY KEY,slug TEXT NOT NULL UNIQUE,kind TEXT NOT NULL,title TEXT NOT NULL,body TEXT NOT NULL,fields TEXT NOT NULL,blocks TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('draft','published','scheduled')),version BIGINT NOT NULL,published_slug TEXT NOT NULL,published_title TEXT NOT NULL,published_body TEXT NOT NULL,published_fields TEXT NOT NULL,published_blocks TEXT NOT NULL,publish_at BIGINT NOT NULL,published_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,author_id TEXT NOT NULL REFERENCES users(id));
 CREATE UNIQUE INDEX IF NOT EXISTS published_slugs ON posts(published_slug) WHERE published_slug<>'';
 CREATE INDEX IF NOT EXISTS public_posts ON posts(status,published_at DESC,id DESC);
+CREATE INDEX IF NOT EXISTS public_model_posts ON posts(kind,status,published_at DESC,id DESC);
 CREATE INDEX IF NOT EXISTS admin_posts ON posts(updated_at DESC,id DESC);
 CREATE INDEX IF NOT EXISTS scheduled_posts ON posts(publish_at) WHERE status='scheduled';
 CREATE TABLE IF NOT EXISTS revisions(id TEXT PRIMARY KEY,post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,version BIGINT NOT NULL,snapshot TEXT NOT NULL,created_at BIGINT NOT NULL, UNIQUE(post_id,version));
 CREATE INDEX IF NOT EXISTS revision_history ON revisions(post_id,version DESC);
-CREATE TABLE IF NOT EXISTS terms(id TEXT PRIMARY KEY,name TEXT NOT NULL,slug TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('category','tag')),UNIQUE(kind,slug));
+CREATE TABLE IF NOT EXISTS terms(id TEXT PRIMARY KEY,name TEXT NOT NULL,slug TEXT NOT NULL,kind TEXT NOT NULL,UNIQUE(kind,slug));
 CREATE TABLE IF NOT EXISTS post_terms(post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,term_id TEXT NOT NULL REFERENCES terms(id) ON DELETE CASCADE,PRIMARY KEY(post_id,term_id));
 CREATE TABLE IF NOT EXISTS published_post_terms(post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,term_id TEXT NOT NULL REFERENCES terms(id) ON DELETE CASCADE,PRIMARY KEY(post_id,term_id));
 CREATE INDEX IF NOT EXISTS published_term_posts ON published_post_terms(term_id,post_id);
@@ -146,10 +153,15 @@ CREATE INDEX IF NOT EXISTS recent_media ON media(created_at DESC,id DESC);
 CREATE TABLE IF NOT EXISTS comments(id TEXT PRIMARY KEY,post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,name TEXT NOT NULL,body TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected')),created_at BIGINT NOT NULL);
 CREATE INDEX IF NOT EXISTS public_comments ON comments(post_id,status,created_at);
 CREATE INDEX IF NOT EXISTS pending_comments ON comments(status,created_at);
+CREATE TABLE IF NOT EXISTS content_models(id TEXT PRIMARY KEY,definition TEXT NOT NULL,version BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS site_design(id BIGINT PRIMARY KEY CHECK(id=1),draft_options TEXT NOT NULL,live_options TEXT NOT NULL,version BIGINT NOT NULL,published_version BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS themes(id TEXT PRIMARY KEY,name TEXT NOT NULL,draft TEXT NOT NULL,live TEXT NOT NULL,version BIGINT NOT NULL,published_version BIGINT NOT NULL,updated_at BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS theme_revisions(id TEXT PRIMARY KEY,theme_id TEXT NOT NULL REFERENCES themes(id) ON DELETE CASCADE,version BIGINT NOT NULL,package TEXT NOT NULL,published BIGINT NOT NULL CHECK(published IN (0,1)),created_at BIGINT NOT NULL,UNIQUE(theme_id,version));
+CREATE INDEX IF NOT EXISTS theme_history ON theme_revisions(theme_id,version DESC);
 CREATE TABLE IF NOT EXISTS comment_limits(client_hash TEXT PRIMARY KEY,last_at BIGINT NOT NULL);
 "#;
 
-const SQLITE_SEARCH: &str = r#"
+pub(crate) const SQLITE_SEARCH: &str = r#"
 CREATE VIRTUAL TABLE IF NOT EXISTS post_search USING fts5(id UNINDEXED,title,body);
 CREATE TRIGGER IF NOT EXISTS post_search_insert AFTER INSERT ON posts WHEN new.status='published' BEGIN
  INSERT INTO post_search(id,title,body) VALUES(new.id,new.published_title,new.published_body); END;

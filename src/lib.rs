@@ -1,10 +1,14 @@
 pub mod auth;
 pub mod backup;
+pub mod builder_web;
 pub mod config;
 pub mod content;
 pub mod db;
 pub mod error;
+pub mod migrations;
 pub mod model;
+pub mod schema;
+pub mod theme;
 pub mod view;
 pub mod web;
 
@@ -21,6 +25,7 @@ pub struct App {
     pub request_work: Arc<Semaphore>,
     pub login_limits: Arc<Mutex<auth::LoginLimits>>,
     pub dummy_hash: Arc<String>,
+    pub themes: Arc<Mutex<std::collections::BTreeMap<(String, i64), theme::Package>>>,
 }
 
 impl App {
@@ -44,6 +49,7 @@ impl App {
             request_work: Arc::new(Semaphore::new(requests)),
             login_limits: Arc::new(Mutex::new(auth::LoginLimits::default())),
             dummy_hash: Arc::new(dummy_hash),
+            themes: Arc::new(Mutex::new(std::collections::BTreeMap::new())),
         })
     }
 }
