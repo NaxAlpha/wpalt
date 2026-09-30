@@ -1,7 +1,11 @@
 name: M1 verification
 on:
   push:
+    branches: [main]
   pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -34,19 +38,29 @@ jobs:
       - run: cargo test --locked
       - run: cargo install cargo-audit --locked --version 0.22.2 --root work/tooling
       - run: python3 scripts/audit_dependencies.py --audit-binary work/tooling/bin/cargo-audit
-      - run: cargo build --locked
-      - run: python3 scripts/cli_acceptance.py
+      - run: cargo build --release --locked
+      - run: python3 scripts/cli_acceptance.py --binary target/release/wpalt
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
       - run: npm install --prefix work/browser playwright@1.62.1
       - run: work/browser/node_modules/.bin/playwright install --with-deps chromium
-      - run: PLAYWRIGHT_MODULE="$PWD/work/browser/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - run: WPALT_BINARY="$PWD/target/release/wpalt" PLAYWRIGHT_MODULE="$PWD/work/browser/node_modules/playwright" node scripts/browser_acceptance.cjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: browser-review
           path: work/browser-evidence/*.png
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wpalt-linux-x86_64
+          path: target/release/wpalt
+          retention-days: 7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: dependency-audit
+          path: work/dependency-audit.json
   compiler-floor:
     runs-on: ubuntu-latest
     steps:

@@ -1,6 +1,6 @@
 # M1 contract — usable publishing CMS
 
-Status: functional implementation under verification; delivery PR pending.
+Status: functional implementation locally verified; independent CI finalizing on [delivery PR #1](https://github.com/NaxAlpha/wpalt/pull/1).
 
 M1 delivers an installable Rust application with bundled admin/public assets. A site owner can run a content website on a local machine or single server, using SQLite or PostgreSQL, without a vendor account. This contract refines M1 in the agreed roadmap; it does not claim final WordPress/plugin parity.
 

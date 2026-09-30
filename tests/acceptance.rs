@@ -432,6 +432,56 @@ async fn permissions_csrf_sessions_and_origin_protect_every_write_surface() {
                 .0,
             StatusCode::FORBIDDEN
         );
+        // Role checks protect the infrastructure and other users' write surfaces.
+        for (path, fields) in [
+            ("/admin/backup", vec![("csrf", editor.csrf.as_str())]),
+            (
+                "/admin/users",
+                vec![
+                    ("csrf", editor.csrf.as_str()),
+                    ("email", "new@example.test"),
+                    ("name", "New user"),
+                    ("role", "admin"),
+                    ("password", PASSWORD),
+                ],
+            ),
+            (
+                "/admin/settings",
+                vec![
+                    ("csrf", editor.csrf.as_str()),
+                    ("title", "Denied"),
+                    ("description", ""),
+                    ("theme", "paper"),
+                    ("navigation", "[]"),
+                    ("field_schema", "[]"),
+                ],
+            ),
+            (
+                "/admin/comments/missing",
+                vec![("csrf", editor.csrf.as_str()), ("status", "approved")],
+            ),
+        ] {
+            assert_eq!(
+                form(&site.app, path, Some(&etoken), &fields).await.0,
+                StatusCode::FORBIDDEN,
+                "editor write unexpectedly allowed: {path}"
+            );
+        }
+        assert_eq!(
+            form(
+                &site.app,
+                "/admin/media/missing",
+                Some(&mtoken),
+                &[
+                    ("csrf", &moderator.csrf),
+                    ("alt", "Denied"),
+                    ("visibility", "public")
+                ]
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
         let p = input("csrf-target", "publish");
         let body = serde_json::to_vec(&p).unwrap();
         assert_eq!(

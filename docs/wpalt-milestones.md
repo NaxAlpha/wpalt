@@ -200,3 +200,7 @@ Maintain each milestone's status as planned, active, functional, hardening or co
 For a proposed change, record the affected requirement/milestone, reason, options, consequences and resulting decision. Realign material scope or direction changes with the user. Routine refactors and implementation choices within the agreed goal can proceed with documented reasoning. Update all affected documents after the decision.
 
 Milestone boundaries may be refined or reordered when dependencies are understood. They must continue to deliver substantial end-user outcomes and remain traceable to the final goal.
+
+### M1 delivery record — 2026-09-30
+
+Functional publishing steps and local hardening are verified. [Primary delivery PR #1](https://github.com/NaxAlpha/wpalt/pull/1) is open; independent CI is finalizing. See [M1 contract](m1-contract.md) and [verification evidence](evidence/m1-verification.md). User review and merge are pending. M2–M9 remain planned; no material product-scope change was needed. Architecture, deployment limits and the compiler dependency correction are documented in ADR 0001.

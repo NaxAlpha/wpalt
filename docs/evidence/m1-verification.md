@@ -1,6 +1,6 @@
 # M1 verification and review evidence
 
-Date: 2026-09-30. Scope: [M1 contract](../m1-contract.md). Local verification is complete; delivery and independent Linux/compiler-floor CI are recorded on the primary pull request. This is a publishing CMS milestone, not final WordPress/plugin parity or a production-support release.
+Date: 2026-09-30. Scope: [M1 contract](../m1-contract.md). Local verification is complete; independent Linux/compiler-floor CI is being finalized on [delivery PR #1](https://github.com/NaxAlpha/wpalt/pull/1). This is a publishing CMS milestone, not final WordPress/plugin parity or a production-support release.
 
 ## Review the end-user system
 
@@ -28,9 +28,9 @@ Formatting, strict Clippy, locked release build, evidence freshness/compatibilit
 
 | System | Home p95, c1 / c10 (ms) | Story p95, c1 / c10 (ms) | Search p95, c1 / c10 (ms) |
 |---|---:|---:|---:|
-| wpalt / SQLite | 0.533 / 2.808 | 0.364 / 2.429 | 2.753 / 28.349 |
-| wpalt / PostgreSQL | 2.082 / 10.054 | 4.361 / 39.099 | 6.897 / 27.421 |
-| WordPress reference / MariaDB | 98.421 / 196.745 | 48.148 / 173.974 | 45.077 / 185.859 |
+| wpalt / SQLite | 0.550 / 3.216 | 0.484 / 2.715 | 2.831 / 27.539 |
+| wpalt / PostgreSQL | 1.515 / 7.093 | 2.301 / 11.101 | 2.954 / 10.372 |
+| WordPress reference / MariaDB | 41.131 / 144.594 | 48.812 / 170.472 | 45.345 / 175.643 |
 
 These are fixture observations, not a fair hardware-identical contest or proof of full-platform superiority. HTML/content/plugin scopes differ; VM/network/client overhead and shared development-host activity affect measurements. WordPress has 1,002 published posts versus wpalt's 1,000 stories plus About. Do not calculate universal speed/memory ratios from these runs.
 
@@ -40,7 +40,7 @@ The [initial run](performance-before.json) exposed PostgreSQL search p95 44.615/
 
 [Authoring diagnostics](diagnostics.json) use the release with debug SQL enabled: admin content-list p95 0.755 ms and editor-read p95 0.640 ms across 50 reads. Correlated SQL counts are home/search 2, story 4, library 3, editor 5, without per-item query expansion. This measures HTTP reads, not typing/render latency; the browser journey verifies actual autosave feedback and interaction. Debug search p95 19.438 ms illustrates why release/non-debug and debug measurements must stay distinct.
 
-The executable is approximately 9.44 MiB, with bundled CSS/JS and no runtime Node/PHP dependency. Native wpalt RSS after public load was 45.62 MiB SQLite / 24.09 MiB PostgreSQL; external database memory is excluded. Separate debug/authoring diagnostics observed idle initialized RSS 30.80 MiB and active-after-read RSS 36.00 MiB. SQLite fixture database/WAL footprint was 12.94 MiB (no uploaded images). PostgreSQL public table/index total was 8,757,248 bytes, excluding global DB/server/VM overhead. WordPress core/theme/plugin source tree was 164,048 KiB and its MariaDB table/index total 2,981,888 bytes; these are different storage boundaries and include neither complete installation dependencies nor image data.
+The executable is approximately 9.44 MiB, with bundled CSS/JS and no runtime Node/PHP dependency. Native wpalt RSS after public load was 45.77 MiB SQLite / 31.25 MiB PostgreSQL; external database memory is excluded. Separate debug/authoring diagnostics observed idle initialized RSS 30.80 MiB and active-after-read RSS 36.00 MiB. SQLite fixture database/WAL footprint was 12.93 MiB (no uploaded images). PostgreSQL public table/index total was 8,757,248 bytes, excluding global DB/server/VM overhead. WordPress core/theme/plugin source tree was 164,048 KiB and its MariaDB table/index total 2,981,888 bytes; these are different storage boundaries and include neither complete installation dependencies nor image data.
 
 M1 reference regression budgets, requiring the same fixture/environment and a documented rerun rather than flaky correctness assertions: non-debug warm p95 <10 ms at c1 and <50 ms at c10 for the measured public routes; native app RSS <80 MiB excluding external databases; release binary <15 MiB; SQLite fixture files <25 MiB excluding media/logs/build caches. They are review targets for this dataset, not guarantees on every machine/configuration. Explain changes before adjusting budgets.
 

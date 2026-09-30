@@ -6,7 +6,7 @@
   },
   "posts_requested": 1000,
   "requests_per_scenario": 200,
-  "binary_bytes": 9899552,
+  "binary_bytes": 9899600,
   "conditions": "Full uncompressed HTML document; warm application; no browser asset/render timing; no application response cache; localhost; Python HTTP client overhead included.",
   "profiles": [
     {
@@ -15,11 +15,11 @@
       "endpoint": "home",
       "concurrency": 1,
       "requests": 200,
-      "p50_ms": 0.401,
-      "p95_ms": 0.533,
-      "p99_ms": 0.581,
-      "requests_per_second": 2243.9,
-      "document_bytes": 9603
+      "p50_ms": 0.455,
+      "p95_ms": 0.55,
+      "p99_ms": 0.639,
+      "requests_per_second": 1992.9,
+      "document_bytes": 9542
     },
     {
       "system": "wpalt",
@@ -27,11 +27,11 @@
       "endpoint": "home",
       "concurrency": 10,
       "requests": 200,
-      "p50_ms": 2.115,
-      "p95_ms": 2.808,
-      "p99_ms": 3.214,
-      "requests_per_second": 4479.9,
-      "document_bytes": 9603
+      "p50_ms": 2.17,
+      "p95_ms": 3.216,
+      "p99_ms": 3.659,
+      "requests_per_second": 4275.8,
+      "document_bytes": 9542
     },
     {
       "system": "wpalt",
@@ -39,10 +39,10 @@
       "endpoint": "story",
       "concurrency": 1,
       "requests": 200,
-      "p50_ms": 0.297,
-      "p95_ms": 0.364,
-      "p99_ms": 0.45,
-      "requests_per_second": 3191.0,
+      "p50_ms": 0.328,
+      "p95_ms": 0.484,
+      "p99_ms": 0.635,
+      "requests_per_second": 2790.3,
       "document_bytes": 2423
     },
     {
@@ -51,10 +51,10 @@
       "endpoint": "story",
       "concurrency": 10,
       "requests": 200,
-      "p50_ms": 1.541,
-      "p95_ms": 2.429,
-      "p99_ms": 2.594,
-      "requests_per_second": 5884.9,
+      "p50_ms": 1.617,
+      "p95_ms": 2.715,
+      "p99_ms": 3.203,
+      "requests_per_second": 5409.1,
       "document_bytes": 2423
     },
     {
@@ -63,11 +63,11 @@
       "endpoint": "search",
       "concurrency": 1,
       "requests": 200,
-      "p50_ms": 2.313,
-      "p95_ms": 2.753,
-      "p99_ms": 2.902,
-      "requests_per_second": 420.6,
-      "document_bytes": 9632
+      "p50_ms": 2.297,
+      "p95_ms": 2.831,
+      "p99_ms": 3.316,
+      "requests_per_second": 417.3,
+      "document_bytes": 9571
     },
     {
       "system": "wpalt",
@@ -75,11 +75,11 @@
       "endpoint": "search",
       "concurrency": 10,
       "requests": 200,
-      "p50_ms": 22.713,
-      "p95_ms": 28.349,
-      "p99_ms": 29.401,
-      "requests_per_second": 419.3,
-      "document_bytes": 9632
+      "p50_ms": 20.684,
+      "p95_ms": 27.539,
+      "p99_ms": 27.842,
+      "requests_per_second": 436.8,
+      "document_bytes": 9571
     },
     {
       "system": "wpalt",
@@ -87,11 +87,11 @@
       "endpoint": "home",
       "concurrency": 1,
       "requests": 200,
-      "p50_ms": 1.406,
-      "p95_ms": 2.082,
-      "p99_ms": 2.546,
-      "requests_per_second": 670.1,
-      "document_bytes": 9611
+      "p50_ms": 1.382,
+      "p95_ms": 1.515,
+      "p99_ms": 1.823,
+      "requests_per_second": 710.5,
+      "document_bytes": 9534
     },
     {
       "system": "wpalt",
@@ -99,11 +99,11 @@
       "endpoint": "home",
       "concurrency": 10,
       "requests": 200,
-      "p50_ms": 7.724,
-      "p95_ms": 10.054,
-      "p99_ms": 12.708,
-      "requests_per_second": 1239.9,
-      "document_bytes": 9611
+      "p50_ms": 5.403,
+      "p95_ms": 7.093,
+      "p99_ms": 12.366,
+      "requests_per_second": 1730.5,
+      "document_bytes": 9534
     },
     {
       "system": "wpalt",
@@ -111,10 +111,10 @@
       "endpoint": "story",
       "concurrency": 1,
       "requests": 200,
-      "p50_ms": 2.626,
-      "p95_ms": 4.361,
-      "p99_ms": 10.061,
-      "requests_per_second": 333.6,
+      "p50_ms": 2.016,
+      "p95_ms": 2.301,
+      "p99_ms": 2.541,
+      "requests_per_second": 486.2,
       "document_bytes": 2423
     },
     {
@@ -123,10 +123,10 @@
       "endpoint": "story",
       "concurrency": 10,
       "requests": 200,
-      "p50_ms": 16.197,
-      "p95_ms": 39.099,
-      "p99_ms": 41.113,
-      "requests_per_second": 460.7,
+      "p50_ms": 10.017,
+      "p95_ms": 11.101,
+      "p99_ms": 11.278,
+      "requests_per_second": 982.6,
       "document_bytes": 2423
     },
     {
@@ -135,11 +135,11 @@
       "endpoint": "search",
       "concurrency": 1,
       "requests": 200,
-      "p50_ms": 3.532,
-      "p95_ms": 6.897,
-      "p99_ms": 10.559,
-      "requests_per_second": 244.0,
-      "document_bytes": 9668
+      "p50_ms": 2.642,
+      "p95_ms": 2.954,
+      "p99_ms": 3.049,
+      "requests_per_second": 376.4,
+      "document_bytes": 9563
     },
     {
       "system": "wpalt",
@@ -147,11 +147,11 @@
       "endpoint": "search",
       "concurrency": 10,
       "requests": 200,
-      "p50_ms": 17.815,
-      "p95_ms": 27.421,
-      "p99_ms": 33.251,
-      "requests_per_second": 521.3,
-      "document_bytes": 9668
+      "p50_ms": 9.241,
+      "p95_ms": 10.372,
+      "p99_ms": 11.141,
+      "requests_per_second": 1065.1,
+      "document_bytes": 9563
     },
     {
       "system": "wordpress-reference",
@@ -159,10 +159,10 @@
       "endpoint": "home",
       "concurrency": 1,
       "requests": 200,
-      "p50_ms": 42.161,
-      "p95_ms": 98.421,
-      "p99_ms": 106.758,
-      "requests_per_second": 19.2,
+      "p50_ms": 38.78,
+      "p95_ms": 41.131,
+      "p99_ms": 42.946,
+      "requests_per_second": 25.5,
       "document_bytes": 101595
     },
     {
@@ -171,10 +171,10 @@
       "endpoint": "home",
       "concurrency": 10,
       "requests": 200,
-      "p50_ms": 123.145,
-      "p95_ms": 196.745,
-      "p99_ms": 240.765,
-      "requests_per_second": 78.0,
+      "p50_ms": 117.835,
+      "p95_ms": 144.594,
+      "p99_ms": 196.737,
+      "requests_per_second": 84.9,
       "document_bytes": 101595
     },
     {
@@ -183,10 +183,10 @@
       "endpoint": "story",
       "concurrency": 1,
       "requests": 200,
-      "p50_ms": 45.901,
-      "p95_ms": 48.148,
-      "p99_ms": 50.446,
-      "requests_per_second": 21.6,
+      "p50_ms": 45.613,
+      "p95_ms": 48.812,
+      "p99_ms": 73.596,
+      "requests_per_second": 21.5,
       "document_bytes": 69979
     },
     {
@@ -195,10 +195,10 @@
       "endpoint": "story",
       "concurrency": 10,
       "requests": 200,
-      "p50_ms": 133.747,
-      "p95_ms": 173.974,
-      "p99_ms": 201.523,
-      "requests_per_second": 74.3,
+      "p50_ms": 131.672,
+      "p95_ms": 170.472,
+      "p99_ms": 186.643,
+      "requests_per_second": 75.4,
       "document_bytes": 69979
     },
     {
@@ -207,10 +207,10 @@
       "endpoint": "search",
       "concurrency": 1,
       "requests": 200,
-      "p50_ms": 43.511,
-      "p95_ms": 45.077,
-      "p99_ms": 46.628,
-      "requests_per_second": 22.9,
+      "p50_ms": 43.08,
+      "p95_ms": 45.345,
+      "p99_ms": 47.129,
+      "requests_per_second": 23.0,
       "document_bytes": 110520
     },
     {
@@ -219,20 +219,20 @@
       "endpoint": "search",
       "concurrency": 10,
       "requests": 200,
-      "p50_ms": 124.615,
-      "p95_ms": 185.859,
-      "p99_ms": 199.864,
-      "requests_per_second": 77.0,
+      "p50_ms": 123.735,
+      "p95_ms": 175.643,
+      "p99_ms": 186.096,
+      "requests_per_second": 78.7,
       "document_bytes": 110520
     }
   ],
   "runtime": {
     "sqlite": {
-      "rss_after_load_bytes": 47841280,
-      "site_files_bytes": 13566416
+      "rss_after_load_bytes": 47988736,
+      "site_files_bytes": 13562320
     },
     "postgres": {
-      "rss_after_load_bytes": 25264128,
+      "rss_after_load_bytes": 32768000,
       "site_files_bytes": 0
     }
   }
