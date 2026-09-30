@@ -1,6 +1,6 @@
 # M2 verification
 
-Date: 2026-10-01. Status: local release verification passed; final PR-head CI pending; no claim of whole WordPress/plugin parity.
+Date: 2026-10-01. Status: local release verification passed; current-head GitHub verification is recorded on PR #3; no claim of whole WordPress/plugin parity.
 
 M1 PR #1 and preparation PR #2 are merged. The actual merged clean build was downloaded and checked: [record](clean-build-verification.json). M2 extends the same pipeline to rebuild its locked frontend and reject stale bundled output before producing the Rust artifact.
 
@@ -41,4 +41,4 @@ Application RSS after load was 51,101,696 / 35,192,832 bytes; SQLite site files 
 
 Regression review budgets on this same local fixture are home concurrency-1 p95 below 10 ms SQLite / 20 ms PostgreSQL, studio state below 20 ms, bundled studio below 100 KiB raw, and native executable below 20 MiB. These are review triggers requiring investigation under comparable conditions, not timing assertions or claims about other hardware.
 
-The initial implementation commit `4ddb3f8dff0a5f6784123132a69f636f9889bf58` passed all three [GitHub jobs](https://github.com/NaxAlpha/wpalt/actions/runs/36788759309). Final refinements add atomic schema snapshots, typed literals/binding checks, ordinary UUID-string rendering and a real simultaneous-theme-writer journey. The final source head must pass the same pipeline before [PR #3](https://github.com/NaxAlpha/wpalt/pull/3) is marked ready.
+The initial implementation commit `4ddb3f8dff0a5f6784123132a69f636f9889bf58` passed all three [GitHub jobs](https://github.com/NaxAlpha/wpalt/actions/runs/36788759309). Final refinements add atomic schema snapshots, typed literals/binding checks, ordinary UUID-string rendering and a real simultaneous-theme-writer journey. Current-head results and clean artifacts are linked from [PR #3](https://github.com/NaxAlpha/wpalt/pull/3); the PR is marked ready only after all three jobs pass and its clean archive identity/checksums are verified. PR review and merge remain separate states.
