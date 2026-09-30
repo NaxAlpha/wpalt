@@ -1,10 +1,10 @@
-name: M1 verification
+name: Application verification and builds
 on:
   push:
     branches: [main]
   pull_request:
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -61,6 +61,36 @@ jobs:
         with:
           name: dependency-audit
           path: work/dependency-audit.json
+  clean-build:
+    needs: [application, compiler-floor]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Select fresh build directories
+        run: |
+          echo "CARGO_HOME=$RUNNER_TEMP/wpalt-clean-cargo" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/wpalt-clean-target" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.98.1
+      - name: Verify fresh build directories
+        run: |
+          test ! -e "$CARGO_TARGET_DIR"
+          test ! -e "$CARGO_HOME/registry"
+      - name: Build merged source without restored caches
+        run: cargo build --release --locked --target x86_64-unknown-linux-gnu
+      - name: Verify the clean executable through install and recovery
+        run: python3 scripts/cli_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
+      - name: Package source identity, executable and checksums
+        run: python3 scripts/package_build.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --target x86_64-unknown-linux-gnu
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wpalt-clean-linux-x86_64-${{ github.sha }}
+          path: |
+            work/distribution/*.tar.gz
+            work/distribution/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 90
   compiler-floor:
     runs-on: ubuntu-latest
     steps:

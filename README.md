@@ -22,6 +22,8 @@ Initialization reads the password from stdin. Use a private pipe/password manage
 
 Configuration follows CLI > supported environment variables > explicitly selected TOML > defaults. The admin panel controls site content/design. `wpalt config` reports validated, redacted infrastructure configuration.
 
+[Automatic clean post-merge builds and downloads](docs/operations.md#automatic-clean-builds-after-merge) are documented in operations.
+
 ## Review M1
 
 - [Contract and deployment boundaries](docs/m1-contract.md)

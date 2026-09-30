@@ -6,7 +6,7 @@ Companions: [Product goals](wpalt-product-goals.md) · [Development methodology]
 
 ## Delivery rules
 
-Every milestone delivers a substantial end-user system, building on the previous release. The roadmap describes proposed delivery boundaries, not completed functionality or a fixed schedule. M1 is delivered in PR #1 and awaits user review/merge; M2–M9 are planned.
+Every milestone delivers a substantial end-user system, building on the previous release. The roadmap describes proposed delivery boundaries, not completed functionality or a fixed schedule. M1 was merged in PR #1; M2–M9 are planned.
 
 Each milestone follows the same process: prepare and, where useful, refactor the preceding system; define the milestone contract; make each functional step work; verify and optimize each step; integrate and optimize the complete system; deliver a runnable release with evidence. Working correctly includes baseline security and data integrity from the outset.
 
@@ -204,3 +204,7 @@ Milestone boundaries may be refined or reordered when dependencies are understoo
 ### M1 delivery record — 2026-09-30
 
 M1 is complete as a reviewable delivery: functional publishing steps and hardening are verified. [Primary delivery PR #1](https://github.com/NaxAlpha/wpalt/pull/1) is open; current-head CI must be green before marking the PR ready. Independent Linux application and Rust 1.85 compiler-floor jobs have passed; their current results remain visible on the PR. See [M1 contract](m1-contract.md) and [verification evidence](evidence/m1-verification.md). User review and merge are pending. M2–M9 remain planned; no material product-scope change was needed. Architecture, deployment limits and the compiler dependency correction are documented in ADR 0001.
+
+### M1 merge and M2 preparation — 2026-10-01
+
+The user authorized merging M1 and proceeding to M2, with automatic clean post-merge builds first. PR #1 merged as `674651d73e178a4f8aca20ab17488059211275f2`. Build-pipeline preparation is documented in operations.md; it supports the milestone delivery process rather than becoming a separate product milestone. M2 starts after its merged-source build is verified.
