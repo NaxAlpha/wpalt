@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md; WordPress core gaps are refined at milestone specification.",
-  "milestone": "M1",
+  "milestone": "M2",
   "capabilities": [
     {
       "id": "F001",
@@ -71,57 +71,63 @@
       "milestone": "M2",
       "status": "planned",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "completion_limits": "M2 covers drafts/preview and safe theme publication; editorial approval policies remain later workflow work."
     },
     {
       "id": "F008",
       "cluster": "content",
       "capability": "Manual language variants and strings",
       "deployment": "L",
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "planned",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained."
     },
     {
       "id": "F009",
       "cluster": "content",
       "capability": "Translation duplication / synchronization",
       "deployment": "L",
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "planned",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained."
     },
     {
       "id": "F010",
       "cluster": "content",
       "capability": "Multilingual slugs and metadata",
       "deployment": "L",
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "planned",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained."
     },
     {
       "id": "F011",
       "cluster": "content",
       "capability": "Automatic translation with local models",
       "deployment": "W",
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "planned",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained."
     },
     {
       "id": "F012",
       "cluster": "content",
       "capability": "Vendor automatic translation / human network",
       "deployment": "E",
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "optional-connector-or-external-boundary",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained."
     },
     {
       "id": "F013",
@@ -181,7 +187,8 @@
       "milestone": "M2",
       "status": "planned",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "completion_limits": "M2 covers validated conditional rendering; membership/protected-content authorization remains M5 and cannot be replaced by hiding nodes."
     },
     {
       "id": "F019",
@@ -191,7 +198,8 @@
       "milestone": "M2",
       "status": "planned",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "completion_limits": "M2 covers controlled styles/tokens and approved local media; arbitrary executable assets/custom CSS require the M8 extension boundary."
     },
     {
       "id": "F020",
@@ -208,10 +216,11 @@
       "cluster": "design",
       "capability": "Collaborative notes and assignments",
       "deployment": "L",
-      "milestone": "M2",
+      "milestone": "M4",
       "status": "planned",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "sequencing_reason": "Collaborative assignments belong to the later workflow platform; requirement retained."
     },
     {
       "id": "F022",
@@ -228,20 +237,22 @@
       "cluster": "design",
       "capability": "AI layout/content generation locally",
       "deployment": "W",
-      "milestone": "M2",
+      "milestone": "M8",
       "status": "planned",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "sequencing_reason": "Local AI worker integrations and Elementor import/output mapping belong to extensibility/migration; no PHP plugin runtime compatibility is assumed. Requirement retained for explicit reconciliation."
     },
     {
       "id": "F024",
       "cluster": "design",
       "capability": "Exact Elementor template/widget compatibility",
       "deployment": "L",
-      "milestone": "M2",
+      "milestone": "M8",
       "status": "planned",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "sequencing_reason": "Local AI worker integrations and Elementor import/output mapping belong to extensibility/migration; no PHP plugin runtime compatibility is assumed. Requirement retained for explicit reconciliation."
     },
     {
       "id": "F025",

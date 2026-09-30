@@ -208,3 +208,7 @@ M1 is complete as a reviewable delivery: functional publishing steps and hardeni
 ### M1 merge and M2 preparation — 2026-10-01
 
 The user authorized merging M1 and proceeding to M2, with automatic clean post-merge builds first. PR #1 merged as `674651d73e178a4f8aca20ab17488059211275f2`. Build-pipeline preparation is documented in operations.md; it supports the milestone delivery process rather than becoming a separate product milestone. M2 starts after its merged-source build is verified.
+
+### M2 active — 2026-10-01
+
+[Build preparation PR #2](https://github.com/NaxAlpha/wpalt/pull/2) merged as `0cce274912ada0e92d51be3e2874088916dbea05`. Its [actual main run](https://github.com/NaxAlpha/wpalt/actions/runs/36778736692) passed all three jobs; the clean archive was downloaded and its source identity/checksums/permissions verified. M2 is active under [its contract](m2-contract.md). M3–M9 remain planned. M2's primary delivery PR will be created when its substantial system is concrete and reviewable.

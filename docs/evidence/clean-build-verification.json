@@ -1,0 +1,29 @@
+{
+  "verified_at": "2026-10-01",
+  "m1_merge": "674651d73e178a4f8aca20ab17488059211275f2",
+  "pipeline_merge": "0cce274912ada0e92d51be3e2874088916dbea05",
+  "pipeline_pr": "https://github.com/NaxAlpha/wpalt/pull/2",
+  "run_url": "https://github.com/NaxAlpha/wpalt/actions/runs/36778736692",
+  "status": "success",
+  "downloaded_archive_sha256": "c07d32a4435f6613d4cea8117c6070fcd783e0e09f618f7fe87858bca901be3b",
+  "package": {
+    "source_commit": "0cce274912ada0e92d51be3e2874088916dbea05",
+    "target": "x86_64-unknown-linux-gnu",
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+    "lockfile_sha256": "ae8d770646f43e6e7818cc765794ccf0b5bc0bb3231a78acd354801691b529f7",
+    "binary_sha256": "b17dab6177fa3a36fe38d9acf0df391d95edc65da42240b76c6fb6895ce75e0b",
+    "workflow_run": "36778736692",
+    "workflow_attempt": "1",
+    "build_policy": "fresh runner; empty Cargo and target directories; cargo build --release --locked; no restored build/dependency cache"
+  },
+  "verification": [
+    "fresh Cargo/target preflight",
+    "locked clean compile",
+    "actual release install/restart/recovery",
+    "downloaded archive checksum",
+    "binary and lockfile checksum",
+    "merged source identity",
+    "executable permissions"
+  ]
+}
