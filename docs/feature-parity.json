@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "core_baseline": "m1-contract.md; WordPress core gaps are refined at milestone specification.",
+  "core_baseline": "m1-contract.md + m2-contract.md; whole plugin groups are not blanket parity claims.",
   "milestone": "M2",
   "capabilities": [
     {
@@ -9,9 +9,16 @@
       "capability": "Custom types and taxonomies",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Installed custom models and model taxonomies; shared draft/live term joins, schema preflight and structured authoring. Taxonomy hierarchy/configurable taxonomy archives remain later refinements.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F002",
@@ -19,9 +26,16 @@
       "capability": "Typed custom fields and relationships",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Shared/model primitive, media and relationship fields; required/type/target validation and batched published relationship resolution. Not every ACF/Pods field type is claimed.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F003",
@@ -29,9 +43,16 @@
       "capability": "Repeaters, galleries and clone groups",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Bounded nested repeaters, image galleries and reusable field groups; group reuse shares definitions rather than copying records.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F004",
@@ -39,9 +60,16 @@
       "capability": "Flexible content / reusable block schemas",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Flexible typed variant/group sections, nested values and reusable parameterized compositions. Arbitrary custom block JavaScript is outside the graph.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F005",
@@ -49,9 +77,16 @@
       "capability": "Global options / settings pages",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Shared typed options with independent draft/live snapshots, authoring widgets and explicit publication.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F006",
@@ -59,9 +94,16 @@
       "capability": "Content revisions and rollback",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Content revisions preserved; bounded theme revisions restore to a draft with optimistic concurrency. Schema changes need explicit data migrations.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F007",
@@ -69,10 +111,17 @@
       "capability": "Drafts, preview and editorial approval",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "completion_limits": "M2 covers drafts/preview and safe theme publication; editorial approval policies remain later workflow work."
+      "completion_limits": "M2 covers drafts/preview and safe theme publication; editorial approval policies remain later workflow work.",
+      "m2_coverage": "Private content/theme previews and safe publication; editorial approval policy is later workflow work.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F008",
@@ -135,9 +184,16 @@
       "capability": "Responsive blocks and layout primitives",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Responsive grid/row/stack, controlled spacing/width/colors, semantic heading levels and desktop/mobile studio previews; no arbitrary CSS execution.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F014",
@@ -145,9 +201,16 @@
       "capability": "Theme-wide templates and dynamic field bindings",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Home/search/content/model templates, typed/dynamic bindings, model collections and repeater/relationship rendering through one server engine.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F015",
@@ -155,9 +218,16 @@
       "capability": "Reusable patterns and design tokens",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Parameterized reusable components and six global color/font tokens; no remote pattern marketplace required.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F016",
@@ -165,9 +235,16 @@
       "capability": "Header, footer and navigation builder",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Compose shared header/footer/navigation nodes; navigation items use local site settings. Mega-menu/hierarchical navigation is not claimed.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F017",
@@ -175,9 +252,16 @@
       "capability": "Tabs, accordions, galleries and carousels",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Keyboard progressive tabs, native details accordion, gallery and horizontally scrollable scroll-snap carousel. No automatic carousel rotation or full WCAG certification.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F018",
@@ -185,10 +269,17 @@
       "capability": "Conditional / protected presentation",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "completion_limits": "M2 covers validated conditional rendering; membership/protected-content authorization remains M5 and cannot be replaced by hiding nodes."
+      "completion_limits": "M2 covers validated conditional rendering; membership/protected-content authorization remains M5 and cannot be replaced by hiding nodes.",
+      "m2_coverage": "Bounded scalar/comparison/all/any/not predicates on public/typed contexts; conditional visibility does not grant membership authorization (M5).",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F019",
@@ -196,10 +287,17 @@
       "capability": "Custom CSS and approved asset insertion",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "completion_limits": "M2 covers controlled styles/tokens and approved local media; arbitrary executable assets/custom CSS require the M8 extension boundary."
+      "completion_limits": "M2 covers controlled styles/tokens and approved local media; arbitrary executable assets/custom CSS require the M8 extension boundary.",
+      "m2_coverage": "Controlled responsive styles/tokens and permission-aware uploaded images; freeform CSS and executable asset insertion remain M8 extension work.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F020",
@@ -207,9 +305,16 @@
       "capability": "Template import/export and cross-site reuse",
       "deployment": "L",
       "milestone": "M2",
-      "status": "planned",
+      "status": "implemented-defined-M2-scope; verification-in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m2_coverage": "Portable declarative JSON import/export in studio and offline CLI; validates installed model/field/component dependencies, does not silently bundle a site database/media.",
+      "evidence": [
+        "m2-contract.md",
+        "evidence/m2-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F021",

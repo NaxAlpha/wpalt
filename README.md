@@ -1,6 +1,6 @@
 # wpalt
 
-An owner-controlled Rust CMS with a bundled admin panel and public website. M1 delivers a usable publishing system on SQLite or PostgreSQL, with no vendor account or external runtime services.
+An owner-controlled Rust CMS with a bundled admin panel and public website. M2 adds a composable website builder to the publishing system on SQLite or PostgreSQL, with no vendor account or external runtime services.
 
 Create posts and pages, keep drafts separate from live content, autosave, preview, restore revisions and schedule publication. Manage images, typed fields, basic compositions, navigation, Paper/Ink themes, moderated comments and local search. Export content, download a consistent manual backup and recover into a fresh database, including across database engines.
 
@@ -8,9 +8,11 @@ Create posts and pages, keep drafts separate from live content, autosave, previe
 
 ## Run
 
-Rust 1.85 or newer is the declared build floor, verified by CI. Build once; the resulting server requires no Cargo, Node or PHP at runtime.
+Rust 1.85 or newer is the declared build floor, verified by CI. Node/npm are frontend development tools; the resulting server requires no Cargo, Node or PHP at runtime.
 
 ```sh
+npm ci --prefix frontend --ignore-scripts
+npm --prefix frontend run build
 cargo build --release --locked
 cp wpalt.example.toml wpalt.local.toml
 ./target/release/wpalt --config wpalt.local.toml init --admin-email you@example.com
@@ -24,9 +26,10 @@ Configuration follows CLI > supported environment variables > explicitly selecte
 
 [Automatic clean post-merge builds and downloads](docs/operations.md#automatic-clean-builds-after-merge) are documented in operations.
 
-## Review M1
+## Review the delivered systems
 
-- [Contract and deployment boundaries](docs/m1-contract.md)
+- [M2 builder contract](docs/m2-contract.md), [authoring guide](docs/theme-authoring.md) and [M2 evidence](docs/evidence/m2-verification.md)
+- [M1 contract and deployment boundaries](docs/m1-contract.md)
 - [Verification, performance, security and reference evidence](docs/evidence/m1-verification.md)
 - [Readable acceptance journeys](tests/acceptance.rs), [real browser workflow](scripts/browser_acceptance.cjs), [CLI recovery journey](scripts/cli_acceptance.py)
 - [Architecture decision](docs/decisions/0001-m1-architecture.md)
@@ -41,4 +44,4 @@ Configuration follows CLI > supported environment variables > explicitly selecte
 - [132 researched capability groups and remaining milestone assignments](docs/feature-parity.json)
 - [Current feature guidance](docs/evidence/feature-guidance.json) and [freshness gate](scripts/check_protocols.py)
 
-M1–M8 are pre-adoption development. M1 provides basic themes/composition; the advanced builder is M2. Full WordPress/plugin parity and multi-server operation remain later milestones. M1 operates one application process per site/data directory, with manual unencrypted backups and fresh-target restore. Licensing is not yet selected. No WordPress or plugin implementation code is incorporated.
+M1–M8 are pre-adoption development. M2 provides typed models, parameterized reusable components, responsive templates, relational/repeater bindings, options and theme publication through a bundled studio. Full WordPress/plugin parity and multi-server operation remain later milestones. M1 operates one application process per site/data directory, with manual unencrypted backups and fresh-target restore. Licensing is not yet selected. No WordPress or plugin implementation code is incorporated.

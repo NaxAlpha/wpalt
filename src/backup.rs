@@ -26,6 +26,43 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
         ],
     ),
     (
+        "content_models",
+        &[("id", false), ("definition", false), ("version", true)],
+    ),
+    (
+        "site_design",
+        &[
+            ("id", true),
+            ("draft_options", false),
+            ("live_options", false),
+            ("version", true),
+            ("published_version", true),
+        ],
+    ),
+    (
+        "themes",
+        &[
+            ("id", false),
+            ("name", false),
+            ("draft", false),
+            ("live", false),
+            ("version", true),
+            ("published_version", true),
+            ("updated_at", true),
+        ],
+    ),
+    (
+        "theme_revisions",
+        &[
+            ("id", false),
+            ("theme_id", false),
+            ("version", true),
+            ("package", false),
+            ("published", true),
+            ("created_at", true),
+        ],
+    ),
+    (
         "users",
         &[
             ("id", false),
@@ -206,7 +243,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     }
     tx.commit().await?;
     let snapshot = Snapshot {
-        schema: 1,
+        schema: 2,
         created_at: crate::now(),
         tables,
         files,
@@ -214,7 +251,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v1".into(),
+        format: "wpalt-backup-v2".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -231,14 +268,14 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v1"
+    if envelope.format != "wpalt-backup-v2"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 1
+    if snapshot.schema != 2
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -319,6 +356,120 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
                 return Err(Error::invalid("Backup row has an invalid shape."));
             }
         }
+    }
+    let registry = crate::schema::Registry {
+        common: serde_json::from_str(&setting_string("field_schema")?)
+            .map_err(|_| Error::invalid("Invalid backup field definitions."))?,
+        models: snapshot.tables["content_models"]
+            .iter()
+            .map(|row| {
+                let id = row["id"]
+                    .as_str()
+                    .ok_or(Error::invalid("Invalid model identifier."))?;
+                let definition = serde_json::from_str(
+                    row["definition"]
+                        .as_str()
+                        .ok_or(Error::invalid("Invalid model definition."))?,
+                )
+                .map_err(|_| Error::invalid("Invalid model definition."))?;
+                Ok((id.to_owned(), definition))
+            })
+            .collect::<Result<_>>()?,
+    };
+    registry.validate()?;
+    let mut relationships = BTreeMap::new();
+    let mut references = Vec::new();
+    for row in &snapshot.tables["posts"] {
+        let fields = registry.fields_for(row["kind"].as_str().unwrap())?;
+        for column in ["fields", "published_fields"] {
+            if column == "published_fields" && row["published_slug"].as_str().unwrap().is_empty() {
+                continue;
+            }
+            let value: Value = serde_json::from_str(row[column].as_str().unwrap())
+                .map_err(|_| Error::invalid("Invalid backup structured values."))?;
+            registry.validate_values(&fields, &value)?;
+            registry.references(&fields, &value, &mut relationships, &mut references)?;
+        }
+    }
+    if snapshot.tables["site_design"].len() != 1 {
+        return Err(Error::invalid("Backup needs one design state."));
+    }
+    for row in &snapshot.tables["site_design"] {
+        for column in ["draft_options", "live_options"] {
+            let value: Value = serde_json::from_str(row[column].as_str().unwrap())
+                .map_err(|_| Error::invalid("Invalid option values."))?;
+            registry.validate_values(&registry.common.options, &value)?;
+            registry.references(
+                &registry.common.options,
+                &value,
+                &mut relationships,
+                &mut references,
+            )?;
+        }
+    }
+    let post_kinds: BTreeMap<_, _> = snapshot.tables["posts"]
+        .iter()
+        .map(|row| (row["id"].as_str().unwrap(), row["kind"].as_str().unwrap()))
+        .collect();
+    let media_ids: HashSet<_> = snapshot.tables["media"]
+        .iter()
+        .map(|row| row["id"].as_str().unwrap())
+        .collect();
+    if relationships
+        .iter()
+        .any(|(id, kind)| post_kinds.get(id.as_str()) != Some(&kind.as_str()))
+        || references.iter().any(|id| !media_ids.contains(id.as_str()))
+    {
+        return Err(Error::invalid(
+            "Backup has missing or mistyped structured references.",
+        ));
+    }
+    let active = setting_string("theme")?;
+    let mut active_found = false;
+    if snapshot.tables["themes"].len() > 32 {
+        return Err(Error::invalid("Backup has too many themes."));
+    }
+    for row in &snapshot.tables["themes"] {
+        if !crate::schema::identifier(row["id"].as_str().unwrap()) {
+            return Err(Error::invalid("Invalid backup theme identifier."));
+        }
+        for column in ["draft", "live"] {
+            let raw = row[column].as_str().unwrap();
+            if !raw.is_empty() {
+                crate::theme::Package::parse(raw, &registry)?;
+            }
+        }
+        let version = row["version"].as_i64().unwrap();
+        let published = row["published_version"].as_i64().unwrap();
+        if version < 1 || published < 0 || published > version {
+            return Err(Error::invalid("Backup has invalid theme versions."));
+        }
+        if published > 0
+            && !snapshot.tables["theme_revisions"].iter().any(|history| {
+                history["theme_id"] == row["id"]
+                    && history["version"].as_i64() == Some(published)
+                    && history["published"].as_i64() == Some(1)
+                    && history["package"] == row["live"]
+            })
+        {
+            return Err(Error::invalid(
+                "Backup publication history does not match its live theme.",
+            ));
+        }
+        if row["id"].as_str() == Some(&active)
+            && row["published_version"].as_i64().unwrap() > 0
+            && !row["live"].as_str().unwrap().is_empty()
+        {
+            active_found = true;
+        }
+    }
+    if !active_found {
+        return Err(Error::invalid("Backup lacks its active published theme."));
+    }
+    // Old revisions can retain removed fields; validate executable/style grammar using
+    // the current registry before exposing any historical publication stylesheet.
+    for row in &snapshot.tables["theme_revisions"] {
+        crate::theme::Package::parse_historical(row["package"].as_str().unwrap(), &registry)?;
     }
     let _guard = app.mutations.lock().await;
     let mut tx = app.db.pool.begin().await?;

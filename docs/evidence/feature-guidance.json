@@ -278,6 +278,141 @@
         "relevant vulnerability or deprecation"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M2-01",
+      "area": "Typed fields and schema integrity",
+      "scope": "M2",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://json-schema.org/understanding-json-schema/reference/object",
+        "https://developer.wordpress.org/block-editor/reference-guides/block-api/block-bindings/"
+      ],
+      "applicable_versions": [
+        "wpalt schema 2",
+        "theme format 1",
+        "Preact 11.0.0",
+        "esbuild 0.28.2"
+      ],
+      "last_checked": "2026-10-01",
+      "next_review": "2026-12-30",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Restricted grammar, known keys and reference targets; preflight working/live values and bindings before schema writes."
+      ],
+      "tests": [
+        "typed_models_and_reusable_components_render_only_published_data",
+        "composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_changes"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed; focused implementation checks, not full WCAG or JSON Schema certification"
+    },
+    {
+      "feature_id": "M2-02",
+      "area": "Theme execution and draft preview boundaries",
+      "scope": "M2",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe#sandbox",
+        "https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html",
+        "https://developer.wordpress.org/themes/global-settings-and-styles/"
+      ],
+      "applicable_versions": [
+        "wpalt schema 2",
+        "theme format 1",
+        "Preact 11.0.0",
+        "esbuild 0.28.2"
+      ],
+      "last_checked": "2026-10-01",
+      "next_review": "2026-10-31",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "No executable theme code; validate paths/CSS/URLs/components; authenticated no-script sandbox preview; immutable public style history and optimistic versions."
+      ],
+      "tests": [
+        "theme_drafts_publish_restore_and_switch_without_content_loss",
+        "composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_changes",
+        "browser_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed; focused implementation checks, not full WCAG or JSON Schema certification"
+    },
+    {
+      "feature_id": "M2-03",
+      "area": "Accessible progressive widgets and bundled studio",
+      "scope": "M2",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.w3.org/WAI/ARIA/apg/patterns/tabs/",
+        "https://www.w3.org/WAI/ARIA/apg/patterns/accordion/",
+        "https://preactjs.com/guide/v11/getting-started/"
+      ],
+      "applicable_versions": [
+        "wpalt schema 2",
+        "theme format 1",
+        "Preact 11.0.0",
+        "esbuild 0.28.2"
+      ],
+      "last_checked": "2026-10-01",
+      "next_review": "2026-12-30",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Progressive tabs provide roles/selection/panel associations/roving focus and arrow/Home/End behavior; native details accordion and scroll-snap gallery; no auto-rotation. Studio bundles locally with explicit control labels. Preview intentionally has no interaction scripts."
+      ],
+      "tests": [
+        "browser_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed; focused implementation checks, not full WCAG or JSON Schema certification"
+    },
+    {
+      "feature_id": "M2-04",
+      "area": "One-off migration and complete recovery",
+      "scope": "M2",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.sqlite.org/lang_altertable.html#otheralter",
+        "https://www.postgresql.org/docs/17/ddl-alter.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 2",
+        "theme format 1",
+        "Preact 11.0.0",
+        "esbuild 0.28.2"
+      ],
+      "last_checked": "2026-10-01",
+      "next_review": "2026-12-30",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Transactional schema-1 conversion with foreign-key recheck; no old runtime parser; fresh-target schema-2 recovery includes definitions/options/theme histories and validates structured references before commit."
+      ],
+      "tests": [
+        "design_backups_preserve_models_options_themes_and_revisions",
+        "migrate_meaningful_m1_site",
+        "cli_acceptance.py"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed; focused implementation checks, not full WCAG or JSON Schema certification"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

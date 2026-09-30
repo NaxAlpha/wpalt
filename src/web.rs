@@ -22,6 +22,7 @@ pub fn router(app: App) -> Router {
     let limit = app.config.max_upload_bytes + 64 * 1024;
     let timeout = app.config.request_timeout_seconds;
     Router::new()
+        .merge(crate::builder_web::routes())
         .route("/", get(home))
         .route("/search", get(home))
         .route("/health", get(health))
@@ -115,6 +116,9 @@ async fn security_and_trace(
         HeaderValue::from_static("strict-origin-when-cross-origin"),
     );
     h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"));
+    if route == "/admin/design/{id}/preview" || route == "/admin/preview/{id}" {
+        h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'"));
+    }
     h.insert(
         "permissions-policy",
         HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
@@ -260,11 +264,13 @@ struct PublicItem {
     kind: String,
     title: String,
     summary: String,
+    #[serde(skip_serializing)]
+    fields: serde_json::Value,
     published_at: i64,
 }
 async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>> {
     let mut sql = QueryBuilder::<Any>::new(
-        "SELECT id,published_slug AS slug,kind,published_title AS title,substr(published_body,1,220) AS summary,published_at FROM posts WHERE status='published'",
+        "SELECT id,published_slug AS slug,kind,published_title AS title,substr(published_body,1,220) AS summary,published_fields,published_at FROM posts WHERE status='published'",
     );
     if let Some(q) = query.q.as_ref().filter(|s| !s.trim().is_empty()) {
         if q.len() > 200 {
@@ -313,6 +319,8 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
             kind: r.get("kind"),
             title: r.get("title"),
             summary: view::excerpt(&r.get::<String, _>("summary")),
+            fields: serde_json::from_str(&r.get::<String, _>("published_fields"))
+                .unwrap_or_default(),
             published_at: r.get("published_at"),
         })
         .collect())
@@ -321,18 +329,31 @@ async fn home(State(app): State<App>, Query(query): Query<ListQuery>) -> Result<
     let settings = app.db.settings().await?;
     let items = published_list(&app, &query).await?;
     let search = query.q.clone().unwrap_or_default();
-    Ok(html_page(
-        if search.is_empty() { "Home" } else { "Search" },
+    let stored = crate::theme::published(&app, &settings.theme).await?;
+    let listing=items.iter().take(20).map(|p|serde_json::json!({"id":p.id,"kind":p.kind,"title":p.title,"url":format!("/{}",p.slug),"body":p.summary,"fields":p.fields})).collect();
+    let mut ctx = crate::theme::context(
+        &app,
         &settings,
+        &stored.package,
         None,
-        html! {
-            section class="hero" {p class="eyebrow" {"Independent publishing"}h1 {(settings.title)}p class="lead" {(settings.description)}}
-            form class="toolbar" method="get" action="/search" {label for="search" class="muted" {"Find something"}input id="search" type="search" name="q" value=(search) placeholder="Search published content";button {"Search"}}
-            div class="page-list" {@for item in items.iter().take(20) {article class="story" {p class="eyebrow" {(item.kind)}h2 {a href=(format!("/{}",item.slug)) {(item.title)}}p class="muted" {(item.summary)}a href=(format!("/{}",item.slug)) {"Read more →"}}}}
-            @if items.is_empty(){p class="empty" {"No published content matches yet."}}
-            @if items.len()>20 {@let last=&items[19];a class="button secondary" href=(next_url(&query,&format!("{}:{}",last.published_at,last.id))) {"Older content →"}}
-        },
-    ))
+        listing,
+        false,
+        if search.is_empty() { "home" } else { "search" },
+    )
+    .await?;
+    ctx.root["navigation"] = serde_json::from_str(&settings.navigation).unwrap_or_default();
+    let extra = html! {form class="toolbar" method="get" action="/search"{label for="search"{"Find something"}input id="search" type="search" name="q" value=(search);button{"Search"}}
+    @if items.is_empty(){p class="empty"{"No published content matches yet."}}
+    @if items.len()>20{@let last=&items[19];a class="button secondary" href=(next_url(&query,&format!("{}:{}",last.published_at,last.id))){"Older content →"}}};
+    Ok(Html(crate::theme::document(
+        &stored,
+        &settings,
+        &ctx,
+        None,
+        false,
+        if search.is_empty() { "home" } else { "search" },
+        extra,
+    )?))
 }
 fn next_url(query: &ListQuery, cursor: &str) -> String {
     let mut params = url::form_urlencoded::Serializer::new(String::new());
@@ -373,20 +394,35 @@ async fn public_post(State(app): State<App>, Path(slug): Path<String>) -> Result
         .ok_or_else(Error::not_found)?;
     let comments=sqlx::query("SELECT name,body FROM comments WHERE post_id=$1 AND status='approved' ORDER BY created_at LIMIT 100").bind(&p.id).fetch_all(&app.db.pool).await?;
     let terms=sqlx::query("SELECT t.kind,t.name,t.slug FROM terms t JOIN published_post_terms pt ON pt.term_id=t.id WHERE pt.post_id=$1 ORDER BY t.name").bind(&p.id).fetch_all(&app.db.pool).await?;
-    Ok(html_page(
-        &p.published_title,
-        &app.db.settings().await?,
-        None,
-        html! {
-            (view::public_body(&p,false))
-            section class="comments" {p class="muted" {@for t in terms {a href=(format!("/?{}={}",t.get::<String,_>("kind"),t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
-                h2 {"Conversation"}
-                @for c in comments {article class="comment" {strong {(c.get::<String,_>("name"))}p {(c.get::<String,_>("body"))}}}
-                form method="post" action=(format!("/{slug}/comments")) {label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}
-                    p class="muted" {"Comments are reviewed before publication."}button {"Submit for review"}}
-            }
-        },
-    ))
+    let settings = app.db.settings().await?;
+    let stored = crate::theme::published(&app, &settings.theme).await?;
+    let mut ctx = crate::theme::context(
+        &app,
+        &settings,
+        &stored.package,
+        Some(&p),
+        Vec::new(),
+        false,
+        &p.kind,
+    )
+    .await?;
+    ctx.root["navigation"] = serde_json::from_str(&settings.navigation).unwrap_or_default();
+    let extra = html! {            section class="comments" {p class="muted" {@for t in terms {a href=(format!("/?{}={}",t.get::<String,_>("kind"),t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
+                    h2 {"Conversation"}
+                    @for c in comments {article class="comment" {strong {(c.get::<String,_>("name"))}p {(c.get::<String,_>("body"))}}}
+                    form method="post" action=(format!("/{slug}/comments")) {label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}
+                        p class="muted" {"Comments are reviewed before publication."}button {"Submit for review"}}
+                }
+    };
+    Ok(Html(crate::theme::document(
+        &stored,
+        &settings,
+        &ctx,
+        Some(&p),
+        false,
+        &p.kind,
+        extra,
+    )?))
 }
 async fn feed(State(app): State<App>) -> Result<Response> {
     let settings = app.db.settings().await?;
@@ -454,6 +490,7 @@ async fn new_post(State(app): State<App>, headers: HeaderMap) -> Result<Html<Str
         blocks: "[]".into(),
         categories: String::new(),
         tags: String::new(),
+        taxonomies: "{}".into(),
         version: 0,
         action: "save".into(),
         publish_at: 0,
@@ -463,7 +500,7 @@ async fn new_post(State(app): State<App>, headers: HeaderMap) -> Result<Html<Str
         "Create content",
         &app.db.settings().await?,
         Some(&s),
-        editor_form(&s, None, &input, &[], None),
+        html! {(editor_form(&s, None, &input, &[], None))script defer src="/assets/builder.js"{}},
     ))
 }
 fn editor_form(
@@ -483,9 +520,10 @@ fn editor_form(
                     label {"Composition blocks (JSON)" textarea name="blocks" {(p.blocks)}small {"Example: [{\"kind\":\"callout\",\"text\":\"Made on your own server.\"}]. Kinds: text, heading, callout."}}
                 }
             }aside class="panel" {h2 {"Publication"}label {"URL slug" input name="slug" aria-label="URL slug" value=(p.slug) required pattern="[a-z0-9-]+" maxlength="120";small {"Lowercase ASCII letters, digits and hyphens."}}
-                label {"Content type" select name="kind" aria-label="Content type" {option value="post" selected[p.kind=="post"] {"Post"}option value="page" selected[p.kind=="page"] {"Page"}}small {"Type is fixed after creation in M1."}}
+                label {"Content type" select name="kind" aria-label="Content type" {option value="post" selected[p.kind=="post"] {"Post"}option value="page" selected[p.kind=="page"] {"Page"}@if p.kind!="post"&&p.kind!="page"{option value=(p.kind) selected{(p.kind)}}}small {"Type is fixed after creation. Define additional models in Design studio."}}
                 label {"Categories" input name="categories" aria-label="Categories" value=(p.categories);small {"Comma-separated names."}}
                 label {"Tags" input name="tags" value=(p.tags);}
+                label {"Custom taxonomies (JSON)" textarea name="taxonomies" {(p.taxonomies)}small {"Declared taxonomy identifiers mapped to arrays of term names."}}
                 label {"Schedule time" input type="datetime-local" data-schedule-time;small {"Uses your browser's local time. Scheduling removes this item from the live site until publication."}}
                 div class="toolbar" {button name="action" value="save" {"Save draft"}button name="action" value="publish" {"Publish now"}button class="secondary" name="action" value="schedule" {"Schedule"}}
                 @if let Some(id)=id {div class="toolbar" {a class="button secondary" href=(format!("/admin/preview/{id}")) target="_blank" rel="noopener" {"Preview"}button class="secondary" name="action" value="unpublish" {"Unpublish"}}}
@@ -529,6 +567,16 @@ async fn edit_post(
         blocks: p.blocks,
         categories: names("category"),
         tags: names("tag"),
+        taxonomies: {
+            let mut custom = std::collections::BTreeMap::<String, Vec<String>>::new();
+            for row in &terms {
+                let kind: String = row.get("kind");
+                if kind != "category" && kind != "tag" {
+                    custom.entry(kind).or_default().push(row.get("name"));
+                }
+            }
+            serde_json::to_string(&custom).unwrap()
+        },
         version: p.version,
         action: "save".into(),
         publish_at: p.publish_at,
@@ -538,7 +586,7 @@ async fn edit_post(
         "Edit content",
         &app.db.settings().await?,
         Some(&s),
-        editor_form(&s, Some(&id), &input, &revisions, None),
+        html! {(editor_form(&s, Some(&id), &input, &revisions, None))script defer src="/assets/builder.js"{}},
     ))
 }
 async fn save_form(
@@ -652,12 +700,27 @@ async fn preview(
     let s = admin_session(&app, &headers).await?;
     editor(&s)?;
     let p = content::get(&app, &id).await?;
-    Ok(html_page(
-        &p.title,
-        &app.db.settings().await?,
-        Some(&s),
-        view::public_body(&p, true),
-    ))
+    let settings = app.db.settings().await?;
+    let stored = crate::theme::load(&app, &settings.theme, true).await?;
+    let ctx = crate::theme::context(
+        &app,
+        &settings,
+        &stored.package,
+        Some(&p),
+        Vec::new(),
+        true,
+        &p.kind,
+    )
+    .await?;
+    Ok(Html(crate::theme::document(
+        &stored,
+        &settings,
+        &ctx,
+        Some(&p),
+        true,
+        &p.kind,
+        html! {p class="notice"{"Private content and theme draft preview. " a href=(format!("/admin/posts/{}",p.id)){"Back to editor"}}},
+    )?))
 }
 async fn media_list(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {
     let s = admin_session(&app, &headers).await?;
@@ -952,6 +1015,9 @@ async fn settings_page(State(app): State<App>, headers: HeaderMap) -> Result<Htm
     let s = admin_session(&app, &headers).await?;
     admin(&s)?;
     let settings = app.db.settings().await?;
+    let themes = sqlx::query("SELECT id,name FROM themes WHERE published_version>0 ORDER BY name")
+        .fetch_all(&app.db.pool)
+        .await?;
     Ok(html_page(
         "Site & theme",
         &settings,
@@ -959,9 +1025,9 @@ async fn settings_page(State(app): State<App>, headers: HeaderMap) -> Result<Htm
         html! {
             (view::heading("Configuration","Make it feel like yours.","Site identity, theme, navigation and typed content definitions share one configuration."))
             form class="panel" method="post" action="/admin/settings" {(view::csrf(&s))label {"Site title" input name="title" value=(settings.title) required maxlength="200";}label {"Description" textarea name="description" maxlength="1000" {(settings.description)}}
-                label {"Theme" select name="theme" aria-label="Theme" {option value="paper" selected[settings.theme=="paper"] {"Paper · light editorial"}option value="ink" selected[settings.theme=="ink"] {"Ink · dark editorial"}}}
+                label {"Theme" select name="theme" aria-label="Theme" {@for theme in themes{option value=(theme.get::<String,_>("id")) selected[settings.theme==theme.get::<String,_>("id")] {(theme.get::<String,_>("name"))}}}}
                 label {"Navigation (JSON)" textarea name="navigation" {(settings.navigation)}small {"Example: [{\"label\":\"About\",\"url\":\"/about\"}]"}}
-                label {"Field schema (JSON)" textarea name="field_schema" {(settings.field_schema)}small {"Up to 32 typed fields: string, number or boolean. Changing types does not rewrite existing records."}}
+                p {a href="/admin/builder" {"Manage typed definitions and advanced themes in Design studio →"}}
                 button {"Save site settings"}
             }p {a href="/admin/users" {"Manage administrators, editors & moderators →"}}
         },
@@ -974,7 +1040,6 @@ struct SettingsInput {
     description: String,
     theme: String,
     navigation: String,
-    field_schema: String,
 }
 async fn save_settings(
     State(app): State<App>,
@@ -989,11 +1054,18 @@ async fn save_settings(
         description: input.description,
         theme: input.theme,
         navigation: input.navigation,
-        field_schema: input.field_schema,
+        field_schema: app.db.settings().await?.field_schema,
     };
     content::validate_settings(&settings)?;
+    crate::theme::load(&app, &settings.theme, false).await?;
     let _guard = app.mutations.lock().await;
-    sqlx::query("UPDATE settings SET title=$1,description=$2,theme=$3,navigation=$4,field_schema=$5 WHERE id=1").bind(settings.title).bind(settings.description).bind(settings.theme).bind(settings.navigation).bind(settings.field_schema).execute(&app.db.pool).await?;
+    sqlx::query("UPDATE settings SET title=$1,description=$2,theme=$3,navigation=$4 WHERE id=1")
+        .bind(settings.title)
+        .bind(settings.description)
+        .bind(settings.theme)
+        .bind(settings.navigation)
+        .execute(&app.db.pool)
+        .await?;
     Ok(Redirect::to("/admin/settings"))
 }
 async fn users(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {

@@ -1,0 +1,13 @@
+{
+  "label": "Projects",
+  "fields": {
+    "client": {"kind": "relationship", "target": "post"},
+    "steps": {"kind": "repeater", "fields": {"label": {"kind": "string"}}, "max_items": 5},
+    "gallery": {"kind": "gallery", "max_items": 3},
+    "sections": {"kind": "flexible", "variants": {"hero": "hero"}, "max_items": 3},
+    "details": {"kind": "object", "fields": {"count": {"kind": "number"}}},
+    "shared": {"kind": "group", "group": "hero"},
+    "photo": {"kind": "media"}
+  },
+  "taxonomies": {"category": "Categories", "tag": "Tags", "sector": "Sector"}
+}

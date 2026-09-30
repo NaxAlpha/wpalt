@@ -109,6 +109,7 @@ fn input(slug: &str, action: &str) -> PostInput {
         blocks: r#"[{"kind":"callout","text":"Made here"}]"#.into(),
         categories: "Field notes".into(),
         tags: "Gardens, Publishing".into(),
+        taxonomies: "{}".into(),
         version: 0,
         action: action.into(),
         publish_at: 0,
@@ -932,10 +933,602 @@ fn configuration_and_composition_reject_unsafe_or_ambiguous_inputs() {
     s.navigation = "[]".into();
     let mut p = input("safe-slug", "save");
     p.fields = r#"{"featured":"wrong type"}"#.into();
-    assert!(content::validate_input(&p, &s).is_err());
+    let registry = wpalt::schema::Registry {
+        common: serde_json::from_str(&s.field_schema).unwrap(),
+        models: [("post".into(), wpalt::schema::Model::initial("Posts"))].into(),
+    };
+    assert!(
+        registry
+            .validate_values(
+                &registry.fields_for("post").unwrap(),
+                &serde_json::from_str(&p.fields).unwrap()
+            )
+            .is_err()
+    );
     p.fields = "{}".into();
     p.blocks = r#"[{"kind":"executable","text":"code"}]"#.into();
     assert!(content::validate_input(&p, &s).is_err());
     assert!(!backup::safe_filename("../../image.png"));
     assert!(!content::valid_slug("admin"));
+}
+
+// M2 cluster 1: one schema connects structured authoring, relationships, options and templates.
+#[tokio::test]
+async fn typed_models_and_reusable_components_render_only_published_data() {
+    use serde_json::json;
+    use wpalt::{schema, theme};
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let mut common = schema::Registry::load(&site.app).await.unwrap().common;
+        common.groups.insert(
+            "hero".into(),
+            std::collections::BTreeMap::from([(
+                "headline".into(),
+                schema::Field::primitive("string"),
+            )]),
+        );
+        schema::save_common(&site.app, common, 1).await.unwrap();
+        let model: schema::Model =
+            serde_json::from_str(include_str!("fixtures/project-model.json")).unwrap();
+        assert_eq!(
+            upload(&site, "public.png", &png(), "public").await,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            upload(&site, "private.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let public_media: String =
+            sqlx::query_scalar("SELECT id FROM media WHERE visibility='public'")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        let private_media: String =
+            sqlx::query_scalar("SELECT id FROM media WHERE visibility='private'")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        schema::save_model(&site.app, "project", model, 0)
+            .await
+            .unwrap();
+        let mut related = input("client", "publish");
+        related.title = "Published client".into();
+        let client = content::save(&site.app, site.session(), None, related.clone())
+            .await
+            .unwrap();
+        related.version = client.version;
+        related.title = "PRIVATE_CLIENT_DRAFT".into();
+        related.action = "save".into();
+        content::save(&site.app, site.session(), Some(&client.id), related)
+            .await
+            .unwrap();
+        let mut project = input("project-one", "publish");
+        project.kind = "project".into();
+        project.fields=json!({"client":client.id,"steps":[{"label":"First useful step"},{"label":"Second useful step"}],"gallery":[public_media,private_media],"photo":public_media,"sections":[{"type":"hero","values":{"headline":"FLEXIBLE_HERO"}}],"shared":{"headline":"REUSED_GROUP"},"details":{"count":7}}).to_string();
+        project.taxonomies = json!({"sector":["Local businesses"]}).to_string();
+        let record = content::save(&site.app, site.session(), None, project.clone())
+            .await
+            .unwrap();
+        let mut common = schema::Registry::load(&site.app).await.unwrap().common;
+        common
+            .options
+            .insert("announcement".into(), schema::Field::primitive("string"));
+        let version = schema::save_common(&site.app, common, 2).await.unwrap();
+        let version = schema::save_options(
+            &site.app,
+            json!({"announcement":"Published announcement"}),
+            version,
+            true,
+        )
+        .await
+        .unwrap();
+        schema::save_options(
+            &site.app,
+            json!({"announcement":"PRIVATE_OPTION_DRAFT"}),
+            version,
+            false,
+        )
+        .await
+        .unwrap();
+        let mut package = theme::load(&site.app, "paper", true).await.unwrap().package;
+        package.components.insert("card".into(),serde_json::from_value(json!({"parameters":{"title":"string"},"root":{"id":"card-root","kind":"heading","text":{"bind":"params.title"}}})).unwrap());
+        package.templates.insert(
+            "project".into(),
+            serde_json::from_str(include_str!("fixtures/project-template.json")).unwrap(),
+        );
+        package.templates.get_mut("home").unwrap().children.push(serde_json::from_value(json!({"id":"project-list","kind":"collection","source":"project","limit":30,"children":[{"id":"project-card","kind":"component","component":"card","arguments":{"title":{"bind":"item.fields.client.title"}}}]})).unwrap());
+        theme::save(&site.app, "paper", package, 1, true)
+            .await
+            .unwrap();
+        let (status, public) = get(&site.app, "/project-one", None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            public.contains("Published client")
+                && public.contains("Published announcement")
+                && public.contains("First useful step")
+                && public.contains("Second useful step")
+        );
+        assert!(!public.contains("PRIVATE_"));
+        assert!(public.contains("FLEXIBLE_HERO") && public.contains("REUSED_GROUP"));
+        assert!(
+            public.contains(&format!("/media/{public_media}"))
+                && !public.contains(&format!("/media/{private_media}"))
+        );
+        let package = theme::load(&site.app, "paper", false)
+            .await
+            .unwrap()
+            .package;
+        let settings = site.app.db.settings().await.unwrap();
+        let before = theme::context(&site.app, &settings, &package, None, vec![], false, "home")
+            .await
+            .unwrap()
+            .queries;
+        for index in 0..29 {
+            let mut extra = project.clone();
+            extra.slug = format!("project-{index}");
+            extra.version = 0;
+            content::save(&site.app, site.session(), None, extra)
+                .await
+                .unwrap();
+        }
+        let after = theme::context(&site.app, &settings, &package, None, vec![], false, "home")
+            .await
+            .unwrap()
+            .queries;
+        assert_eq!(
+            before, after,
+            "Thirty related cards use the same number of bulk queries as one card"
+        );
+        assert!(after <= 6);
+
+        let edit = get(
+            &site.app,
+            &format!("/admin/posts/{}", record.id),
+            Some(&site.token),
+        )
+        .await
+        .1;
+        assert!(
+            edit.contains("Local businesses"),
+            "Custom terms survive editing"
+        );
+        // A target which has never been published must resolve to empty in visitor output.
+        let mut private_input = input("private-client", "save");
+        private_input.title = "NEVER_PUBLISHED_CLIENT".into();
+        let private = content::save(&site.app, site.session(), None, private_input)
+            .await
+            .unwrap();
+        project.version = record.version;
+        project.fields = json!({"client":private.id,"steps":[]}).to_string();
+        content::save(&site.app, site.session(), Some(&record.id), project)
+            .await
+            .unwrap();
+        let public = get(&site.app, "/project-one", None).await.1;
+        assert!(!public.contains("NEVER_PUBLISHED_CLIENT"));
+        site.close().await;
+    }
+}
+
+// M2 cluster 2: draft publication, optimistic conflicts and revision restore are distinct operations.
+#[tokio::test]
+async fn theme_drafts_publish_restore_and_switch_without_content_loss() {
+    use wpalt::theme;
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let post = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("preserved", "publish"),
+        )
+        .await
+        .unwrap();
+        let old = theme::load(&site.app, "paper", true).await.unwrap();
+        let mut package = old.package.clone();
+        package.footer.text = serde_json::json!("PRIVATE_THEME_DRAFT");
+        package.tokens.insert("accent".into(), "#803355".into());
+        let v = theme::save(&site.app, "paper", package.clone(), old.version, false)
+            .await
+            .unwrap();
+        assert_eq!(
+            theme::save(&site.app, "paper", package.clone(), old.version, false)
+                .await
+                .unwrap_err()
+                .0,
+            StatusCode::CONFLICT
+        );
+        assert!(
+            !get(&site.app, "/preserved", None)
+                .await
+                .1
+                .contains("PRIVATE_THEME_DRAFT")
+        );
+        let preview = format!(
+            "/admin/design/paper/preview?template=content&post={}",
+            post.id
+        );
+        let (_, headers, body) =
+            request(&site.app, "GET", &preview, Some(&site.token), "", vec![]).await;
+        assert!(
+            String::from_utf8(body)
+                .unwrap()
+                .contains("PRIVATE_THEME_DRAFT")
+        );
+        assert!(
+            headers["content-security-policy"]
+                .to_str()
+                .unwrap()
+                .contains("script-src 'none'")
+        );
+        assert_eq!(
+            get(&site.app, "/themes/paper/2/style.css", None).await.0,
+            StatusCode::NOT_FOUND
+        );
+        let v = theme::save(&site.app, "paper", package, v, true)
+            .await
+            .unwrap();
+        assert!(
+            get(&site.app, "/preserved", None)
+                .await
+                .1
+                .contains("PRIVATE_THEME_DRAFT")
+        );
+        assert_eq!(
+            get(&site.app, "/themes/paper/1/style.css", None).await.0,
+            StatusCode::OK,
+            "In-flight old HTML retains its public style revision"
+        );
+        theme::save(&site.app, "paper", old.package, v, false)
+            .await
+            .unwrap();
+        assert!(
+            get(&site.app, "/preserved", None)
+                .await
+                .1
+                .contains("PRIVATE_THEME_DRAFT"),
+            "Restore only changes the working draft"
+        );
+        theme::activate(&site.app, "ink").await.unwrap();
+        assert!(
+            get(&site.app, "/preserved", None)
+                .await
+                .1
+                .contains("A story worth sharing")
+        );
+        assert_eq!(
+            content::get(&site.app, &post.id)
+                .await
+                .unwrap()
+                .published_title,
+            "A story worth sharing"
+        );
+        site.close().await;
+    }
+}
+
+// M2 cluster 3: enforce grammar, work limits, privileges and data-bearing schema safety.
+#[tokio::test]
+async fn composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_changes() {
+    use serde_json::json;
+    use wpalt::{schema, theme};
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("existing", "publish"),
+        )
+        .await
+        .unwrap();
+        let registry = schema::Registry::load(&site.app).await.unwrap();
+        let base = theme::load(&site.app, "paper", true).await.unwrap().package;
+        let mut bad = base.clone();
+        bad.footer.kind = "link".into();
+        bad.footer.href = json!("javascript:alert(1)");
+        assert!(bad.validate(&registry).is_err());
+        let mut bad = base.clone();
+        bad.components.insert("loop".into(),serde_json::from_value(json!({"parameters":{},"root":{"id":"loop-root","kind":"component","component":"loop"}})).unwrap());
+        assert!(bad.validate(&registry).is_err());
+        let mut bad = base.clone();
+        bad.footer.style.background = "url(https://evil.example)".into();
+        assert!(bad.validate(&registry).is_err());
+        let mut bad = base.clone();
+        bad.templates.insert("post".into(),serde_json::from_value(json!({"id":"outer","kind":"collection","source":"post","limit":50,"children":[{"id":"middle","kind":"collection","source":"post","limit":50,"children":[{"id":"inner","kind":"collection","source":"post","limit":50}]}]})).unwrap());
+        assert!(bad.validate(&registry).is_err());
+        let mut common = registry.common.clone();
+        common.fields.get_mut("subtitle").unwrap().kind = "number".into();
+        assert!(schema::save_common(&site.app, common, 1).await.is_err());
+        assert_eq!(
+            schema::Registry::load(&site.app)
+                .await
+                .unwrap()
+                .common
+                .fields["subtitle"]
+                .kind,
+            "string"
+        );
+        let body = json!({"csrf":site.session().csrf,"version":1,"package":base,"publish":true})
+            .to_string()
+            .into_bytes();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/api/admin/design/paper",
+                None,
+                "application/json",
+                body
+            )
+            .await
+            .0,
+            StatusCode::UNAUTHORIZED
+        );
+        auth::add_user(
+            &site.app,
+            "editor@example.test",
+            "Editor",
+            "editor",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (token, editor) = auth::login(&site.app, "editor@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let body = json!({"csrf":editor.csrf,"version":1,"package":base,"publish":true})
+            .to_string()
+            .into_bytes();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/api/admin/design/paper",
+                Some(&token),
+                "application/json",
+                body
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        let body = json!({"csrf":"wrong","version":1,"package":base,"publish":true})
+            .to_string()
+            .into_bytes();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/api/admin/design/paper",
+                Some(&site.token),
+                "application/json",
+                body
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        let too_large=json!({"csrf":site.session().csrf,"version":1,"package":base,"padding":"x".repeat(340*1024)}).to_string().into_bytes();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/api/admin/design/paper",
+                Some(&site.token),
+                "application/json",
+                too_large
+            )
+            .await
+            .0,
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "Design JSON uses a tighter limit than image upload bodies"
+        );
+        let ctx = theme::context(
+            &site.app,
+            &site.app.db.settings().await.unwrap(),
+            &base,
+            None,
+            vec![],
+            false,
+            "home",
+        )
+        .await
+        .unwrap();
+        assert!(
+            ctx.queries <= 5,
+            "A default page uses a fixed query count independent of listing size"
+        );
+        site.close().await;
+    }
+}
+
+// M2 cluster 4: recover complete design/schema state into a fresh engine.
+#[tokio::test]
+async fn design_backups_preserve_models_options_themes_and_revisions() {
+    use serde_json::json;
+    use wpalt::{schema, theme};
+    for pg in engines() {
+        migrate_meaningful_m1_site(pg).await;
+        let source = Site::new(pg, true).await;
+        let mut common = schema::Registry::load(&source.app).await.unwrap().common;
+        common
+            .options
+            .insert("banner".into(), schema::Field::primitive("string"));
+        common
+            .options
+            .insert("obsolete".into(), schema::Field::primitive("string"));
+        schema::save_common(&source.app, common, 1).await.unwrap();
+        schema::save_options(
+            &source.app,
+            json!({"banner":"Recover this value","obsolete":"Old option"}),
+            2,
+            true,
+        )
+        .await
+        .unwrap();
+        let mut package = theme::load(&source.app, "paper", true)
+            .await
+            .unwrap()
+            .package;
+        package.footer.text = json!({"bind":"options.obsolete"});
+        theme::save(&source.app, "paper", package.clone(), 1, true)
+            .await
+            .unwrap();
+        package.footer.text = json!({"bind":"options.banner"});
+        theme::save(&source.app, "paper", package, 2, true)
+            .await
+            .unwrap();
+        schema::save_options(&source.app, json!({"banner":"Recover this value"}), 3, true)
+            .await
+            .unwrap();
+        let mut common = schema::Registry::load(&source.app).await.unwrap().common;
+        common.options.remove("obsolete");
+        schema::save_common(&source.app, common, 4).await.unwrap();
+        let bytes = backup::capture(&source.app).await.unwrap();
+        let recovered = Site::new(!pg && std::env::var("TEST_DATABASE_URL").is_ok(), false).await;
+        backup::restore(&recovered.app, &bytes).await.unwrap();
+        assert!(
+            get(&recovered.app, "/", None)
+                .await
+                .1
+                .contains("Recover this value")
+        );
+        assert_eq!(
+            theme::load(&recovered.app, "paper", true)
+                .await
+                .unwrap()
+                .version,
+            3
+        );
+        assert!(
+            schema::Registry::load(&recovered.app)
+                .await
+                .unwrap()
+                .common
+                .options
+                .contains_key("banner")
+        );
+        assert_eq!(
+            get(&recovered.app, "/themes/paper/2/style.css", None)
+                .await
+                .0,
+            StatusCode::OK,
+            "Historical styles do not require obsolete field definitions"
+        );
+        let historical: String = sqlx::query_scalar(
+            "SELECT package FROM theme_revisions WHERE theme_id='paper' AND version=2",
+        )
+        .fetch_one(&recovered.app.db.pool)
+        .await
+        .unwrap();
+        assert!(
+            theme::Package::parse(
+                &historical,
+                &schema::Registry::load(&recovered.app).await.unwrap()
+            )
+            .is_err(),
+            "An obsolete dependency must be repaired before restoring it into the current working graph"
+        );
+        source.close().await;
+        recovered.close().await;
+    }
+}
+
+/// A real schema-1 fixture from the merged M1 source, with working/live content,
+/// terms, authentication and a restorable revision. Migration runs on both engines.
+async fn migrate_meaningful_m1_site(pg: bool) {
+    let fixture = Site::new(pg, false).await;
+    let config = (*fixture.app.config).clone();
+    fixture.app.db.pool.close().await;
+    if let (Some(name), Some(root)) = (&fixture.schema, &fixture.root_url) {
+        let pool = sqlx::PgPool::connect(root).await.unwrap();
+        sqlx::query(&format!("DROP SCHEMA {name} CASCADE"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(&format!("CREATE SCHEMA {name}"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool.close().await;
+    } else {
+        std::fs::remove_file(fixture._directory.path().join("site.db")).unwrap();
+    }
+    let db = wpalt::db::Db::open(&config).await.unwrap();
+    sqlx::raw_sql(include_str!("fixtures/m1-schema.sql"))
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    if !pg {
+        sqlx::raw_sql(include_str!("fixtures/m1-search.sql"))
+            .execute(&db.pool)
+            .await
+            .unwrap();
+    }
+    let user = uuid::Uuid::new_v4().to_string();
+    let id = uuid::Uuid::new_v4().to_string();
+    let revision = uuid::Uuid::new_v4().to_string();
+    sqlx::query("INSERT INTO settings(id,title,description,theme,navigation,field_schema) VALUES(1,'Migrated journal','Preserve this site','ink','[]',$1)").bind(r#"{"subtitle":"string","featured":"boolean"}"#).execute(&db.pool).await.unwrap();
+    sqlx::query("INSERT INTO users(id,email,name,role,password_hash,created_at) VALUES($1,'owner@example.test','Owner','admin',$2,1)").bind(&user).bind(auth::hash_password(PASSWORD).unwrap()).execute(&db.pool).await.unwrap();
+    let post = serde_json::json!({"id":id,"slug":"legacy-story","kind":"post","title":"Private M1 title","body":"PRIVATE_M1_WORKING","fields":"{\"subtitle\":\"Preserved fields\",\"featured\":true}","blocks":"[]","status":"published","version":2,"published_slug":"legacy-story","published_title":"M1 public title","published_body":"M1_PUBLIC_BODY","published_fields":"{\"subtitle\":\"Public fields\"}","published_blocks":"[]","publish_at":0,"published_at":1,"updated_at":2,"author_id":user});
+    sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)").bind(&id).bind("legacy-story").bind("post").bind("Private M1 title").bind("PRIVATE_M1_WORKING").bind(post["fields"].as_str().unwrap()).bind("[]").bind("published").bind(2i64).bind("legacy-story").bind("M1 public title").bind("M1_PUBLIC_BODY").bind(post["published_fields"].as_str().unwrap()).bind("[]").bind(0i64).bind(1i64).bind(2i64).bind(&user).execute(&db.pool).await.unwrap();
+    let term = uuid::Uuid::new_v4().to_string();
+    sqlx::query(
+        "INSERT INTO terms(id,kind,name,slug) VALUES($1,'category','Legacy notes','legacy-notes')",
+    )
+    .bind(&term)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    for table in ["post_terms", "published_post_terms"] {
+        sqlx::query(&format!(
+            "INSERT INTO {table}(post_id,term_id) VALUES($1,$2)"
+        ))
+        .bind(&id)
+        .bind(&term)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    }
+    sqlx::query(
+        "INSERT INTO revisions(id,post_id,version,snapshot,created_at) VALUES($1,$2,2,$3,2)",
+    )
+    .bind(&revision)
+    .bind(&id)
+    .bind(serde_json::json!({"post":post,"categories":"Legacy notes","tags":""}).to_string())
+    .bind(&user)
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    db.pool.close().await;
+    let app = App::open(config.clone()).await.unwrap();
+    let (_, session) = auth::login(&app, "owner@example.test", PASSWORD)
+        .await
+        .unwrap();
+    let html = get(&app, "/legacy-story", None).await.1;
+    assert!(html.contains("M1_PUBLIC_BODY") && !html.contains("PRIVATE_M1_WORKING"));
+    let restored = content::restore_revision(&app, &session, &id, &revision, 2)
+        .await
+        .unwrap();
+    assert_eq!(restored.body, "PRIVATE_M1_WORKING");
+    assert_eq!(restored.version, 3);
+    assert_eq!(
+        wpalt::theme::load(&app, "ink", true)
+            .await
+            .unwrap()
+            .published_version,
+        1
+    );
+    wpalt::schema::save_model(&app, "project", wpalt::schema::Model::initial("Project"), 0)
+        .await
+        .unwrap();
+    app.db.pool.close().await;
+    let reopened = App::open(config).await.unwrap();
+    assert_eq!(
+        content::get(&reopened, &id).await.unwrap().version,
+        3,
+        "Migration is one-off; reopening preserves subsequent data"
+    );
+    reopened.db.pool.close().await;
+    fixture.close().await;
 }
