@@ -1,0 +1,9 @@
+/target/
+/.cargo-cache/
+/data/
+/work/
+*.db
+*.db-shm
+*.db-wal
+.env
+wpalt.local.toml

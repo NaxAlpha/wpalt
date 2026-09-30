@@ -1,0 +1,3574 @@
+{
+  "research_date": "2026-09-30",
+  "scope": "Locality/account-gate audit of original 40 products and proposed unified-suite/lite-CMS scope",
+  "methodology": {
+    "facts": "Official vendor/project architecture and expiry docs; prior capability/adoption inventory",
+    "inference": "Independent implementation feasibility, clustering, effort and product roadmap",
+    "limits": "No premium binaries installed/tested; no network capture; no bypass; no exact parity or measured market-demand claim"
+  },
+  "deployment_classes": {
+    "L": {
+      "label": "Application-local",
+      "description": "Can be implemented in local application/PHP/browser using local storage; listed dependencies must be supported by host."
+    },
+    "W": {
+      "label": "Owner-hosted worker",
+      "description": "Still self-hostable on the same VPS; needs a process/binary/container, model, system scheduler or substantial resource budget."
+    },
+    "E": {
+      "label": "External connector",
+      "description": "Local glue to another system, protocol or provider; not necessarily vendor SaaS, but not isolated origin-only operation."
+    },
+    "D": {
+      "label": "Outside failure/network domain",
+      "description": "Needs another location, independent observer, upstream capacity or distributed edge. Can sometimes be owner-managed rather than SaaS."
+    },
+    "I": {
+      "label": "External intelligence/data",
+      "description": "Local engine can consume it, but a single site cannot generate the same proprietary/global/current dataset."
+    }
+  },
+  "clusters": [
+    {
+      "id": "content",
+      "title": "Content model & editorial",
+      "examples": "ACF; WPCode; Code Snippets; Elementor dynamic content",
+      "scope": "Field definitions, typed records, relations, repeaters, revisions, options and permissions.",
+      "priority": "P0",
+      "effort": "Medium",
+      "rationale": "One schema drives editor, forms, structured data and templates."
+    },
+    {
+      "id": "design",
+      "title": "Design & presentation",
+      "examples": "Elementor; Essential Addons; ElementsKit",
+      "scope": "Blocks, patterns, layout rules, dynamic bindings, templates, navigation and popups.",
+      "priority": "P1",
+      "effort": "High",
+      "rationale": "Use existing WordPress blocks first; visual-builder parity is a large separate product."
+    },
+    {
+      "id": "seo",
+      "title": "SEO & local discovery",
+      "examples": "Yoast; Rank Math; AIOSEO",
+      "scope": "Metadata, schema, redirects, sitemaps, links, local business data and multilingual URLs.",
+      "priority": "P0",
+      "effort": "Medium",
+      "rationale": "Output generation is local; Google performance/rank data is a connector."
+    },
+    {
+      "id": "forms",
+      "title": "Forms & workflow",
+      "examples": "WPForms; Gravity Forms; WPCode conditions",
+      "scope": "Fields, entries, uploads, conditions, calculations, signatures and queued actions.",
+      "priority": "P0",
+      "effort": "High",
+      "rationale": "Reuse schema/conditions/queue; CRM and payment APIs are optional adapters."
+    },
+    {
+      "id": "identity",
+      "title": "Identity, access & learning",
+      "examples": "MemberPress; Woo Memberships; registration tools",
+      "scope": "Roles, restricted content, drip, courses, progress, quizzes and member entitlements.",
+      "priority": "P2",
+      "effort": "High",
+      "rationale": "Access rules are local; commercial subscription collection is external."
+    },
+    {
+      "id": "commerce",
+      "title": "Commerce & reservations",
+      "examples": "Woo core; Subscriptions; Bookings; Memberships",
+      "scope": "Catalog, inventory, orders, coupons, calendars, resource capacity and entitlement state.",
+      "priority": "P2",
+      "effort": "Very high",
+      "rationale": "Keep existing WooCommerce for plugin route; do not rebuild broad commerce in an initial lite CMS."
+    },
+    {
+      "id": "media",
+      "title": "Media & performance",
+      "examples": "WP Rocket; LiteSpeed; WP-Optimize; Fastest Cache; Smush; Imagify; ShortPixel; EWWW",
+      "scope": "Caching, image codecs, lazy loading, cleanup, asset optimization and expensive generation jobs.",
+      "priority": "P0/P1",
+      "effort": "High",
+      "rationale": "Pure PHP baseline with optional owner-hosted workers; CDN stays separate."
+    },
+    {
+      "id": "analytics",
+      "title": "Analytics & conversion",
+      "examples": "MonsterInsights; OptinMonster; Jetpack Stats",
+      "scope": "First-party events, funnels, experiments, heatmaps, popups and campaign reports.",
+      "priority": "P1",
+      "effort": "High",
+      "rationale": "Share events and consent; reports need not be stored in a SaaS account."
+    },
+    {
+      "id": "communications",
+      "title": "Email, CRM & audience",
+      "examples": "WP Mail SMTP; MC4WP; Jetpack newsletter",
+      "scope": "Mail queue/logs/retries, lists, segments, templates, opt-ins and customer fields.",
+      "priority": "P0/P2",
+      "effort": "High",
+      "rationale": "Local controls are easy to separate from SMTP deliverability and external contact platforms."
+    },
+    {
+      "id": "security",
+      "title": "Security, consent & abuse",
+      "examples": "Wordfence; Really Simple Security; Complianz; Akismet",
+      "scope": "Local 2FA, rate limits, headers, audit trail, script blocking, consent records and rule engines.",
+      "priority": "P0",
+      "effort": "High",
+      "rationale": "Threat feeds, crowdsourced spam intelligence and human response are separate services."
+    },
+    {
+      "id": "resilience",
+      "title": "Backups, recovery & migration",
+      "examples": "UpdraftPlus; Duplicator; All-in-One Migration; Jetpack; ManageWP",
+      "scope": "Consistent snapshots, scheduling, retention, encryption, restores, exports and site moves.",
+      "priority": "P0",
+      "effort": "High",
+      "rationale": "Local backup engine plus user-chosen independent copy and standalone recovery tool."
+    },
+    {
+      "id": "operations",
+      "title": "Development & fleet operations",
+      "examples": "ManageWP; WPCode; Code Snippets; MainWP-style management",
+      "scope": "Module ownership, settings export, cron/queues, health logs, permissions and client workflows.",
+      "priority": "P0/P2",
+      "effort": "High",
+      "rationale": "One package; independent modules; optional separate owner-hosted fleet controller."
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "F001",
+      "cluster": "content",
+      "feature": "Custom types and taxonomies",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Store schemas and validate records; use WordPress native registries in plugin route.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F002",
+      "cluster": "content",
+      "feature": "Typed custom fields and relationships",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Shared schema with validation, indexed relations and field permissions.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F003",
+      "cluster": "content",
+      "feature": "Repeaters, galleries and clone groups",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Nested/referenced structured data; no remote computation needed.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F004",
+      "cluster": "content",
+      "feature": "Flexible content / reusable block schemas",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Versioned structured block tree consumed by editor and renderer.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F005",
+      "cluster": "content",
+      "feature": "Global options / settings pages",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Low",
+      "implementation": "Typed site-level settings with revisions and export.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F006",
+      "cluster": "content",
+      "feature": "Content revisions and rollback",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Store revision metadata and changes; define retention.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F007",
+      "cluster": "content",
+      "feature": "Drafts, preview and editorial approval",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Role-based publishing state and authenticated previews.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F008",
+      "cluster": "content",
+      "feature": "Manual language variants and strings",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Language-linked records and locale-aware routing.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F009",
+      "cluster": "content",
+      "feature": "Translation duplication / synchronization",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Track source revisions and which fields synchronize.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F010",
+      "cluster": "content",
+      "feature": "Multilingual slugs and metadata",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Locale uniqueness, redirects, hreflang and canonical rules.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F011",
+      "cluster": "content",
+      "feature": "Automatic translation with local models",
+      "deployment": "W",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Optional owner-hosted model worker; quality/language support not equivalent by default.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F012",
+      "cluster": "content",
+      "feature": "Vendor automatic translation / human network",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "High",
+      "implementation": "Optional chosen provider; exclude vendor credits and translator marketplace from core.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F013",
+      "cluster": "design",
+      "feature": "Responsive blocks and layout primitives",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Reuse Gutenberg for plugin; constrained visual blocks for lite CMS.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F014",
+      "cluster": "design",
+      "feature": "Theme-wide templates and dynamic field bindings",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Template resolver and field bindings share content schema.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F015",
+      "cluster": "design",
+      "feature": "Reusable patterns and design tokens",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Local pattern library and token-based styling.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F016",
+      "cluster": "design",
+      "feature": "Header, footer and navigation builder",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Menu schema, templates and responsive presentation.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F017",
+      "cluster": "design",
+      "feature": "Tabs, accordions, galleries and carousels",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Ship accessible components; load assets only when used.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F018",
+      "cluster": "design",
+      "feature": "Conditional / protected presentation",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Shared condition engine; enforce access server-side for sensitive content.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F019",
+      "cluster": "design",
+      "feature": "Custom CSS and approved asset insertion",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Scoped styles and privileged safe asset controls.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F020",
+      "cluster": "design",
+      "feature": "Template import/export and cross-site reuse",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Portable versioned schema; optional owner-controlled sync.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F021",
+      "cluster": "design",
+      "feature": "Collaborative notes and assignments",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "Medium",
+      "implementation": "Local records and user permissions; real-time presence can use a worker.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F022",
+      "cluster": "design",
+      "feature": "Cloud template marketplace/library",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "Medium",
+      "implementation": "Do not require it; download/import assets through an optional user action.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F023",
+      "cluster": "design",
+      "feature": "AI layout/content generation locally",
+      "deployment": "W",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Optional local model; hardware, training and output quality constraints.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F024",
+      "cluster": "design",
+      "feature": "Exact Elementor template/widget compatibility",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "Very high",
+      "implementation": "Migration/compatibility project, not a consequence of having similar blocks.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F025",
+      "cluster": "seo",
+      "feature": "SEO titles, metadata and social previews",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Low",
+      "implementation": "Derived templates plus per-record overrides.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F026",
+      "cluster": "seo",
+      "feature": "Canonical, robots and indexing rules",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Central URL authority; avoid contradictory outputs.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F027",
+      "cluster": "seo",
+      "feature": "XML, image, video and news sitemaps",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Generate from local content with incremental invalidation.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F028",
+      "cluster": "seo",
+      "feature": "Schema graph and custom schema builder",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Typed JSON-LD derived from shared fields; no ranking guarantee.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F029",
+      "cluster": "seo",
+      "feature": "Local business / multiple location schema",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Location records and business attributes; external maps optional.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F030",
+      "cluster": "seo",
+      "feature": "Redirects, regex rules and 404 reports",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Bounded logs and cached matching; protect against loops.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F031",
+      "cluster": "seo",
+      "feature": "Internal-link graph / orphan detection",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Parse own content and maintain indexed link graph.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F032",
+      "cluster": "seo",
+      "feature": "Internal broken-link checks",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Check local routing without requesting outside websites.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F033",
+      "cluster": "seo",
+      "feature": "External broken-link checks",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "Medium",
+      "implementation": "Worker can run locally, but must contact target sites; limits and retries.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F034",
+      "cluster": "seo",
+      "feature": "Readability and keyword heuristics",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Local tokenization/dictionaries; deeper language coverage adds work.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F035",
+      "cluster": "seo",
+      "feature": "Search Console / search index data",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "Medium",
+      "implementation": "Optional Google API; origin cannot know unseen search impressions.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F036",
+      "cluster": "seo",
+      "feature": "SERP ranking / competitive keyword datasets",
+      "deployment": "I",
+      "phase": "Exclude",
+      "effort": "High",
+      "implementation": "Search-engine observations require external data; no parity claim from local logs.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F037",
+      "cluster": "forms",
+      "feature": "Form designer and reusable field schema",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Fields reuse content-schema validation and renderer.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F038",
+      "cluster": "forms",
+      "feature": "Conditional fields / notification routing",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "One conditions engine; server validates client decisions.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F039",
+      "cluster": "forms",
+      "feature": "Multi-step forms and repeatable inputs",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Persist validated step state and bound payload sizes.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F040",
+      "cluster": "forms",
+      "feature": "Entry storage, search, CSV export and permissions",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Local tables with retention and field-level access.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F041",
+      "cluster": "forms",
+      "feature": "File uploads and protected attachments",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Quotas, MIME checks and access-controlled downloads.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F042",
+      "cluster": "forms",
+      "feature": "Calculations and pricing logic",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Safe formula evaluator; do not execute arbitrary submitted code.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F043",
+      "cluster": "forms",
+      "feature": "Signatures and signed-document records",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Canvas/signature records are local; formal identity/signing services are separate.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F044",
+      "cluster": "forms",
+      "feature": "Surveys, polls and scoring",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Typed questions, aggregates and local scoring.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F045",
+      "cluster": "forms",
+      "feature": "Save/resume, partial entries and abandonment",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Tokenized resumable state and privacy-aware retention.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F046",
+      "cluster": "forms",
+      "feature": "Offline capture and later synchronization",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Browser storage/service worker and conflict-safe resubmission.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F047",
+      "cluster": "forms",
+      "feature": "User registration and post creation",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Permission-checked actions against local identity/content models.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F048",
+      "cluster": "forms",
+      "feature": "Webhook and CRM/marketing handoff",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "Medium",
+      "implementation": "Optional destinations; queue/retry runs locally.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F049",
+      "cluster": "forms",
+      "feature": "Payment fields / gateway checkout",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "High",
+      "implementation": "Local form UI with processor tokenization/redirect; exclude settlement.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F050",
+      "cluster": "forms",
+      "feature": "External CAPTCHA service",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "Low",
+      "implementation": "Optional hCaptcha/reCAPTCHA/Turnstile; use local anti-abuse baseline by default.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F051",
+      "cluster": "identity",
+      "feature": "Local users, roles and granular permissions",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Reuse WordPress auth; CMS needs its own hardened session and access model.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F052",
+      "cluster": "identity",
+      "feature": "Content and download access rules",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Check on server and bypass public caches for protected responses.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F053",
+      "cluster": "identity",
+      "feature": "Membership state and entitlement administration",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Local entitlement ledger, transitions and audit trail.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F054",
+      "cluster": "identity",
+      "feature": "Content drip and timed unlocks",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "Medium",
+      "implementation": "Queue-driven unlock schedules and timezone rules.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F055",
+      "cluster": "identity",
+      "feature": "Course lessons and learner progress",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Progress state, prerequisites and resumable learning.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F056",
+      "cluster": "identity",
+      "feature": "Quizzes, assignments, certificates and gradebook",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Assessment workflow plus document generation; significant product scope.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F057",
+      "cluster": "identity",
+      "feature": "Corporate subaccounts and gifting",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Seat entitlements and delegated permissions.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F058",
+      "cluster": "identity",
+      "feature": "Community profiles and discussion groups",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Local content/users; moderation and anti-abuse needed.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F059",
+      "cluster": "identity",
+      "feature": "Affiliate referral and commission records",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "First-party attribution and ledger; payout network separate.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F060",
+      "cluster": "identity",
+      "feature": "Enterprise identity / social-login provider",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "High",
+      "implementation": "Local session logic; external IdP identity assertion optional.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F061",
+      "cluster": "commerce",
+      "feature": "Catalog, variants and digital products",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Plugin route keeps WooCommerce; CMS needs product schema/pricing.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F062",
+      "cluster": "commerce",
+      "feature": "Cart, checkout state and orders",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "Very high",
+      "implementation": "Correct totals, order state transitions and idempotency.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F063",
+      "cluster": "commerce",
+      "feature": "Inventory and reservation locks",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "Very high",
+      "implementation": "Atomic stock/capacity updates and expiry of abandoned reservations.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F064",
+      "cluster": "commerce",
+      "feature": "Coupons, discounts and member pricing",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Shared rules with conflict resolution and bounded combinations.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F065",
+      "cluster": "commerce",
+      "feature": "Booking calendars, staff/resources and group capacity",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "Very high",
+      "implementation": "Transactional resource availability and timezone handling.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F066",
+      "cluster": "commerce",
+      "feature": "Local appointment confirmations and reminder scheduling",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "Medium",
+      "implementation": "Queue local reminders; delivery follows mail adapter.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F067",
+      "cluster": "commerce",
+      "feature": "Subscription schedules, proration and dunning state",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "Very high",
+      "implementation": "Local ledger/workflows; gateway webhooks drive settled payment state.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F068",
+      "cluster": "commerce",
+      "feature": "Refund/admin transaction workflow",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Local audit/state; external money movement requires processor API.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F069",
+      "cluster": "commerce",
+      "feature": "Card settlement and recurring collection",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "Very high",
+      "implementation": "Bank/payment network integration cannot be replaced by an origin-only algorithm.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F070",
+      "cluster": "commerce",
+      "feature": "Shipping rates/labels and calendar sync",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "High",
+      "implementation": "Optional carrier/calendar APIs; static local rates remain possible.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F071",
+      "cluster": "commerce",
+      "feature": "Current tax/compliance datasets",
+      "deployment": "I",
+      "phase": "Exclude",
+      "effort": "High",
+      "implementation": "Can store configured rules locally; do not promise universally maintained external tax knowledge.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F072",
+      "cluster": "media",
+      "feature": "Page caching, invalidation and preload",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "One cache owner; exclude private/cart/checkout responses.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F073",
+      "cluster": "media",
+      "feature": "Browser-cache headers and compression settings",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "May need server configuration; plugin cannot control every host setting.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F074",
+      "cluster": "media",
+      "feature": "Object-cache integration",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Use host-supported cache; Redis/Memcached is a same-host optional service.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F075",
+      "cluster": "media",
+      "feature": "Asset minification and loading controls",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Dependency-aware processing with per-page exclusions and rollback.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F076",
+      "cluster": "media",
+      "feature": "Lazy loading, dimensions and preload hints",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Native markup/defaults; avoid lazy-loading the critical image.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F077",
+      "cluster": "media",
+      "feature": "Resize, compress and WebP/AVIF derivatives",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "When host image codecs exist; queue heavy batches and preserve originals.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F078",
+      "cluster": "media",
+      "feature": "Native image binary / imgproxy worker",
+      "deployment": "W",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Own-host process/container for better throughput or missing PHP codecs.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F079",
+      "cluster": "media",
+      "feature": "Unused/critical CSS generation",
+      "deployment": "W",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Local static analysis or browser rendering; viewport/state compatibility remains difficult.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F080",
+      "cluster": "media",
+      "feature": "Unused-image and database cleanup",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Dependency index and dry run; no blind deletion of referenced media.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F081",
+      "cluster": "media",
+      "feature": "Geolocation / role-aware cache variants",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Finite cache keys, cache isolation and maintained local location data.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F082",
+      "cluster": "media",
+      "feature": "Video transcoding on own server",
+      "deployment": "W",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Optional CPU/GPU-heavy queue; single-host delivery still lacks edge-network reach.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F083",
+      "cluster": "media",
+      "feature": "Global image/video CDN and edge WAF",
+      "deployment": "D",
+      "phase": "Exclude",
+      "effort": "Very high",
+      "implementation": "Geographic network and upstream capacity cannot be replicated on the origin alone.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F084",
+      "cluster": "analytics",
+      "feature": "First-party pageviews, events and conversions",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Local event ingestion with retention, aggregation and bot treatment.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F085",
+      "cluster": "analytics",
+      "feature": "Forms/store funnels and custom dimensions",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Shared events emitted by forms/orders; results need validated instrumentation.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F086",
+      "cluster": "analytics",
+      "feature": "Local dashboards and reports",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Preaggregated tables; exports and role-based visibility.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F087",
+      "cluster": "analytics",
+      "feature": "Heatmaps and masked session replay",
+      "deployment": "W",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Local-capable collection/processing; storage/privacy demands exceed basic metrics.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F088",
+      "cluster": "analytics",
+      "feature": "A/B experiments and variant allocation",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Stable assignment, cache-aware delivery and defensible analysis.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F089",
+      "cluster": "analytics",
+      "feature": "Exit-intent, device and referrer popups",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "Browser conditions plus local campaign configuration.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F090",
+      "cluster": "analytics",
+      "feature": "Scheduled/cookie/visitor-based targeting",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "Medium",
+      "implementation": "First-party state and shared condition engine; consent-aware.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F091",
+      "cluster": "analytics",
+      "feature": "On-site coupon wheels / offer campaigns",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "Medium",
+      "implementation": "Local UI/randomization and commerce discount integration.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F092",
+      "cluster": "analytics",
+      "feature": "Google/ad-platform reporting datasets",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "High",
+      "implementation": "Optional credentials; own events do not recreate platform attribution history.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F093",
+      "cluster": "analytics",
+      "feature": "Cross-site audience / advertiser identity graph",
+      "deployment": "I",
+      "phase": "Exclude",
+      "effort": "Very high",
+      "implementation": "Single site lacks the external network data and access.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F094",
+      "cluster": "communications",
+      "feature": "SMTP settings and connection routing",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Own SMTP/MTA or user-chosen provider; no suite-vendor account.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F095",
+      "cluster": "communications",
+      "feature": "Mail logs, resend, failure alerts and fallback",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Record transport result versus delivery/open status distinctly.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F096",
+      "cluster": "communications",
+      "feature": "Transactional templates and notification rules",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Reuse field/condition engine with local template previews.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F097",
+      "cluster": "communications",
+      "feature": "Mailing lists, consent records and segmentation",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Local audience database and unsubscribe/retention workflows.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F098",
+      "cluster": "communications",
+      "feature": "Newsletter design, queue and automation",
+      "deployment": "L",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Throttled batches, sequence state and crash-safe retry.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F099",
+      "cluster": "communications",
+      "feature": "Self-operated outbound mail server",
+      "deployment": "W",
+      "phase": "P2",
+      "effort": "Very high",
+      "implementation": "Possible on VPS; reputation, DNS, blocked ports and delivery operations remain.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F100",
+      "cluster": "communications",
+      "feature": "Chosen SMTP/transactional mail provider",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "Medium",
+      "implementation": "External delivery infrastructure is optional; not evidence of a plugin-vendor lock.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F101",
+      "cluster": "communications",
+      "feature": "Gmail/Microsoft or remote CRM connectors",
+      "deployment": "E",
+      "phase": "Adapter",
+      "effort": "Medium",
+      "implementation": "Their OAuth/accounts inherent to chosen integration.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F102",
+      "cluster": "communications",
+      "feature": "Global inbox deliverability / shared reputation service",
+      "deployment": "I",
+      "phase": "Exclude",
+      "effort": "Very high",
+      "implementation": "Do not promise delivery quality from logging/SMTP settings alone.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F103",
+      "cluster": "security",
+      "feature": "TOTP/passkeys and local login protections",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Local credential enrollment, recovery and rate policies.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F104",
+      "cluster": "security",
+      "feature": "Security headers and hardening",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Host capability checks and configurable application policies.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F105",
+      "cluster": "security",
+      "feature": "Local request rule engine and rate limits",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Origin filtering; cannot absorb attacks saturating upstream link.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F106",
+      "cluster": "security",
+      "feature": "File-integrity / known-pattern malware scans",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Local scanner; signature provenance/freshness maintained separately.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F107",
+      "cluster": "security",
+      "feature": "Audit logs and privileged action history",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Local retention; external copy needed for tamper-resistant evidence after compromise.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F108",
+      "cluster": "security",
+      "feature": "Honeypots, proof-of-work and basic spam heuristics",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Local/browser defenses; no promise of Akismet network accuracy.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F109",
+      "cluster": "security",
+      "feature": "Cookie banner and consent/script enforcement",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Shared third-party registry, categories and local preference storage.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F110",
+      "cluster": "security",
+      "feature": "Consent records and data-request workflows",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Export/delete actions and locally stored proof with retention policy.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F111",
+      "cluster": "security",
+      "feature": "Cookie scan on own pages",
+      "deployment": "W",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Owner-hosted headless browser can observe dynamic scripts/cookies.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F112",
+      "cluster": "security",
+      "feature": "Fresh vulnerability/reputation/signature datasets",
+      "deployment": "I",
+      "phase": "Exclude",
+      "effort": "High",
+      "implementation": "External research/feed is optional; local engine alone cannot invent new threat knowledge.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F113",
+      "cluster": "security",
+      "feature": "Akismet-style shared spam classification",
+      "deployment": "I",
+      "phase": "Exclude",
+      "effort": "Very high",
+      "implementation": "Maintain generic local alternative; no network-wide detection parity claim.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F114",
+      "cluster": "security",
+      "feature": "DDoS absorption and managed incident response",
+      "deployment": "D",
+      "phase": "Exclude",
+      "effort": "Very high",
+      "implementation": "Network perimeter capacity and humans are outside single-origin software.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F115",
+      "cluster": "resilience",
+      "feature": "Consistent files + database snapshot",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Coordinate database export with file state; raw live DB-file copying is insufficient.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F116",
+      "cluster": "resilience",
+      "feature": "Schedules, retention and pre-update backups",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Reliable scheduler, reserved disk space and bounded history.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F117",
+      "cluster": "resilience",
+      "feature": "Encrypted backup packages and recovery keys",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Owner-held key; export it outside the machine before relying on recovery.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F118",
+      "cluster": "resilience",
+      "feature": "Incremental/deduplicated backup worker",
+      "deployment": "W",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Own-host restic-style process and repository; integration and database export still needed.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F119",
+      "cluster": "resilience",
+      "feature": "Selective restore, clone and URL-aware migration",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Validate archive, serialized data and destination compatibility.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F120",
+      "cluster": "resilience",
+      "feature": "Portable restore utility independent of CMS",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Archive + DB + manifest + offline utility; avoid dependence on vendor login.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F121",
+      "cluster": "resilience",
+      "feature": "Off-site copy to owner SFTP/NAS/secondary host",
+      "deployment": "D",
+      "phase": "Adapter",
+      "effort": "Medium",
+      "implementation": "Separate failure domain required; can be owner-controlled rather than vendor cloud.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F122",
+      "cluster": "resilience",
+      "feature": "Point-in-time recovery and continuous replication",
+      "deployment": "W",
+      "phase": "P2",
+      "effort": "Very high",
+      "implementation": "Database logs/replication and ordered recovery; not just frequent ZIP jobs.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F123",
+      "cluster": "resilience",
+      "feature": "Vendor vault / off-site disaster recovery service",
+      "deployment": "D",
+      "phase": "Exclude",
+      "effort": "High",
+      "implementation": "Skip mandatory vendor storage; offer a pluggable independent target.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F124",
+      "cluster": "operations",
+      "feature": "One module registry and ownership resolver",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Only one SEO/cache/mail handler active; detect existing plugin ownership.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F125",
+      "cluster": "operations",
+      "feature": "Unified settings/schema export and import",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Versioned JSON, credentials excluded from ordinary exports.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F126",
+      "cluster": "operations",
+      "feature": "Background jobs, retries and health history",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Persistent queue with idempotency, locks, budgets and dead-letter handling.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F127",
+      "cluster": "operations",
+      "feature": "Reliable system-scheduled worker",
+      "deployment": "W",
+      "phase": "P0",
+      "effort": "Medium",
+      "implementation": "Host cron/CLI; shared hosting may expose a control-panel cron instead.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F128",
+      "cluster": "operations",
+      "feature": "Local safe-mode and rollback controls",
+      "deployment": "L",
+      "phase": "P0",
+      "effort": "High",
+      "implementation": "Disable failed module independently; keep admin and recovery accessible.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F129",
+      "cluster": "operations",
+      "feature": "Authorized snippets and developer hooks",
+      "deployment": "L",
+      "phase": "P1",
+      "effort": "High",
+      "implementation": "Privileged capability; a lite CMS can prefer structured hooks over arbitrary code UI.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F130",
+      "cluster": "operations",
+      "feature": "Owner-hosted fleet controller",
+      "deployment": "W",
+      "phase": "P2",
+      "effort": "High",
+      "implementation": "Separate application/control plane with authenticated site agents.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F131",
+      "cluster": "operations",
+      "feature": "Uptime alerts while origin is down",
+      "deployment": "D",
+      "phase": "Adapter",
+      "effort": "Medium",
+      "implementation": "Observer must remain alive outside origin failure domain; own second host is sufficient.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    },
+    {
+      "id": "F132",
+      "cluster": "operations",
+      "feature": "Vendor license renewal / cloud quotas",
+      "deployment": "E",
+      "phase": "Exclude",
+      "effort": "Low",
+      "implementation": "Proposed local core has no vendor runtime entitlement call; optional update delivery separate.",
+      "evidence": "Engineering inference; comparable capabilities cited in cluster and plugin profiles"
+    }
+  ],
+  "plugin_profiles": [
+    {
+      "id": "elementor",
+      "name": "Elementor",
+      "cluster": "design",
+      "disposition": "Keep local subset",
+      "popularity": "10+ million active installations (WordPress.org)",
+      "local_candidate": "Theme templates, widgets, responsive layout, popups, dynamic fields and local form submissions.",
+      "external_or_excluded": "AI generation, shared cloud kits/services, delivery and hosted products excluded from core.",
+      "account_gate": "Verified restriction: current help limits new/edited premium operations after expiry. Renewal article uses broader “stop” wording; precise frontend impact is not established. Account/license activation is distinct from executing layout code.",
+      "evidence": "Documented gate; engineering locality inference",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/elementor/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://elementor.com/pro/"
+        },
+        {
+          "title": "Elementor non-renewal behavior",
+          "url": "https://elementor.com/help/what-happens-to-my-site-if-i-cancel-elementor-pro/"
+        },
+        {
+          "title": "Elementor renewal documentation",
+          "url": "https://elementor.com/help/how-can-i-renew-my-subscription/"
+        }
+      ]
+    },
+    {
+      "id": "essential-addons-for-elementor",
+      "name": "Essential Addons for Elementor",
+      "cluster": "design",
+      "disposition": "Local candidate",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Widgets, menus, post displays, galleries, protected sections and conditional presentation.",
+      "external_or_excluded": "Remote social feeds/third-party form platforms and template-cloud libraries become optional adapters.",
+      "account_gate": "Paid widget/module packaging is verified. No claim that all paid rendering requires a live account; expiry enforcement was not independently verified.",
+      "evidence": "Capability docs; gate mechanics unknown",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/essential-addons-for-elementor-lite/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://essential-addons.com/"
+        }
+      ]
+    },
+    {
+      "id": "elementskit",
+      "name": "ElementsKit",
+      "cluster": "design",
+      "disposition": "Local candidate",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Header/footer, mega menus, galleries, interactions and conditional content.",
+      "external_or_excluded": "Social/meeting integrations and remote template assets excluded or optional.",
+      "account_gate": "Local capability tiers are commercial entitlements; runtime account and expiry behavior not verified.",
+      "evidence": "Capability docs; gate mechanics unknown",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/elementskit-lite/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wpmet.com/plugin/elementskit/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "advanced-custom-fields-acf",
+      "name": "Advanced Custom Fields (ACF)",
+      "cluster": "content",
+      "disposition": "Local candidate",
+      "popularity": "2+ million active installations (WordPress.org)",
+      "local_candidate": "Repeaters, flexible layouts, galleries, clone fields, options and block definitions.",
+      "external_or_excluded": "Update/download/support portal; no cloud compute inherently required for field editing.",
+      "account_gate": "Verified: without activation, Pro field definition authoring is restricted. Previously activated expired licenses can edit existing definitions but cannot create new Pro definitions. Content values and frontend rendering remain unaffected.",
+      "evidence": "Documented local authoring gate",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/advanced-custom-fields/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.advancedcustomfields.com/pro/"
+        },
+        {
+          "title": "ACF license activation and expiry",
+          "url": "https://www.advancedcustomfields.com/resources/license-activations/"
+        }
+      ]
+    },
+    {
+      "id": "wpcode",
+      "name": "WPCode",
+      "cluster": "operations",
+      "disposition": "Local candidate",
+      "popularity": "3+ million active installations (WordPress.org)",
+      "local_candidate": "Snippet insertion, local conditions, revisions, scheduling, safe testing, permissions and pixel event wiring.",
+      "external_or_excluded": "Private vendor cloud library and AI excluded; ad-platform event endpoints optional.",
+      "account_gate": "Paid local tools are tier-gated; exact network checks and expiry behavior not verified. Conditions/revisions can be independently implemented without a vendor account.",
+      "evidence": "Capability docs; gate mechanics unknown",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/insert-headers-and-footers/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://library.wpcode.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "code-snippets",
+      "name": "Code Snippets",
+      "cluster": "operations",
+      "disposition": "Local candidate",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Snippet organization, CSS/JS/PHP insertion, editor integration and local revision workflows.",
+      "external_or_excluded": "Vendor cloud sync and AI excluded; self-managed export/sync is feasible.",
+      "account_gate": "Pro feature packaging documented; runtime/expiry enforcement not verified.",
+      "evidence": "Capability docs; gate mechanics unknown",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/code-snippets/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://codesnippets.pro/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "yoast-seo",
+      "name": "Yoast SEO",
+      "cluster": "seo",
+      "disposition": "Keep local subset",
+      "popularity": "10+ million active installations (WordPress.org)",
+      "local_candidate": "Redirects, schema, metadata, sitemaps, breadcrumbs, local/video/news output and link analysis.",
+      "external_or_excluded": "AI/content suggestions, support/training and remote search data outside local core.",
+      "account_gate": "Paid output/editor tools are commercial gates. Exact offline license behavior not verified; do not classify all paid SEO as cloud-backed.",
+      "evidence": "Capability docs; locality inference",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wordpress-seo/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://yoast.com/product/yoast-seo-premium-wordpress/"
+        }
+      ]
+    },
+    {
+      "id": "rank-math",
+      "name": "Rank Math",
+      "cluster": "seo",
+      "disposition": "Keep local subset",
+      "popularity": "4+ million active installations (WordPress.org)",
+      "local_candidate": "Schema builder, redirects, metadata, local-location records, image rules and internal-link analysis.",
+      "external_or_excluded": "SERP/rank observations, Search Console data and vendor AI require external data/services.",
+      "account_gate": "Paid site/client and keyword allowances mix licensing with services. Exact offline/expiry handling of each module not verified.",
+      "evidence": "Mixed feature boundaries; enforcement unknown",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/seo-by-rank-math/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://rankmath.com/offer/"
+        },
+        {
+          "title": "Google Search Console API data",
+          "url": "https://developers.google.com/webmaster-tools/v1/searchanalytics/query"
+        }
+      ]
+    },
+    {
+      "id": "all-in-one-seo-aioseo",
+      "name": "All in One SEO (AIOSEO)",
+      "cluster": "seo",
+      "disposition": "Keep local subset",
+      "popularity": "2+ million active installations (WordPress.org)",
+      "local_candidate": "Link suggestions, redirects, schema, local business records, sitemaps and metadata.",
+      "external_or_excluded": "Search Statistics relying on Google performance/index data and hosted AI are excluded/connectors.",
+      "account_gate": "Paid local and service features coexist; no blanket claim that every paid feature needs the account at runtime.",
+      "evidence": "Mixed feature boundaries; enforcement unknown",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/all-in-one-seo-pack/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://aioseo.com/pricing/"
+        },
+        {
+          "title": "Google Search Console API data",
+          "url": "https://developers.google.com/webmaster-tools/v1/searchanalytics/query"
+        }
+      ]
+    },
+    {
+      "id": "wpforms",
+      "name": "WPForms",
+      "cluster": "forms",
+      "disposition": "Keep local subset",
+      "popularity": "5+ million active installations (WordPress.org)",
+      "local_candidate": "Conditional forms, stored entries, uploads, multi-step forms, surveys, calculations, signatures and user/content creation.",
+      "external_or_excluded": "Stripe/other payments, CRM/marketing APIs and hosted AI remain optional.",
+      "account_gate": "Verified renewal FAQ allows continued use of installed Pro version. Add-on downloads, support/updates and payment fee entitlements are distinct from core form execution.",
+      "evidence": "Documented installed continuation",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wpforms-lite/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wpforms.com/pricing/"
+        },
+        {
+          "title": "WPForms license renewal FAQ",
+          "url": "https://wpforms.com/docs/how-to-renew-your-wpforms-license/"
+        }
+      ]
+    },
+    {
+      "id": "gravity-forms",
+      "name": "Gravity Forms",
+      "cluster": "forms",
+      "disposition": "Keep local subset",
+      "popularity": "Vendor claim: 5M+ websites; definition not independently audited",
+      "local_candidate": "Conditional forms, entry storage, uploads, surveys, registration, quizzes and local workflow actions.",
+      "external_or_excluded": "Payment and CRM/messaging systems require adapters and their own credentials.",
+      "account_gate": "Verified installed products continue after expiry; updates/support/downloads and new-site registration stop. Even a recovery/reinstall registration can require a renewed license.",
+      "evidence": "Documented continuation + registration gate",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.gravityforms.com/pricing/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.gravityforms.com/about/"
+        },
+        {
+          "title": "Gravity Forms license expiry",
+          "url": "https://docs.gravityforms.com/license-expiry/"
+        }
+      ]
+    },
+    {
+      "id": "wp-mail-smtp",
+      "name": "WP Mail SMTP",
+      "cluster": "communications",
+      "disposition": "Keep local subset",
+      "popularity": "4+ million active installations (WordPress.org)",
+      "local_candidate": "Queueing, routing, logs, resend, fallback connections, reports and local mail templates.",
+      "external_or_excluded": "Actual delivery uses an owner MTA or chosen SMTP/API service; Gmail/Microsoft integrations inherently need their credentials.",
+      "account_gate": "Paid local observability is a packaging choice; exact expiry effects on every log/routing feature not verified. Provider OAuth is not a plugin-vendor account gate.",
+      "evidence": "Local control versus external transport",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wp-mail-smtp/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wpmailsmtp.com/pricing/"
+        },
+        {
+          "title": "FluentSMTP feature inventory",
+          "url": "https://fluentsmtp.com/"
+        }
+      ]
+    },
+    {
+      "id": "mc4wp-mailchimp-for-wordpress",
+      "name": "MC4WP: Mailchimp for WordPress",
+      "cluster": "communications",
+      "disposition": "Replace service workflow",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Forms, segments, opt-in records, reporting and customer/purchase sync logic can have a local equivalent.",
+      "external_or_excluded": "The existing product fundamentally connects to Mailchimp; use a local audience engine if avoiding that account.",
+      "account_gate": "Official sources conflict: pricing says premium access ends; newer expiry KB says installed plugin continues. Do not claim a confirmed runtime shutoff. Mailchimp credentials remain inherent to this integration.",
+      "evidence": "Expiry unresolved; service dependence clear",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/mailchimp-for-wp/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.mc4wp.com/pricing/"
+        },
+        {
+          "title": "MC4WP expiry knowledge base",
+          "url": "https://www.mc4wp.com/kb/happens-license-expires/"
+        },
+        {
+          "title": "MC4WP pricing / expiry FAQ",
+          "url": "https://www.mc4wp.com/pricing/"
+        },
+        {
+          "title": "listmonk self-hosted mail management",
+          "url": "https://listmonk.app/"
+        }
+      ]
+    },
+    {
+      "id": "optinmonster",
+      "name": "OptinMonster",
+      "cluster": "analytics",
+      "disposition": "Reimplement local capability",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Popup builder, exit-intent/device triggers, scheduled offers, A/B tests and conversion tracking.",
+      "external_or_excluded": "Skip its hosted campaign account/analytics implementation; remote targeting datasets and integrations optional.",
+      "account_gate": "Existing product uses hosted authoring/reporting and plan quotas. This is genuine SaaS as sold, but ordinary popup/experiment logic does not inherently require SaaS.",
+      "evidence": "Documented SaaS; local equivalent inference",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/optinmonster/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://optinmonster.com/pricing/"
+        },
+        {
+          "title": "OptinMonster campaign builder",
+          "url": "https://optinmonster.com/docs/optinmonster-builder-overview/"
+        }
+      ]
+    },
+    {
+      "id": "monsterinsights",
+      "name": "MonsterInsights",
+      "cluster": "analytics",
+      "disposition": "Replace analytics backend",
+      "popularity": "2+ million active installations (WordPress.org)",
+      "local_candidate": "First-party visits/events, forms/store conversions, dimensions, funnels and in-admin reports.",
+      "external_or_excluded": "GA4 reporting, Google-owned history and ad-platform attribution cannot be recreated from origin data alone.",
+      "account_gate": "Existing Google Analytics integration needs Google credentials. A local metrics engine replaces the job, not the identical underlying GA4 dataset. Paid report packaging is separate.",
+      "evidence": "Backend substitution required",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/google-analytics-for-wordpress/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.monsterinsights.com/pricing/"
+        },
+        {
+          "title": "Matomo self-hosted analytics",
+          "url": "https://matomo.org/guide/installation-maintenance/matomo-on-premise-self-hosted/"
+        },
+        {
+          "title": "Umami self-hosting FAQ",
+          "url": "https://docs.umami.is/docs/faq"
+        }
+      ]
+    },
+    {
+      "id": "wordfence",
+      "name": "Wordfence",
+      "cluster": "security",
+      "disposition": "Keep local subset",
+      "popularity": "5+ million active installations (WordPress.org)",
+      "local_candidate": "Request filtering, login controls, 2FA, integrity checks, file scans and local audit logs.",
+      "external_or_excluded": "Fresh proprietary rules/signatures, reputation network and analyst response excluded from core.",
+      "account_gate": "Free/paid API keys and premium intelligence timing are documented. Local security engine and continually researched feed are different deliverables.",
+      "evidence": "Documented keys/feed; local engine inference",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wordfence/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.wordfence.com/products/wordfence-premium/"
+        },
+        {
+          "title": "Wordfence API/license keys",
+          "url": "https://www.wordfence.com/help/api-key/"
+        }
+      ]
+    },
+    {
+      "id": "really-simple-security",
+      "name": "Really Simple Security",
+      "cluster": "security",
+      "disposition": "Keep local subset",
+      "popularity": "3+ million active installations (WordPress.org)",
+      "local_candidate": "Hardening, security headers, TOTP/passkeys, login policies and local request rules.",
+      "external_or_excluded": "Vulnerability intelligence/certificate authorities and any ongoing remote services separate from controls.",
+      "account_gate": "Commercial gates on local security controls are verified at capability level; exact runtime account requirement unknown.",
+      "evidence": "Capability docs; gate mechanics unknown",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/really-simple-ssl/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://really-simple-ssl.com/pro/"
+        }
+      ]
+    },
+    {
+      "id": "akismet",
+      "name": "Akismet",
+      "cluster": "security",
+      "disposition": "Exclude service; replace basic job",
+      "popularity": "5+ million active installations (WordPress.org)",
+      "local_candidate": "Honeypots, local challenge/rate rules, moderation heuristics and a locally maintained classifier can cover basic anti-spam.",
+      "external_or_excluded": "Do not promise Akismet network intelligence or equivalent detection accuracy; current classification calls its servers.",
+      "account_gate": "API key is genuinely used for remote comment classification. This is not just an arbitrary lock on a shipped local classifier.",
+      "evidence": "Documented cloud execution",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/akismet/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://akismet.com/pricing/"
+        },
+        {
+          "title": "Akismet API architecture",
+          "url": "https://akismet.com/developers/detailed-docs/"
+        },
+        {
+          "title": "Akismet per-comment service usage",
+          "url": "https://akismet.com/support/general/akismet-api-usage-limits/"
+        }
+      ]
+    },
+    {
+      "id": "complianz",
+      "name": "Complianz",
+      "cluster": "security",
+      "disposition": "Keep local subset",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Consent UI, script blocking, local consent records, preference categories, region rules and data-request workflows.",
+      "external_or_excluded": "Maintained legal/cookie databases, geo-IP data and external CMP/ad registrations separate.",
+      "account_gate": "Paid local operations can be independently designed; exact account/expiry controls were not audited. Region-aware UI does not guarantee correct legal configuration.",
+      "evidence": "Capability docs; locality inference",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/complianz-gdpr/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://complianz.io/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "jetpack",
+      "name": "Jetpack",
+      "cluster": "resilience",
+      "disposition": "Keep local subset",
+      "popularity": "3+ million active installations (WordPress.org)",
+      "local_candidate": "Local events/stats, request protection, publishing, forms, newsletter management and snapshot orchestration.",
+      "external_or_excluded": "Skip vendor backup vault, image/video CDN, hosted search/AI and remote security/spam services.",
+      "account_gate": "Service bundles need connected accounts as implemented. Some functionality is ordinary local software; vendor vault/network services have genuine external infrastructure.",
+      "evidence": "Mixed local/service architecture",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/jetpack/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://jetpack.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "updraftplus",
+      "name": "UpdraftPlus",
+      "cluster": "resilience",
+      "disposition": "Local candidate",
+      "popularity": "4+ million active installations (WordPress.org)",
+      "local_candidate": "Backup creation, precision schedules, incremental files, retention, encryption, update snapshots, restoration and migration.",
+      "external_or_excluded": "Vault/storage is separate; owner SFTP/secondary storage can avoid the plugin vendor account.",
+      "account_gate": "Verified: installed Premium remains accessible after term ends; updates/support/new releases stop. Premium scheduling does not inherently need vendor compute.",
+      "evidence": "Documented local operation/continuation",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/updraftplus/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://teamupdraft.com/updraftplus/pricing/"
+        },
+        {
+          "title": "UpdraftPlus premium features and cancellation",
+          "url": "https://teamupdraft.com/updraftplus/pricing/"
+        },
+        {
+          "title": "UpdraftPlus backup schedules",
+          "url": "https://teamupdraft.com/docs/updraftplus/backing-up/how-to/schedule-file-and-database-backups/"
+        }
+      ]
+    },
+    {
+      "id": "all-in-one-wp-migration",
+      "name": "All-in-One WP Migration",
+      "cluster": "resilience",
+      "disposition": "Local candidate",
+      "popularity": "5+ million active installations (WordPress.org)",
+      "local_candidate": "Package export/import, URL replacement, selected data movement, local scheduling and restore tools.",
+      "external_or_excluded": "Cloud destination accounts optional; skip vendor-service dependencies for a new local engine.",
+      "account_gate": "Paid extensions unlock local import/CLI/size workflows. Exact expiry/network enforcement not verified; avoid assuming “Unlimited” removes all host limits.",
+      "evidence": "Commercial package gates; mechanics unknown",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/all-in-one-wp-migration/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://servmask.com/products/unlimited-extension"
+        }
+      ]
+    },
+    {
+      "id": "duplicator",
+      "name": "Duplicator",
+      "cluster": "resilience",
+      "disposition": "Local candidate",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Installable archives, local scheduling, encrypted backups, restores, clone/staging and selective migration.",
+      "external_or_excluded": "Optional vendor cloud storage or external destination accounts.",
+      "account_gate": "Paid automation/large-site workflows are local-capable; runtime/expiry controls not independently verified.",
+      "evidence": "Capability docs; local engine inference",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/duplicator/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://duplicator.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "managewp-worker",
+      "name": "ManageWP Worker",
+      "cluster": "operations",
+      "disposition": "Replace service workflow",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Bulk update orchestration, inventories, permissions, client reports and self-hosted fleet management.",
+      "external_or_excluded": "Skip vendor dashboard/cloud backup/remote uptime; a separate owner-hosted controller can replace management.",
+      "account_gate": "Worker is a connector to the hosted control plane, not a complete independent dashboard. MainWP demonstrates the owner-hosted alternative.",
+      "evidence": "Documented cloud model; self-hosted substitute",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/worker/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://managewp.com/pricing/"
+        },
+        {
+          "title": "ManageWP backup infrastructure",
+          "url": "https://managewp.com/features/backup/"
+        },
+        {
+          "title": "MainWP self-hosted management",
+          "url": "https://mainwp.com/"
+        }
+      ]
+    },
+    {
+      "id": "litespeed-cache",
+      "name": "LiteSpeed Cache",
+      "cluster": "media",
+      "disposition": "Keep local subset",
+      "popularity": "7+ million active installations (WordPress.org)",
+      "local_candidate": "Asset/media settings, cleanup and caching with a compatible local LiteSpeed server.",
+      "external_or_excluded": "QUIC.cloud CDN and remote image/page optimization require service usage as implemented.",
+      "account_gate": "No paid Pro plugin. Server/CDN requirements are technical deployment dependencies; OpenLiteSpeed is an option. Local cache should not be mislabeled as a license-locked Pro feature.",
+      "evidence": "Documented infrastructure split",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/litespeed-cache/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wordpress.org/plugins/litespeed-cache/"
+        }
+      ]
+    },
+    {
+      "id": "wp-rocket",
+      "name": "WP Rocket",
+      "cluster": "media",
+      "disposition": "Keep local subset",
+      "popularity": "Vendor claim: 5,594,000+ websites; not comparable to directory active installs",
+      "local_candidate": "Page caching, preload, JS scheduling/lazy loading and ordinary on-host optimization.",
+      "external_or_excluded": "Current CSS-generation and performance services, limited CDN and remote compatibility feeds excluded.",
+      "account_gate": "Verified: local plugin continues after expiry; cloud features stop 15 days later. CSS output on disk does not mean it was generated locally. A new local generator needs its own implementation/resources.",
+      "evidence": "Documented local versus cloud expiry",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://wp-rocket.me/pricing/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wp-rocket.me/"
+        },
+        {
+          "title": "WP Rocket expiry: local versus cloud",
+          "url": "https://docs.wp-rocket.me/article/1711-what-happens-if-my-license-expires"
+        },
+        {
+          "title": "WP Rocket Remove Unused CSS architecture",
+          "url": "https://docs.wp-rocket.me/article/1529-remove-unused-css"
+        },
+        {
+          "title": "Critical CSS local extraction tool",
+          "url": "https://github.com/addyosmani/critical"
+        }
+      ]
+    },
+    {
+      "id": "wp-fastest-cache",
+      "name": "WP Fastest Cache",
+      "cluster": "media",
+      "disposition": "Local candidate",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Caching, mobile/widget variations, minification, database cleanup and local lazy-load controls.",
+      "external_or_excluded": "Metered image processing and CDN integrations must be checked separately; substitute local codecs.",
+      "account_gate": "One-time licenses exist; image credits are distinct. Not all image processing is proven local in the vendor product.",
+      "evidence": "Local candidate; image pipeline uncertain",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wp-fastest-cache/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.wpfastestcache.com/"
+        }
+      ]
+    },
+    {
+      "id": "wp-optimize",
+      "name": "WP-Optimize",
+      "cluster": "media",
+      "disposition": "Local candidate",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Cache/DB cleanup, precise scheduling, role/geographic cache rules, media cleanup and asset settings.",
+      "external_or_excluded": "Cloudflare API/remote integrations optional; image backend must be checked rather than assumed local.",
+      "account_gate": "Installed TeamUpdraft software continuation is documented generally. Individual feature network paths not audited.",
+      "evidence": "Local feasible; backend details partly unknown",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wp-optimize/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://teamupdraft.com/wp-optimize/pricing/"
+        },
+        {
+          "title": "TeamUpdraft installed software and updates",
+          "url": "https://teamupdraft.com/docs/account-management/orders-and-subscriptions/how-long-updates-are-available/"
+        }
+      ]
+    },
+    {
+      "id": "smush",
+      "name": "Smush",
+      "cluster": "media",
+      "disposition": "Reimplement local capability",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Resize/compress/convert images, lazy loading, dimensions and local preload hints.",
+      "external_or_excluded": "Skip current remote compression/CDN; keep the underlying optimization job using local libraries.",
+      "account_gate": "Docs confirm compression API sends images to third-party servers. Account/Hub gates coexist with an actual remote pipeline; it is not currently an offline compressor.",
+      "evidence": "Documented remote pipeline; feasible local replacement",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wp-smushit/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wordpress.org/plugins/wp-smushit/"
+        },
+        {
+          "title": "Smush API and CDN architecture",
+          "url": "https://wpmudev.com/docs/wpmu-dev-plugins/smush/"
+        },
+        {
+          "title": "EWWW local command-line tools",
+          "url": "https://docs.ewww.io/article/29-what-is-exec-and-why-do-i-need-it"
+        },
+        {
+          "title": "WordPress AVIF support",
+          "url": "https://make.wordpress.org/core/2024/02/23/wordpress-6-5-adds-avif-support/"
+        }
+      ]
+    },
+    {
+      "id": "imagify",
+      "name": "Imagify",
+      "cluster": "media",
+      "disposition": "Reimplement local capability",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Compression, resizing, WebP/AVIF generation, backups and bulk processing with local codecs.",
+      "external_or_excluded": "Skip current API optimization quotas; no global CDN parity promised.",
+      "account_gate": "API performs compression remotely. Completed files stay locally, which is different from account-independent processing of future files.",
+      "evidence": "Documented remote processing",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/imagify/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://imagify.io/pricing/"
+        },
+        {
+          "title": "Imagify processing FAQ",
+          "url": "https://imagify.io/faq/"
+        },
+        {
+          "title": "imgproxy self-hosted installation",
+          "url": "https://docs.imgproxy.net/installation"
+        }
+      ]
+    },
+    {
+      "id": "shortpixel-image-optimizer",
+      "name": "ShortPixel Image Optimizer",
+      "cluster": "media",
+      "disposition": "Reimplement local capability",
+      "popularity": "300,000+ active installations (WordPress.org)",
+      "local_candidate": "Image transformation/format conversion, resizing and local image metadata management.",
+      "external_or_excluded": "Skip vendor optimization cloud/CDN/hosted AI and credit accounting.",
+      "account_gate": "Official FAQ confirms original images go to its optimization cloud. Same general tasks can be implemented locally without promising identical compression output.",
+      "evidence": "Documented remote processing",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/shortpixel-image-optimiser/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://shortpixel.com/pricing"
+        },
+        {
+          "title": "ShortPixel architecture FAQ",
+          "url": "https://shortpixel.com/faq"
+        },
+        {
+          "title": "imgproxy self-hosted installation",
+          "url": "https://docs.imgproxy.net/installation"
+        }
+      ]
+    },
+    {
+      "id": "ewww-image-optimizer",
+      "name": "EWWW Image Optimizer",
+      "cluster": "media",
+      "disposition": "Keep local subset",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "local_candidate": "Existing local optimization and locally stored original-image backups; own codec processing.",
+      "external_or_excluded": "Skip API compression, Easy IO/CDN and vendor backup services.",
+      "account_gate": "Local mode is documented and needs command-line support/exec for relevant tools; some host environments require cloud fallback.",
+      "evidence": "Documented local mode + host requirements",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/ewww-image-optimizer/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://ewww.io/plans/"
+        },
+        {
+          "title": "EWWW local command-line tools",
+          "url": "https://docs.ewww.io/article/29-what-is-exec-and-why-do-i-need-it"
+        },
+        {
+          "title": "EWWW local compression options",
+          "url": "https://docs.ewww.io/article/102-local-compression-options"
+        }
+      ]
+    },
+    {
+      "id": "polylang",
+      "name": "Polylang",
+      "cluster": "content",
+      "disposition": "Local candidate",
+      "popularity": "800,000+ active installations (WordPress.org)",
+      "local_candidate": "Language-linked records, menus, slugs, strings, duplicate/sync workflows and multilingual commerce data.",
+      "external_or_excluded": "Own-key DeepL or other machine translation is optional; manual translations remain local.",
+      "account_gate": "License described for updates/support. Exact backend enforcement is not independently tested; no blanket no-account assurance for all Pro installation workflows.",
+      "evidence": "Local data model; licensing docs",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/polylang/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://polylang.pro/pricing/"
+        },
+        {
+          "title": "Polylang licensing and integrations",
+          "url": "https://polylang.pro/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "translatepress",
+      "name": "TranslatePress",
+      "cluster": "content",
+      "disposition": "Keep local subset",
+      "popularity": "400,000+ active installations (WordPress.org)",
+      "local_candidate": "Visual/manual translation editing, multilingual routing, local string storage, SEO and translator roles.",
+      "external_or_excluded": "Current AI/Google/DeepL translation calls external services; owner-hosted translation worker could substitute.",
+      "account_gate": "Terms say expiry removes AI and certain premium features, without a complete feature list. Distinguish retained translated content from ability to use every paid tool.",
+      "evidence": "Documented AI; incomplete expiry scope",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/translatepress-multilingual/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://translatepress.com/pricing/"
+        },
+        {
+          "title": "TranslatePress service and expiry terms",
+          "url": "https://translatepress.com/terms-conditions/"
+        },
+        {
+          "title": "LibreTranslate self-hosted installation",
+          "url": "https://docs.libretranslate.com/guides/installation/"
+        }
+      ]
+    },
+    {
+      "id": "wpml",
+      "name": "WPML",
+      "cluster": "content",
+      "disposition": "Keep local subset",
+      "popularity": "Vendor claim: 1.5M websites / 250,000 users; not directory active installs",
+      "local_candidate": "Manual translations, language relationships, strings, URLs and editorial translation workflows.",
+      "external_or_excluded": "Paid automatic translation and professional translation network excluded/connectors.",
+      "account_gate": "Verified: existing registered sites continue. New-site registration or changed-URL re-registration requires active subscription, so a migration can encounter an account gate.",
+      "evidence": "Documented registration/continuation",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://app.wpml.org/purchase"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wpml.org/"
+        },
+        {
+          "title": "WPML subscription and site registration",
+          "url": "https://wpml.org/home/terms-and-conditions/"
+        }
+      ]
+    },
+    {
+      "id": "woocommerce-core",
+      "name": "WooCommerce core",
+      "cluster": "commerce",
+      "disposition": "Keep existing engine",
+      "popularity": "7+ million active installations (WordPress.org)",
+      "local_candidate": "Catalog, carts, orders, inventory, coupons, customer records and local reports.",
+      "external_or_excluded": "Payment networks, carrier quotes/labels and specialist external services are adapters.",
+      "account_gate": "Core is free; no universal Pro runtime lock. Extension-specific licenses and payment-provider accounts must be distinguished.",
+      "evidence": "Documented free core; locality inference",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/woocommerce/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://woocommerce.com/"
+        }
+      ]
+    },
+    {
+      "id": "woocommerce-subscriptions",
+      "name": "WooCommerce Subscriptions",
+      "cluster": "commerce",
+      "disposition": "Keep local subset",
+      "popularity": "Woo marketplace: 100K+ active installs; separate from core adoption",
+      "local_candidate": "Subscription state, schedules, entitlement rules, renewal events, retries and customer management.",
+      "external_or_excluded": "Actual recurring card charges require gateway/payment network. A local scheduler alone cannot settle transactions.",
+      "account_gate": "Paid extension is local software with gateway integration. Exact extension expiry controls not verified; do not equate processor credentials with vendor entitlement.",
+      "evidence": "Local workflow + external settlement",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://woocommerce.com/products/woocommerce-subscriptions/"
+        }
+      ]
+    },
+    {
+      "id": "woocommerce-bookings",
+      "name": "WooCommerce Bookings",
+      "cluster": "commerce",
+      "disposition": "Local candidate",
+      "popularity": "Woo marketplace: 20K+ active installs",
+      "local_candidate": "Availability calendars, resource capacity, booking rules, group/person pricing and reservation records.",
+      "external_or_excluded": "Google Calendar and payment collection optional external adapters.",
+      "account_gate": "Commercial booking engine is local-capable; full runtime/expiry behavior not audited. Production concurrency correctness is the substantial engineering work.",
+      "evidence": "Local algorithm/data; enforcement unknown",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://woocommerce.com/products/woocommerce-bookings/"
+        }
+      ]
+    },
+    {
+      "id": "woocommerce-memberships",
+      "name": "WooCommerce Memberships",
+      "cluster": "identity",
+      "disposition": "Local candidate",
+      "popularity": "Woo marketplace: 30K+ active installs",
+      "local_candidate": "Content access, drip, member discounts/perks, local member administration.",
+      "external_or_excluded": "Recurring charges need a billing gateway/Subscriptions-style workflow.",
+      "account_gate": "Paid content-access feature is not inherently cloud. Exact expiry/license behavior was not verified.",
+      "evidence": "Local rules; enforcement unknown",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://woocommerce.com/products/woocommerce-memberships/"
+        }
+      ]
+    },
+    {
+      "id": "memberpress",
+      "name": "MemberPress",
+      "cluster": "identity",
+      "disposition": "Keep local subset",
+      "popularity": "Vendor says thousands of creators; no independently verified active-install count",
+      "local_candidate": "Access rules, members, content dripping, course progress, quizzes and community/affiliate records.",
+      "external_or_excluded": "Payments and hosted AI excluded/adapters; large live messaging demands optional workers.",
+      "account_gate": "Verified: admin screens/functions become unavailable after grace period; existing frontend operations remain. Locally stored membership data does not equal perpetual management access.",
+      "evidence": "Documented local admin restriction",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://memberpress.com/plans/pricing/"
+        },
+        {
+          "title": "MemberPress expiry behavior",
+          "url": "https://memberpress.com/docs/what-happens-when-my-subscription-ends/"
+        }
+      ]
+    }
+  ],
+  "documented_gates": [
+    {
+      "product": "ACF Pro",
+      "type": "Local capability restricted",
+      "observed": "Pro schema-authoring controls depend on activation. Expired, previously activated licenses allow existing definitions to be edited but prevent new Pro definitions. Data-value editing/rendering stays available.",
+      "implication": "A direct example of local operations with commercial enforcement; not a cloud-compute requirement.",
+      "sources": [
+        "https://www.advancedcustomfields.com/resources/license-activations/"
+      ]
+    },
+    {
+      "product": "MemberPress",
+      "type": "Local admin restricted",
+      "observed": "After expiry and grace period, admin screens/functions become inaccessible; existing frontend operations continue.",
+      "implication": "Content/member data can remain local while management access is subscription-gated.",
+      "sources": [
+        "https://memberpress.com/docs/what-happens-when-my-subscription-ends/"
+      ]
+    },
+    {
+      "product": "Elementor Pro",
+      "type": "Local premium operations restricted",
+      "observed": "Current non-renewal guidance restricts new widgets/tags and some existing premium access; renewal help says Pro features stop. These descriptions differ in breadth.",
+      "implication": "Clear premium entitlement gate; do not assume the entire live site goes offline or assert exact offline-cache duration.",
+      "sources": [
+        "https://elementor.com/help/what-happens-to-my-site-if-i-cancel-elementor-pro/",
+        "https://elementor.com/help/how-can-i-renew-my-subscription/"
+      ]
+    },
+    {
+      "product": "WPML",
+      "type": "New/re-registered sites gated",
+      "observed": "Existing registered installations continue, but a new site or changed URL requires active subscription for registration.",
+      "implication": "Migration portability can depend on entitlement even when manual translations are local.",
+      "sources": [
+        "https://wpml.org/home/terms-and-conditions/"
+      ]
+    },
+    {
+      "product": "TranslatePress",
+      "type": "Mixed / incomplete expiry scope",
+      "observed": "Terms say AI and certain premium features become unavailable after expiry; precise premium feature list is absent. AI text is sent to its service.",
+      "implication": "Confirmed service dependency; only partial evidence about local-feature enforcement.",
+      "sources": [
+        "https://translatepress.com/terms-conditions/"
+      ]
+    },
+    {
+      "product": "Gravity Forms",
+      "type": "Installed runtime continues",
+      "observed": "Installed core/add-ons continue operating after expiry. Updates, support, downloads and new-site registration stop.",
+      "implication": "Commercial software without documented shutdown of existing forms; recovery registration remains a dependency.",
+      "sources": [
+        "https://docs.gravityforms.com/license-expiry/"
+      ]
+    },
+    {
+      "product": "WPForms",
+      "type": "Installed version continues",
+      "observed": "Renewal FAQ says the installed Pro version remains usable. Downloads/updates/support and gateway fee benefits are separate entitlements.",
+      "implication": "Do not describe all paid form logic as forced ongoing cloud access.",
+      "sources": [
+        "https://wpforms.com/docs/how-to-renew-your-wpforms-license/"
+      ]
+    },
+    {
+      "product": "UpdraftPlus Premium",
+      "type": "Installed runtime continues",
+      "observed": "Vendor says Premium remains accessible after the term; updates/support/new releases stop. Vault space is a distinct service.",
+      "implication": "Precision scheduling and snapshot logic are local-capable paid software.",
+      "sources": [
+        "https://teamupdraft.com/updraftplus/pricing/"
+      ]
+    },
+    {
+      "product": "WP Rocket",
+      "type": "Local continues; remote services stop",
+      "observed": "Normal plugin operation continues. Documented cloud features cease after 15 days, including CSS generation and performance services.",
+      "implication": "A real mixed product: remote generation is actual vendor architecture, but a local substitute is technically possible.",
+      "sources": [
+        "https://docs.wp-rocket.me/article/1711-what-happens-if-my-license-expires",
+        "https://docs.wp-rocket.me/article/1529-remove-unused-css"
+      ]
+    },
+    {
+      "product": "ASE Pro",
+      "type": "Installed features continue; activation licensed",
+      "observed": "Annual expiry leaves installed Pro features available but removes updates/support and new activations. Lifetime licenses are offered. Revocation is a separate documented case.",
+      "implication": "Already an integrated one-time-purchase benchmark, with commercial license mechanics.",
+      "sources": [
+        "https://www.wpase.com/pricing/"
+      ]
+    },
+    {
+      "product": "MC4WP",
+      "type": "Conflicting documentation",
+      "observed": "Pricing says premium access ends; expiry KB says continued use without updates/support. Both are current public sources.",
+      "implication": "Treat actual runtime enforcement as unresolved; Mailchimp account dependence is clear.",
+      "sources": [
+        "https://www.mc4wp.com/kb/happens-license-expires/",
+        "https://www.mc4wp.com/pricing/"
+      ]
+    },
+    {
+      "product": "Directus (CMS benchmark)",
+      "type": "Self-hosted paid capability limits",
+      "observed": "Current docs describe an unlicensed core tier and paid entitlements, online revalidation and Enterprise-only offline tokens.",
+      "implication": "Self-hosting is not the same as unrestricted or account-independent local use.",
+      "sources": [
+        "https://directus.com/docs/licensing/overview"
+      ]
+    }
+  ],
+  "benchmarks": [
+    {
+      "name": "ASE",
+      "type": "Existing unified WordPress utility plugin",
+      "scope": "Custom content types, admin/editor utilities, code snippets, redirects and site operations; existing modular suite.",
+      "boundary": "78 modules advertised (counts overlap free/Pro); one-time licenses offered. Annual expiry keeps installed features but stops updates/support/new activations.",
+      "gap": "Does not establish full SEO/form/commerce/backup parity. Benchmark integration quality and remaining gaps.",
+      "sources": [
+        "https://www.wpase.com/features/",
+        "https://www.wpase.com/pricing/"
+      ]
+    },
+    {
+      "name": "MainWP",
+      "type": "Owner-hosted fleet management",
+      "scope": "Own WordPress dashboard/controller can manage connected sites without a vendor-hosted control plane.",
+      "boundary": "Self-hosted design verified; extension accounts/licenses and external services still need individual assessment.",
+      "gap": "A controller on the failed origin cannot independently detect that outage; controller placement matters.",
+      "sources": [
+        "https://mainwp.com/"
+      ]
+    },
+    {
+      "name": "FluentSMTP",
+      "type": "Local mail controls",
+      "scope": "Logs, resend, routing/fallback and provider connections demonstrate that these do not need a paid vendor cloud.",
+      "boundary": "Free product as advertised; actual mail transport still needs owner SMTP/MTA or a provider.",
+      "gap": "Local logs do not prove recipient inbox delivery.",
+      "sources": [
+        "https://fluentsmtp.com/"
+      ]
+    },
+    {
+      "name": "Matomo / Umami",
+      "type": "Owner-hosted analytics",
+      "scope": "Shows reporting and event analysis can be run on owner infrastructure; Matomo supports on-premise heatmap workflows.",
+      "boundary": "Cloud hosting is optional; premium analytics plugin entitlements vary.",
+      "gap": "Not identical GA4 data, Google Search Console or ad-platform attribution; running analytics adds storage/CPU operations.",
+      "sources": [
+        "https://matomo.org/guide/installation-maintenance/matomo-on-premise-self-hosted/",
+        "https://matomo.org/guide/reports/heatmaps/",
+        "https://docs.umami.is/docs/faq"
+      ]
+    },
+    {
+      "name": "listmonk",
+      "type": "Local audience and campaigns",
+      "scope": "Mailing lists, segmentation/campaign engine and queues run on owner infrastructure.",
+      "boundary": "Own application, database and configured SMTP transport; hosted Mailchimp not inherently needed for the job.",
+      "gap": "Mail reputation and delivery remain an operational responsibility or chosen external service.",
+      "sources": [
+        "https://listmonk.app/"
+      ]
+    },
+    {
+      "name": "restic / imgproxy / LibreTranslate",
+      "type": "Optional owner-hosted workers",
+      "scope": "Demonstrate backup storage, image transformation and translation tasks can be operated outside vendor SaaS.",
+      "boundary": "Additional processes/libraries/model assets; not guaranteed on ordinary shared WordPress hosting.",
+      "gap": "These are building blocks, not a single installed WordPress plugin or turnkey parity with the original services.",
+      "sources": [
+        "https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html",
+        "https://docs.imgproxy.net/installation",
+        "https://docs.libretranslate.com/guides/installation/"
+      ]
+    }
+  ],
+  "cms_references": [
+    {
+      "name": "ProcessWire",
+      "type": "PHP CMS / content framework",
+      "scope": "Custom fields, repeaters, roles and multilingual content already form a coherent core.",
+      "fit": "Strong reference for schema-first design on PHP infrastructure; learn its integrated model before creating another CMS.",
+      "gap": "A developer still builds the site presentation; richer builders/forms/cache may be paid modules. Not full WooCommerce ecosystem replacement.",
+      "sources": [
+        "https://processwire.com/"
+      ]
+    },
+    {
+      "name": "Kirby",
+      "type": "Self-hosted PHP CMS",
+      "scope": "Content editing and templates on owner hosting; one-time per-install/domain license model.",
+      "fit": "Useful reference for download/install ownership and manual license-file provisioning.",
+      "gap": "Commercial activation still exists. Offline license-file import does not prove every service/add-on is account-free.",
+      "sources": [
+        "https://getkirby.com/buy/answers/included",
+        "https://getkirby.com/docs/guide/quickstart"
+      ]
+    },
+    {
+      "name": "Grav",
+      "type": "PHP flat-file CMS",
+      "scope": "Content pages without a mandatory SQL database; documented server requirements.",
+      "fit": "A plausible lightweight content-site foundation; inspect file-based editing and deployment.",
+      "gap": "Flat files alone do not solve transactional orders, inventory, analytics events or large form-entry workloads. Those often need separate structured storage.",
+      "sources": [
+        "https://learn.getgrav.org/17/basics/requirements"
+      ]
+    },
+    {
+      "name": "Payload",
+      "type": "Self-hosted TypeScript / Next.js backend",
+      "scope": "Integrated admin, schema, migrations, auth, access control, files and generated APIs.",
+      "fit": "Good foundation if a VPS/Node deployment and custom application frontend fit the target.",
+      "gap": "Requires build/runtime/database/storage operations; not a drop-in shared-PHP installation. Enterprise services/features should be assessed separately.",
+      "sources": [
+        "https://payloadcms.com/docs/getting-started/what-is-payload",
+        "https://payloadcms.com/docs/production/deployment"
+      ]
+    },
+    {
+      "name": "Drupal",
+      "type": "Modular PHP CMS",
+      "scope": "Established content-management foundation with modules/themes and several database options.",
+      "fit": "A reference for rich integrated CMS capability and mature extensibility.",
+      "gap": "Feature richness and operating model are not the same as “lite”; migration and ecosystem integration remain work.",
+      "sources": [
+        "https://www.drupal.org/docs/user_guide/en/understanding-drupal.html"
+      ]
+    },
+    {
+      "name": "Directus",
+      "type": "Self-hosted data platform",
+      "scope": "Owner-operated database/content APIs and administration.",
+      "fit": "Useful demonstration of local data/control with optional hosted service.",
+      "gap": "Current MSCL core/paid limits and revalidation mean it should not be assumed to satisfy unrestricted account-independent operation. This is a product-doc observation, not a legal assessment.",
+      "sources": [
+        "https://directus.com/docs/self-hosting/overview",
+        "https://directus.com/docs/licensing/overview"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://www.advancedcustomfields.com/resources/license-activations/",
+      "title": "ACF license activation and expiry",
+      "supports": "Local authoring controls restricted by license; content editing/rendering remains available.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://elementor.com/help/what-happens-to-my-site-if-i-cancel-elementor-pro/",
+      "title": "Elementor non-renewal behavior",
+      "supports": "New premium widgets/tags and some existing premium operations restricted; no inference that whole frontend goes offline.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://elementor.com/help/how-can-i-renew-my-subscription/",
+      "title": "Elementor renewal documentation",
+      "supports": "Broader language says Pro features stop at expiry; interpret alongside specific non-renewal guidance.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://memberpress.com/docs/what-happens-when-my-subscription-ends/",
+      "title": "MemberPress expiry behavior",
+      "supports": "Backend/admin functions become unavailable after grace period; existing frontend remains.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://docs.gravityforms.com/license-expiry/",
+      "title": "Gravity Forms license expiry",
+      "supports": "Installed products continue; updates/support/downloads/new registration end.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpforms.com/docs/how-to-renew-your-wpforms-license/",
+      "title": "WPForms license renewal FAQ",
+      "supports": "Installed Pro version remains usable; ongoing update/add-on/support entitlements differ.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpml.org/home/terms-and-conditions/",
+      "title": "WPML subscription and site registration",
+      "supports": "Existing registered sites continue; new/changed URL registration requires active subscription.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://polylang.pro/pricing/",
+      "title": "Polylang licensing and integrations",
+      "supports": "License described for updates/support; own-key DeepL integration distinct from local translations.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://translatepress.com/terms-conditions/",
+      "title": "TranslatePress service and expiry terms",
+      "supports": "AI sends text to service; some premium features lost on expiry, exact list not specified.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://teamupdraft.com/updraftplus/pricing/",
+      "title": "UpdraftPlus premium features and cancellation",
+      "supports": "Local backups/retention and installed premium continuation; Vault is separate storage.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://teamupdraft.com/docs/updraftplus/backing-up/how-to/schedule-file-and-database-backups/",
+      "title": "UpdraftPlus backup schedules",
+      "supports": "Exact scheduling, incrementals and retention are premium local workflows.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://teamupdraft.com/docs/account-management/orders-and-subscriptions/how-long-updates-are-available/",
+      "title": "TeamUpdraft installed software and updates",
+      "supports": "Installed software remains usable after cancellation; update/support term ends.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://docs.wp-rocket.me/article/1711-what-happens-if-my-license-expires",
+      "title": "WP Rocket expiry: local versus cloud",
+      "supports": "Normal local operation remains; documented cloud features stop after 15 days.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://docs.wp-rocket.me/article/1529-remove-unused-css",
+      "title": "WP Rocket Remove Unused CSS architecture",
+      "supports": "Generation uses remote tool and valid license, although output is stored locally.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.wordfence.com/help/api-key/",
+      "title": "Wordfence API/license keys",
+      "supports": "Free and paid keys; rules/signatures update entitlements.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://akismet.com/developers/detailed-docs/",
+      "title": "Akismet API architecture",
+      "supports": "Remote spam/ham classification service.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://akismet.com/support/general/akismet-api-usage-limits/",
+      "title": "Akismet per-comment service usage",
+      "supports": "Incoming comments invoke remote classification API.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpmudev.com/docs/wpmu-dev-plugins/smush/",
+      "title": "Smush API and CDN architecture",
+      "supports": "Images sent to remote compression servers; CDN separate.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://imagify.io/faq/",
+      "title": "Imagify processing FAQ",
+      "supports": "Compression runs remotely; completed assets remain on user server.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://shortpixel.com/faq",
+      "title": "ShortPixel architecture FAQ",
+      "supports": "Original images sent to optimization cloud.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://docs.ewww.io/article/29-what-is-exec-and-why-do-i-need-it",
+      "title": "EWWW local command-line tools",
+      "supports": "Local compression uses server tools/exec; cloud alternatives also available.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://docs.ewww.io/article/102-local-compression-options",
+      "title": "EWWW local compression options",
+      "supports": "Local versus API processing and local/cloud backup options.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://managewp.com/features/backup/",
+      "title": "ManageWP backup infrastructure",
+      "supports": "Off-site backups and service-provided control plane.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://optinmonster.com/docs/optinmonster-builder-overview/",
+      "title": "OptinMonster campaign builder",
+      "supports": "Campaign authoring/analytics managed through service dashboard.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.mc4wp.com/kb/happens-license-expires/",
+      "title": "MC4WP expiry knowledge base",
+      "supports": "Says installed plugin continues; conflicts with pricing-page premium-access language.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.mc4wp.com/pricing/",
+      "title": "MC4WP pricing / expiry FAQ",
+      "supports": "Premium-access expiry wording conflicts with support article; exact enforcement not established.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.wpase.com/features/",
+      "title": "ASE feature inventory",
+      "supports": "Existing modular plugin bundling content types, snippets and admin/site operations.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.wpase.com/pricing/",
+      "title": "ASE plans and license behavior",
+      "supports": "One-time licenses offered; annual expiry allows installed features to continue, new activations differ.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://mainwp.com/",
+      "title": "MainWP self-hosted management",
+      "supports": "Owner-hosted alternative to a vendor SaaS fleet dashboard.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://fluentsmtp.com/",
+      "title": "FluentSMTP feature inventory",
+      "supports": "Free SMTP connections, logs, resend and fallback demonstrate local mail-control feasibility.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://matomo.org/guide/installation-maintenance/matomo-on-premise-self-hosted/",
+      "title": "Matomo self-hosted analytics",
+      "supports": "Analytics data/engine can run on owner infrastructure.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://matomo.org/guide/reports/heatmaps/",
+      "title": "Matomo heatmaps guide",
+      "supports": "Heatmap processing can be deployed on premise; plugin entitlement is separate.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://docs.umami.is/docs/faq",
+      "title": "Umami self-hosting FAQ",
+      "supports": "Self-hosted analytics alternative to managed cloud.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://listmonk.app/",
+      "title": "listmonk self-hosted mail management",
+      "supports": "Lists, campaigns and queues run locally; SMTP transport is configured separately.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html",
+      "title": "restic local/SFTP repositories",
+      "supports": "User-controlled local or remote repositories; remote need not be vendor SaaS.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://restic.readthedocs.io/en/stable/010_introduction.html",
+      "title": "restic snapshots, restores and integrity",
+      "supports": "Restorable snapshots and checking data integrity.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://developer.wordpress.org/plugins/cron/",
+      "title": "WordPress cron design",
+      "supports": "Page-load-driven scheduling differs from an independent system scheduler.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://developer.wordpress.org/plugins/cron/hooking-wp-cron-into-the-system-task-scheduler/",
+      "title": "WordPress system task scheduler integration",
+      "supports": "Host-level scheduled invocation can support reliable local background work.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://actionscheduler.org/",
+      "title": "Action Scheduler local job queue",
+      "supports": "WordPress background jobs can use a local queue.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://docs.imgproxy.net/installation",
+      "title": "imgproxy self-hosted installation",
+      "supports": "Owner-hosted image processing service; needs executable/container environment.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://make.wordpress.org/core/2024/02/23/wordpress-6-5-adds-avif-support/",
+      "title": "WordPress AVIF support",
+      "supports": "Local media capabilities depend on available server image libraries.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://github.com/addyosmani/critical",
+      "title": "Critical CSS local extraction tool",
+      "supports": "Local static/render engines; browser renderer for relevant use cases.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://docs.libretranslate.com/guides/installation/",
+      "title": "LibreTranslate self-hosted installation",
+      "supports": "Machine translation can run in owner infrastructure with model/runtime requirements.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://github.com/ggml-org/llama.cpp",
+      "title": "llama.cpp local inference",
+      "supports": "Local AI inference feasible; hardware/models and quality matter.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://github.com/louislam/uptime-kuma",
+      "title": "Uptime Kuma self-hosted monitoring",
+      "supports": "Can run on owner infrastructure; independent host needed for origin-down alerts.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://developers.google.com/webmaster-tools/v1/searchanalytics/query",
+      "title": "Google Search Console API data",
+      "supports": "Google-owned impressions/query/position data cannot be inferred solely from origin logs.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://processwire.com/",
+      "title": "ProcessWire core content model",
+      "supports": "Custom fields, repeaters, roles and multilingual CMS functions already integrated.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://getkirby.com/buy/answers/included",
+      "title": "Kirby self-hosted one-time license",
+      "supports": "Single-install/domain self-hosted model with one-time purchase.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://getkirby.com/docs/guide/quickstart",
+      "title": "Kirby manual license-file activation",
+      "supports": "License-file import avoids the production Panel contacting licensing server for registration.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://learn.getgrav.org/17/basics/requirements",
+      "title": "Grav requirements",
+      "supports": "PHP flat-file CMS deployment baseline.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://payloadcms.com/docs/getting-started/what-is-payload",
+      "title": "Payload integrated backend",
+      "supports": "Local collections/APIs/auth/access/files; hosted offering is optional.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://payloadcms.com/docs/production/deployment",
+      "title": "Payload deployment requirements",
+      "supports": "Next.js runtime/build, database and persistent assets must be operated.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://directus.com/docs/self-hosting/overview",
+      "title": "Directus self-hosting",
+      "supports": "Self-hosted infrastructure is distinct from account/license independence.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://directus.com/docs/licensing/overview",
+      "title": "Directus current licensing modes",
+      "supports": "Core no-license tier; paid online refresh; offline tokens Enterprise-only; local limits gated.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.drupal.org/docs/user_guide/en/understanding-drupal.html",
+      "title": "Drupal modular PHP CMS",
+      "supports": "Existing modular CMS baseline, not a claim of lightweight operation.",
+      "type": "Official product documentation or primary project repository",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/elementor/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Elementor capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://elementor.com/pro/",
+      "title": "Official pricing / product",
+      "supports": "Elementor capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/essential-addons-for-elementor-lite/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Essential Addons for Elementor capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://essential-addons.com/",
+      "title": "Official pricing / product",
+      "supports": "Essential Addons for Elementor capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/elementskit-lite/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "ElementsKit capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpmet.com/plugin/elementskit/pricing/",
+      "title": "Official pricing / product",
+      "supports": "ElementsKit capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/advanced-custom-fields/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Advanced Custom Fields (ACF) capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.advancedcustomfields.com/pro/",
+      "title": "Official pricing / product",
+      "supports": "Advanced Custom Fields (ACF) capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/insert-headers-and-footers/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "WPCode capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://library.wpcode.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "WPCode capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/code-snippets/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Code Snippets capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://codesnippets.pro/pricing/",
+      "title": "Official pricing / product",
+      "supports": "Code Snippets capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wordpress-seo/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Yoast SEO capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://yoast.com/product/yoast-seo-premium-wordpress/",
+      "title": "Official pricing / product",
+      "supports": "Yoast SEO capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/seo-by-rank-math/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Rank Math capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://rankmath.com/offer/",
+      "title": "Official pricing / product",
+      "supports": "Rank Math capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/all-in-one-seo-pack/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "All in One SEO (AIOSEO) capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://aioseo.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "All in One SEO (AIOSEO) capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wpforms-lite/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "WPForms capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpforms.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "WPForms capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.gravityforms.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "Gravity Forms capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.gravityforms.com/about/",
+      "title": "Official pricing / product",
+      "supports": "Gravity Forms capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wp-mail-smtp/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "WP Mail SMTP capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpmailsmtp.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "WP Mail SMTP capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/mailchimp-for-wp/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "MC4WP: Mailchimp for WordPress capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/optinmonster/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "OptinMonster capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://optinmonster.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "OptinMonster capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/google-analytics-for-wordpress/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "MonsterInsights capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.monsterinsights.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "MonsterInsights capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wordfence/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Wordfence capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.wordfence.com/products/wordfence-premium/",
+      "title": "Official pricing / product",
+      "supports": "Wordfence capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/really-simple-ssl/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Really Simple Security capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://really-simple-ssl.com/pro/",
+      "title": "Official pricing / product",
+      "supports": "Really Simple Security capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/akismet/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Akismet capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://akismet.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "Akismet capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/complianz-gdpr/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Complianz capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://complianz.io/pricing/",
+      "title": "Official pricing / product",
+      "supports": "Complianz capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/jetpack/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Jetpack capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://jetpack.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "Jetpack capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/updraftplus/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "UpdraftPlus capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/all-in-one-wp-migration/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "All-in-One WP Migration capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://servmask.com/products/unlimited-extension",
+      "title": "Official pricing / product",
+      "supports": "All-in-One WP Migration capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/duplicator/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Duplicator capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://duplicator.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "Duplicator capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/worker/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "ManageWP Worker capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://managewp.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "ManageWP Worker capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/litespeed-cache/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "LiteSpeed Cache capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wp-rocket.me/pricing/",
+      "title": "Official pricing / product",
+      "supports": "WP Rocket capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wp-rocket.me/",
+      "title": "Official pricing / product",
+      "supports": "WP Rocket capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wp-fastest-cache/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "WP Fastest Cache capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.wpfastestcache.com/",
+      "title": "Official pricing / product",
+      "supports": "WP Fastest Cache capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wp-optimize/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "WP-Optimize capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://teamupdraft.com/wp-optimize/pricing/",
+      "title": "Official pricing / product",
+      "supports": "WP-Optimize capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wp-smushit/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Smush capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/imagify/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Imagify capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://imagify.io/pricing/",
+      "title": "Official pricing / product",
+      "supports": "Imagify capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/shortpixel-image-optimiser/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "ShortPixel Image Optimizer capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://shortpixel.com/pricing",
+      "title": "Official pricing / product",
+      "supports": "ShortPixel Image Optimizer capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/ewww-image-optimizer/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "EWWW Image Optimizer capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://ewww.io/plans/",
+      "title": "Official pricing / product",
+      "supports": "EWWW Image Optimizer capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/polylang/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "Polylang capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/translatepress-multilingual/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "TranslatePress capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://translatepress.com/pricing/",
+      "title": "Official pricing / product",
+      "supports": "TranslatePress capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://app.wpml.org/purchase",
+      "title": "Official pricing / product",
+      "supports": "WPML capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpml.org/",
+      "title": "Official pricing / product",
+      "supports": "WPML capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/woocommerce/",
+      "title": "WordPress.org: features and adoption",
+      "supports": "WooCommerce core capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://woocommerce.com/",
+      "title": "Official pricing / product",
+      "supports": "WooCommerce core capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://woocommerce.com/products/woocommerce-subscriptions/",
+      "title": "Official pricing / product",
+      "supports": "WooCommerce Subscriptions capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://woocommerce.com/products/woocommerce-bookings/",
+      "title": "Official pricing / product",
+      "supports": "WooCommerce Bookings capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://woocommerce.com/products/woocommerce-memberships/",
+      "title": "Official pricing / product",
+      "supports": "WooCommerce Memberships capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://memberpress.com/plans/pricing/",
+      "title": "Official pricing / product",
+      "supports": "MemberPress capability baseline from original research",
+      "type": "Official vendor / WordPress directory",
+      "accessed": "2026-09-30"
+    }
+  ]
+}

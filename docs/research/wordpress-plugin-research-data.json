@@ -1,0 +1,1999 @@
+{
+  "research_date": "2026-09-30",
+  "methodology": {
+    "selection": "33 directory-listed products, with 30 at 1M+ active installs; 7 paid-only/marketplace category supplements",
+    "feature_scope": "Major advertised capability groups and tier boundaries, not every widget/template/third-party SKU",
+    "price_scope": "Observed official displays; retain regional currency and tax; intro/renewal shown where verified",
+    "evidence_limit": "Installation bands do not reveal paid customers or conversion; buyer anecdotes are directional; no hands-on plugin testing"
+  },
+  "profiles": [
+    {
+      "id": "elementor",
+      "name": "Elementor",
+      "category": "Design & development",
+      "model": "Freemium + services",
+      "popularity": "10+ million active installations (WordPress.org)",
+      "free": [
+        "Responsive visual page editor; containers and grids",
+        "Basic text, image, heading, button, icon, gallery, tabs and accordion widgets",
+        "Template import/export and reusable layouts"
+      ],
+      "paid": [
+        "Essential: theme builder, additional widgets, native WordPress dynamic content and form widget",
+        "Advanced Solo / Advanced / Expert: custom-field and custom-post-type dynamic content, popups, form submissions and integrations, custom CSS/code, WooCommerce builder and collaboration notes",
+        "One: plugin plus shared credits for AI, images, accessibility, cookie consent, email and site management; Agency expands site and credit limits"
+      ],
+      "pricing": "Official July 2026 article lists Essential $60/year, Advanced Solo $84/year, One $168/year. Live page confirms Essential 1 site; Solo 1; Advanced 3; Expert 25; One 1; One Agency unlimited. Current checkout prices for every tier could not be verified. One has 25,000 shared monthly credits; One Agency 350,000.",
+      "why_pay": "Inference: agencies buy reusable design workflows; stores buy product templates; marketing teams buy popups and connected forms. Theme-wide control removes repeated coding. User discussions specifically describe these time savings.",
+      "free_is_enough": "A few landing pages using an existing theme and basic widgets; a block-editor design may also meet the need.",
+      "caveats": "Essential is a narrower paid plan: custom fields/CPTs, popups and submitted-entry management need a higher tier. Pro plugin plans do not include One service credits. Unlimited sites does not mean unlimited AI/email usage.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/elementor/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://elementor.com/pro/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://elementor.com/help/elementor-pro-vs-free/?level=2"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://elementor.com/blog/elementor-free/"
+        }
+      ]
+    },
+    {
+      "id": "essential-addons-for-elementor",
+      "name": "Essential Addons for Elementor",
+      "category": "Design & development",
+      "model": "Freemium",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "60+ widgets including post grid, data table, pricing table, testimonials, forms styling and WooCommerce product displays",
+        "Basic creative effects and extensions; reading progress and table of contents",
+        "Enable only needed elements",
+        "Current free list also includes header/footer builder, mega menu, WooCommerce cart/checkout, login/register, filterable gallery and several product widgets"
+      ],
+      "paid": [
+        "50+ additional elements: post carousel, advanced menus, interactive promotions, galleries and content protection",
+        "Advanced WooCommerce displays, dynamic tags, cross-domain copying, conditional display and parallax extensions",
+        "Paid support and updates; temporary Templately Pro access varies by license"
+      ],
+      "pricing": "Birthday offer: 1 site $3.99/month billed annually ($47.88), displayed regular $4.99 ($59.88/year); unlimited $6.49 ($77.88/year), regular $9.99 ($119.88/year). Lifetime unlimited $179.99 offer / $299.99 regular. Renewal amount not independently confirmed.",
+      "why_pay": "Inference: designers pay for a specific missing widget or reusable interaction rather than commissioning custom code; unlimited/lifetime licenses spread cost across clients.",
+      "free_is_enough": "Existing free widgets can create the desired layout without special filtering, interactions or protection.",
+      "caveats": "Requires Elementor. Widget counts mix free and paid elements. Templately access is temporary, not a perpetual inclusion; do not buy only for a high widget count.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/essential-addons-for-elementor-lite/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://essential-addons.com/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://essential-addons.com/compare/"
+        }
+      ]
+    },
+    {
+      "id": "elementskit",
+      "name": "ElementsKit",
+      "category": "Design & development",
+      "model": "Freemium",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "50+ widgets and templates",
+        "Header/footer and mega-menu tools; heading, accordion, tabs, buttons, testimonials and form styling",
+        "Free modules and design layouts"
+      ],
+      "paid": [
+        "Personal: expanded widgets and basic paid modules",
+        "Professional: additional galleries, advanced search/toggle, hotspots, sticky content and modals",
+        "Agency: broader conditional/protected content, WooCommerce/social elements, cross-domain tools and advanced modules; check the detailed tier matrix for widget builder access"
+      ],
+      "pricing": "Annual offer / regular: Personal $39 / $49 (1 site); Professional $87 / $119 (5 sites); Agency $179 / $249 (unlimited). Lifetime options offered; their checkout prices were not verified. Introductory renewal terms need checkout confirmation.",
+      "why_pay": "Inference: clients requiring mega menus, richer interactive sections or uncommon store widgets justify the paid add-on; agencies amortize unlimited-site access.",
+      "free_is_enough": "The free header/footer, navigation and widgets cover the site design.",
+      "caveats": "Official directory and pricing descriptions overlap on some modules (including widget-building language); verify the exact target module in the chosen tier. Requires Elementor.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/elementskit-lite/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wpmet.com/plugin/elementskit/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "advanced-custom-fields-acf",
+      "name": "Advanced Custom Fields (ACF)",
+      "category": "Design & development",
+      "model": "Freemium",
+      "popularity": "2+ million active installations (WordPress.org)",
+      "free": [
+        "Custom-field groups and location rules; 30+ field types",
+        "Fields for posts, users, taxonomy terms and media; developer APIs and local JSON",
+        "Custom post type and taxonomy registration interfaces"
+      ],
+      "paid": [
+        "All Pro licenses: Repeater and Flexible Content fields",
+        "ACF Blocks and Options Pages",
+        "Gallery and Clone fields; premium updates and support"
+      ],
+      "pricing": "Personal $49/year (1 site); Freelancer $149/year (10); Agency $249/year (unlimited). Feature set is the same; site allowance changes.",
+      "why_pay": "Inference: repeatable data and reusable content components save developer time and make editing safer for clients. Forum users explicitly request repeaters/gallery and debate price versus agency value.",
+      "free_is_enough": "Simple structured fields without nested/repeating groups or custom block workflows.",
+      "caveats": "ACF is a content-model tool, not a complete page builder. Pro features need theme/block implementation; licensing is not the total development cost.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/advanced-custom-fields/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.advancedcustomfields.com/pro/"
+        }
+      ]
+    },
+    {
+      "id": "wpcode",
+      "name": "WPCode",
+      "category": "Design & development",
+      "model": "Freemium",
+      "popularity": "3+ million active installations (WordPress.org)",
+      "free": [
+        "Header/footer scripts and PHP, JavaScript, HTML, CSS/text snippets",
+        "Snippet library, generator, basic conditional insertion and automatic locations",
+        "Error handling and import/export"
+      ],
+      "paid": [
+        "Basic: revisions, private cloud, test mode, scheduling, page-specific snippets, blocks, SCSS and file insertion",
+        "Plus: conversion pixels and server-side integrations for major ad networks and commerce plugins",
+        "Pro: AI allowance, access controls and geolocation conditions; bundle adds larger AI allocation, multisite/client tools and companion products"
+      ],
+      "pricing": "Annual intro → renewal: Basic $49 → $99 (1 site); Plus $99 → $149 (5); Pro $199 → $249 (25); bundle $349 → $399 (100). AI advertised allocations: Pro 500 snippets, bundle 1,000; check reset conditions.",
+      "why_pay": "Inference: site operators buy rollback/testing to reduce risky code changes; marketers buy reliable event wiring across ad platforms; agencies buy control over client access.",
+      "free_is_enough": "Adding analytics tags or a few basic conditional snippets.",
+      "caveats": "Basic conditions are already free. AI output still needs review. Conversion measurement depends on correct event setup, consent and ad-platform rules.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/insert-headers-and-footers/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://library.wpcode.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "code-snippets",
+      "name": "Code Snippets",
+      "category": "Design & development",
+      "model": "Freemium",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "Add, activate/deactivate and organize PHP snippets without editing theme files",
+        "Import/export and community-library access",
+        "Cloud-related capabilities vary between public sharing and private workflows"
+      ],
+      "paid": [
+        "Pro: CSS/JavaScript snippets and integrations with Gutenberg/Elementor",
+        "Private cloud library and synchronization workflows",
+        "AI assistance and premium support"
+      ],
+      "pricing": "Explicit monthly choices: $3.90 (1 site), $7.90 (10), $14.90 (100), $29.90 (unlimited). Lifetime choices: $137 / $237 / $447 / $897 respectively. Annual selector was ambiguous in captured page, so no annual/site combination is asserted.",
+      "why_pay": "Inference: developers pay to distribute maintained snippets across clients, reuse design snippets and reduce repetitive work. Lifetime licensing appeals to stable agency workflows.",
+      "free_is_enough": "A small library of PHP snippets maintained on one site.",
+      "caveats": "Public and private cloud wording overlaps across plans; confirm private synchronization needs. A snippet manager does not make arbitrary code safe.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/code-snippets/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://codesnippets.pro/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "yoast-seo",
+      "name": "Yoast SEO",
+      "category": "SEO",
+      "model": "Freemium",
+      "popularity": "10+ million active installations (WordPress.org)",
+      "free": [
+        "Title/meta editing, XML sitemaps, canonical URLs and schema graph",
+        "SEO/readability feedback and basic focus-keyphrase analysis",
+        "Breadcrumbs and standard indexing controls"
+      ],
+      "paid": [
+        "Premium: redirects, multiple keyphrases/synonyms, internal-link suggestions and orphan-content workouts",
+        "AI metadata/social drafting and content-planning tools",
+        "Current package includes Local, Video and News SEO plugins; support and training"
+      ],
+      "pricing": "Yoast SEO Premium $118.80/year, excluding VAT, for the displayed purchase. WooCommerce SEO is a separate product unless checkout explicitly includes it.",
+      "why_pay": "Inference: publishers with many pages buy editorial consistency and redirect/link-maintenance time savings; specialist businesses buy included local/video/news capabilities. It does not sell guaranteed rankings.",
+      "free_is_enough": "A modest site with manually maintained links, metadata and basic SEO checks.",
+      "caveats": "Alternative free SEO plugins already provide some features Yoast monetizes. The content planner advertises five ideas/starter drafts; AI and support are vendor services rather than ranking evidence.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wordpress-seo/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://yoast.com/product/yoast-seo-premium-wordpress/"
+        }
+      ]
+    },
+    {
+      "id": "rank-math",
+      "name": "Rank Math",
+      "category": "SEO",
+      "model": "Freemium",
+      "popularity": "4+ million active installations (WordPress.org)",
+      "free": [
+        "Metadata, XML sitemaps, SEO analysis and multiple focus keywords",
+        "Redirects, 404 monitor, basic schema and single-location local SEO",
+        "Search Console integration and WooCommerce basics"
+      ],
+      "paid": [
+        "Pro: keyword rank tracking, richer/custom schema, news/video sitemaps, enhanced image/local/commerce SEO and reports",
+        "Business/Agency: client-site entitlements and higher keyword/reporting limits",
+        "AI Link Genius is promoted in paid offerings; Content AI has separate plans beyond any trial"
+      ],
+      "pricing": "Observed EUR annualized intro → renewal: Pro €83.88 → €107.88 (unlimited personal sites); Business €275.88 → €335.88; Agency €635.88 → €779.88. Promotional limits shown: 200 / 750 client sites and 20,000 / 75,000 keywords; Pro 1,000 keywords. Base limits may be lower after promotion.",
+      "why_pay": "Inference: agencies buy client reporting and tracking at portfolio scale; SEO specialists buy advanced structured-data workflows. Strong free functionality raises the threshold for casual users to pay.",
+      "free_is_enough": "Most technical SEO needs, including redirects and basic structured data, without paid rank reporting.",
+      "caveats": "Personal-site licensing excludes client work. Monthly headline rates are billed annually. Content AI is not permanently bundled without limit.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/seo-by-rank-math/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://rankmath.com/offer/"
+        }
+      ]
+    },
+    {
+      "id": "all-in-one-seo-aioseo",
+      "name": "All in One SEO (AIOSEO)",
+      "category": "SEO",
+      "model": "Freemium",
+      "popularity": "2+ million active installations (WordPress.org)",
+      "free": [
+        "SEO titles/descriptions, XML sitemaps, social metadata and basic schema",
+        "TruSEO content analysis and basic site SEO setup",
+        "Standard indexing and webmaster-tool integrations"
+      ],
+      "paid": [
+        "Basic: advanced SEO/schema and 10,000 AI credits",
+        "Plus: local/author SEO, 25,000 AI credits",
+        "Pro: Link Assistant, advanced redirects, news/video tools and 50,000 credits; Elite: Search Statistics, keyword/index/content-decay reporting and network tools, 200,000 credits"
+      ],
+      "pricing": "Annual intro → renewal: Basic $49.50 → $99 (1 site); Plus $99.50 → $199 (3); Pro $199.50 → $399 (10); Elite $299.50 → $599 (100). Credit cadence and service availability should be checked at purchase.",
+      "why_pay": "Inference: content teams pay to find link opportunities and declining content; local businesses pay for specialized schema; agencies buy site allowances and reporting.",
+      "free_is_enough": "Basic SEO setup and editing metadata without automated linking or advanced performance reporting.",
+      "caveats": "Pricing-page generic text suggests similar features across plans, but its detailed module matrix shows meaningful gates. Use the detailed matrix. Directory adoption is 2M+, lower than vendor marketing claims.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/all-in-one-seo-pack/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://aioseo.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "wpforms",
+      "name": "WPForms",
+      "category": "Forms & email",
+      "model": "Freemium + payment fees",
+      "popularity": "5+ million active installations (WordPress.org)",
+      "free": [
+        "Drag-and-drop forms, templates, notifications and confirmations",
+        "Spam controls including CAPTCHA integrations",
+        "Basic payment collection; free/payment-limited plans may carry an additional platform fee"
+      ],
+      "paid": [
+        "Basic: entry management, conditional logic, uploads, multipage forms, repeaters and advanced fields",
+        "Plus: broader email-marketing integrations",
+        "Pro: advanced payments, surveys/polls, signatures, registration, calculations, saved/abandoned/offline and conversational workflows; Elite adds CRM, webhooks, automation and business/admin integrations"
+      ],
+      "pricing": "Annual intro → renewal: Basic $49.50 → $99 (1 site); Plus $99.50 → $199 (3); Pro $199.50 → $399 (5); Elite $299.50 → $599 (unlimited). Basic/Plus retain additional payment fees in the comparison; Pro/Elite remove the platform fee. Processor charges remain.",
+      "why_pay": "Inference: the strongest triggers are conditional workflows, usable stored entries, uploads, CRM handoff and fee removal. Support threads show buyers willing to consider payment for one missing workflow but objecting to excessive tier cost.",
+      "free_is_enough": "A simple contact or newsletter form that only needs email notifications.",
+      "caveats": "“Pro features” may mean the paid family, not specifically the Pro tier. Conditional logic is available in Basic. Free/inactive-license payment fee advertised at 3%; verify gateway-specific rules.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wpforms-lite/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wpforms.com/pricing/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wordpress.org/support/topic/conditional-logic-96/"
+        }
+      ]
+    },
+    {
+      "id": "gravity-forms",
+      "name": "Gravity Forms",
+      "category": "Forms & email",
+      "model": "Paid-only",
+      "popularity": "Vendor claim: 5M+ websites; definition not independently audited",
+      "free": [
+        "No free plugin; online demo available. WordPress itself does not provide this feature suite."
+      ],
+      "paid": [
+        "All plans: visual forms, conditional logic, file uploads, multipage forms and entry management",
+        "Basic: core marketing integrations",
+        "Pro: payment gateways and workflow integrations such as Zapier/Slack/Twilio; Elite: registration, surveys/polls/quizzes, signatures, partial entries, conversational forms, webhooks, advanced post creation and multisite"
+      ],
+      "pricing": "Basic $59/year (1 site); Pro $159/year (3); Elite $259/year (unlimited). Third-party Gravity ecosystem products such as Gravity Flow and GravityKit are separate.",
+      "why_pay": "Inference: organizations buy dependable complex forms and supported integrations; developers value extensibility. A form replacing manual data entry can justify a license with little time saved.",
+      "free_is_enough": "Use a free alternative such as Contact Form 7 or WPForms Lite for straightforward contact forms.",
+      "caveats": "No WordPress.org active-install figure for the paid plugin. Vendor says used on 5M+ websites; that claim is not a verified current paid-license count.",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.gravityforms.com/pricing/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.gravityforms.com/about/"
+        }
+      ]
+    },
+    {
+      "id": "wp-mail-smtp",
+      "name": "WP Mail SMTP",
+      "category": "Forms & email",
+      "model": "Freemium + service fees",
+      "popularity": "4+ million active installations (WordPress.org)",
+      "free": [
+        "Route WordPress mail through SMTP or supported mail-provider APIs",
+        "Common integrations, configuration tools and test emails",
+        "Basic troubleshooting of WordPress mail delivery"
+      ],
+      "paid": [
+        "Pro: email logs, delivery reports, tracking, resend tools, failure alerts, backup connections and smart routing",
+        "Selected premium mailers including Microsoft/Outlook, Amazon SES and Zoho",
+        "Elite adds supported white-glove setup; higher plans mainly expand site count"
+      ],
+      "pricing": "Annual intro → renewal: Pro $49 → $99 (1 site); Elite $99 → $149 (1); Developer $199 → $249 (20); Agency $399 → $449 (100). Email-provider usage fees are separate.",
+      "why_pay": "Inference: stores and membership sites pay because missing password resets, invoices or orders create support work and lost sales; logs and alerts expose failures before customers complain.",
+      "free_is_enough": "One working SMTP/API connection and occasional test emails, with monitoring supplied by the host/provider.",
+      "caveats": "Setup service applies to specified providers rather than arbitrary mail systems. SMTP authentication improves delivery infrastructure but cannot guarantee inbox placement.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wp-mail-smtp/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wpmailsmtp.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "mc4wp-mailchimp-for-wordpress",
+      "name": "MC4WP: Mailchimp for WordPress",
+      "category": "Forms & email",
+      "model": "Freemium + service fees",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "One newsletter signup form",
+        "Mailchimp API connection and opt-in checkboxes in existing WordPress/form/commerce workflows",
+        "Basic subscription handling and form customization"
+      ],
+      "paid": [
+        "Multiple signup forms and enhanced styling builder",
+        "WooCommerce customer/purchase synchronization",
+        "Form reports, notifications and premium support"
+      ],
+      "pricing": "All premium features: $59/year (1 site), $99/year (5), $249/year (25). Mailchimp account charges are additional. Pricing page says Pro features stop after subscription expiry.",
+      "why_pay": "Inference: stores buy segmentation based on purchase history; marketers buy multiple tailored forms and feedback about signups. A small newsletter has less reason to upgrade.",
+      "free_is_enough": "One signup form and a simple mailing list.",
+      "caveats": "Buying the plugin does not include a Mailchimp paid account or remove that service’s contact/send limits.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/mailchimp-for-wp/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.mc4wp.com/pricing/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.mc4wp.com/"
+        }
+      ]
+    },
+    {
+      "id": "optinmonster",
+      "name": "OptinMonster",
+      "category": "Marketing & analytics",
+      "model": "Paid SaaS + free connector",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "Free WordPress connector; installation is not proof of a fully free campaign platform",
+        "Account/trial/offer conditions govern usable campaign access"
+      ],
+      "paid": [
+        "Basic: campaign creation and core targeting",
+        "Plus: A/B testing, device targeting, content locking and reporting",
+        "Pro: exit intent, scheduling, richer triggers, revenue attribution and integrations; Growth: geolocation, visitor/onsite retargeting, commerce campaigns and broader account tools"
+      ],
+      "pricing": "Annual intro → renewal: Basic $108 → $210 (1 site; 2,500 impressions/month); Plus $324 → $570 (2; 10,000); Pro $444 → $870 (3; 25,000); Growth $804 → $1,470 (5; 100,000). Headline monthly rates require annual billing.",
+      "why_pay": "Inference: marketers pay for measurable experiments and behavior-triggered offers. The relevant business case is incremental profitable leads/orders, not popup appearance alone.",
+      "free_is_enough": "Use a basic free form/banner when advanced targeting and controlled testing are unnecessary.",
+      "caveats": "1M+ connector installations are not 1M paid SaaS customers. Campaign impressions, sites and marketing-service costs matter. Vendor case-study lifts are selected outcomes, not expected results.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/optinmonster/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://optinmonster.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "monsterinsights",
+      "name": "MonsterInsights",
+      "category": "Marketing & analytics",
+      "model": "Freemium",
+      "popularity": "2+ million active installations (WordPress.org)",
+      "free": [
+        "Google Analytics connection and basic WordPress dashboard",
+        "Basic traffic/interaction reporting and automated setup",
+        "Google Analytics itself has a free service tier"
+      ],
+      "paid": [
+        "Plus: richer reports, media/search-console views and page insights",
+        "Pro: ecommerce and form-conversion tracking, custom dimensions and user/customer journeys",
+        "Elite: more automation, access/multisite tools and companion feedback/heatmap features; AI allowances increase by tier"
+      ],
+      "pricing": "Annual intro → renewal: Plus $99.50 → $199 (1 site); Pro $199.50 → $399 (5); Elite $299.50 → $599. Elite site allowance and some AI allocations conflict across sections of the live page, so they are not asserted.",
+      "why_pay": "Inference: nontechnical owners buy convenient reliable event setup and reports inside WordPress; ecommerce teams buy integrated funnel visibility without custom GA4 engineering.",
+      "free_is_enough": "Basic GA4 setup or a team already comfortable building reports and events directly in Google Analytics.",
+      "caveats": "The paid product mostly adds integration and workflow convenience, not exclusive ownership of analytics data. Consent, correct event setup and attribution limitations still apply.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/google-analytics-for-wordpress/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.monsterinsights.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "wordfence",
+      "name": "Wordfence",
+      "category": "Security & consent",
+      "model": "Freemium + managed service",
+      "popularity": "5+ million active installations (WordPress.org)",
+      "free": [
+        "Endpoint firewall and malware/file-integrity scans",
+        "Login protection, 2FA, rate limiting and vulnerability alerts",
+        "Free firewall/signature updates are delayed 30 days; standard scans every three days"
+      ],
+      "paid": [
+        "Premium: real-time rules/signatures, IP blocklist, country blocking, custom scan schedules, 30-day audit trail and support",
+        "Care: analyst setup, monitoring, incident assistance and longer audit retention",
+        "Response: 24/7 service with advertised one-hour response and one-year audit retention"
+      ],
+      "pricing": "Premium $149/site/year; Care $590; Response $1,250. Multi-site discounts available. Wordfence Central site management is free.",
+      "why_pay": "Inference: valuable sites buy faster protection and human help during incidents; agencies buy predictable escalation. The incremental value is reduced exposure and recovery effort, not a guarantee against compromise.",
+      "free_is_enough": "A low-risk site with maintained hosting controls and acceptance of delayed threat intelligence.",
+      "caveats": "Premium is not the same as analyst-managed Care/Response. Malware cleanup/service scope should be checked. Protection overlaps with host WAFs; no tier eliminates all security risk.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wordfence/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.wordfence.com/products/wordfence-premium/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://lp.wordfence.com/en/wordfence-plans-pricing-ga"
+        }
+      ]
+    },
+    {
+      "id": "really-simple-security",
+      "name": "Really Simple Security",
+      "category": "Security & consent",
+      "model": "Freemium",
+      "popularity": "3+ million active installations (WordPress.org)",
+      "free": [
+        "SSL redirects and certificate assistance where hosting supports it",
+        "Basic hardening, vulnerability detection and email-based 2FA",
+        "Simple security configuration"
+      ],
+      "paid": [
+        "Firewall, country/IP blocking, custom rules and suspicious-request controls",
+        "Security headers/CSP, HSTS and mixed-content scans",
+        "Automated vulnerability mitigation, advanced login/password policies, TOTP/passkeys and premium support"
+      ],
+      "pricing": "Annual intro → renewal: Personal $49 → $69 (1 site); Professional $99 → $119 (5); Agency $199 → $209 (25). Same paid feature set across licenses.",
+      "why_pay": "Inference: owners pay for guided hardening and a consolidated interface; agencies buy standardized policies across clients.",
+      "free_is_enough": "Basic HTTPS and vulnerability alerts with hosting and other tools covering advanced controls.",
+      "caveats": "Former name Really Simple SSL can mislead buyers about the wider suite. Automated fixes need compatibility checks; a paid license is not a malware-cleanup service.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/really-simple-ssl/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://really-simple-ssl.com/pro/"
+        }
+      ]
+    },
+    {
+      "id": "akismet",
+      "name": "Akismet",
+      "category": "Security & consent",
+      "model": "Commercial entitlement + capacity",
+      "popularity": "5+ million active installations (WordPress.org)",
+      "free": [
+        "Personal plan: pay what you can, including an eligible zero-cost option for noncommercial use",
+        "Core comment/form spam filtering through the cloud service"
+      ],
+      "paid": [
+        "Pro: commercial use, support and 500 API calls/month for one site",
+        "Business: unlimited sites and 5,000 API calls/month",
+        "Enterprise: negotiated usage/support capacity"
+      ],
+      "pricing": "Pro $9.95/month billed annually ($119.40/year); Business $49.95/month billed annually ($599.40/year); Enterprise custom.",
+      "why_pay": "Inference: commercial sites pay for legitimate service entitlement, capacity and support, and to avoid manually moderating spam. The distinction is not simply a stronger algorithm unlocked by payment.",
+      "free_is_enough": "An eligible personal noncommercial blog within service conditions.",
+      "caveats": "Commercial sites do not qualify for the free personal entitlement. API calls are not interchangeable with visitors or comments; confirm workload and overage terms.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/akismet/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://akismet.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "complianz",
+      "name": "Complianz",
+      "category": "Security & consent",
+      "model": "Freemium",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "Consent wizard, cookie banner, cookie policy and script/iframe blocking",
+        "Cookie scan and integrations for a selected regional setup",
+        "Basic consent-category configuration"
+      ],
+      "paid": [
+        "Premium: region-specific banners/documents for multiple jurisdictions",
+        "Records of consent, data-request workflows, statistics and A/B testing",
+        "Hybrid scans, advertising frameworks/TCF and premium legal-document tooling; Agency supports multisite"
+      ],
+      "pricing": "Annual headline prices: Personal $59 (1 site); Professional $179 (5); Agency $399 (25). Page also renders alternate $54/$163/$363 and EUR equivalents in duplicate regional sections; checkout is needed to resolve final currency/tax price.",
+      "why_pay": "Inference: international and advertising-supported sites pay for region-specific operations, records and supported integrations; agencies pay to reuse configuration.",
+      "free_is_enough": "A straightforward regional consent setup supported by the free functionality.",
+      "caveats": "Consent Mode wording can overlap with free integrations; the premium distinction is the full advertised suite. A configured plugin does not independently establish legal compliance. Multisite requires the appropriate license.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/complianz-gdpr/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://complianz.io/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "jetpack",
+      "name": "Jetpack",
+      "category": "Site operations",
+      "model": "Freemium service bundle",
+      "popularity": "3+ million active installations (WordPress.org)",
+      "free": [
+        "Basic brute-force protection, image CDN and assorted publishing tools",
+        "Newsletters, mobile tools and limited social sharing",
+        "Personal/noncommercial Stats entitlement differs from commercial paid Stats"
+      ],
+      "paid": [
+        "Security: real-time backup/restore, malware/WAF and Akismet service allowances",
+        "Growth: commercial Stats, advanced social/newsletter tools, paywall and lower platform payment fee",
+        "Complete: larger backup/video/Stats/search/spam limits plus Boost, AI and CRM tools; individual services can also be bought separately"
+      ],
+      "pricing": "Observed CHF annual-billed intro → renewal: Security and Growth CHF107.40 → CHF203.40/year; Complete CHF263.40 → CHF515.40/year. These are regional displayed prices, not USD conversions. Security backup 10GB; Complete 1TB; other usage allowances differ.",
+      "why_pay": "Inference: owners buy a connected operations bundle and off-site recovery; publishers pay for commercial analytics and subscription tools. Convenience can be valuable even with free alternatives to individual components.",
+      "free_is_enough": "Basic publishing/protection with host backups and an eligible free Stats use case.",
+      "caveats": "Plugin installation does not mean all bundled services are free. Growth advertises a 2% payment platform fee versus free 10%; payment processor fees remain. Bundles may duplicate host or existing tools.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/jetpack/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://jetpack.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "updraftplus",
+      "name": "UpdraftPlus",
+      "category": "Backup & migration",
+      "model": "Freemium",
+      "popularity": "4+ million active installations (WordPress.org)",
+      "free": [
+        "Scheduled/manual backups and restore",
+        "Common remote destinations such as Google Drive, Dropbox, S3 and FTP",
+        "Migration with search/replace is now in the free product"
+      ],
+      "paid": [
+        "Premium: incremental and pre-update backups, precise schedules and multiple destinations",
+        "Extra files/external databases, encryption, anonymization and more storage integrations",
+        "Direct site-to-site migration, multisite/CLI, support and included Vault storage; Gold raises cloud allowance"
+      ],
+      "pricing": "Observed USD prices including Belgium VAT: Personal $84.70 (2 sites), Business $114.95 (10), Agency $175.45 (35), Enterprise $235.95 (unlimited), Gold $482.79 (unlimited, 50GB Vault). This tax-localized display is not a universal base price.",
+      "why_pay": "Inference: stores need shorter recovery gaps; agencies buy safer updates and reliable supported restores. Preventing one labor-intensive recovery can justify an annual fee.",
+      "free_is_enough": "Periodic backups and standard migrations on a modest site, with tested remote restores.",
+      "caveats": "Do not describe migration as entirely paid. Most premium plans include 1GB Vault, not unlimited backup storage. Premium code continues after expiry but updates/support stop, per vendor.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/updraftplus/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://teamupdraft.com/updraftplus/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "all-in-one-wp-migration",
+      "name": "All-in-One WP Migration",
+      "category": "Backup & migration",
+      "model": "Free + extensions",
+      "popularity": "5+ million active installations (WordPress.org)",
+      "free": [
+        "Export/import WordPress files and database in a migration package",
+        "URL/search replacements and straightforward manual transfers",
+        "Import capacity remains subject to hosting/free-product constraints"
+      ],
+      "paid": [
+        "Unlimited extension: larger import handling, server restore, WP-CLI and reset tools",
+        "Pro: scheduled backups, cloud destinations, encryption and direct URL workflows",
+        "Multisite support is a separate extension"
+      ],
+      "pricing": "Unlimited $69/year (50 used sites); Pro $99/year (50 used sites). The name “Unlimited” refers to migration capability, not unlimited site activations. Used-site accounting includes sites removed during the subscription year; local development exemptions apply.",
+      "why_pay": "Inference: developers pay when a migration exceeds free/host limits or repeated manual imports cost time; Pro supports routine cloud backup workflows.",
+      "free_is_enough": "A small manual move that fits the environment’s upload and import constraints.",
+      "caveats": "No single universal free 512MB limit is assumed. Annual-service and lifetime-update wording overlaps on the product page; verify entitlement after cancellation. Staging sites can consume allowance.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/all-in-one-wp-migration/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://servmask.com/products/unlimited-extension"
+        }
+      ]
+    },
+    {
+      "id": "duplicator",
+      "name": "Duplicator",
+      "category": "Backup & migration",
+      "model": "Freemium",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "Manual backup/migration packages with installer",
+        "Move or clone a WordPress site without a recurring backup service",
+        "Basic package-based recovery"
+      ],
+      "paid": [
+        "Basic: scheduled/encrypted backups, server/import restore, larger-site handling and a cloud destination",
+        "Plus: hourly schedules, multiple destinations, branding and settings migration",
+        "Pro: multisite, staging, advanced permissions and selective migration; Elite adds logging tools"
+      ],
+      "pricing": "Displayed regular annual prices: Basic $79 (2 sites), Plus $199 (5), Pro $399 (20), Elite $599 (100). Promotional banner advertised discounts but exact introductory prices were not reliably captured. Optional cloud-storage subscriptions cost extra.",
+      "why_pay": "Inference: agencies buy repeatable deployments and large-site migrations; operators buy automation and off-site recovery. Installer branding can support a professional client handoff.",
+      "free_is_enough": "Occasional manual cloning/migration with sufficient technical confidence.",
+      "caveats": "Paid plugin access does not automatically mean unlimited cloud storage. Destination storage/provider charges and restore testing remain relevant.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/duplicator/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://duplicator.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "managewp-worker",
+      "name": "ManageWP Worker",
+      "category": "Site operations",
+      "model": "Free connector + modular SaaS",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "Unlimited-site management dashboard, one-click login and plugin/theme updates",
+        "Manual security/performance checks, basic client reporting and team workflows",
+        "Monthly cloud backup allowance"
+      ],
+      "paid": [
+        "Premium backup: more frequent/on-demand workflows, cloning and safe updates",
+        "Paid uptime, scheduled security/performance checks, SEO, link monitoring, advanced reports and white labeling",
+        "Vulnerability service and large-portfolio bundles"
+      ],
+      "pricing": "Per site/month: premium backup $2; many monitoring/reporting modules $1 each; vulnerability service $2. Up-to-100-site bundles: backup $75/month; many other modules $25; all-in-one $150, subject to inclusion matrix. Usage billed in arrears.",
+      "why_pay": "Inference: agencies pay to reduce repeated maintenance tasks and produce client-visible reports. White labeling and alerts make an ongoing maintenance contract easier to deliver.",
+      "free_is_enough": "A portfolio needing centralized updates and manual checks, with another backup system.",
+      "caveats": "Safe updates and cloning depend on paid backup despite appearing in broader feature lists. Connector installs are sites attached to a service, not paid agency accounts.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/worker/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://managewp.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "litespeed-cache",
+      "name": "LiteSpeed Cache",
+      "category": "Performance & images",
+      "model": "Free plugin + paid infrastructure",
+      "popularity": "7+ million active installations (WordPress.org)",
+      "free": [
+        "Minification, deferred/delayed JS, lazy loading, image optimization, WebP/AVIF, database cleanup and CDN integration",
+        "Server-level page caching with compatible LiteSpeed/OpenLiteSpeed or QUIC.cloud",
+        "Multisite, WooCommerce cache rules, exclusions and purge controls"
+      ],
+      "paid": [
+        "No separate Pro plugin: paid LiteSpeed server/hosting editions and QUIC.cloud service usage",
+        "Cloud/CDN capacity, optimization quotas and infrastructure features beyond free service levels",
+        "Some server-exclusive features differ between OpenLiteSpeed and commercial LiteSpeed"
+      ],
+      "pricing": "Plugin $0. Paid infrastructure and QUIC.cloud costs depend on hosting, region, bandwidth and service usage; no universal annual plugin-upgrade price. Exact current service quotas/prices were not independently verified.",
+      "why_pay": "Inference: customers pay for infrastructure capacity and delivery reliability while retaining the free plugin; hosts may absorb the server license into hosting prices.",
+      "free_is_enough": "Compatible free/host-provided server caching and service usage within free quotas.",
+      "caveats": "General optimization works on other web servers, but native page-cache features require the supported infrastructure. This is an adjacent monetization example, not a freemium paid-plugin tier.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/litespeed-cache/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wordpress.org/plugins/litespeed-cache/"
+        }
+      ]
+    },
+    {
+      "id": "wp-rocket",
+      "name": "WP Rocket",
+      "category": "Performance & images",
+      "model": "Paid-only",
+      "popularity": "Vendor claim: 5,594,000+ websites; not comparable to directory active installs",
+      "free": [
+        "No free plugin. Free alternatives include LiteSpeed Cache, WP Super Cache and WP Fastest Cache."
+      ],
+      "paid": [
+        "Page caching and preloading, lazy loading and media optimizations",
+        "Delayed JavaScript and unused-CSS reduction",
+        "Performance guidance via Rocket Insights, support and limited built-in CDN coverage; full CDN coverage is a separate service"
+      ],
+      "pricing": "Single $59.95/year (1 site); Plus $119.95 (3); Multi $299.95 (50). Larger 100/500-site options require selector/checkout verification. Included CDN is limited to three key pages and ten edge locations.",
+      "why_pay": "Inference: buyers pay for setup time saved and a supported optimization bundle. Public users report easy initial gains, while others report incompatibilities or prefer free caching.",
+      "free_is_enough": "An existing host cache or correctly configured free tool already achieves acceptable real-user performance.",
+      "caveats": "Vendor’s 5,594,000+ websites claim is not a current audited license count. Improvement depends on hosting/theme/assets; optimize carefully. Some service-backed features need an active renewal.",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://wp-rocket.me/pricing/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wp-rocket.me/"
+        }
+      ]
+    },
+    {
+      "id": "wp-fastest-cache",
+      "name": "WP Fastest Cache",
+      "category": "Performance & images",
+      "model": "Freemium + one-time license",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "Page caching, preload, browser caching and gzip",
+        "Basic HTML/CSS minification and combining",
+        "Cache exclusions and CDN integration"
+      ],
+      "paid": [
+        "Mobile/widget caches and expanded CSS/JS optimization",
+        "Lazy loading, delayed JS, image optimization/WebP and font optimization",
+        "Database cleanup, cache statistics and premium support"
+      ],
+      "pricing": "One-time: Bronze $49 (1 license), Silver $125 (3), Gold $175 (5), Platinum $300 (10). Each license includes 10,000 image credits, advertised unlimited updates/support and one-year license-transfer rights.",
+      "why_pay": "Inference: buyers prefer a one-time fee for a broader performance toolkit, especially when avoiding recurring subscriptions matters.",
+      "free_is_enough": "Standard page caching/minification without paid media or advanced optimization needs.",
+      "caveats": "Lifetime plugin access does not make image processing credits infinite. Avoid assuming several caching plugins can safely run simultaneously.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wp-fastest-cache/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://www.wpfastestcache.com/"
+        }
+      ]
+    },
+    {
+      "id": "wp-optimize",
+      "name": "WP-Optimize",
+      "category": "Performance & images",
+      "model": "Freemium",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "Database cleanup and standard scheduled cleanup",
+        "Lossy/lossless bulk image compression and WebP",
+        "Basic caching, gzip, HTML/CSS/JS minification and font optimization"
+      ],
+      "paid": [
+        "Granular schedules/table optimization and database performance tweaks",
+        "Unused-image cleanup, lazy loading, per-role/user and geolocation caching",
+        "Preloading, advanced purging/logging, Cloudflare, multilingual/multisite/CLI and premium support"
+      ],
+      "pricing": "Starter $49/year (2 sites); Business $99 (5); Enterprise $194 (unlimited). Site allowance changes; premium functionality is shared.",
+      "why_pay": "Inference: maintainers pay for finer control over complex stores/databases and supported cleanup at portfolio scale.",
+      "free_is_enough": "Routine cleanup, bulk compression/WebP and basic caching.",
+      "caveats": "Scheduled cleanup and WebP are already free. The official free-versus-premium table is the clearest boundary source. Back up before destructive database/media cleanup.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wp-optimize/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://teamupdraft.com/wp-optimize/pricing/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://teamupdraft.com/wp-optimize/free-vs-premium/"
+        }
+      ]
+    },
+    {
+      "id": "smush",
+      "name": "Smush",
+      "category": "Performance & images",
+      "model": "Freemium + service bundle",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "Automatic lossless compression, resizing, directory optimization and lazy loading",
+        "Super compression with free Hub connection; uninterrupted background bulk processing",
+        "Free input file-size limit advertised at 5MB"
+      ],
+      "paid": [
+        "WebP/AVIF delivery and CDN up to advertised 500GB, dynamic resizing",
+        "Larger/original images up to 256MB, full-size processing",
+        "Missing dimensions/LCP-preload tools and premium support; sold standalone or in WPMU DEV bundles depending on offer"
+      ],
+      "pricing": "Live Smush standalone/bundle checkout price could not be verified. Do not treat an older promotional monthly price as current. Confirm CDN quota, renewals and companion-product inclusions.",
+      "why_pay": "Inference: image-heavy publishers buy efficient delivery and larger-file handling; agencies may pay for the broader WPMU DEV management/security suite.",
+      "free_is_enough": "Ordinary image compression and bulk processing within the current free limits.",
+      "caveats": "April 2026 changes moved Super compression and uninterrupted bulk processing into free access. Older comparisons calling those paid-only are obsolete. CDN quota is not unlimited.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/wp-smushit/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wordpress.org/plugins/wp-smushit/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wpmudev.com/plugins/"
+        }
+      ]
+    },
+    {
+      "id": "imagify",
+      "name": "Imagify",
+      "category": "Performance & images",
+      "model": "Freemium usage quota",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "20MB processing/month, images up to 2MB, unlimited sites",
+        "Smart/lossless compression, resizing and bulk/background processing",
+        "Original backup and WebP/AVIF generation"
+      ],
+      "paid": [
+        "Growth: 500MB/month with no paid file-size ceiling advertised",
+        "Infinity: unlimited monthly processing allowance",
+        "Same core optimization workflow; paid capacity rather than exclusive format support"
+      ],
+      "pricing": "Growth $4.99/month billed annually ($59.88/year), or $5.99 monthly; Infinity $9.99 annual-billed ($119.88/year), or $11.99 monthly. Growth excess advertised $5/additional GB.",
+      "why_pay": "Inference: photographers, stores and large existing libraries pay once the free byte quota or per-file limit becomes the bottleneck.",
+      "free_is_enough": "A small blog whose uploads fit 20MB/month and 2MB per image.",
+      "caveats": "Approximate image counts on marketing pages are estimates; bytes are the quota. WebP/AVIF are already available free. Confirm fair-use treatment of unlimited capacity.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/imagify/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://imagify.io/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "shortpixel-image-optimizer",
+      "name": "ShortPixel Image Optimizer",
+      "category": "Performance & images",
+      "model": "Freemium credits + subscription",
+      "popularity": "300,000+ active installations (WordPress.org)",
+      "free": [
+        "100 optimization credits/month",
+        "Lossy/glossy/lossless compression, bulk processing and WebP/AVIF options",
+        "Resizing, EXIF controls, API/multisite/CLI-related workflows"
+      ],
+      "paid": [
+        "Additional one-time credit packages or unlimited monthly subscription",
+        "Higher capacity for large libraries and thumbnails",
+        "AI Image SEO features and delivery services have their own allowances; do not assume all processing shares one unlimited quota"
+      ],
+      "pricing": "Official directory advertises unlimited monthly optimization at $9.99; the live pricing page did not expose all selectable plan prices. One-time packs available, but amounts/renewals require checkout verification.",
+      "why_pay": "Inference: users pay for throughput and large backlogs while keeping the same familiar workflow. Byte/credit accounting can make high-thumbnail sites reach the free limit quickly.",
+      "free_is_enough": "A low-volume library within 100 credits/month.",
+      "caveats": "Credits are processing units, not necessarily uploaded originals: thumbnails/conversions can affect usage. CDN/AI entitlements must be checked separately. Do not present directory copy as a confirmed checkout quote.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/shortpixel-image-optimiser/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://shortpixel.com/pricing"
+        }
+      ]
+    },
+    {
+      "id": "ewww-image-optimizer",
+      "name": "EWWW Image Optimizer",
+      "category": "Performance & images",
+      "model": "Free local + paid cloud",
+      "popularity": "1+ million active installations (WordPress.org)",
+      "free": [
+        "Local optimization without a processing quota, subject to server capability",
+        "WebP, resizing, lazy loading and bulk workflows",
+        "Basic local backups and community/email support"
+      ],
+      "paid": [
+        "Standard: cloud compression/CDN, automatic delivery, WebP/AVIF, backups and SWIS optimizations",
+        "Growth: higher bandwidth/credits, more critical-CSS sites, custom domain and watermarks",
+        "Infinite: higher capacity plus hotlink/bot controls and additional performance-service allowances"
+      ],
+      "pricing": "Annual: Standard $80 (50GB bandwidth, 300,000 compression credits/year); Growth $160 (200GB, 600,000); Infinite $320 (400GB, 1.2M). Monthly Standard $8. Unlimited sites advertised; bandwidth overage $0.065/GB on indicated plans.",
+      "why_pay": "Inference: paying moves work off constrained hosting and adds global image delivery. Agencies value unlimited sites but still budget aggregate service usage.",
+      "free_is_enough": "Local processing works well on the host and advanced cloud delivery is unnecessary.",
+      "caveats": "Unlimited images/sites does not erase bandwidth or cloud-credit limits. Free local tools can depend on server binaries/permissions; paid cloud service is a different cost structure.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/ewww-image-optimizer/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://ewww.io/plans/"
+        }
+      ]
+    },
+    {
+      "id": "polylang",
+      "name": "Polylang",
+      "category": "Translation",
+      "model": "Freemium + commerce extension",
+      "popularity": "800,000+ active installations (WordPress.org)",
+      "free": [
+        "Manual multilingual posts/pages, custom post types, taxonomies and media",
+        "Menus/widgets/language switcher and language-specific URL structure",
+        "Unlimited languages and basic multilingual SEO integration"
+      ],
+      "paid": [
+        "Pro: translated/shared slugs, duplication/synchronization, FSE and developer/translation workflows including REST/XLIFF/DeepL integration",
+        "Polylang for WooCommerce: store/product/cart/checkout/email translations and commerce synchronization",
+        "Business Pack includes both paid products"
+      ],
+      "pricing": "One-site headline annual prices: Pro €99; WooCommerce €99; Business Pack €139. Higher site licenses available. Advertised renewal discount 50%; verify applicable renewal offer. External translation APIs can cost extra.",
+      "why_pay": "Inference: publishers pay for editorial synchronization and translated URLs; stores pay because commerce data and checkout need coordinated multilingual behavior.",
+      "free_is_enough": "A manually translated editorial site without paid workflow or commerce requirements.",
+      "caveats": "WooCommerce support is not automatically included in Pro alone. Pricing matrix does not claim Elementor compatibility across the product; validate the builder workflow.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/polylang/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://polylang.pro/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "translatepress",
+      "name": "TranslatePress",
+      "category": "Translation",
+      "model": "Freemium + AI quota",
+      "popularity": "400,000+ active installations (WordPress.org)",
+      "free": [
+        "Visual frontend translation into one additional language",
+        "Translate visible content, images and WooCommerce/forms strings",
+        "Own Google translation API integration; advertised 2,000 free AI words"
+      ],
+      "paid": [
+        "Personal: multiple languages, SEO metadata/slug tools and 50,000 AI words/year",
+        "Business: translator roles, DeepL, language domains, navigation and automatic language detection; 200,000 AI words/year",
+        "Developer: same broader tools, unlimited sites and 500,000 AI words/year"
+      ],
+      "pricing": "Personal €99/year (1 site); Business €199 (3); Developer €349 (unlimited). Extra AI-word packs available (example: 100,000 words €24). External API charges can apply.",
+      "why_pay": "Inference: site owners pay to translate storefronts visually without managing separate post versions; multilingual SEO and additional languages create the upgrade trigger.",
+      "free_is_enough": "A bilingual site with manual visual translation and modest AI needs.",
+      "caveats": "Free is bilingual, not unlimited languages. Existing local translations persist, but AI/services and some premium functionality need renewal. Word quotas are not unlimited translation jobs.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/translatepress-multilingual/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://translatepress.com/pricing/"
+        }
+      ]
+    },
+    {
+      "id": "wpml",
+      "name": "WPML",
+      "category": "Translation",
+      "model": "Paid-only + translation usage",
+      "popularity": "Vendor claim: 1.5M websites / 250,000 users; not directory active installs",
+      "free": [
+        "No free WPML plugin. Free alternatives include Polylang and TranslatePress with their respective limits."
+      ],
+      "paid": [
+        "Blog: manual translation of simpler sites",
+        "CMS: advanced/string translation, translation management, builder/FSE/commerce support and AI allowance",
+        "Agency: higher site and AI allowances; professional translation services available separately"
+      ],
+      "pricing": "Blog €39/year (1 production + 3 development sites); CMS €99 (3 + 9; 22,500 AI words); Agency €199 (unlimited; 45,000 AI words). Extra automatic translation usage is separately billable; renewal checkout not verified.",
+      "why_pay": "Inference: agencies pay for coordinated multilingual workflows and compatibility with complex sites; multilingual stores pay to avoid operational mistakes across languages.",
+      "free_is_enough": "Choose a free alternative for a small manual bilingual site when its content model and compatibility fit.",
+      "caveats": "Vendor claims 1.5M websites and 250,000 users, not independently verified paid-active licenses. Credit/word and development-site rules should be read before budgeting.",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://app.wpml.org/purchase"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://wpml.org/"
+        }
+      ]
+    },
+    {
+      "id": "woocommerce-core",
+      "name": "WooCommerce core",
+      "category": "Commerce & memberships",
+      "model": "Free core + extensions",
+      "popularity": "7+ million active installations (WordPress.org)",
+      "free": [
+        "Products/variations, physical/digital goods, inventory and order management",
+        "Cart/checkout, coupons, standard shipping/tax and reporting",
+        "Payment gateway integrations and extension ecosystem"
+      ],
+      "paid": [
+        "No universal WooCommerce Pro tier",
+        "Paid first-party/third-party extensions add recurring subscriptions, bookings, memberships and specialist commerce workflows",
+        "Hosting, payment processing, tax/shipping services and support providers may charge separately"
+      ],
+      "pricing": "Core plugin $0. Extension pricing varies. Three prominent paid extensions are separately profiled below to show real workflow boundaries; their installs are not added to core installs.",
+      "why_pay": "Inference: merchants pay for capabilities tied to the business model and reliable transactions. A subscription/booking business needs more than a standard one-off product checkout.",
+      "free_is_enough": "A straightforward catalog selling ordinary one-time products with suitable free gateway/shipping tools.",
+      "caveats": "7M+ core installations are not 7M paying extension users. Free core does not imply a zero-cost store, and extension popularity must be measured separately.",
+      "sources": [
+        {
+          "title": "WordPress.org: features and adoption",
+          "url": "https://wordpress.org/plugins/woocommerce/"
+        },
+        {
+          "title": "Official pricing / product",
+          "url": "https://woocommerce.com/"
+        }
+      ]
+    },
+    {
+      "id": "woocommerce-subscriptions",
+      "name": "WooCommerce Subscriptions",
+      "category": "Commerce & memberships",
+      "model": "Paid extension",
+      "popularity": "Woo marketplace: 100K+ active installs; separate from core adoption",
+      "free": [
+        "No free edition of this official extension; free WooCommerce handles ordinary one-time orders."
+      ],
+      "paid": [
+        "Recurring products, schedules, trials and signup fees",
+        "Customer subscription management, switching/proration and renewal workflows",
+        "Retry/reminder tools, reports and supported gateway integrations"
+      ],
+      "pricing": "Observed €244/year on product page; locale-dependent display. Subscription includes updates/support. Confirm currency, gateway compatibility and production-site license in checkout.",
+      "why_pay": "Inference: recurring billing is revenue-enabling infrastructure; reliable renewals and expert troubleshooting outweigh license cost for many established stores. Current marketplace reviews praise support but also object to price.",
+      "free_is_enough": "One-time sales that do not need ongoing billing.",
+      "caveats": "Requires WooCommerce and a compatible recurring-payment gateway. Processor fees remain. A license does not eliminate failed payments or integration conflicts.",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://woocommerce.com/products/woocommerce-subscriptions/"
+        }
+      ]
+    },
+    {
+      "id": "woocommerce-bookings",
+      "name": "WooCommerce Bookings",
+      "category": "Commerce & memberships",
+      "model": "Paid extension",
+      "popularity": "Woo marketplace: 20K+ active installs",
+      "free": [
+        "No free edition of the official extension; core WooCommerce does not provide its full availability engine."
+      ],
+      "paid": [
+        "Fixed or flexible bookable time slots and availability rules",
+        "Resources, persons/group capacity and variable booking prices",
+        "Booking management, calendar integration and notifications"
+      ],
+      "pricing": "Observed €217/year; two-year offer €347.20 versus €434 regular. Regional currency/tax display can vary. Includes updates/support; confirm production-site licensing at checkout.",
+      "why_pay": "Inference: appointment, rental and tour businesses pay to prevent scheduling collisions and collect bookings through existing store workflows.",
+      "free_is_enough": "A simple request form with manually confirmed appointments at very low volume.",
+      "caveats": "Calendar synchronization and resource rules need configuration/testing. Deposits, availability blocks and advanced automation are separate paid add-ons; the Accommodation Bookings add-on is free. Do not equate marketplace installs with individual paying customers.",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://woocommerce.com/products/woocommerce-bookings/"
+        }
+      ]
+    },
+    {
+      "id": "woocommerce-memberships",
+      "name": "WooCommerce Memberships",
+      "category": "Commerce & memberships",
+      "model": "Paid extension",
+      "popularity": "Woo marketplace: 30K+ active installs",
+      "free": [
+        "No free edition of this official extension. Core WooCommerce can sell products but does not supply its full membership-access system."
+      ],
+      "paid": [
+        "Member-only content/products and timed content dripping",
+        "Grant access after purchase or manually; member discounts/perks",
+        "Membership administration/import/export and integration with WooCommerce Subscriptions for recurring billing"
+      ],
+      "pricing": "$199/year; two-year offer $318.40 displayed versus $398 standard. Subscriptions is a separate paid requirement for recurring membership billing.",
+      "why_pay": "Inference: existing WooCommerce stores pay to combine content access, member perks and product sales without operating separate systems.",
+      "free_is_enough": "Ordinary product sales or a simple manually managed private page.",
+      "caveats": "30K+ marketplace active installs are a niche measure. Membership access and recurring billing are separate products; budget their combined cost if both are needed.",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://woocommerce.com/products/woocommerce-memberships/"
+        }
+      ]
+    },
+    {
+      "id": "memberpress",
+      "name": "MemberPress",
+      "category": "Commerce & memberships",
+      "model": "Paid-only + fee tiers",
+      "popularity": "Vendor says thousands of creators; no independently verified active-install count",
+      "free": [
+        "No free MemberPress edition. Free membership plugins are alternatives rather than a limited MemberPress tier."
+      ],
+      "paid": [
+        "Launch: content protection, recurring memberships, coupons, reminders, courses, Stripe, site builder and 25,000 AI credits; 4.9% platform fee",
+        "Growth: removes platform fee, adds coaching/community, quizzes/assignments/certificates, drip and more payment/marketing integrations; 50,000 credits",
+        "Scale: developer/API/webhooks/Zapier, corporate/gifting tools, gradebook, affiliate platform and 100,000 credits"
+      ],
+      "pricing": "Annual intro → renewal: Launch $199.50 → $399; Growth $349.50 → $699; Scale $499.50 → $999. Payment processor fees remain even in 0% platform-fee tiers. Production-site allowances were not reconciled.",
+      "why_pay": "Inference: creators buy an integrated paid-content/course business and supported operations. Growth becomes compelling when platform-fee savings or coaching/community needs outweigh the larger subscription.",
+      "free_is_enough": "An experimental membership concept with minimal billing/content rules can start with a suitable free alternative.",
+      "caveats": "Included here as a prominent category supplement, not proven top overall by active installs. Vendor revenue claims do not establish customer count or plugin-attributable income. New beta/AI/community inclusions may evolve.",
+      "sources": [
+        {
+          "title": "Official pricing / product",
+          "url": "https://memberpress.com/plans/pricing/"
+        }
+      ]
+    }
+  ],
+  "purchase_drivers": [
+    {
+      "driver": "Revenue-enabling workflow",
+      "examples": "Subscriptions, Bookings, MemberPress; WPForms/Gravity Forms payments and CRM",
+      "rationale": "The paid capability enables a business transaction or replaces a fragile manual process.",
+      "value_test": "Incremental gross profit + staff time saved, after processing and service fees."
+    },
+    {
+      "driver": "Time and reusable work",
+      "examples": "Elementor, ACF, WPCode, ManageWP, migration tools",
+      "rationale": "Repeated client/site tasks make convenience economically meaningful.",
+      "value_test": "Hours avoided × realistic labor value; include learning and configuration time."
+    },
+    {
+      "driver": "Recovery and threat response",
+      "examples": "UpdraftPlus, Jetpack, Wordfence",
+      "rationale": "Users buy shorter recovery gaps, faster threat intelligence and access to humans.",
+      "value_test": "Business impact of downtime, restore effort and existing host coverage; no guaranteed risk elimination."
+    },
+    {
+      "driver": "Capacity and cloud delivery",
+      "examples": "Imagify, ShortPixel, EWWW, TranslatePress, LiteSpeed/QUIC.cloud",
+      "rationale": "Free limits are sufficient initially; large libraries/traffic/translation volumes cross a quota.",
+      "value_test": "Bytes/credits/words/bandwidth, overage rules and total provider bill."
+    },
+    {
+      "driver": "Operational visibility",
+      "examples": "WP Mail SMTP, MonsterInsights, SEO reporting, ManageWP",
+      "rationale": "Logs and alerts reduce uncertainty and make client reporting easier.",
+      "value_test": "Whether the team acts on the data, plus debugging/reporting hours avoided."
+    },
+    {
+      "driver": "Support and accountability",
+      "examples": "Paid backup/security/form/commerce products",
+      "rationale": "A supported escalation path matters during difficult integrations or outages.",
+      "value_test": "Support scope, response terms, access requirements and prior support quality."
+    },
+    {
+      "driver": "Commercial permission",
+      "examples": "Akismet; Jetpack commercial Stats",
+      "rationale": "Payment authorizes a commercial service use case even when the basic function resembles free use.",
+      "value_test": "Eligibility and usage entitlement; do not assume an algorithmic feature unlock."
+    }
+  ],
+  "buyer_evidence": [
+    {
+      "theme": "Elementor: time saved",
+      "source_type": "Independent user discussion • Feb 2022",
+      "signal": "An owner describes easier theme-wide design and WooCommerce customization after upgrading; replies describe reuse across sites.",
+      "limitation": "Direct self-reported upgrade value; older anecdote, not current pricing or a representative survey.",
+      "url": "https://www.reddit.com/r/elementor/comments/sl8lk6/getting_elementor_pro_was_so_worth_it/"
+    },
+    {
+      "theme": "Elementor: need varies",
+      "source_type": "Independent user discussion • Nov 2023",
+      "signal": "Users value headers/footers, custom CSS and dynamic content; other replies describe free alternatives and prefer different tools.",
+      "limitation": "Evidence of differing workflows and willingness to pay, not a universal preference.",
+      "url": "https://www.reddit.com/r/Wordpress/comments/185u79h"
+    },
+    {
+      "theme": "WPForms: one feature triggers interest",
+      "source_type": "Official support forum",
+      "signal": "A prospective buyer wants conditional notification routing and challenges the apparent cost; vendor explains that Basic includes conditional logic.",
+      "limitation": "Clear expressed need and price objection. This is purchase consideration, not proof that a payment occurred.",
+      "url": "https://wordpress.org/support/topic/conditional-logic-96/"
+    },
+    {
+      "theme": "ACF: repeatable content versus price",
+      "source_type": "Official support forum • 2024–25 discussion",
+      "signal": "Developers ask for repeaters/gallery in free access; another participant explains the value of multi-site developer licensing.",
+      "limitation": "Shows both a feature trigger and resistance to paying. Participants and actual purchasing history are unverified.",
+      "url": "https://wordpress.org/support/topic/we-need-the-pro-features-repeater-field-and-co-2/"
+    },
+    {
+      "theme": "WP Rocket: convenience and compatibility",
+      "source_type": "Independent user discussion • Mar 2023",
+      "signal": "Users report easy initial optimization and time saved; others report breakage or prefer free solutions.",
+      "limitation": "Older mixed anecdotal evidence. Some technical statements in the thread are inaccurate, so pricing/features are taken from official sources.",
+      "url": "https://www.reddit.com/r/Wordpress/comments/11jnfay/wp_rocket_is_it_worth_it/"
+    },
+    {
+      "theme": "Woo Subscriptions: paid support can justify cost",
+      "source_type": "Vendor-hosted marketplace reviews • Aug–Sep 2026",
+      "signal": "One recent reviewer values support that resolved a discount-plugin conflict despite price; another criticizes the price and reports leaving.",
+      "limitation": "Current paid-product experience, but vendor-hosted reviews are selection-biased and do not prove average outcomes.",
+      "url": "https://woocommerce.com/products/woocommerce-subscriptions/"
+    },
+    {
+      "theme": "Woo Memberships: combined workflow",
+      "source_type": "Vendor-hosted marketplace reviews",
+      "signal": "A user describes valuing flexible customization, established software and assistance during build-out.",
+      "limitation": "Specific customer story; not independent audit or proof that every membership business should buy it.",
+      "url": "https://woocommerce.com/products/woocommerce-memberships/"
+    },
+    {
+      "theme": "UpdraftPlus: recovery and help",
+      "source_type": "Vendor-selected testimonial",
+      "signal": "An agency testimonial emphasizes recovery and expert assistance with complex problems.",
+      "limitation": "Illustrates a plausible purchase motive; vendor-selected, not a measured incident-reduction rate.",
+      "url": "https://teamupdraft.com/updraftplus/pricing/"
+    },
+    {
+      "theme": "OptinMonster: growth claims",
+      "source_type": "Vendor-selected testimonials",
+      "signal": "Marketing stories emphasize list growth, campaign conversion and campaign setup convenience.",
+      "limitation": "These are advertised case outcomes. They do not establish incremental causality or a typical return.",
+      "url": "https://optinmonster.com/pricing/"
+    },
+    {
+      "theme": "Free functionality can remove an upgrade trigger",
+      "source_type": "Official Smush release/feature description • Apr 2026 changes",
+      "signal": "Super compression and uninterrupted bulk processing are now offered through free access, changing the older premium boundary.",
+      "limitation": "Verified product change, not buyer sentiment. Explains why old upgrade advice may no longer apply.",
+      "url": "https://wordpress.org/plugins/wp-smushit/"
+    }
+  ],
+  "source_index": [
+    {
+      "url": "https://wordpress.org/plugins/elementor/",
+      "used_for": [
+        "Elementor"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://elementor.com/pro/",
+      "used_for": [
+        "Elementor"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://elementor.com/help/elementor-pro-vs-free/?level=2",
+      "used_for": [
+        "Elementor"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://elementor.com/blog/elementor-free/",
+      "used_for": [
+        "Elementor"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/essential-addons-for-elementor-lite/",
+      "used_for": [
+        "Essential Addons for Elementor"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://essential-addons.com/",
+      "used_for": [
+        "Essential Addons for Elementor"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://essential-addons.com/compare/",
+      "used_for": [
+        "Essential Addons for Elementor"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/elementskit-lite/",
+      "used_for": [
+        "ElementsKit"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpmet.com/plugin/elementskit/pricing/",
+      "used_for": [
+        "ElementsKit"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/advanced-custom-fields/",
+      "used_for": [
+        "Advanced Custom Fields (ACF)"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.advancedcustomfields.com/pro/",
+      "used_for": [
+        "Advanced Custom Fields (ACF)"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/insert-headers-and-footers/",
+      "used_for": [
+        "WPCode"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://library.wpcode.com/pricing/",
+      "used_for": [
+        "WPCode"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/code-snippets/",
+      "used_for": [
+        "Code Snippets"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://codesnippets.pro/pricing/",
+      "used_for": [
+        "Code Snippets"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wordpress-seo/",
+      "used_for": [
+        "Yoast SEO"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://yoast.com/product/yoast-seo-premium-wordpress/",
+      "used_for": [
+        "Yoast SEO"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/seo-by-rank-math/",
+      "used_for": [
+        "Rank Math"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://rankmath.com/offer/",
+      "used_for": [
+        "Rank Math"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/all-in-one-seo-pack/",
+      "used_for": [
+        "All in One SEO (AIOSEO)"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://aioseo.com/pricing/",
+      "used_for": [
+        "All in One SEO (AIOSEO)"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wpforms-lite/",
+      "used_for": [
+        "WPForms"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpforms.com/pricing/",
+      "used_for": [
+        "WPForms"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/support/topic/conditional-logic-96/",
+      "used_for": [
+        "Buyer evidence",
+        "WPForms"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.gravityforms.com/pricing/",
+      "used_for": [
+        "Gravity Forms"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.gravityforms.com/about/",
+      "used_for": [
+        "Gravity Forms"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wp-mail-smtp/",
+      "used_for": [
+        "WP Mail SMTP"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpmailsmtp.com/pricing/",
+      "used_for": [
+        "WP Mail SMTP"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/mailchimp-for-wp/",
+      "used_for": [
+        "MC4WP: Mailchimp for WordPress"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.mc4wp.com/pricing/",
+      "used_for": [
+        "MC4WP: Mailchimp for WordPress"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.mc4wp.com/",
+      "used_for": [
+        "MC4WP: Mailchimp for WordPress"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/optinmonster/",
+      "used_for": [
+        "OptinMonster"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://optinmonster.com/pricing/",
+      "used_for": [
+        "Buyer evidence",
+        "OptinMonster"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/google-analytics-for-wordpress/",
+      "used_for": [
+        "MonsterInsights"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.monsterinsights.com/pricing/",
+      "used_for": [
+        "MonsterInsights"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wordfence/",
+      "used_for": [
+        "Wordfence"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.wordfence.com/products/wordfence-premium/",
+      "used_for": [
+        "Wordfence"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://lp.wordfence.com/en/wordfence-plans-pricing-ga",
+      "used_for": [
+        "Wordfence"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/really-simple-ssl/",
+      "used_for": [
+        "Really Simple Security"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://really-simple-ssl.com/pro/",
+      "used_for": [
+        "Really Simple Security"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/akismet/",
+      "used_for": [
+        "Akismet"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://akismet.com/pricing/",
+      "used_for": [
+        "Akismet"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/complianz-gdpr/",
+      "used_for": [
+        "Complianz"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://complianz.io/pricing/",
+      "used_for": [
+        "Complianz"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/jetpack/",
+      "used_for": [
+        "Jetpack"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://jetpack.com/pricing/",
+      "used_for": [
+        "Jetpack"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/updraftplus/",
+      "used_for": [
+        "UpdraftPlus"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://teamupdraft.com/updraftplus/pricing/",
+      "used_for": [
+        "Buyer evidence",
+        "UpdraftPlus"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/all-in-one-wp-migration/",
+      "used_for": [
+        "All-in-One WP Migration"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://servmask.com/products/unlimited-extension",
+      "used_for": [
+        "All-in-One WP Migration"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/duplicator/",
+      "used_for": [
+        "Duplicator"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://duplicator.com/pricing/",
+      "used_for": [
+        "Duplicator"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/worker/",
+      "used_for": [
+        "ManageWP Worker"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://managewp.com/pricing/",
+      "used_for": [
+        "ManageWP Worker"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/litespeed-cache/",
+      "used_for": [
+        "LiteSpeed Cache"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wp-rocket.me/pricing/",
+      "used_for": [
+        "WP Rocket"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wp-rocket.me/",
+      "used_for": [
+        "WP Rocket"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wp-fastest-cache/",
+      "used_for": [
+        "WP Fastest Cache"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.wpfastestcache.com/",
+      "used_for": [
+        "WP Fastest Cache"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wp-optimize/",
+      "used_for": [
+        "WP-Optimize"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://teamupdraft.com/wp-optimize/pricing/",
+      "used_for": [
+        "WP-Optimize"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://teamupdraft.com/wp-optimize/free-vs-premium/",
+      "used_for": [
+        "WP-Optimize"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/wp-smushit/",
+      "used_for": [
+        "Buyer evidence",
+        "Smush"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpmudev.com/plugins/",
+      "used_for": [
+        "Smush"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/imagify/",
+      "used_for": [
+        "Imagify"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://imagify.io/pricing/",
+      "used_for": [
+        "Imagify"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/shortpixel-image-optimiser/",
+      "used_for": [
+        "ShortPixel Image Optimizer"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://shortpixel.com/pricing",
+      "used_for": [
+        "ShortPixel Image Optimizer"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/ewww-image-optimizer/",
+      "used_for": [
+        "EWWW Image Optimizer"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://ewww.io/plans/",
+      "used_for": [
+        "EWWW Image Optimizer"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/polylang/",
+      "used_for": [
+        "Polylang"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://polylang.pro/pricing/",
+      "used_for": [
+        "Polylang"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/translatepress-multilingual/",
+      "used_for": [
+        "TranslatePress"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://translatepress.com/pricing/",
+      "used_for": [
+        "TranslatePress"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://app.wpml.org/purchase",
+      "used_for": [
+        "WPML"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wpml.org/",
+      "used_for": [
+        "WPML"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/woocommerce/",
+      "used_for": [
+        "WooCommerce core"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://woocommerce.com/",
+      "used_for": [
+        "WooCommerce core"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://woocommerce.com/products/woocommerce-subscriptions/",
+      "used_for": [
+        "Buyer evidence",
+        "WooCommerce Subscriptions"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://woocommerce.com/products/woocommerce-bookings/",
+      "used_for": [
+        "WooCommerce Bookings"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://woocommerce.com/products/woocommerce-memberships/",
+      "used_for": [
+        "Buyer evidence",
+        "WooCommerce Memberships"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://memberpress.com/plans/pricing/",
+      "used_for": [
+        "MemberPress"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.reddit.com/r/elementor/comments/sl8lk6/getting_elementor_pro_was_so_worth_it/",
+      "used_for": [
+        "Buyer evidence"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.reddit.com/r/Wordpress/comments/185u79h",
+      "used_for": [
+        "Buyer evidence"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/support/topic/we-need-the-pro-features-repeater-field-and-co-2/",
+      "used_for": [
+        "Buyer evidence"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://www.reddit.com/r/Wordpress/comments/11jnfay/wp_rocket_is_it_worth_it/",
+      "used_for": [
+        "Buyer evidence"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/browse/popular/",
+      "used_for": [
+        "Selection / popularity"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/browse/popular/page/2/",
+      "used_for": [
+        "Selection / popularity"
+      ],
+      "accessed": "2026-09-30"
+    },
+    {
+      "url": "https://wordpress.org/plugins/browse/popular/page/3/",
+      "used_for": [
+        "Selection / popularity"
+      ],
+      "accessed": "2026-09-30"
+    }
+  ]
+}
