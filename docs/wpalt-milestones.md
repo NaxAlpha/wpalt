@@ -211,4 +211,8 @@ The user authorized merging M1 and proceeding to M2, with automatic clean post-m
 
 ### M2 active — 2026-10-01
 
-[Build preparation PR #2](https://github.com/NaxAlpha/wpalt/pull/2) merged as `0cce274912ada0e92d51be3e2874088916dbea05`. Its [actual main run](https://github.com/NaxAlpha/wpalt/actions/runs/36778736692) passed all three jobs; the clean archive was downloaded and its source identity/checksums/permissions verified. M2 is active under [its contract](m2-contract.md). M3–M9 remain planned. M2's primary delivery PR will be created when its substantial system is concrete and reviewable.
+[Build preparation PR #2](https://github.com/NaxAlpha/wpalt/pull/2) merged as `0cce274912ada0e92d51be3e2874088916dbea05`. Its [actual main run](https://github.com/NaxAlpha/wpalt/actions/runs/36778736692) passed all three jobs; the clean archive was downloaded and its source identity/checksums/permissions verified. M2 is active under [its contract](m2-contract.md). M3–M9 remain planned. [M2 delivery PR #3](https://github.com/NaxAlpha/wpalt/pull/3) is open. Its initial implementation passed all three GitHub jobs; final refinements and evidence require current-head verification before ready-for-review status.
+
+### M2 verified local delivery — 2026-10-01
+
+The composable studio, typed authoring, published-data bindings, theme/options publication/history, portable packages and schema-2 upgrade/recovery are implemented. Twelve readable acceptance journeys pass on SQLite and PostgreSQL 17; native release browser/CLI checks pass. Performance, SQL plans, security/data boundaries and remaining capability limits are recorded in [M2 evidence](evidence/m2-verification.md). Final-head CI and user review/merge remain distinct delivery states. M3–M9 remain planned.

@@ -1,0 +1,176 @@
+{
+  "machine": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "cpu": "arm",
+    "logical_cpus": 8
+  },
+  "posts_requested": 1000,
+  "requests_per_scenario": 100,
+  "binary_bytes": 10894016,
+  "conditions": "Full uncompressed HTML document; warm application; no browser asset/render timing; no application response cache; localhost; Python HTTP client overhead included.",
+  "profiles": [
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 0.772,
+      "p95_ms": 0.977,
+      "p99_ms": 1.056,
+      "requests_per_second": 1160.2,
+      "document_bytes": 9198
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 4.085,
+      "p95_ms": 5.492,
+      "p99_ms": 7.031,
+      "requests_per_second": 2310.5,
+      "document_bytes": 9198
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 0.499,
+      "p95_ms": 0.563,
+      "p99_ms": 0.591,
+      "requests_per_second": 1963.2,
+      "document_bytes": 2401
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 1.666,
+      "p95_ms": 2.261,
+      "p99_ms": 2.602,
+      "requests_per_second": 5479.0,
+      "document_bytes": 2401
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 2.98,
+      "p95_ms": 3.262,
+      "p99_ms": 3.338,
+      "requests_per_second": 330.3,
+      "document_bytes": 5671
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 20.794,
+      "p95_ms": 42.654,
+      "p99_ms": 47.493,
+      "requests_per_second": 409.1,
+      "document_bytes": 5671
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "home",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 3.899,
+      "p95_ms": 4.636,
+      "p99_ms": 4.784,
+      "requests_per_second": 256.3,
+      "document_bytes": 9139
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "home",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 16.256,
+      "p95_ms": 20.354,
+      "p99_ms": 21.362,
+      "requests_per_second": 578.6,
+      "document_bytes": 9139
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "story",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 3.441,
+      "p95_ms": 3.93,
+      "p99_ms": 4.111,
+      "requests_per_second": 285.1,
+      "document_bytes": 2401
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "story",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 16.826,
+      "p95_ms": 18.047,
+      "p99_ms": 18.609,
+      "requests_per_second": 588.1,
+      "document_bytes": 2401
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "search",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 4.522,
+      "p95_ms": 5.146,
+      "p99_ms": 5.787,
+      "requests_per_second": 218.2,
+      "document_bytes": 5653
+    },
+    {
+      "system": "wpalt",
+      "database": "postgres",
+      "endpoint": "search",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 16.947,
+      "p95_ms": 18.541,
+      "p99_ms": 19.443,
+      "requests_per_second": 577.0,
+      "document_bytes": 5653
+    }
+  ],
+  "cold_first_request_ms": {
+    "sqlite": 2.196,
+    "postgres": 11.903
+  },
+  "studio_asset_bytes": {
+    "raw": 34894,
+    "gzip": 12478
+  },
+  "composition_fixture": "20 dynamic cards with typed field bindings and three explicit reusable component parameters",
+  "runtime": {
+    "sqlite": {
+      "rss_after_load_bytes": 51101696,
+      "site_files_bytes": 13768601
+    },
+    "postgres": {
+      "rss_after_load_bytes": 35192832,
+      "site_files_bytes": 1433
+    }
+  }
+}

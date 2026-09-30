@@ -98,19 +98,28 @@ pub fn identifier(name: &str) -> bool {
 }
 impl Registry {
     pub async fn load(app: &App) -> Result<Self> {
-        let common = serde_json::from_str(&app.db.settings().await?.field_schema)
-            .map_err(|_| Error::invalid("Site field definitions are invalid."))?;
-        let rows = sqlx::query("SELECT id,definition FROM content_models ORDER BY id")
-            .fetch_all(&app.db.pool)
-            .await?;
+        // One statement gives a coherent schema snapshot on both engines and
+        // avoids loading unrelated site metadata or a second round trip.
+        let rows=sqlx::query("SELECT '' AS id,field_schema AS definition FROM settings WHERE id=1 UNION ALL SELECT id,definition FROM content_models").fetch_all(&app.db.pool).await?;
+        let mut common = None;
         let mut models = BTreeMap::new();
         for row in rows {
-            models.insert(
-                row.get("id"),
-                serde_json::from_str(&row.get::<String, _>("definition"))
-                    .map_err(|_| Error::invalid("A content model is invalid."))?,
-            );
+            let id: String = row.get("id");
+            let raw: String = row.get("definition");
+            if id.is_empty() {
+                common = Some(
+                    serde_json::from_str(&raw)
+                        .map_err(|_| Error::invalid("Site field definitions are invalid."))?,
+                );
+            } else {
+                models.insert(
+                    id,
+                    serde_json::from_str(&raw)
+                        .map_err(|_| Error::invalid("A content model is invalid."))?,
+                );
+            }
         }
+        let common = common.ok_or(Error::invalid("Site is not initialized."))?;
         Ok(Self { common, models })
     }
     pub fn fields_for(&self, kind: &str) -> Result<BTreeMap<String, Field>> {

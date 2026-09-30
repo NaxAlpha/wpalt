@@ -1002,9 +1002,10 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
         content::save(&site.app, site.session(), Some(&client.id), related)
             .await
             .unwrap();
+        let public_identifier = uuid::Uuid::new_v4().to_string();
         let mut project = input("project-one", "publish");
         project.kind = "project".into();
-        project.fields=json!({"client":client.id,"steps":[{"label":"First useful step"},{"label":"Second useful step"}],"gallery":[public_media,private_media],"photo":public_media,"sections":[{"type":"hero","values":{"headline":"FLEXIBLE_HERO"}}],"shared":{"headline":"REUSED_GROUP"},"details":{"count":7}}).to_string();
+        project.fields=json!({"subtitle":public_identifier,"client":client.id,"steps":[{"label":"First useful step"},{"label":"Second useful step"}],"gallery":[public_media,private_media],"photo":public_media,"sections":[{"type":"hero","values":{"headline":"FLEXIBLE_HERO"}}],"shared":{"headline":"REUSED_GROUP"},"details":{"count":7}}).to_string();
         project.taxonomies = json!({"sector":["Local businesses"]}).to_string();
         let record = content::save(&site.app, site.session(), None, project.clone())
             .await
@@ -1049,6 +1050,10 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
                 && public.contains("Second useful step")
         );
         assert!(!public.contains("PRIVATE_"));
+        assert!(
+            public.contains(&public_identifier),
+            "Ordinary UUID-shaped strings are not mistaken for private relationship references"
+        );
         assert!(public.contains("FLEXIBLE_HERO") && public.contains("REUSED_GROUP"));
         assert!(
             public.contains(&format!("/media/{public_media}"))
@@ -1201,6 +1206,25 @@ async fn theme_drafts_publish_restore_and_switch_without_content_loss() {
                 .unwrap()
                 .published_title,
             "A story worth sharing"
+        );
+        let current = theme::load(&site.app, "paper", true).await.unwrap();
+        let mut left = current.package.clone();
+        let mut right = current.package;
+        left.footer.text = serde_json::json!("Concurrent writer A");
+        right.footer.text = serde_json::json!("Concurrent writer B");
+        let (a, b) = tokio::join!(
+            theme::save(&site.app, "paper", left, current.version, false),
+            theme::save(&site.app, "paper", right, current.version, false)
+        );
+        assert_eq!(
+            usize::from(a.is_ok()) + usize::from(b.is_ok()),
+            1,
+            "Exactly one concurrent theme writer succeeds"
+        );
+        assert_eq!(a.err().or_else(|| b.err()).unwrap().0, StatusCode::CONFLICT);
+        assert_eq!(
+            theme::load(&site.app, "paper", true).await.unwrap().version,
+            current.version + 1
         );
         site.close().await;
     }

@@ -258,6 +258,38 @@ impl Package {
             binding(v, r, model, params)?;
         }
         check_condition(&n.condition, r, model, params, 0, &mut 64)?;
+        if !n.image.is_null() && !n.image.is_string() && !n.image.is_object() {
+            return Err(Error::invalid(
+                "Media values must be a UUID or a typed binding.",
+            ));
+        }
+        if !n.href.is_null() && !n.href.is_string() && !n.href.is_object() {
+            return Err(Error::invalid(
+                "Link destinations must be text URLs or bindings.",
+            ));
+        }
+        if n.image.is_object() {
+            if let Some(kind) = binding_kind(&n.image, r, model, params) {
+                let expected = if n.kind == "image" {
+                    "media"
+                } else {
+                    "gallery"
+                };
+                if kind != expected {
+                    return Err(Error::invalid(
+                        "Image/gallery binding has the wrong declared field type.",
+                    ));
+                }
+            }
+        }
+        if n.kind == "repeater" {
+            if let Some(kind) = binding_kind(&json!({"bind":n.source}), r, model, params) {
+                if !["repeater", "flexible", "gallery"].contains(&kind.as_str()) {
+                    return Err(Error::invalid("Repeaters must bind a declared list field."));
+                }
+            }
+        }
+
         if let Some(id) = n.image.as_str() {
             if !id.is_empty() && uuid::Uuid::parse_str(id).is_err() {
                 return Err(Error::invalid(
@@ -456,6 +488,67 @@ impl Package {
             add(n, &mut out)
         }
         out
+    }
+}
+fn field_kind(
+    r: &Registry,
+    fields: &BTreeMap<String, crate::schema::Field>,
+    parts: &[&str],
+) -> Option<String> {
+    let (first, tail) = parts.split_first()?;
+    let field = fields.get(*first)?;
+    if tail.is_empty() {
+        return Some(field.kind.clone());
+    }
+    match field.kind.as_str() {
+        "object" | "repeater" => field_kind(r, &field.fields, tail),
+        "group" => field_kind(r, r.common.groups.get(&field.group)?, tail),
+        "relationship" => {
+            if tail.len() == 1 && ["title", "body", "url", "kind", "id"].contains(&tail[0]) {
+                Some("string".into())
+            } else if tail.first() == Some(&"fields") {
+                field_kind(r, &r.fields_for(&field.target).ok()?, &tail[1..])
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+fn binding_kind(
+    v: &Value,
+    r: &Registry,
+    model: Option<&str>,
+    params: &BTreeMap<String, String>,
+) -> Option<String> {
+    if let Some(path) = v.get("bind").and_then(Value::as_str) {
+        let parts: Vec<_> = path.split('.').collect();
+        match parts.as_slice() {
+            ["site", ..]
+            | ["post", "title" | "body" | "url" | "kind" | "id"]
+            | ["item", "title" | "body" | "url" | "kind" | "id" | "type"] => Some("string".into()),
+            ["params", key] => params.get(*key).cloned(),
+            ["post", "fields", ..] => field_kind(
+                r,
+                &model
+                    .and_then(|m| r.fields_for(m).ok())
+                    .unwrap_or_else(|| r.common.fields.clone()),
+                &parts[2..],
+            ),
+            ["options", ..] => field_kind(r, &r.common.options, &parts[1..]),
+            ["item", "fields", ..] => model
+                .and_then(|m| r.fields_for(m).ok())
+                .and_then(|fields| field_kind(r, &fields, &parts[2..])),
+            _ => None,
+        }
+    } else if v.is_string() {
+        Some("string".into())
+    } else if v.is_number() {
+        Some("number".into())
+    } else if v.is_boolean() {
+        Some("boolean".into())
+    } else {
+        None
     }
 }
 fn nested_field_path(
@@ -877,7 +970,20 @@ pub async fn published(app: &App, id: &str) -> Result<Stored> {
         } else {
             let raw:Option<String>=sqlx::query_scalar("SELECT package FROM theme_revisions WHERE theme_id=$1 AND version=$2 AND published=1").bind(id).bind(published_version).fetch_optional(&app.db.pool).await?;
             let Some(raw) = raw else { continue };
-            let package = Package::parse(&raw, &Registry::load(app).await?)?;
+            let package = match Package::parse(&raw, &Registry::load(app).await?) {
+                Ok(package) => package,
+                Err(error) => {
+                    let current: i64 =
+                        sqlx::query_scalar("SELECT published_version FROM themes WHERE id=$1")
+                            .bind(id)
+                            .fetch_one(&app.db.pool)
+                            .await?;
+                    if current != published_version {
+                        continue;
+                    }
+                    return Err(error);
+                }
+            };
             let mut cache = app.themes.lock().await;
             if cache.len() >= 32 {
                 cache.clear();
@@ -900,6 +1006,7 @@ pub struct Context {
     pub relations: BTreeMap<String, Value>,
     pub media: BTreeMap<String, String>,
     pub queries: usize,
+    reference_ids: BTreeSet<String>,
 }
 /// Stream selected published columns and stop before aggregating excessive data.
 async fn public_values(
@@ -952,6 +1059,7 @@ pub async fn context(
         relations: BTreeMap::new(),
         media: BTreeMap::new(),
         queries: 1,
+        reference_ids: BTreeSet::new(),
     };
     fn dependencies<'a>(
         package: &'a Package,
@@ -1008,7 +1116,7 @@ pub async fn context(
     }
     // Typed references gathered in batches. Public resolution *always* uses published snapshots.
     let registry = Registry::load(app).await?;
-    ctx.queries += 2;
+    ctx.queries += 1;
     let mut refs = BTreeMap::new();
     let mut media = Vec::new();
     let mut literal_relations = Vec::new();
@@ -1110,6 +1218,8 @@ pub async fn context(
         }
     }
 
+    ctx.reference_ids.extend(refs.keys().cloned());
+    ctx.reference_ids.extend(media.iter().cloned());
     media.sort();
     media.dedup();
     if media.len() > 128 {
@@ -1168,7 +1278,7 @@ impl Context {
         // Missing/private relationship IDs never become rendered content or conditions.
         if value
             .as_str()
-            .is_some_and(|s| uuid::Uuid::parse_str(s).is_ok())
+            .is_some_and(|s| self.reference_ids.contains(s))
             && !self.relations.contains_key(value.as_str().unwrap())
             && !self.media.contains_key(value.as_str().unwrap())
         {

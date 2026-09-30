@@ -1,6 +1,6 @@
 # M2 contract — composable website builder
 
-Status: implemented, final verification and delivery PR preparation active. Date: 2026-10-01.
+Status: implemented and locally verified; delivery PR #3 open, final-head CI pending. Date: 2026-10-01.
 
 Prerequisite complete: M1 PR #1 and build-pipeline PR #2 are merged; their actual main commits passed verification. The clean archive from `0cce274912ada0e92d51be3e2874088916dbea05` was downloaded and checked for source identity, hashes and executable permissions. See [build evidence](evidence/clean-build-verification.json).
 

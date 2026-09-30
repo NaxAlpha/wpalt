@@ -60,29 +60,59 @@ function Binding({ label, value, onChange }) {
         {label}
         <select
           aria-label={label}
-          value={bound ? "bind" : "literal"}
+          value={
+            bound
+              ? "bind"
+              : typeof value === "number"
+                ? "number"
+                : typeof value === "boolean"
+                  ? "boolean"
+                  : "literal"
+          }
           onChange={(e) =>
             onChange(
-              e.currentTarget.value === "bind" ? { bind: "site.title" } : "",
+              e.currentTarget.value === "bind"
+                ? { bind: "site.title" }
+                : e.currentTarget.value === "number"
+                  ? 0
+                  : e.currentTarget.value === "boolean"
+                    ? false
+                    : "",
             )
           }
         >
-          <option value="literal">Literal</option>
+          <option value="literal">Text literal</option>
+          <option value="number">Number literal</option>
+          <option value="boolean">Boolean literal</option>
           <option value="bind">Dynamic binding</option>
         </select>
       </label>
-      <input
-        aria-label={label + " value"}
-        value={bound ? value.bind : (value ?? "")}
-        placeholder={bound ? "post.fields.subtitle" : "Text"}
-        onInput={(e) =>
-          onChange(
-            bound
-              ? { ...value, bind: e.currentTarget.value }
-              : e.currentTarget.value,
-          )
-        }
-      />
+      {!bound && typeof value === "boolean" ? (
+        <input
+          type="checkbox"
+          aria-label={label + " value"}
+          checked={value}
+          onChange={(e) => onChange(e.currentTarget.checked)}
+        />
+      ) : (
+        <input
+          type={!bound && typeof value === "number" ? "number" : "text"}
+          aria-label={label + " value"}
+          value={bound ? value.bind : (value ?? "")}
+          placeholder={bound ? "post.fields.subtitle" : "Text"}
+          onInput={(e) =>
+            onChange(
+              bound
+                ? { ...value, bind: e.currentTarget.value }
+                : typeof value === "number"
+                  ? e.currentTarget.value === ""
+                    ? null
+                    : Number(e.currentTarget.value)
+                  : e.currentTarget.value,
+            )
+          }
+        />
+      )}
       {bound && (
         <Scalar
           label="Fallback"
