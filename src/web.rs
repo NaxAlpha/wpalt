@@ -30,6 +30,7 @@ pub fn router(app: App) -> Router {
         .route("/logout", post(logout))
         .route("/feed.xml", get(feed))
         .route("/assets/app.css", get(css))
+        .route("/assets/admin-ui.css", get(admin_css))
         .route("/assets/admin.js", get(js))
         .route("/admin", get(dashboard))
         .route("/admin/posts", get(post_list))
@@ -157,6 +158,13 @@ fn admin(s: &Session) -> Result<()> {
 }
 fn html_page(title: &str, settings: &Settings, s: Option<&Session>, body: Markup) -> Html<String> {
     Html(view::layout(title, settings, s, body))
+}
+async fn admin_css() -> Response {
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        include_str!("../assets/generated/admin-ui.css"),
+    )
+        .into_response()
 }
 async fn css() -> impl IntoResponse {
     (

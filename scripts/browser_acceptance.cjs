@@ -101,6 +101,7 @@ async function freePort() {
     page.getByRole("button", { name: "Sign in", exact: true }),
   );
   await page.waitForURL(origin + "/admin");
+  await require("./ui_contracts.cjs")(owner, origin);
   await page.screenshot({
     path: path.join(output, "admin-desktop.png"),
     fullPage: true,
@@ -297,7 +298,7 @@ async function freePort() {
     .fill("unsafe identifier");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await page
-    .getByRole("status")
+    .getByRole("alert")
     .filter({ hasText: "unique safe identifiers" })
     .waitFor();
   await visitor.reload();

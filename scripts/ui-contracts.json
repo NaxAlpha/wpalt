@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "viewports": [320, 768, 1440],
+  "height": 1000,
+  "control_min_height": 44,
+  "control_radius": 8,
+  "panel_radius": 12,
+  "sidebar_width": 224,
+  "desktop_workspace_padding": 32,
+  "mobile_workspace_padding": 16,
+  "focus_outline_min_width": 3,
+  "normal_text_contrast": 4.5,
+  "control_boundary_contrast": 3,
+  "geometry_tolerance_px": 0.5,
+  "visual_diff": {
+    "threshold": 0.15,
+    "max_changed_ratio": 0.001,
+    "include_anti_alias": false
+  },
+  "rationale": "Product interaction target is 44px, stricter than WCAG 2.2 AA target minimum; floating layout allows 0.5px rounding. Pixel baseline is an independent review artifact, never generated from tokens in ordinary CI.",
+  "control_min_width": 44,
+  "control_font_px": 14,
+  "body_font_px": 16
+}

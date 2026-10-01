@@ -1,5 +1,6 @@
 import { h, render, Fragment } from "preact";
 import { useState, useEffect, useRef } from "preact/hooks";
+import { Button, Field, Notice, Disclosure } from "./ui.jsx";
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const kinds = [
   "section",
@@ -41,15 +42,13 @@ const node = (kind) => ({
 const own = (o, k) => Object.hasOwn(o, k);
 function Scalar({ label, value, onChange, type = "text", ...rest }) {
   return (
-    <label>
-      {label}
-      <input
-        type={type}
-        value={value ?? ""}
-        onInput={(e) => onChange(e.currentTarget.value)}
-        {...rest}
-      />
-    </label>
+    <Field
+      label={label}
+      type={type}
+      value={value ?? ""}
+      onInput={(e) => onChange(e.currentTarget.value)}
+      {...rest}
+    />
   );
 }
 function Binding({ label, value, onChange }) {
@@ -173,12 +172,12 @@ function Condition({ value, onChange }) {
 function Outline({ root, path, selected, onSelect }) {
   return (
     <div class="outline">
-      <button
+      <Button
         class={"quiet " + (selected === path ? "selected" : "")}
         onClick={() => onSelect(path)}
       >
         {root.kind} <small>{root.id}</small>
-      </button>
+      </Button>
       {(root.children || []).map((c, i) => (
         <Outline
           key={c.id}
@@ -333,7 +332,7 @@ function Fields({ definition, onChange, groups, models }) {
               }
             />
           )}
-          <button
+          <Button
             class="quiet"
             onClick={() => {
               const next = { ...definition };
@@ -342,7 +341,7 @@ function Fields({ definition, onChange, groups, models }) {
             }}
           >
             Remove field
-          </button>
+          </Button>
         </div>
       ))}
       <AddName
@@ -365,7 +364,7 @@ function AddName({ label, onAdd }) {
         value={id}
         onInput={(e) => set(e.currentTarget.value)}
       />
-      <button
+      <Button
         class="secondary"
         onClick={() => {
           if (
@@ -378,7 +377,7 @@ function AddName({ label, onAdd }) {
         }}
       >
         {label}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -444,21 +443,21 @@ function Values({ fields, value, onChange, state, groups }) {
                         change(v.map((x, j) => (j === i ? next : x)))
                       }
                     />
-                    <button
+                    <Button
                       class="quiet"
                       onClick={() => change(v.filter((_, j) => j !== i))}
                     >
                       Remove row
-                    </button>
+                    </Button>
                   </div>
                 ))}
-                <button
+                <Button
                   class="secondary"
                   onClick={() => change([...(v || []), {}])}
                   disabled={(v || []).length >= (f.max_items || 20)}
                 >
                   Add row
-                </button>
+                </Button>
               </fieldset>
             ) : f.kind === "gallery" ? (
               <fieldset>
@@ -468,12 +467,12 @@ function Values({ fields, value, onChange, state, groups }) {
                     <span>
                       {state.media.find((m) => m.id === id)?.label || id}
                     </span>
-                    <button
+                    <Button
                       class="quiet"
                       onClick={() => change(v.filter((_, j) => j !== i))}
                     >
                       Remove
-                    </button>
+                    </Button>
                   </div>
                 ))}
                 <select
@@ -509,12 +508,12 @@ function Values({ fields, value, onChange, state, groups }) {
                         )
                       }
                     />
-                    <button
+                    <Button
                       class="quiet"
                       onClick={() => change(v.filter((_, j) => j !== i))}
                     >
                       Remove section
-                    </button>
+                    </Button>
                   </section>
                 ))}
                 <select
@@ -685,13 +684,13 @@ function App() {
             ))}
           </select>
         </label>
-        <button disabled={busy} onClick={() => action(() => save(false))}>
+        <Button busy={busy} onClick={() => action(() => save(false))}>
           Save draft
-        </button>
-        <button disabled={busy} onClick={() => action(() => save(true))}>
+        </Button>
+        <Button busy={busy} onClick={() => action(() => save(true))}>
           Publish theme
-        </button>
-        <button
+        </Button>
+        <Button
           class="secondary"
           disabled={busy || dirty}
           onClick={() =>
@@ -703,8 +702,8 @@ function App() {
           }
         >
           Activate
-        </button>
-        <button
+        </Button>
+        <Button
           class="secondary"
           onClick={() => {
             const blob = new Blob([JSON.stringify(pkg, null, 2)], {
@@ -718,7 +717,7 @@ function App() {
           }}
         >
           Export package
-        </button>
+        </Button>
         <label class="file-button">
           Import package
           <input
@@ -726,7 +725,9 @@ function App() {
             accept="application/json"
             onChange={(e) =>
               action(async () => {
-                const raw = await e.currentTarget.files[0].text();
+                const file = e.currentTarget.files[0];
+                if (!file) return;
+                const raw = await file.text();
                 const p = JSON.parse(raw);
                 const name = "import-" + crypto.randomUUID().slice(0, 8);
                 await api("/api/admin/design/" + name, {
@@ -743,18 +744,19 @@ function App() {
           />
         </label>
       </div>
-      <p class="notice" role="status" aria-live="polite">
+      <Notice error={blocked}>
         {message ||
           "Drafts are private. Theme and shared options publish independently."}
-      </p>
+      </Notice>
       <nav class="studio-tabs" aria-label="Studio tools">
         {["compose", "models", "options", "history", "package"].map((t) => (
-          <button
+          <Button
             class={tab === t ? "" : "secondary"}
+            aria-current={tab === t ? "page" : undefined}
             onClick={() => setTab(t)}
           >
             {t}
-          </button>
+          </Button>
         ))}
       </nav>
       {tab === "compose" && (
@@ -834,21 +836,22 @@ function App() {
                 onSelect={setSelected}
               />
             )}
-            <h3>Design tokens</h3>
-            {Object.keys(pkg.tokens).map((k) => (
-              <Scalar
-                label={k}
-                type={k === "font" ? "text" : "color"}
-                value={pkg.tokens[k]}
-                onChange={(v) => update((p) => (p.tokens[k] = v))}
-              />
-            ))}
+            <Disclosure summary="Design tokens" collapseOnNarrow>
+              {Object.keys(pkg.tokens).map((k) => (
+                <Scalar
+                  label={k}
+                  type={k === "font" ? "text" : "color"}
+                  value={pkg.tokens[k]}
+                  onChange={(v) => update((p) => (p.tokens[k] = v))}
+                />
+              ))}
+            </Disclosure>
           </aside>
           <section class="panel preview-panel">
             <div class="toolbar">
-              <button class="secondary" onClick={() => setMobile((v) => !v)}>
+              <Button class="secondary" onClick={() => setMobile((v) => !v)}>
                 {mobile ? "Desktop preview" : "Mobile preview"}
-              </button>
+              </Button>
               <label>
                 Preview content
                 <select
@@ -1119,7 +1122,7 @@ function App() {
                 </label>
                 {selected.includes(".children.") && (
                   <div class="toolbar">
-                    <button
+                    <Button
                       class="secondary"
                       onClick={() =>
                         update((p) => {
@@ -1144,8 +1147,8 @@ function App() {
                       }
                     >
                       Move up
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       class="secondary"
                       onClick={() =>
                         update((p) => {
@@ -1158,7 +1161,7 @@ function App() {
                       }
                     >
                       Remove node
-                    </button>
+                    </Button>
                   </div>
                 )}
               </>
@@ -1242,7 +1245,7 @@ function App() {
               })
             }
           />
-          <button
+          <Button
             onClick={() =>
               action(async () => {
                 await api("/api/admin/models/" + model, {
@@ -1255,7 +1258,7 @@ function App() {
             }
           >
             Save model
-          </button>
+          </Button>
           <h3>Common fields</h3>
           <Fields
             definition={schema.fields}
@@ -1293,7 +1296,7 @@ function App() {
             models={models}
             onChange={(v) => setCommon({ ...schema, options: v })}
           />
-          <button
+          <Button
             onClick={() =>
               action(async () => {
                 await api("/api/admin/schema", {
@@ -1306,7 +1309,7 @@ function App() {
             }
           >
             Save shared definitions
-          </button>
+          </Button>
         </section>
       )}
       {tab === "options" && (
@@ -1321,7 +1324,7 @@ function App() {
           />
           <div class="toolbar">
             {[false, true].map((publish) => (
-              <button
+              <Button
                 onClick={() =>
                   action(async () => {
                     await api("/api/admin/options", {
@@ -1337,7 +1340,7 @@ function App() {
                 }
               >
                 {publish ? "Publish options" : "Save option draft"}
-              </button>
+              </Button>
             ))}
           </div>
         </section>
@@ -1354,7 +1357,7 @@ function App() {
                   Version {r.version}
                   {r.published ? " · published" : " · draft"}
                 </span>
-                <button
+                <Button
                   class="secondary"
                   onClick={() =>
                     action(async () => {
@@ -1368,7 +1371,7 @@ function App() {
                   }
                 >
                   Restore draft
-                </button>
+                </Button>
               </div>
             ))}
         </section>
@@ -1386,7 +1389,7 @@ function App() {
             value={raw}
             onInput={(e) => setRaw(e.currentTarget.value)}
           />
-          <button
+          <Button
             onClick={() =>
               action(async () => {
                 const packageValue = JSON.parse(raw);
@@ -1401,7 +1404,7 @@ function App() {
             }
           >
             Validate and save package
-          </button>
+          </Button>
         </section>
       )}
     </>

@@ -6,7 +6,7 @@ Companions: [Product goals](wpalt-product-goals.md) · [Development methodology]
 
 ## Delivery rules
 
-Every milestone delivers a substantial end-user system, building on the previous release. The roadmap describes proposed delivery boundaries, not completed functionality or a fixed schedule. M1 was merged in PR #1; M2 is implemented with local release verification; current-head CI/review status is on PR #3; M3–M9 are planned.
+Every milestone delivers a substantial end-user system, building on the previous release. The roadmap describes proposed delivery boundaries, not completed functionality or a fixed schedule. M1 and M2 are merged in PRs #1 and #3. Frontend foundation preparation is active before M3; M3–M9 are planned.
 
 Each milestone follows the same process: prepare and, where useful, refactor the preceding system; define the milestone contract; make each functional step work; verify and optimize each step; integrate and optimize the complete system; deliver a runnable release with evidence. Working correctly includes baseline security and data integrity from the outset.
 
@@ -216,3 +216,7 @@ The user authorized merging M1 and proceeding to M2, with automatic clean post-m
 ### M2 verified local delivery — 2026-10-01
 
 The composable studio, typed authoring, published-data bindings, theme/options publication/history, portable packages and schema-2 upgrade/recovery are implemented. Twelve readable acceptance journeys pass on SQLite and PostgreSQL 17; native release browser/CLI checks pass. Performance, SQL plans, security/data boundaries and remaining capability limits are recorded in [M2 evidence](evidence/m2-verification.md). Final-head CI and user review/merge remain distinct delivery states. M3–M9 remain planned.
+
+### M2 merged; frontend preparation before M3 — 2026-10-01
+
+[PR #3](https://github.com/NaxAlpha/wpalt/pull/3) merged as `e527cd118b1a9326e3d8288e506746a1908afb52`; [actual main build](https://github.com/NaxAlpha/wpalt/actions/runs/36793117434) passed and its clean archive was downloaded/verified. The user requested a dedicated supporting frontend PR before M3. Its [contract](frontend-foundations.md) establishes tokens, shared controls, precise browser measurements, visual baselines and human aesthetic review, with improvements to current administration. It does not create a small internal milestone or replace M3's substantial user outcome. M3–M9 remain planned; theme evolution follows existing M2/M8 scope.

@@ -4,13 +4,16 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "format:check": "prettier --check builder.jsx build.mjs package.json"
+    "format:check": "prettier --check *.jsx *.mjs *.css *.json"
   },
   "dependencies": {
     "preact": "11.0.0"
   },
   "devDependencies": {
+    "axe-core": "4.13.0",
     "esbuild": "0.28.2",
+    "pixelmatch": "7.2.0",
+    "pngjs": "7.0.0",
     "prettier": "3.9.9"
   }
 }

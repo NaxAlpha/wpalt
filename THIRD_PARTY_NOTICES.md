@@ -25,3 +25,5 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Development-only visual verification uses pixelmatch 7.2.0 and pngjs 7.0.0 (MIT), and axe-core 4.13.0 (MPL-2.0), through the locked npm toolchain. These scanners/diff libraries are not included in the application runtime bundle. Their package notices remain in the installed development dependencies.

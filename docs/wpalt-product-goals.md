@@ -163,3 +163,7 @@ Beginning with M9 and future adopted releases, use explicit supported upgrade pa
 Any temporary compatibility layer must have a reason, supported version range, replacement/migration path and removal release or review deadline. Remove it as soon as the documented migration and support conditions permit. Retain necessary migration capability separately from legacy runtime code; removing a compatibility layer must not strand users on a supported upgrade path. Multi-server upgrades must explicitly select a bounded mixed-version window or a controlled maintenance migration.
 
 Reference baseline: [Local-first plugin and CMS research](research/local-first-plugin-and-cms-research.html) and [structured capability catalog](research/local-first-plugin-and-cms-data.json). The earlier research's recommendation to build a WordPress plugin first is superseded by the agreed standalone Rust application direction.
+
+## 13. Frontend foundations — agreed 2026-10-01
+
+A supporting PR before M3 establishes a precise design system, component/placement measurements, visual regression evidence and explicit aesthetic/UX review. Apply it to improve current administration and future frontend work. Testing must verify useful UI guarantees and remain understandable and bounded. Theme/customization capabilities remain assigned to existing milestones unless a material new product direction is explicitly agreed.

@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-01",
+  "platform": "darwin",
+  "browser": "154.0.8037.59",
+  "measured_surfaces": 18,
+  "control_measurements": 197,
+  "visual_comparisons": [
+    {
+      "name": "components-320",
+      "changed_pixels": 0,
+      "changed_ratio": 0
+    },
+    {
+      "name": "components-768",
+      "changed_pixels": 0,
+      "changed_ratio": 0
+    },
+    {
+      "name": "components-1440",
+      "changed_pixels": 0,
+      "changed_ratio": 0
+    }
+  ],
+  "automated_accessibility_scans": 6,
+  "accessibility_violations": 0,
+  "manual_incomplete_findings": 0,
+  "max_observed_initial_layout_shift": 0.00010738749999999999,
+  "assets": {
+    "builder.js": {
+      "raw_bytes": 35906,
+      "gzip_bytes": 12972
+    },
+    "admin-ui.css": {
+      "raw_bytes": 9191,
+      "gzip_bytes": 2383
+    }
+  },
+  "native_release_binary_bytes": 10910528,
+  "status": "passed",
+  "limits": "Sampled Chromium/macOS native release; no full accessibility certification or field Core Web Vitals claim. Platform-specific screenshot references; aesthetics require human review."
+}

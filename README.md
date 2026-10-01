@@ -26,6 +26,10 @@ Configuration follows CLI > supported environment variables > explicitly selecte
 
 [Automatic clean post-merge builds and downloads](docs/operations.md#automatic-clean-builds-after-merge) are documented in operations.
 
+## Frontend quality foundation
+
+The pre-M3 supporting work uses semantic tokens and native components, measured responsive geometry, accessibility checks and reviewed platform-specific visual baselines. [Design and verification contract](docs/frontend-foundations.md) explains how to extend it and review its screenshot/measurement reports. These developer tools add no Node requirement to the running server.
+
 ## Review the delivered systems
 
 - [M2 builder contract](docs/m2-contract.md), [authoring guide](docs/theme-authoring.md) and [M2 evidence](docs/evidence/m2-verification.md)

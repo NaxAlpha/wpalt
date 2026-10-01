@@ -413,6 +413,44 @@
         "relevant vulnerability or deprecation"
       ],
       "status": "reviewed; focused implementation checks, not full WCAG or JSON Schema certification"
+    },
+    {
+      "feature_id": "UI-01",
+      "area": "Frontend design system and visual verification",
+      "scope": "pre-M3 supporting preparation",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.w3.org/TR/WCAG22/",
+        "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+        "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html",
+        "https://playwright.dev/docs/test-snapshots",
+        "https://github.com/dequelabs/axe-core"
+      ],
+      "applicable_versions": [
+        "WCAG 2.2 targeted criteria; not full conformance",
+        "Playwright 1.62.1",
+        "wpalt UI contract 1",
+        "axe-core 4.13.0",
+        "pixelmatch 7.2.0; pngjs 7.0.0"
+      ],
+      "last_checked": "2026-10-01",
+      "next_review": "2026-10-31",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Measure actual component geometry/contrast/keyboard states and responsive placement; review deterministic visual baselines explicitly.",
+        "Keep aesthetic judgment separate from automated pixel/geometry regression checks."
+      ],
+      "tests": [
+        "scripts/ui_contracts.cjs within real-browser acceptance"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "browser/platform upgrade",
+        "guideline revision",
+        "new interaction pattern"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

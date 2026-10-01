@@ -12,9 +12,10 @@ pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body:
         title {(title) " · " (settings.title)}
         meta name="description" content=(settings.description);
         link rel="stylesheet" href="/assets/app.css";
+        @if admin || title == "Sign in" {link rel="stylesheet" href="/assets/admin-ui.css";}
         @if admin {script defer src="/assets/admin.js" {}}
         link rel="alternate" type="application/rss+xml" title=(settings.title) href="/feed.xml";
-    } body class=(if admin{"admin"}else{settings.theme.as_str()}) {
+    } body class=(if admin{"admin"}else if title == "Sign in" {"auth"}else{settings.theme.as_str()}) {
         a class="skip" href="#main" {"Skip to content"}
         @if let Some(s)=session {
             aside class="sidebar" {
