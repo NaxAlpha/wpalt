@@ -506,6 +506,39 @@ module.exports = async function verifyUI(context, origin) {
           "page",
           "Current section must remain indicated on nested routes",
         );
+        if (route === "/admin" && width === 1440) {
+          await page.locator(".sidebar .brand").focus();
+          await page.keyboard.press("Tab");
+          const dark = await page.locator(":focus").evaluate((el) => {
+            const rgb = (c) =>
+              c
+                .match(/[\d.]+/g)
+                .slice(0, 3)
+                .map(Number);
+            const style = getComputedStyle(el);
+            return {
+              name: el.textContent.trim(),
+              color: rgb(style.outlineColor),
+              background: rgb(
+                getComputedStyle(document.querySelector(".sidebar"))
+                  .backgroundColor,
+              ),
+              width: parseFloat(style.outlineWidth),
+            };
+          });
+          results.dark_keyboard_focus = {
+            ...dark,
+            contrast: contrast(dark.color, dark.background),
+          };
+          assert(
+            dark.name === "Overview" &&
+              dark.width >= contract.focus_outline_min_width &&
+              results.dark_keyboard_focus.contrast >=
+                contract.control_boundary_contrast,
+            "Dark sidebar keyboard focus must remain visible and contrasting",
+          );
+          await page.locator(":focus").evaluate((el) => el.blur());
+        }
         if (width === 1440) await accessibility(page, origin, route, results);
         assert.deepEqual(
           m.failures,

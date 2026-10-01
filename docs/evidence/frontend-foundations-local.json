@@ -32,11 +32,12 @@
       "gzip_bytes": 12981
     },
     "admin-ui.css": {
-      "raw_bytes": 9701,
-      "gzip_bytes": 2458
+      "raw_bytes": 9809,
+      "gzip_bytes": 2484
     }
   },
   "native_release_binary_bytes": 10910528,
   "status": "passed",
-  "limits": "Sampled Chromium/macOS native release; no full accessibility certification or field Core Web Vitals claim. Platform-specific screenshot references; aesthetics require human review."
+  "limits": "Sampled Chromium/macOS native release; no full accessibility certification or field Core Web Vitals claim. Platform-specific screenshot references; aesthetics require human review.",
+  "dark_focus_contrast": 11.134601601135547
 }

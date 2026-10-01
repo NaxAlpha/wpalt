@@ -17,7 +17,8 @@
     "sidebar": "#132c2a",
     "sidebar-text": "#e0eee8",
     "sidebar-muted": "#b4ccc1",
-    "sidebar-active": "#244c40"
+    "sidebar-active": "#244c40",
+    "focus-on-dark": "#b7eadd"
   },
   "space": {
     "1": 4,

@@ -423,3 +423,7 @@
   gap: var(--ui-space-3);
   min-height: var(--ui-size-control);
 }
+
+.admin .sidebar :focus-visible {
+  outline-color: var(--ui-color-focus-on-dark);
+}

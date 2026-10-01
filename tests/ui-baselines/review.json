@@ -1,6 +1,6 @@
 {
   "reviewed_on": "2026-10-01",
-  "reviewed_by": "wpalt development review",
+  "reviewed_by": "Codex visual inspection; user review pending on PR #4",
   "gallery_contract": 1,
   "linux": {
     "capture_run": "https://github.com/NaxAlpha/wpalt/actions/runs/36796239498",
