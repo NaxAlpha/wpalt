@@ -1,24 +1,24 @@
 {
   "reviewed_on": "2026-10-01",
-  "reviewed_by": "Codex development visual inspection; user aesthetic review pending on redesign PR",
+  "reviewed_by": "Codex development visual inspection; user aesthetic review pending on PR #5",
   "gallery_contract": 2,
   "linux": {
-    "capture_run": "https://github.com/NaxAlpha/wpalt/actions/runs/36796239498",
-    "source_commit": "f03902477a39073787668a752f2b5b17e1a518c6",
+    "capture_run": "https://github.com/NaxAlpha/wpalt/actions/runs/36854568027",
+    "source_commit": "872ab881efa8cc3d0db13174fde846d8086ebaaa",
     "os": "Ubuntu 24.04",
     "browser": "Playwright 1.62.1 Chromium 151.0.7922.34",
-    "redesign_status": "capture and explicit inspection pending"
+    "redesign_status": "gallery images explicitly inspected; ordinary final comparison required"
   },
   "darwin": {
     "browser": "installed Chrome 154.0.8037.59",
     "os": "macOS native",
     "tool": "Playwright 1.62.1"
   },
-  "rationale": "Intentional calm cardless redesign: inspected local 320/768/1440 gallery hierarchy, open sections, action priority, normal-weight field values, errors and narrow reflow. Linux redesign reference inspection pending; previous Linux provenance retained until capture. Final ordinary comparison must pass.",
+  "rationale": "Intentional calm cardless redesign: inspected 320/768/1440 gallery hierarchy, open sections, action priority, normal-weight field values, error/disabled/busy states and narrow reflow on macOS and Linux. Platform font weight/rasterization differences are expected. Linux capture passed 32 geometry surfaces, ten accessibility scans, reduced motion and text spacing; only the old-design screenshot references failed. Final ordinary comparison must pass.",
   "baseline_sha256": {
-    "tests/ui-baselines/linux-chromium/components-320.png": "c3c695856e5f7561c60dfb80a5e8f8d62b5a03ea03e565ea5885e676c8f6a22a",
-    "tests/ui-baselines/linux-chromium/components-1440.png": "a113317fe8c9f9b275e518f0f0e47fbb390d7bf9139f40e1c4af6e99333e56a8",
-    "tests/ui-baselines/linux-chromium/components-768.png": "20858c49777056965812798d4aabcfdb3cb1bd5d8f22ecbd53e040c0e57da113",
+    "tests/ui-baselines/linux-chromium/components-320.png": "01fc4105b04d83d56f9c5d03c1809e317999f911056c1c841e8e947e93302c0a",
+    "tests/ui-baselines/linux-chromium/components-1440.png": "92682f47d4632a030a5c79c2d6f32388adae2b8b9da50b28664a25f74fa6d7fa",
+    "tests/ui-baselines/linux-chromium/components-768.png": "bdf89f94ea8aafb4284891d9d04e8bc6c5e3019b193e3096383af4ed4c93ac5e",
     "tests/ui-baselines/darwin-chromium/components-320.png": "2418e3f3f12ba210dddea15ecd9c71ca6d1e4bb5379e0d348e7f50a998f666c7",
     "tests/ui-baselines/darwin-chromium/components-1440.png": "1c42c50b2e1f4f76a35a5dc8d222b3c5ccf51e9766d6fd4d977295b4d63e5422",
     "tests/ui-baselines/darwin-chromium/components-768.png": "337820df26548454d985dc5ef5300f6eb4f5515edabe64c868a19c61141756f5"

@@ -1,6 +1,6 @@
 {
   "date": "2026-10-01",
-  "binary_profile": "debug; native release verification also required on final design",
+  "binary_profile": "native release",
   "browser": "154.0.8037.59",
   "measured_surfaces": 32,
   "control_measurements": 328,
@@ -20,5 +20,25 @@
       "raw_bytes": 13191,
       "gzip_bytes": 3113
     }
-  }
+  },
+  "native_release_binary_bytes": 10910528,
+  "visual_comparisons": [
+    {
+      "name": "components-320",
+      "changed_pixels": 0,
+      "changed_ratio": 0
+    },
+    {
+      "name": "components-768",
+      "changed_pixels": 0,
+      "changed_ratio": 0
+    },
+    {
+      "name": "components-1440",
+      "changed_pixels": 0,
+      "changed_ratio": 0
+    }
+  ],
+  "max_observed_initial_layout_shift": 0,
+  "status": "passed"
 }

@@ -226,3 +226,5 @@ The composable studio, typed authoring, published-data bindings, theme/options p
 ### Calm default UI redesign before M3 — 2026-10-01
 
 Frontend foundation [PR #4](https://github.com/NaxAlpha/wpalt/pull/4) merged as `c0b2ff65cc0e952da0b3fa63109f38ca801f3ef1`; actual-main checks and downloaded clean-build hashes were verified. The user then authorized a separate current-interface redesign: [calm cardless administration contract](calm-admin-design.md). This supporting PR applies the established measurement foundation to an open, coherent default admin experience; future milestone features and public theme evolution remain in their existing scope. M3 has not started.
+
+[Calm default UI PR #5](https://github.com/NaxAlpha/wpalt/pull/5) delivers this supporting redesign and its measured review evidence. It leaves M3 pending; readiness requires final-head application, compiler-floor and clean-build checks plus explicitly reviewed visual references.
