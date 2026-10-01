@@ -52,7 +52,7 @@ async fn page(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>
         "Design studio",
         &settings,
         Some(&s),
-        html! {(view::heading("Design studio","Build a coherent website.","Compose templates and reusable components. Preview drafts before publishing."))div id="builder" data-csrf=(s.csrf){p{"Loading local studio…"}}script defer src="/assets/builder.js"{}},
+        html! {(view::heading("Design studio","Design studio","Compose templates and reusable components. Preview drafts before publishing."))div id="builder" data-csrf=(s.csrf){p{"Loading local studio…"}}script defer src="/assets/builder.js"{}},
     )))
 }
 async fn bundle() -> Response {

@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-01",
+  "binary_profile": "debug; native release verification also required on final design",
+  "browser": "154.0.8037.59",
+  "measured_surfaces": 32,
+  "control_measurements": 328,
+  "automated_accessibility_scans": 10,
+  "violations": 0,
+  "incomplete": 0,
+  "reduced_motion": "passed",
+  "text_spacing": "passed",
+  "keyboard_focus_contrast": 6.15462385895871,
+  "sidebar_focus_contrast": 5.62464689222185,
+  "assets": {
+    "builder.js": {
+      "raw_bytes": 35946,
+      "gzip_bytes": 12986
+    },
+    "admin-ui.css": {
+      "raw_bytes": 13191,
+      "gzip_bytes": 3113
+    }
+  }
+}

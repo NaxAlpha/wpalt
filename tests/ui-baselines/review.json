@@ -1,25 +1,26 @@
 {
   "reviewed_on": "2026-10-01",
-  "reviewed_by": "Codex visual inspection; user review pending on PR #4",
-  "gallery_contract": 1,
+  "reviewed_by": "Codex development visual inspection; user aesthetic review pending on redesign PR",
+  "gallery_contract": 2,
   "linux": {
     "capture_run": "https://github.com/NaxAlpha/wpalt/actions/runs/36796239498",
     "source_commit": "f03902477a39073787668a752f2b5b17e1a518c6",
     "os": "Ubuntu 24.04",
-    "browser": "Playwright 1.62.1 Chromium 151.0.7922.34"
+    "browser": "Playwright 1.62.1 Chromium 151.0.7922.34",
+    "redesign_status": "capture and explicit inspection pending"
   },
   "darwin": {
     "browser": "installed Chrome 154.0.8037.59",
     "os": "macOS native",
     "tool": "Playwright 1.62.1"
   },
-  "rationale": "Inspected 320/768/1440px gallery hierarchy, wrapping, action states, label/error treatment, checkbox/disclosure and spacing. Separate Linux/macOS font rendering is intentional. No unresolved measured geometry or automated accessibility findings in initial captures; missing Linux references were the only bootstrap failure. Final ordinary comparison must pass.",
+  "rationale": "Intentional calm cardless redesign: inspected local 320/768/1440 gallery hierarchy, open sections, action priority, normal-weight field values, errors and narrow reflow. Linux redesign reference inspection pending; previous Linux provenance retained until capture. Final ordinary comparison must pass.",
   "baseline_sha256": {
     "tests/ui-baselines/linux-chromium/components-320.png": "c3c695856e5f7561c60dfb80a5e8f8d62b5a03ea03e565ea5885e676c8f6a22a",
     "tests/ui-baselines/linux-chromium/components-1440.png": "a113317fe8c9f9b275e518f0f0e47fbb390d7bf9139f40e1c4af6e99333e56a8",
     "tests/ui-baselines/linux-chromium/components-768.png": "20858c49777056965812798d4aabcfdb3cb1bd5d8f22ecbd53e040c0e57da113",
-    "tests/ui-baselines/darwin-chromium/components-320.png": "75c51fc140340eba683b06f8480faa5dd74d8296c93ef8a15f0d0850a605ce59",
-    "tests/ui-baselines/darwin-chromium/components-1440.png": "980af4c7a0625d30ca2d9d1cef899fdb883479133b9e16118d90b3a0fead65c1",
-    "tests/ui-baselines/darwin-chromium/components-768.png": "28aa8fcd2ed0b4ba35b1df2c3519b7e90706f24a4559e41bc7a822a7909a9b15"
+    "tests/ui-baselines/darwin-chromium/components-320.png": "2418e3f3f12ba210dddea15ecd9c71ca6d1e4bb5379e0d348e7f50a998f666c7",
+    "tests/ui-baselines/darwin-chromium/components-1440.png": "1c42c50b2e1f4f76a35a5dc8d222b3c5ccf51e9766d6fd4d977295b4d63e5422",
+    "tests/ui-baselines/darwin-chromium/components-768.png": "337820df26548454d985dc5ef5300f6eb4f5515edabe64c868a19c61141756f5"
   }
 }

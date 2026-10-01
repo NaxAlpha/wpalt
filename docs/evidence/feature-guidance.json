@@ -424,7 +424,9 @@
         "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
         "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html",
         "https://playwright.dev/docs/test-snapshots",
-        "https://github.com/dequelabs/axe-core"
+        "https://github.com/dequelabs/axe-core",
+        "https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html",
+        "https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html"
       ],
       "applicable_versions": [
         "WCAG 2.2 targeted criteria; not full conformance",
@@ -439,7 +441,9 @@
       "maintenance_owner": "wpalt maintainers",
       "requirements": [
         "Measure actual component geometry/contrast/keyboard states and responsive placement; review deterministic visual baselines explicitly.",
-        "Keep aesthetic judgment separate from automated pixel/geometry regression checks."
+        "Keep aesthetic judgment separate from automated pixel/geometry regression checks.",
+        "Cardless default admin sections preserve clear boundaries for editable controls; the calm appearance is a reviewed product choice.",
+        "User text-spacing and reduced-motion preferences preserve usable interface interactions."
       ],
       "tests": [
         "scripts/ui_contracts.cjs within real-browser acceptance"

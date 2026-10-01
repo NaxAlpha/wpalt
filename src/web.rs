@@ -248,7 +248,7 @@ async fn dashboard(State(app): State<App>, headers: HeaderMap) -> Result<Respons
     };
     let r=sqlx::query("SELECT (SELECT COUNT(*) FROM posts) AS content,(SELECT COUNT(*) FROM posts WHERE status='published') AS published,(SELECT COUNT(*) FROM media) AS media,(SELECT COUNT(*) FROM comments WHERE status='pending') AS pending").fetch_one(&app.db.pool).await?;
     Ok(html_page("Overview",&app.db.settings().await?,Some(&s),html!{
-        (view::heading("Workspace","A good place to publish.","Create useful content, shape your website and keep your data on your own server."))
+        (view::heading("Workspace","Overview","Create useful content, shape your website and keep your data on your own server."))
         div class="grid" {div class="panel stat" {strong {(r.get::<i64,_>("content"))}span {"Content items"}}div class="panel stat" {strong {(r.get::<i64,_>("published"))}span {"Published"}}div class="panel stat" {strong {(r.get::<i64,_>("media"))}span {"Media files"}}}
         div class="split" {section class="panel" {h2 {"Start with a story."}p class="muted" {"Draft privately, preview your changes, and publish when you are ready. Autosave preserves your working copy without changing the live page."}
             @if s.can_edit(){a class="button" href="/admin/posts/new" {"Create content"} " " a class="button secondary" href="/admin/posts" {"Browse content"}}
@@ -477,7 +477,7 @@ async fn post_list(
         &app.db.settings().await?,
         Some(&s),
         html! {
-            (view::heading("Publishing","Your content.","Working drafts and published pages live together, with separate public snapshots."))
+            (view::heading("Publishing","Content","Working drafts and published pages live together, with separate public snapshots."))
             div class="toolbar" {a class="button" href="/admin/posts/new" {"Create content"}}
             section class="panel table-wrap" {table {thead {tr {th {"Title"}th {"Type"}th {"Status"}th {"Revision"}}}tbody {@for row in rows.iter().take(50) {tr {td class="title" {a href=(format!("/admin/posts/{}",row.get::<String,_>("id"))) {(row.get::<String,_>("title"))}}td {(row.get::<String,_>("kind"))}td {span class=(format!("status {}",row.get::<String,_>("status"))) {(row.get::<String,_>("status"))}}td {(row.get::<i64,_>("version"))}}}}}
                 @if rows.is_empty(){p class="empty" {"Start with your first page or story."}}
@@ -519,7 +519,7 @@ fn editor_form(
     error: Option<&str>,
 ) -> Markup {
     html! {
-        (view::heading("Publishing",if id.is_some(){"Shape your story."}else{"Something worth sharing."},"Write in Markdown, bind typed fields and compose reusable page sections."))
+        (view::heading("Publishing",if id.is_some(){"Edit content"}else{"New content"},"Write in Markdown, bind typed fields and compose reusable page sections."))
         div class="notice error" data-editor-error hidden[error.is_none()] {(error.unwrap_or(""))}
         form method="post" action=(id.map(|id|format!("/admin/posts/{id}")).unwrap_or_else(||"/admin/posts/new".into())) data-editor data-new=(if id.is_some(){"false"}else{"true"}) {
             (view::csrf(s)) input type="hidden" name="version" value=(p.version);input type="hidden" name="publish_at" value=(p.publish_at);
@@ -533,7 +533,7 @@ fn editor_form(
                 label {"Tags" input name="tags" value=(p.tags);}
                 label {"Custom taxonomies (JSON)" textarea name="taxonomies" {(p.taxonomies)}small {"Declared taxonomy identifiers mapped to arrays of term names."}}
                 label {"Schedule time" input type="datetime-local" data-schedule-time;small {"Uses your browser's local time. Scheduling removes this item from the live site until publication."}}
-                div class="toolbar" {button name="action" value="save" {"Save draft"}button name="action" value="publish" {"Publish now"}button class="secondary" name="action" value="schedule" {"Schedule"}}
+                div class="toolbar" {button name="action" value="save" {"Save draft"}button class="secondary" name="action" value="publish" {"Publish now"}button class="secondary" name="action" value="schedule" {"Schedule"}}
                 @if let Some(id)=id {div class="toolbar" {a class="button secondary" href=(format!("/admin/preview/{id}")) target="_blank" rel="noopener" {"Preview"}button class="secondary" name="action" value="unpublish" {"Unpublish"}}}
                 p class="save-status" data-save-status {"Saved working copies do not update the live page."}
             }}
@@ -739,7 +739,7 @@ async fn media_list(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
         &app.db.settings().await?,
         Some(&s),
         html! {
-            (view::heading("Assets","A library of your own.","Upload images, describe them and choose who can access them. SVG and executable uploads are not accepted."))
+            (view::heading("Assets","Media library","Upload images, describe them and choose who can access them. SVG and executable uploads are not accepted."))
             section class="panel" {form method="post" action="/admin/media" enctype="multipart/form-data" {(view::csrf(&s))div class="field-row" {label {"Image" input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/gif" required;}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" {"Public"}option value="private" {"Editors only"}}}}label {"Alternative text" input name="alt" maxlength="500";}button {"Upload image"}}}
             div class="cards" {@for r in rows {@let id=r.get::<String,_>("id");section class="panel media-card" {img src=(format!("/media/{id}")) alt=(r.get::<String,_>("alt"));h3 {(r.get::<String,_>("original_name"))}p class="muted" {(r.get::<i64,_>("size")/1024) " KiB"}code {(format!("![description](/media/{id})"))}
                 form method="post" action=(format!("/admin/media/{id}")) {(view::csrf(&s))label {"Alternative text" input name="alt" value=(r.get::<String,_>("alt")) maxlength="500";}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" selected[r.get::<String,_>("visibility")=="public"] {"Public"}option value="private" selected[r.get::<String,_>("visibility")=="private"] {"Editors only"}}}button class="secondary" {"Save details"}}
@@ -981,7 +981,7 @@ async fn comments(State(app): State<App>, headers: HeaderMap) -> Result<Html<Str
         &app.db.settings().await?,
         Some(&s),
         html! {
-            (view::heading("Community","Keep the conversation useful.","All public submissions start in the moderation queue."))
+            (view::heading("Community","Comments","All public submissions start in the moderation queue."))
             @if rows.is_empty(){section class="panel empty" {"No comments yet."}}
             @for r in rows {section class="panel" {h3 {(r.get::<String,_>("name")) " · " (r.get::<String,_>("title"))}p {(r.get::<String,_>("body"))}span class=(format!("status {}",r.get::<String,_>("status"))) {(r.get::<String,_>("status"))}
                 form class="toolbar" method="post" action=(format!("/admin/comments/{}",r.get::<String,_>("id"))) {(view::csrf(&s))button name="status" value="approved" {"Approve"}button class="secondary" name="status" value="rejected" {"Reject"}button class="secondary" name="status" value="pending" {"Hold"}}
@@ -1031,7 +1031,7 @@ async fn settings_page(State(app): State<App>, headers: HeaderMap) -> Result<Htm
         &settings,
         Some(&s),
         html! {
-            (view::heading("Configuration","Make it feel like yours.","Site identity, theme, navigation and typed content definitions share one configuration."))
+            (view::heading("Configuration","Site settings","Site identity, theme, navigation and typed content definitions share one configuration."))
             form class="panel" method="post" action="/admin/settings" {(view::csrf(&s))label {"Site title" input name="title" value=(settings.title) required maxlength="200";}label {"Description" textarea name="description" maxlength="1000" {(settings.description)}}
                 label {"Theme" select name="theme" aria-label="Theme" {@for theme in themes{option value=(theme.get::<String,_>("id")) selected[settings.theme==theme.get::<String,_>("id")] {(theme.get::<String,_>("name"))}}}}
                 label {"Navigation (JSON)" textarea name="navigation" {(settings.navigation)}small {"Example: [{\"label\":\"About\",\"url\":\"/about\"}]"}}
@@ -1087,7 +1087,7 @@ async fn users(State(app): State<App>, headers: HeaderMap) -> Result<Html<String
         &app.db.settings().await?,
         Some(&s),
         html! {
-            (view::heading("Access","Give people the right tools.","Administrators manage the site, editors manage content/media, and moderators review comments."))
+            (view::heading("Access","People & access","Administrators manage the site, editors manage content/media, and moderators review comments."))
             section class="panel table-wrap" {table {thead {tr {th {"Name"}th {"Email"}th {"Access"}}}tbody {@for r in rows {tr {td {(r.get::<String,_>("name"))}td {(r.get::<String,_>("email"))}td {
                 form method="post" action=(format!("/admin/users/{}",r.get::<String,_>("id"))) {(view::csrf(&s))input type="hidden" name="name" value=(r.get::<String,_>("name"));
                     select name="role" aria-label="Account role" {@for role in ["admin","editor","moderator","disabled"] {option value=(role) selected[r.get::<String,_>("role")==role] {(role)}}}
@@ -1141,7 +1141,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
         &app.db.settings().await?,
         Some(&s),
         html! {
-            (view::heading("Operations","A clear view of your server.","Manual snapshots, portable content and useful diagnostics without cloud dependencies."))
+            (view::heading("Operations","Operations","Manual snapshots, portable content and useful diagnostics without cloud dependencies."))
             div class="split" {section class="panel" {h2 {"Back up & move"}p class="muted" {"Download a consistent database-and-media snapshot. It includes password hashes and private content; keep it secure. M1 snapshots are not encrypted."}
                 form method="post" action="/admin/backup" {(view::csrf(&s))button {"Download full backup"}}
                 p class="muted" {"Restore with the CLI into an empty database/data directory while the server is stopped. Keep an independent copy to recover from losing this host."}

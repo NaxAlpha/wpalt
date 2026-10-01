@@ -687,7 +687,11 @@ function App() {
         <Button busy={busy} onClick={() => action(() => save(false))}>
           Save draft
         </Button>
-        <Button busy={busy} onClick={() => action(() => save(true))}>
+        <Button
+          variant="secondary"
+          busy={busy}
+          onClick={() => action(() => save(true))}
+        >
           Publish theme
         </Button>
         <Button

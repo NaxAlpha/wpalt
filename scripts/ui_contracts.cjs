@@ -72,7 +72,15 @@ async function geometry(page) {
       const s = getComputedStyle(el);
       check(
         near(parseFloat(s.borderRadius), c.panel_radius),
-        "panel radius drift",
+        "section radius drift",
+      );
+      check(
+        parseFloat(s.borderLeftWidth) === 0 &&
+          parseFloat(s.borderRightWidth) === 0 &&
+          parseFloat(s.borderBottomWidth) === 0 &&
+          s.boxShadow === "none" &&
+          s.backgroundColor === "rgba(0, 0, 0, 0)",
+        "section must stay open without an enclosing card",
       );
     }
     check(
@@ -338,6 +346,34 @@ module.exports = async function verifyUI(context, origin) {
         results.visual_failures.push(error.message);
       }
     }
+    // Calm interaction must respect the system's reduced-motion preference.
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const reduced = await page
+      .locator("[data-ui=primary]")
+      .evaluate((el) => getComputedStyle(el).transitionDuration);
+    assert.equal(
+      reduced,
+      "0s",
+      "Reduced-motion preference must disable transitions",
+    );
+    results.reduced_motion = "passed";
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    // User text-spacing overrides must not hide or clip the component gallery.
+    await page.setViewportSize({ width: 320, height: contract.height });
+    const spacing = await page.addStyleTag({
+      content:
+        ".ui-gallery * { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important; } .ui-gallery p { margin-bottom: 2em !important; }",
+    });
+    const spaced = await geometry(page);
+    assert.deepEqual(
+      spaced.failures,
+      [],
+      "User text spacing must preserve usable targets and reflow: " +
+        spaced.failures.join("; "),
+    );
+    results.text_spacing = "passed";
+    await spacing.evaluate((el) => el.remove());
+    await page.setViewportSize({ width: 1440, height: contract.height });
     // Keyboard/focus and state contracts use real components, not DOM mocks.
     await page.getByRole("button", { name: "Save draft", exact: true }).focus();
     await page.keyboard.press("Tab");
@@ -425,6 +461,10 @@ module.exports = async function verifyUI(context, origin) {
       "/admin/posts/new",
       "/admin/builder",
       "/admin/settings",
+      "/admin/media",
+      "/admin/comments",
+      "/admin/operations",
+      "/admin/users",
     ]) {
       const widths =
         route === "/admin/builder"
@@ -494,11 +534,15 @@ module.exports = async function verifyUI(context, origin) {
         });
         const expectedNav = route.startsWith("/admin/posts")
           ? "Content"
-          : route === "/admin/builder"
-            ? "Design studio"
-            : route === "/admin/settings"
-              ? "Site settings"
-              : "Overview";
+          : {
+              "/admin": "Overview",
+              "/admin/builder": "Design studio",
+              "/admin/settings": "Site settings",
+              "/admin/users": "Site settings",
+              "/admin/media": "Media library",
+              "/admin/comments": "Comments",
+              "/admin/operations": "Operations",
+            }[route];
         assert.equal(
           await page
             .getByRole("link", { name: expectedNav, exact: true })
@@ -526,16 +570,16 @@ module.exports = async function verifyUI(context, origin) {
               width: parseFloat(style.outlineWidth),
             };
           });
-          results.dark_keyboard_focus = {
+          results.sidebar_keyboard_focus = {
             ...dark,
             contrast: contrast(dark.color, dark.background),
           };
           assert(
             dark.name === "Overview" &&
               dark.width >= contract.focus_outline_min_width &&
-              results.dark_keyboard_focus.contrast >=
+              results.sidebar_keyboard_focus.contrast >=
                 contract.control_boundary_contrast,
-            "Dark sidebar keyboard focus must remain visible and contrasting",
+            "Sidebar keyboard focus must remain visible and contrasting",
           );
           await page.locator(":focus").evaluate((el) => el.blur());
         }
@@ -563,7 +607,7 @@ module.exports = async function verifyUI(context, origin) {
     );
     results.status = "passed";
     console.log(
-      "PASS: measured component shapes/targets/contrast, keyboard states, regression guard, and five real admin surfaces at three widths.",
+      "PASS: measured component shapes/targets/contrast, keyboard states, regression guard, and nine real admin surfaces at three widths.",
     );
   } catch (error) {
     results.status = "failed";

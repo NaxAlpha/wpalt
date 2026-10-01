@@ -1,24 +1,24 @@
 {
-  "version": 1,
+  "version": 2,
   "color": {
-    "canvas": "#f5f7f6",
+    "canvas": "#faf9f6",
     "surface": "#ffffff",
-    "text": "#172b29",
-    "muted": "#526760",
-    "border": "#d6e0db",
-    "control-border": "#71857b",
-    "accent": "#12684f",
-    "accent-hover": "#0b503c",
-    "accent-soft": "#e7f2ec",
+    "text": "#262c30",
+    "muted": "#59646a",
+    "border": "#deded7",
+    "control-border": "#7b8588",
+    "accent": "#355e6b",
+    "accent-hover": "#244653",
+    "accent-soft": "#e7efef",
     "on-accent": "#ffffff",
-    "danger": "#963535",
-    "danger-soft": "#fff0ed",
-    "focus": "#185cbb",
-    "sidebar": "#132c2a",
-    "sidebar-text": "#e0eee8",
-    "sidebar-muted": "#b4ccc1",
-    "sidebar-active": "#244c40",
-    "focus-on-dark": "#b7eadd"
+    "danger": "#963838",
+    "danger-soft": "#fbefec",
+    "focus": "#315f9b",
+    "sidebar": "#f0efe9",
+    "sidebar-text": "#343d41",
+    "sidebar-muted": "#59646a",
+    "sidebar-active": "#e1e7e5",
+    "sidebar-focus": "#315f9b"
   },
   "space": {
     "1": 4,
@@ -31,8 +31,8 @@
     "10": 40
   },
   "radius": {
-    "control": 8,
-    "panel": 12,
+    "control": 6,
+    "panel": 0,
     "badge": 4
   },
   "size": {
