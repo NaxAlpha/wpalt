@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "core_baseline": "m1-contract.md + m2-contract.md; whole plugin groups are not blanket parity claims.",
-  "milestone": "M2",
+  "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md; partial plugin groups are not blanket parity claims.",
+  "milestone": "M3",
   "capabilities": [
     {
       "id": "F001",
@@ -129,10 +129,17 @@
       "capability": "Manual language variants and strings",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "implemented-defined-M3-scope; current-head verification recorded on milestone PR",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained."
+      "m3_coverage": "Independent language variants, labels/direction and per-language navigation. No automatic translation or admin localization.",
+      "evidence": [
+        "m3-contract.md",
+        "discovery.md",
+        "evidence/m3-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F009",
@@ -365,9 +372,17 @@
       "capability": "SEO titles, metadata and social previews",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "implemented-defined-M3-scope; current-head verification recorded on milestone PR",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m3_coverage": "Per-content title/description and social metadata; no social image manager or SERP preview scoring.",
+      "evidence": [
+        "m3-contract.md",
+        "discovery.md",
+        "evidence/m3-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F026",
@@ -375,9 +390,17 @@
       "capability": "Canonical, robots and indexing rules",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "implemented-defined-M3-scope; current-head verification recorded on milestone PR",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m3_coverage": "Local canonical, noindex, robots and reciprocal published hreflang; no arbitrary external canonical override.",
+      "evidence": [
+        "m3-contract.md",
+        "discovery.md",
+        "evidence/m3-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F027",
@@ -385,9 +408,17 @@
       "capability": "XML, image, video and news sitemaps",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "implemented-defined-M3-scope; current-head verification recorded on milestone PR",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m3_coverage": "Bounded XML content sitemaps and index; image/video/news extensions deferred.",
+      "evidence": [
+        "m3-contract.md",
+        "discovery.md",
+        "evidence/m3-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F028",
@@ -395,9 +426,17 @@
       "capability": "Schema graph and custom schema builder",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "implemented-defined-M3-scope; current-head verification recorded on milestone PR",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m3_coverage": "One minimal WebPage/Article graph with optional LocalBusiness node; arbitrary schema builder and rich-result enrichment deferred.",
+      "evidence": [
+        "m3-contract.md",
+        "discovery.md",
+        "evidence/m3-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F029",
@@ -405,9 +444,17 @@
       "capability": "Local business / multiple location schema",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "implemented-defined-M3-scope; current-head verification recorded on milestone PR",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m3_coverage": "One visible business identity/address; multiple locations and richer business types deferred.",
+      "evidence": [
+        "m3-contract.md",
+        "discovery.md",
+        "evidence/m3-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F030",
@@ -415,9 +462,17 @@
       "capability": "Redirects, regex rules and 404 reports",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "implemented-defined-M3-scope; current-head verification recorded on milestone PR",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m3_coverage": "Exact local 301/302 rules with loop/conflict/work limits; regex, automatic slug redirects and 404 reports deferred.",
+      "evidence": [
+        "m3-contract.md",
+        "discovery.md",
+        "evidence/m3-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F031",
@@ -435,9 +490,17 @@
       "capability": "Internal broken-link checks",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "implemented-defined-M3-scope; current-head verification recorded on milestone PR",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m3_coverage": "Bounded published Markdown local link/public media checks, no external fetching; theme/raw HTML crawler extensions deferred.",
+      "evidence": [
+        "m3-contract.md",
+        "discovery.md",
+        "evidence/m3-verification.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F033",

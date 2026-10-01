@@ -165,6 +165,7 @@ pub async fn save(
         ));
     }
 
+    crate::discovery::validate_content(app, &input).await?;
     let mut tx = app.db.pool.begin().await?;
     let old = if let Some(id) = id {
         Some(
@@ -208,7 +209,16 @@ pub async fn save(
         published_at: 0,
         updated_at: time,
         author_id: session.user.id.clone(),
+        locale: input.locale.clone(),
+        translation_group: input.translation_group.clone(),
+        seo: input.seo.clone(),
+        published_locale: input.locale.clone(),
+        published_translation_group: String::new(),
+        published_seo: "{}".into(),
     });
+    post.locale = input.locale.clone();
+    post.translation_group = input.translation_group.clone();
+    post.seo = input.seo.clone();
     post.title = input.title.trim().into();
     post.slug = input.slug.clone();
     post.body = input.body.clone();
@@ -241,6 +251,7 @@ pub async fn save(
         sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)")
             .bind(&post.id).bind(&post.slug).bind(&post.kind).bind(&post.title).bind(&post.body).bind(&post.fields).bind(&post.blocks).bind(&post.status).bind(post.version).bind(&post.published_slug).bind(&post.published_title).bind(&post.published_body).bind(&post.published_fields).bind(&post.published_blocks).bind(post.publish_at).bind(post.published_at).bind(post.updated_at).bind(&post.author_id).execute(&mut *tx).await?;
     }
+    sqlx::query("UPDATE posts SET locale=$1,translation_group=$2,seo=$3,published_locale=$4,published_translation_group=$5,published_seo=$6 WHERE id=$7").bind(&post.locale).bind(&post.translation_group).bind(&post.seo).bind(&post.published_locale).bind(&post.published_translation_group).bind(&post.published_seo).bind(&post.id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM post_terms WHERE post_id=$1")
         .bind(&post.id)
         .execute(&mut *tx)
@@ -296,6 +307,9 @@ pub async fn save(
     Ok(post)
 }
 fn promote(post: &mut Post, time: i64) {
+    post.published_locale = post.locale.clone();
+    post.published_translation_group = post.translation_group.clone();
+    post.published_seo = post.seo.clone();
     post.published_slug = post.slug.clone();
     post.published_title = post.title.clone();
     post.published_body = post.body.clone();
@@ -331,7 +345,7 @@ pub async fn publish_due(app: &App) -> Result<usize> {
         promote(&mut p, now());
         p.version += 1;
         p.status = "published".into();
-        let result=sqlx::query("UPDATE posts SET status='published',published_slug=slug,published_title=title,published_body=body,published_fields=fields,published_blocks=blocks,publish_at=0,published_at=$1,version=$2 WHERE id=$3 AND status='scheduled' AND version=$4").bind(p.published_at).bind(p.version).bind(&p.id).bind(p.version-1).execute(&mut *tx).await?;
+        let result=sqlx::query("UPDATE posts SET status='published',published_slug=slug,published_title=title,published_body=body,published_fields=fields,published_blocks=blocks,published_locale=locale,published_translation_group=translation_group,published_seo=seo,publish_at=0,published_at=$1,version=$2 WHERE id=$3 AND status='scheduled' AND version=$4").bind(p.published_at).bind(p.version).bind(&p.id).bind(p.version-1).execute(&mut *tx).await?;
         if result.rows_affected() == 1 {
             copy_terms(&mut tx, &p.id).await?;
             let terms=sqlx::query("SELECT t.name,t.kind FROM terms t JOIN post_terms pt ON pt.term_id=t.id WHERE pt.post_id=$1 ORDER BY t.name").bind(&p.id).fetch_all(&mut *tx).await?;
@@ -392,6 +406,9 @@ pub async fn restore_revision(
         session,
         Some(id),
         PostInput {
+            locale: p.locale,
+            translation_group: p.translation_group,
+            seo: p.seo,
             title: p.title,
             slug: p.slug,
             kind: p.kind,

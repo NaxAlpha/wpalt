@@ -461,6 +461,8 @@ module.exports = async function verifyUI(context, origin) {
       "/admin/posts/new",
       "/admin/builder",
       "/admin/settings",
+      "/admin/discovery",
+      "/admin/discovery/links",
       "/admin/media",
       "/admin/comments",
       "/admin/operations",
@@ -538,6 +540,8 @@ module.exports = async function verifyUI(context, origin) {
               "/admin": "Overview",
               "/admin/builder": "Design studio",
               "/admin/settings": "Site settings",
+              "/admin/discovery": "Discovery",
+              "/admin/discovery/links": "Discovery",
               "/admin/users": "Site settings",
               "/admin/media": "Media library",
               "/admin/comments": "Comments",
@@ -607,7 +611,7 @@ module.exports = async function verifyUI(context, origin) {
     );
     results.status = "passed";
     console.log(
-      "PASS: measured component shapes/targets/contrast, keyboard states, regression guard, and nine real admin surfaces at three widths.",
+      "PASS: measured component shapes/targets/contrast, keyboard states, regression guard, and eleven real admin surfaces at three widths.",
     );
   } catch (error) {
     results.status = "failed";

@@ -21,6 +21,12 @@ pub struct Post {
     pub published_at: i64,
     pub updated_at: i64,
     pub author_id: String,
+    pub locale: String,
+    pub translation_group: String,
+    pub seo: String,
+    pub published_locale: String,
+    pub published_translation_group: String,
+    pub published_seo: String,
 }
 impl Post {
     pub fn from_row(r: AnyRow) -> Self {
@@ -43,6 +49,12 @@ impl Post {
             published_at: r.get("published_at"),
             updated_at: r.get("updated_at"),
             author_id: r.get("author_id"),
+            locale: r.get("locale"),
+            translation_group: r.get("translation_group"),
+            seo: r.get("seo"),
+            published_locale: r.get("published_locale"),
+            published_translation_group: r.get("published_translation_group"),
+            published_seo: r.get("published_seo"),
         }
     }
 }
@@ -104,6 +116,12 @@ pub struct Block {
 #[derive(Clone, Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PostInput {
+    #[serde(default = "default_locale")]
+    pub locale: String,
+    #[serde(default)]
+    pub translation_group: String,
+    #[serde(default = "empty_object")]
+    pub seo: String,
     pub title: String,
     pub slug: String,
     pub kind: String,
@@ -135,4 +153,8 @@ fn empty_array() -> String {
 }
 fn save_action() -> String {
     "save".into()
+}
+
+fn default_locale() -> String {
+    "en".into()
 }

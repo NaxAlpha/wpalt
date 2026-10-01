@@ -4,6 +4,7 @@ pub mod builder_web;
 pub mod config;
 pub mod content;
 pub mod db;
+pub mod discovery;
 pub mod error;
 pub mod migrations;
 pub mod model;

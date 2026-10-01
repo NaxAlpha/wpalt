@@ -200,6 +200,11 @@
 .admin .field-row {
   gap: var(--ui-space-4);
 }
+.admin .field-row > button {
+  align-self: end;
+  justify-self: start;
+}
+
 .admin .ui-field {
   margin: var(--ui-space-4) 0;
   min-width: 0;

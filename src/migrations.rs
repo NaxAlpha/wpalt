@@ -40,13 +40,14 @@ pub async fn from_m1(db: &Db) -> anyhow::Result<()> {
             for table in ["posts","settings","terms"] {
                 let prefix=format!("CREATE TABLE IF NOT EXISTS {table}(");
                 let create=SCHEMA.lines().find(|line|line.starts_with(&prefix)).ok_or_else(||anyhow::anyhow!("migration table definition missing"))?;
+                let create=create.replace(",locale TEXT NOT NULL DEFAULT 'en',translation_group TEXT NOT NULL DEFAULT '',seo TEXT NOT NULL DEFAULT '{}',published_locale TEXT NOT NULL DEFAULT 'en',published_translation_group TEXT NOT NULL DEFAULT '',published_seo TEXT NOT NULL DEFAULT '{}'", "");
                 sqlx::raw_sql(&create.replacen(&prefix,&format!("CREATE TABLE {table}_m2("),1)).execute(&mut *tx).await?;
                 sqlx::query(&format!("INSERT INTO {table}_m2 SELECT * FROM {table}")).execute(&mut *tx).await?;
                 sqlx::query(&format!("DROP TABLE {table}")).execute(&mut *tx).await?;
                 sqlx::query(&format!("ALTER TABLE {table}_m2 RENAME TO {table}")).execute(&mut *tx).await?;
             }
         }
-        sqlx::raw_sql(SCHEMA).execute(&mut *tx).await?;
+        sqlx::raw_sql(&SCHEMA.lines().filter(|line| !line.contains("language_posts") && !line.contains("translation_drafts") && !line.contains("translation_live")).collect::<Vec<_>>().join("\n")).execute(&mut *tx).await?;
         if let Some(row)=sqlx::query("SELECT field_schema FROM settings WHERE id=1").fetch_optional(&mut *tx).await? {
             let old:std::collections::BTreeMap<String,String>=serde_json::from_str(&row.get::<String,_>("field_schema"))?;
             let mut definition=Definition::default();
@@ -85,4 +86,63 @@ pub async fn from_m1(db: &Db) -> anyhow::Result<()> {
             .await?;
     }
     result
+}
+
+/// Preserve M2 content and revision metadata once; no old parser in request paths.
+pub async fn from_m2(db: &Db) -> anyhow::Result<()> {
+    let mut tx = db.pool.begin().await?;
+    for (name, default) in [
+        ("locale", "en"),
+        ("translation_group", ""),
+        ("seo", "{}"),
+        ("published_locale", "en"),
+        ("published_translation_group", ""),
+        ("published_seo", "{}"),
+    ] {
+        sqlx::query(&format!(
+            "ALTER TABLE posts ADD COLUMN {name} TEXT NOT NULL DEFAULT '{default}'"
+        ))
+        .execute(&mut *tx)
+        .await?;
+    }
+    let mut after = String::new();
+    loop {
+        let rows =
+            sqlx::query("SELECT id,snapshot FROM revisions WHERE id>$1 ORDER BY id LIMIT 20")
+                .bind(&after)
+                .fetch_all(&mut *tx)
+                .await?;
+        if rows.is_empty() {
+            break;
+        }
+        for row in rows {
+            let id: String = row.get("id");
+            let mut value: serde_json::Value =
+                serde_json::from_str(&row.get::<String, _>("snapshot"))?;
+            let post = value["post"]
+                .as_object_mut()
+                .ok_or_else(|| anyhow::anyhow!("invalid stored revision"))?;
+            for (name, default) in [
+                ("locale", "en"),
+                ("translation_group", ""),
+                ("seo", "{}"),
+                ("published_locale", "en"),
+                ("published_translation_group", ""),
+                ("published_seo", "{}"),
+            ] {
+                post.insert(name.into(), default.into());
+            }
+            sqlx::query("UPDATE revisions SET snapshot=$1 WHERE id=$2")
+                .bind(value.to_string())
+                .bind(&id)
+                .execute(&mut *tx)
+                .await?;
+            after = id;
+        }
+    }
+    sqlx::query("UPDATE schema_version SET version=3 WHERE id=1")
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(())
 }

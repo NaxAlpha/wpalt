@@ -15,6 +15,19 @@ use std::{
 // Types and table names are an allowlist, never supplied by an archive.
 const TABLES: &[(&str, &[(&str, bool)])] = &[
     (
+        "discovery_settings",
+        &[("id", true), ("definition", false), ("version", true)],
+    ),
+    (
+        "redirects",
+        &[
+            ("source", false),
+            ("target", false),
+            ("code", true),
+            ("version", true),
+        ],
+    ),
+    (
         "settings",
         &[
             ("id", true),
@@ -94,6 +107,12 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
             ("published_at", true),
             ("updated_at", true),
             ("author_id", false),
+            ("locale", false),
+            ("translation_group", false),
+            ("seo", false),
+            ("published_locale", false),
+            ("published_translation_group", false),
+            ("published_seo", false),
         ],
     ),
     (
@@ -243,7 +262,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     }
     tx.commit().await?;
     let snapshot = Snapshot {
-        schema: 2,
+        schema: 3,
         created_at: crate::now(),
         tables,
         files,
@@ -251,7 +270,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v2".into(),
+        format: "wpalt-backup-v3".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -268,14 +287,14 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v2"
+    if envelope.format != "wpalt-backup-v3"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 2
+    if snapshot.schema != 3
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -283,6 +302,93 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     {
         return Err(Error::invalid("Unsupported backup schema or table set."));
     }
+    let discovery_rows = &snapshot.tables["discovery_settings"];
+    if discovery_rows.len() != 1
+        || discovery_rows[0]["id"] != 1
+        || discovery_rows[0]["version"].as_i64().is_none_or(|v| v < 1)
+    {
+        return Err(Error::invalid(
+            "Backup must contain one versioned discovery definition.",
+        ));
+    }
+    let definition: crate::discovery::Definition = serde_json::from_str(
+        discovery_rows[0]["definition"]
+            .as_str()
+            .ok_or(Error::invalid("Invalid discovery definition."))?,
+    )
+    .map_err(|_| Error::invalid("Invalid discovery definition."))?;
+    definition.validate()?;
+    let mut groups = BTreeMap::new();
+    let mut public_paths = HashSet::from(["/".to_owned(), "/search".to_owned()]);
+    for language in &definition.languages {
+        public_paths.insert(format!("/{}", language.code));
+        public_paths.insert(definition.path(&language.code, ""));
+        public_paths.insert(definition.path(&language.code, "search"));
+    }
+    for row in &snapshot.tables["posts"] {
+        for prefix in ["", "published_"] {
+            let text = |key: &str| {
+                row[&format!("{prefix}{key}")]
+                    .as_str()
+                    .ok_or(Error::invalid("Invalid discovery content metadata."))
+            };
+            let locale = text("locale")?;
+            let group = text("translation_group")?;
+            definition
+                .language(locale)
+                .map_err(|_| Error::invalid("Content uses an unconfigured language."))?;
+            crate::discovery::Seo::parse(text("seo")?)?;
+            if group.len() > 80 || (!group.is_empty() && !crate::schema::identifier(group)) {
+                return Err(Error::invalid("Invalid translation group."));
+            }
+            if !group.is_empty() {
+                let kind = row["kind"]
+                    .as_str()
+                    .ok_or(Error::invalid("Invalid content type."))?;
+                if groups
+                    .insert(group, kind)
+                    .is_some_and(|previous| previous != kind)
+                {
+                    return Err(Error::invalid("Translation group mixes content types."));
+                }
+            }
+        }
+        if row["status"] == "published" || row["status"] == "scheduled" {
+            let prefix = if row["status"] == "published" {
+                "published_"
+            } else {
+                ""
+            };
+            let locale = row[&format!("{prefix}locale")].as_str().unwrap();
+            let slug = row[&format!("{prefix}slug")]
+                .as_str()
+                .ok_or(Error::invalid("Invalid published slug."))?;
+            if definition.languages.iter().any(|l| l.code == slug) {
+                return Err(Error::invalid("Content conflicts with a language route."));
+            }
+            public_paths.insert(definition.path(locale, slug));
+            public_paths.insert(format!("/{slug}"));
+        }
+    }
+    let mut redirects = BTreeMap::new();
+    for row in &snapshot.tables["redirects"] {
+        let source = row["source"]
+            .as_str()
+            .ok_or(Error::invalid("Invalid redirect source."))?;
+        let target = row["target"]
+            .as_str()
+            .ok_or(Error::invalid("Invalid redirect target."))?;
+        if !matches!(row["code"].as_i64(), Some(301 | 302))
+            || row["version"].as_i64().is_none_or(|v| v < 1)
+            || public_paths.contains(source)
+            || redirects
+                .insert(source.to_owned(), target.to_owned())
+                .is_some()
+        {
+            return Err(Error::invalid("Invalid or conflicting redirect rule."));
+        }
+    }
+    crate::discovery::validate_redirect_graph(&redirects)?;
     let settings = snapshot.tables["settings"]
         .first()
         .ok_or(Error::invalid("Backup has no site settings."))?;
@@ -474,15 +580,27 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     let _guard = app.mutations.lock().await;
     let mut tx = app.db.pool.begin().await?;
     for (name, _) in TABLES {
-        let count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {name}"))
+        let count: i64 = if *name == "discovery_settings" {
+            sqlx::query_scalar(
+                "SELECT COUNT(*) FROM discovery_settings WHERE version<>1 OR definition<>$1",
+            )
+            .bind(serde_json::to_string(&crate::discovery::Definition::default()).unwrap())
             .fetch_one(&mut *tx)
-            .await?;
+            .await?
+        } else {
+            sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {name}"))
+                .fetch_one(&mut *tx)
+                .await?
+        };
         if count != 0 {
             return Err(Error::invalid(
                 "Restore requires an empty target. Back up and use a fresh database/data directory.",
             ));
         }
     }
+    sqlx::query("DELETE FROM discovery_settings")
+        .execute(&mut *tx)
+        .await?;
     for (name, columns) in TABLES {
         for row in &snapshot.tables[*name] {
             let mut q = QueryBuilder::<Any>::new(format!(

@@ -101,6 +101,9 @@ fn engines() -> Vec<bool> {
 }
 fn input(slug: &str, action: &str) -> PostInput {
     PostInput {
+        locale: "en".into(),
+        translation_group: String::new(),
+        seo: "{}".into(),
         title: "A story worth sharing".into(),
         slug: slug.into(),
         kind: "post".into(),
@@ -1064,10 +1067,19 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
             .unwrap()
             .package;
         let settings = site.app.db.settings().await.unwrap();
-        let before = theme::context(&site.app, &settings, &package, None, vec![], false, "home")
-            .await
-            .unwrap()
-            .queries;
+        let before = theme::context(
+            &site.app,
+            &settings,
+            &package,
+            None,
+            vec![],
+            false,
+            "home",
+            None,
+        )
+        .await
+        .unwrap()
+        .queries;
         for index in 0..29 {
             let mut extra = project.clone();
             extra.slug = format!("project-{index}");
@@ -1076,10 +1088,19 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
                 .await
                 .unwrap();
         }
-        let after = theme::context(&site.app, &settings, &package, None, vec![], false, "home")
-            .await
-            .unwrap()
-            .queries;
+        let after = theme::context(
+            &site.app,
+            &settings,
+            &package,
+            None,
+            vec![],
+            false,
+            "home",
+            None,
+        )
+        .await
+        .unwrap()
+        .queries;
         assert_eq!(
             before, after,
             "Thirty related cards use the same number of bulk queries as one card"
@@ -1355,6 +1376,7 @@ async fn composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_chan
             vec![],
             false,
             "home",
+            None,
         )
         .await
         .unwrap();
@@ -1555,4 +1577,461 @@ async fn migrate_meaningful_m1_site(pg: bool) {
     );
     reopened.db.pool.close().await;
     fixture.close().await;
+}
+
+async fn multilingual(site: &Site) {
+    use wpalt::discovery::{Definition, Language};
+    let mut d = Definition::default();
+    d.languages.push(Language {
+        code: "fr".into(),
+        label: "Français".into(),
+        search_label: "Rechercher".into(),
+        ..Language::default()
+    });
+    d.languages.push(Language {
+        code: "ar".into(),
+        label: "العربية".into(),
+        direction: "rtl".into(),
+        ..Language::default()
+    });
+    wpalt::discovery::configure(&site.app, d, 1).await.unwrap();
+}
+
+#[tokio::test]
+async fn multilingual_publication_keeps_drafts_private_and_variants_reciprocal() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        multilingual(&site).await;
+        let mut english = input("garden", "publish");
+        english.translation_group = "garden-story".into();
+        english.seo = r#"{"title":"Garden discovery","schema_type":"Article"}"#.into();
+        let en = content::save(&site.app, site.session(), None, english.clone())
+            .await
+            .unwrap();
+        let mut french = input("jardin", "save");
+        french.locale = "fr".into();
+        french.translation_group = "garden-story".into();
+        french.body = "Une histoire de jardin".into();
+        let fr = content::save(&site.app, site.session(), None, french.clone())
+            .await
+            .unwrap();
+        assert!(
+            !get(&site.app, "/garden", None)
+                .await
+                .1
+                .contains("hreflang=\"fr\"")
+        );
+        assert_eq!(
+            get(&site.app, "/fr/jardin", None).await.0,
+            StatusCode::NOT_FOUND
+        );
+        french.version = fr.version;
+        french.action = "publish".into();
+        let fr = content::save(&site.app, site.session(), Some(&fr.id), french.clone())
+            .await
+            .unwrap();
+        for path in ["/garden", "/fr/jardin"] {
+            let (status, html) = get(&site.app, path, None).await;
+            assert_eq!(status, StatusCode::OK);
+            assert!(html.contains("hreflang=\"en\"") && html.contains("hreflang=\"fr\""));
+            assert!(!html.contains("hreflang=\"ar\""));
+            assert_eq!(html.matches("rel=\"canonical\"").count(), 1);
+        }
+        let (status, headers, _) = request(&site.app, "GET", "/jardin", None, "", vec![]).await;
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(headers["location"], "/fr/jardin");
+        french.version = fr.version;
+        french.action = "save".into();
+        french.seo = r#"{"title":"PRIVATE_SEARCH_TITLE","noindex":true}"#.into();
+        content::save(&site.app, site.session(), Some(&fr.id), french.clone())
+            .await
+            .unwrap();
+        assert!(
+            !get(&site.app, "/fr/jardin", None)
+                .await
+                .1
+                .contains("PRIVATE_SEARCH_TITLE")
+        );
+        let preview = get(
+            &site.app,
+            &format!("/admin/preview/{}", fr.id),
+            Some(&site.token),
+        )
+        .await
+        .1;
+        assert!(preview.contains("PRIVATE_SEARCH_TITLE") && preview.contains("noindex"));
+        assert!(!preview.contains("rel=\"canonical\""));
+        english.version = en.version;
+        english.action = "save".into();
+        english.title = "Concurrent edit".into();
+        let (a, b) = tokio::join!(
+            content::save(&site.app, site.session(), Some(&en.id), english.clone()),
+            content::save(&site.app, site.session(), Some(&en.id), english)
+        );
+        assert!(a.is_ok() ^ b.is_ok());
+        let home = get(&site.app, "/fr/", None).await.1;
+        assert!(home.contains("jardin") && !home.contains("href=\"/garden\""));
+        let search = get(&site.app, "/fr/search?q=jardin", None).await.1;
+        assert!(search.contains("/fr/jardin") && search.contains("noindex,follow"));
+        assert!(get(&site.app, "/ar/", None).await.1.contains("dir=\"rtl\""));
+        let mut wrong = french.clone();
+        wrong.slug = "other-fr".into();
+        wrong.version = 0;
+        assert!(
+            content::save(&site.app, site.session(), None, wrong)
+                .await
+                .is_err()
+        );
+        let mut d = wpalt::discovery::load(&site.app).await.unwrap().0;
+        d.languages.retain(|l| l.code != "fr");
+        assert!(wpalt::discovery::configure(&site.app, d, 2).await.is_err());
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn discovery_metadata_redirects_links_and_permissions_are_one_local_system() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        multilingual(&site).await;
+        let mut d = wpalt::discovery::load(&site.app).await.unwrap().0;
+        d.business = wpalt::discovery::Business {
+            name: "Quiet & Co".into(),
+            street: "10 Garden Lane".into(),
+            city: "Paris".into(),
+            country: "FR".into(),
+            ..Default::default()
+        };
+        wpalt::discovery::configure(&site.app, d, 2).await.unwrap();
+        let mut p = input("public-story", "publish");
+        p.seo=serde_json::json!({"title":"Garden </script> & discovery","description":"A truthful description","schema_type":"Article"}).to_string();
+        p.body="[Known](/public-story) [Missing](/missing-local) [External](https://example.test/untested)".into();
+        content::save(&site.app, site.session(), None, p)
+            .await
+            .unwrap();
+        let html = get(&site.app, "/public-story", None).await.1;
+        let raw = html
+            .split("<script type=\"application/ld+json\">")
+            .nth(1)
+            .unwrap()
+            .split("</script>")
+            .next()
+            .unwrap();
+        let graph: serde_json::Value = serde_json::from_str(raw).unwrap();
+        assert_eq!(graph[0]["headline"], "Garden </script> & discovery");
+        assert_eq!(graph[1]["@type"], "LocalBusiness");
+        assert!(html.contains("10 Garden Lane") && html.contains("Quiet &amp; Co"));
+        let mut hidden = input("unlisted", "publish");
+        hidden.seo = r#"{"noindex":true}"#.into();
+        content::save(&site.app, site.session(), None, hidden)
+            .await
+            .unwrap();
+        let map = get(&site.app, "/sitemap.xml", None).await.1;
+        assert!(map.contains("/public-story") && !map.contains("/unlisted"));
+        assert!(
+            get(&site.app, "/sitemap-index.xml", None)
+                .await
+                .1
+                .contains("/sitemap.xml")
+        );
+        assert!(
+            get(&site.app, "/robots.txt", None)
+                .await
+                .1
+                .contains("Sitemap:")
+        );
+        use wpalt::discovery::save_redirect;
+        save_redirect(&site.app, "/old-story", "/public-story", 301, 0)
+            .await
+            .unwrap();
+        let (status, headers, _) = request(&site.app, "GET", "/old-story", None, "", vec![]).await;
+        assert_eq!(status, StatusCode::MOVED_PERMANENTLY);
+        assert_eq!(headers["location"], "/public-story");
+        assert!(
+            save_redirect(&site.app, "/public-story", "/elsewhere", 301, 0)
+                .await
+                .is_err()
+        );
+        assert!(
+            save_redirect(&site.app, "/outside", "https://example.test/", 302, 0)
+                .await
+                .is_err()
+        );
+        save_redirect(&site.app, "/a", "/b", 302, 0).await.unwrap();
+        assert!(save_redirect(&site.app, "/b", "/a", 301, 0).await.is_err());
+        assert!(
+            content::save(
+                &site.app,
+                site.session(),
+                None,
+                input("old-story", "publish")
+            )
+            .await
+            .is_err()
+        );
+        let links = get(&site.app, "/admin/discovery/links", Some(&site.token))
+            .await
+            .1;
+        assert!(
+            links.contains("/missing-local")
+                && !links.contains("/public-story</")
+                && !links.contains("https://example.test/untested")
+        );
+        assert_eq!(
+            get(&site.app, "/admin/discovery", None).await.0,
+            StatusCode::SEE_OTHER
+        );
+        let status = form(
+            &site.app,
+            "/admin/discovery/redirects",
+            Some(&site.token),
+            &[
+                ("csrf", "wrong"),
+                ("source", "/bad"),
+                ("target", "/public-story"),
+                ("code", "301"),
+                ("version", "0"),
+                ("action", "save"),
+            ],
+        )
+        .await
+        .0;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn discovery_recovery_preserves_configuration_and_rejects_malicious_rules() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        multilingual(&site).await;
+        let mut p = input("bonjour", "publish");
+        p.locale = "fr".into();
+        p.seo = r#"{"title":"Bonjour discovery"}"#.into();
+        content::save(&site.app, site.session(), None, p)
+            .await
+            .unwrap();
+        wpalt::discovery::save_redirect(&site.app, "/ancien", "/fr/bonjour", 301, 0)
+            .await
+            .unwrap();
+        let archive = backup::capture(&site.app).await.unwrap();
+        let target = Site::new(pg, false).await;
+        backup::restore(&target.app, &archive).await.unwrap();
+        assert!(
+            get(&target.app, "/fr/bonjour", None)
+                .await
+                .1
+                .contains("Bonjour discovery")
+        );
+        assert_eq!(
+            request(&target.app, "GET", "/ancien", None, "", vec![])
+                .await
+                .1["location"],
+            "/fr/bonjour"
+        );
+        let mut envelope: serde_json::Value = serde_json::from_slice(&archive).unwrap();
+        let mut payload: serde_json::Value =
+            serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        payload["tables"]["redirects"][0]["target"] = serde_json::json!("https://attacker.test/");
+        let payload = payload.to_string();
+        envelope["sha256"] = serde_json::json!(auth::digest(payload.as_bytes()));
+        envelope["payload"] = serde_json::json!(payload);
+        let fresh = Site::new(pg, false).await;
+        assert!(
+            backup::restore(&fresh.app, &serde_json::to_vec(&envelope).unwrap())
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
+                .fetch_one(&fresh.app.db.pool)
+                .await
+                .unwrap(),
+            0
+        );
+        fresh.close().await;
+        target.close().await;
+        site.close().await;
+    }
+}
+
+/// One volume journey verifies crawler pagination, exclusion and actual engine plans.
+/// Timings are observations, never machine-dependent pass thresholds.
+#[tokio::test]
+async fn discovery_volume_has_bounded_pages_and_indexed_language_search() {
+    let mut evidence = Vec::new();
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        multilingual(&site).await;
+        let base = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("volume-base", "publish"),
+        )
+        .await
+        .unwrap();
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        for n in 0..2005 {
+            let slug = format!("volume-{n}");
+            sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo) SELECT $1,$2,kind,title,body,fields,blocks,status,version,$2,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,$3,$3,$4,$4 FROM posts WHERE id=$5")
+                .bind(uuid::Uuid::new_v4().to_string()).bind(slug).bind(if n%2==0 {"fr"} else {"en"}).bind(if n%7==0 {r#"{"noindex":true}"#}else{"{}"}).bind(&base.id).execute(&mut *tx).await.unwrap();
+        }
+        tx.commit().await.unwrap();
+        let index = get(&site.app, "/sitemap-index.xml", None).await.1;
+        assert_eq!(index.matches("<sitemap>").count(), 3);
+        let mut all = HashSet::new();
+        for loc in index
+            .split("<loc>")
+            .skip(1)
+            .map(|part| part.split("</loc>").next().unwrap())
+        {
+            let path = loc.strip_prefix(&site.app.config.origin()).unwrap();
+            let (status, body) = get(&site.app, path, None).await;
+            assert_eq!(status, StatusCode::OK);
+            assert!(body.matches("<url>").count() <= 1000);
+            for url in body
+                .split("<loc>")
+                .skip(1)
+                .map(|part| part.split("</loc>").next().unwrap())
+            {
+                assert!(
+                    all.insert(url.to_owned()),
+                    "No duplicate sitemap URLs across stable pages"
+                );
+            }
+        }
+        assert_eq!(all.len(), 2006 - 287);
+        let plan_sql = if pg {
+            "EXPLAIN (ANALYZE,BUFFERS) SELECT id FROM posts WHERE status='published' AND id>'' ORDER BY id LIMIT 1001"
+        } else {
+            "EXPLAIN QUERY PLAN SELECT id FROM posts WHERE status='published' AND id>'' ORDER BY id LIMIT 1001"
+        };
+        let plan = sqlx::query(plan_sql)
+            .fetch_all(&site.app.db.pool)
+            .await
+            .unwrap()
+            .iter()
+            .map(|r| r.get::<String, _>(if pg { 0 } else { 3 }))
+            .collect::<Vec<_>>();
+        let search = get(&site.app, "/api/content?lang=fr&q=garden", None).await;
+        assert_eq!(search.0, StatusCode::OK);
+        assert!(search.1.contains("fr/volume"));
+        assert!(!search.1.contains("journal"));
+        let mut samples = Vec::new();
+        for path in ["/sitemap.xml", "/sitemap-index.xml", "/fr/search?q=garden"] {
+            let mut millis = Vec::new();
+            for _ in 0..12 {
+                let start = std::time::Instant::now();
+                assert_eq!(get(&site.app, path, None).await.0, StatusCode::OK);
+                millis.push(start.elapsed().as_secs_f64() * 1000.0);
+            }
+            millis.sort_by(f64::total_cmp);
+            samples.push(serde_json::json!({"path":path,"median_ms":millis[6],"max_ms":millis[11],"samples":12}));
+        }
+        evidence.push(serde_json::json!({"engine":if pg {"postgres"}else{"sqlite"},"published_rows":2006,"sitemap_urls":all.len(),"sitemap_plan":plan,"http_in_process":samples,"conditions":"debug build; real DB; HTTP router in-process; no network/browser latency; observations not budgets"}));
+        site.close().await;
+    }
+    std::fs::create_dir_all("work").unwrap();
+    std::fs::write(
+        "work/m3-volume.json",
+        serde_json::to_string_pretty(&evidence).unwrap(),
+    )
+    .unwrap();
+}
+
+#[tokio::test]
+async fn schema_two_upgrade_preserves_publication_and_restorable_editor_history() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let published = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("m2-history", "publish"),
+        )
+        .await
+        .unwrap();
+        let mut working = input("m2-history", "save");
+        working.version = published.version;
+        working.body = "PRIVATE_M2_HISTORY".into();
+        let working = content::save(&site.app, site.session(), Some(&published.id), working)
+            .await
+            .unwrap();
+        let history = sqlx::query(
+            "SELECT id,snapshot FROM revisions WHERE post_id=$1 ORDER BY version DESC LIMIT 1",
+        )
+        .bind(&published.id)
+        .fetch_one(&site.app.db.pool)
+        .await
+        .unwrap();
+        let revision: String = history.get("id");
+        let mut snapshot: serde_json::Value =
+            serde_json::from_str(&history.get::<String, _>("snapshot")).unwrap();
+        let metadata = [
+            "locale",
+            "translation_group",
+            "seo",
+            "published_locale",
+            "published_translation_group",
+            "published_seo",
+        ];
+        for key in metadata {
+            snapshot["post"].as_object_mut().unwrap().remove(key);
+        }
+        sqlx::query("UPDATE revisions SET snapshot=$1 WHERE id=$2")
+            .bind(snapshot.to_string())
+            .bind(&revision)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        for index in ["language_posts", "translation_drafts", "translation_live"] {
+            sqlx::query(&format!("DROP INDEX {index}"))
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+        }
+        for column in metadata {
+            sqlx::query(&format!("ALTER TABLE posts DROP COLUMN {column}"))
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+        }
+        sqlx::query("UPDATE schema_version SET version=2 WHERE id=1")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let config = (*site.app.config).clone();
+        site.app.db.pool.close().await;
+        let upgraded = App::open(config.clone()).await.unwrap();
+        let html = get(&upgraded, "/m2-history", None).await.1;
+        assert!(html.contains("quiet garden") && !html.contains("PRIVATE_M2_HISTORY"));
+        let (_, session) = auth::login(&upgraded, "owner@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let restored = content::restore_revision(
+            &upgraded,
+            &session,
+            &published.id,
+            &revision,
+            working.version,
+        )
+        .await
+        .unwrap();
+        assert_eq!(restored.body, "PRIVATE_M2_HISTORY");
+        assert_eq!(restored.locale, "en");
+        assert_eq!(restored.seo, "{}");
+        upgraded.db.pool.close().await;
+        let reopened = App::open(config).await.unwrap();
+        assert_eq!(
+            content::get(&reopened, &published.id)
+                .await
+                .unwrap()
+                .version,
+            restored.version
+        );
+        reopened.db.pool.close().await;
+        site.close().await;
+    }
 }

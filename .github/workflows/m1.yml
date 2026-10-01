@@ -70,6 +70,11 @@ jobs:
         with:
           name: dependency-audit
           path: work/dependency-audit.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: m3-volume-evidence
+          path: work/m3-volume.json
   clean-build:
     needs: [application, compiler-floor]
     runs-on: ubuntu-24.04

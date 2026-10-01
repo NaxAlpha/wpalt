@@ -330,7 +330,9 @@ async function freePort() {
     .selectOption("project");
   await page
     .locator("details")
-    .first()
+    .filter({
+      has: page.getByText("Typed fields & composition", { exact: true }),
+    })
     .evaluate((e) => (e.open = true));
   await page
     .getByLabel("client-name", { exact: true })
@@ -344,7 +346,9 @@ async function freePort() {
   await page.waitForURL(/\/admin\/posts\/[a-f0-9-]+$/);
   await page
     .locator("details")
-    .first()
+    .filter({
+      has: page.getByText("Typed fields & composition", { exact: true }),
+    })
     .evaluate((e) => (e.open = true));
   await page.getByLabel("client-name", { exact: true }).waitFor();
   assert.equal(
@@ -434,6 +438,128 @@ async function freePort() {
     path: path.join(output, "public-mobile.png"),
     fullPage: true,
   });
+  // M3: native language configuration, translation authoring and publication isolation.
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  for (const [code, label, direction] of [
+    ["fr", "Français", "ltr"],
+    ["ar", "العربية", "rtl"],
+  ]) {
+    await page.goto(origin + "/admin/discovery");
+    await page.getByText("Add a language", { exact: true }).click();
+    const form = page
+      .locator('form[action="/admin/discovery/languages"]')
+      .last();
+    await form.getByLabel("Language code", { exact: true }).fill(code);
+    await form.getByLabel("Language label", { exact: true }).fill(label);
+    await form
+      .getByLabel("Writing direction", { exact: true })
+      .selectOption(direction);
+    await form
+      .getByLabel("Search button text", { exact: true })
+      .fill(code === "fr" ? "Rechercher" : "بحث");
+    await submit(
+      page,
+      form.getByRole("button", { name: "Add language", exact: true }),
+    );
+    await page
+      .getByRole("heading", { name: label + " · " + code, exact: true })
+      .waitFor();
+  }
+  await page.goto(origin + "/admin/posts/new");
+  await page.getByLabel("Title", { exact: true }).fill("Un jardin tranquille");
+  await page.getByLabel("URL slug", { exact: true }).fill("jardin-tranquille");
+  await page.getByLabel("Language", { exact: true }).selectOption("fr");
+  await page
+    .getByLabel("Search title", { exact: true })
+    .fill("Notre jardin · découverte");
+  await page
+    .getByLabel("Search description", { exact: true })
+    .fill("Une publication indépendante, sans compte externe.");
+  await submit(
+    page,
+    page.getByRole("button", { name: "Publish now", exact: true }),
+  );
+  const translationEditor = page.url();
+  await visitor.goto(origin + "/fr/jardin-tranquille");
+  assert.equal(await visitor.title(), "Notre jardin · découverte");
+  assert.equal(await visitor.locator("html").getAttribute("lang"), "fr");
+  assert.equal(await visitor.locator("link[rel=canonical]").count(), 1);
+  await page
+    .getByLabel("Search title", { exact: true })
+    .fill("PRIVATE SEO WORKING COPY");
+  await submit(
+    page,
+    page.getByRole("button", { name: "Save draft", exact: true }),
+  );
+  await visitor.reload();
+  assert.equal(await visitor.title(), "Notre jardin · découverte");
+  await page.goto(origin + "/admin/posts/new");
+  await page.getByLabel("Title", { exact: true }).fill("مساحة هادئة للكتابة");
+  await page
+    .getByLabel("Content", { exact: true })
+    .fill(
+      "أفكار وقصص في مكان مستقل.\n\n## حديقة صغيرة\n\nهذا المحتوى منشور باللغة العربية على خادمك.",
+    );
+  await page.getByLabel("URL slug", { exact: true }).fill("arabic-story");
+  await page.getByLabel("Language", { exact: true }).selectOption("ar");
+  await submit(
+    page,
+    page.getByRole("button", { name: "Publish now", exact: true }),
+  );
+  await visitor.setViewportSize({ width: 320, height: 900 });
+  await visitor.goto(origin + "/ar/arabic-story");
+  assert.equal(await visitor.locator("html").getAttribute("dir"), "rtl");
+  assert.equal(
+    await visitor.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth + 1,
+    ),
+    false,
+  );
+  await visitor.screenshot({
+    path: path.join(output, "m3-rtl-mobile.png"),
+    fullPage: true,
+  });
+  await page.goto(origin + "/admin/discovery");
+  await page.getByLabel("Source path", { exact: true }).fill("/ancien-jardin");
+  await page
+    .getByLabel("Destination path", { exact: true })
+    .fill("/fr/jardin-tranquille");
+  await submit(
+    page,
+    page.getByRole("button", { name: "Add redirect", exact: true }),
+  );
+  await visitor.goto(origin + "/ancien-jardin");
+  assert.equal(visitor.url(), origin + "/fr/jardin-tranquille");
+  await page.screenshot({
+    path: path.join(output, "m3-discovery-desktop.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 320, height: 900 });
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth + 1,
+    ),
+    false,
+  );
+  await page.screenshot({
+    path: path.join(output, "m3-discovery-mobile.png"),
+    fullPage: true,
+  });
+  // Without JavaScript the same editor must preserve typed SEO controls.
+  const native = await browser.newContext({ javaScriptEnabled: false });
+  await native.addCookies(await owner.cookies());
+  const nativePage = await native.newPage();
+  await nativePage.goto(translationEditor);
+  await nativePage
+    .getByLabel("Search title", { exact: true })
+    .fill("Découverte sans JavaScript");
+  await submit(
+    nativePage,
+    nativePage.getByRole("button", { name: "Publish now", exact: true }),
+  );
+  await visitor.reload();
+  assert.equal(await visitor.title(), "Découverte sans JavaScript");
+  await native.close();
   assert.deepEqual(errors, [], "Browser JavaScript errors");
   assert.deepEqual(remote, [], "Unexpected external runtime requests");
   fs.writeFileSync(
@@ -456,6 +582,10 @@ async function freePort() {
           "typed model authoring",
           "invalid draft feedback",
           "keyboard tabs",
+          "multilingual discovery and RTL",
+          "publication-only SEO",
+          "local redirects",
+          "native SEO authoring without JavaScript",
         ],
         external_requests: remote.length,
         script_errors: errors.length,

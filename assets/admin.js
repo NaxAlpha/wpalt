@@ -6,6 +6,8 @@ for (const link of document.querySelectorAll('.sidebar nav a')) {
 }
 const editor = document.querySelector('[data-editor]');
 if (editor) {
+  const seo = editor.querySelector('[data-seo-json]');
+  if (seo) editor.addEventListener('input', () => { seo.value = JSON.stringify({title:editor.querySelector('[data-seo-title]').value,description:editor.querySelector('[data-seo-description]').value,noindex:editor.querySelector('[data-seo-noindex]').checked,schema_type:editor.querySelector('[data-seo-type]').value}); });
   let dirty = false, saving = false, conflicted = false, timer;
   const status = document.querySelector('[data-save-status]');
   const error = document.querySelector('[data-editor-error]');

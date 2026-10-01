@@ -25,7 +25,7 @@ pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body:
                     a href="/admin" {"Overview"}
                     @if s.can_edit() {a href="/admin/posts" {"Content"} a href="/admin/media" {"Media library"}}
                     @if s.can_moderate() {a href="/admin/comments" {"Comments"}}
-                    @if s.is_admin() {a href="/admin/builder" {"Design studio"} a href="/admin/settings" {"Site settings"} a href="/admin/operations" {"Operations"}}
+                    @if s.is_admin() {a href="/admin/builder" {"Design studio"} a href="/admin/discovery" {"Discovery"} a href="/admin/settings" {"Site settings"} a href="/admin/operations" {"Operations"}}
                     a href="/" {"View website ↗"}
                 }
                 div class="account" {strong {(s.user.name)} span {(s.user.role)}

@@ -266,6 +266,7 @@ async fn preview(
         listing,
         true,
         &q.template,
+        None,
     )
     .await?;
     ctx.root["navigation"] = serde_json::from_str(&settings.navigation).unwrap_or(json!([]));
