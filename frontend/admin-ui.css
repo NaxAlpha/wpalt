@@ -334,6 +334,11 @@
     grid-column: 1/-1;
   }
 }
+@media (--ui-studio-single) {
+  .admin .studio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (--ui-mobile) {
   .admin .sidebar {
     position: relative;
@@ -398,4 +403,23 @@
 :is(.admin, .auth) main :is(p, li) a:not(.button) {
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.admin fieldset {
+  border: 1px solid var(--ui-color-control-border);
+  border-radius: var(--ui-radius-control);
+  padding: var(--ui-space-4);
+  min-inline-size: 0;
+  margin: 0 0 var(--ui-space-4);
+}
+.admin legend {
+  font-size: var(--ui-type-label);
+  font-weight: 650;
+  padding-inline: var(--ui-space-2);
+}
+.admin label:has(> input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  min-height: var(--ui-size-control);
 }

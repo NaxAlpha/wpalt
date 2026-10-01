@@ -220,3 +220,5 @@ The composable studio, typed authoring, published-data bindings, theme/options p
 ### M2 merged; frontend preparation before M3 — 2026-10-01
 
 [PR #3](https://github.com/NaxAlpha/wpalt/pull/3) merged as `e527cd118b1a9326e3d8288e506746a1908afb52`; [actual main build](https://github.com/NaxAlpha/wpalt/actions/runs/36793117434) passed and its clean archive was downloaded/verified. The user requested a dedicated supporting frontend PR before M3. Its [contract](frontend-foundations.md) establishes tokens, shared controls, precise browser measurements, visual baselines and human aesthetic review, with improvements to current administration. It does not create a small internal milestone or replace M3's substantial user outcome. M3–M9 remain planned; theme evolution follows existing M2/M8 scope.
+
+[Frontend supporting PR #4](https://github.com/NaxAlpha/wpalt/pull/4) contains its design/measurement foundation, current admin improvements and review evidence. Readiness requires ordinary platform comparison and all current-head application/compiler/clean-build jobs; review/merge remain separate. M3 has not started.

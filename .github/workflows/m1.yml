@@ -48,9 +48,8 @@ jobs:
       - run: python3 scripts/audit_dependencies.py --audit-binary work/tooling/bin/cargo-audit
       - run: cargo build --release --locked
       - run: python3 scripts/cli_acceptance.py --binary target/release/wpalt
-      - run: npm install --prefix work/browser playwright@1.62.1
-      - run: work/browser/node_modules/.bin/playwright install --with-deps chromium
-      - run: WPALT_BINARY="$PWD/target/release/wpalt" PLAYWRIGHT_MODULE="$PWD/work/browser/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - run: frontend/node_modules/.bin/playwright install --with-deps chromium
+      - run: WPALT_BINARY="$PWD/target/release/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:

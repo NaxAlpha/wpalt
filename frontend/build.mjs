@@ -37,6 +37,10 @@ styles = styles
     "(--ui-studio-stack)",
     `(max-width: ${tokens.breakpoint["studio-stack"]}px)`,
   );
+styles = styles.replaceAll(
+  "(--ui-studio-single)",
+  `(max-width: ${tokens.breakpoint["studio-single"]}px)`,
+);
 const css = await transform(`:root{${declarations}}\n${styles}`, {
   loader: "css",
   minify: true,

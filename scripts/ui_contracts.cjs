@@ -112,7 +112,7 @@ async function geometry(page) {
       },
       surfaces: [
         ...document.querySelectorAll(
-          ".panel,.notice,.status,h1,h2,label,textarea,.sidebar nav a",
+          ".panel,.notice,.status,h1,h2,label,textarea,fieldset,details,summary,iframe,.outline,.binding,.studio-toolbar,.studio-tabs,.sidebar nav a",
         ),
       ]
         .filter(visible)
@@ -345,6 +345,22 @@ module.exports = async function verifyUI(context, origin) {
     const focus = await page.locator(":focus").evaluate((el) => ({
       width: parseFloat(getComputedStyle(el).outlineWidth),
       style: getComputedStyle(el).outlineStyle,
+      color: getComputedStyle(el)
+        .outlineColor.match(/[\d.]+/g)
+        .slice(0, 3)
+        .map(Number),
+      background: (() => {
+        let parent = el.parentElement;
+        while (
+          parent &&
+          getComputedStyle(parent).backgroundColor === "rgba(0, 0, 0, 0)"
+        )
+          parent = parent.parentElement;
+        return getComputedStyle(parent)
+          .backgroundColor.match(/[\d.]+/g)
+          .slice(0, 3)
+          .map(Number);
+      })(),
       rect: el.getBoundingClientRect().toJSON(),
       center:
         document.elementFromPoint(
@@ -357,6 +373,14 @@ module.exports = async function verifyUI(context, origin) {
         focus.style !== "none" &&
         focus.center,
       "Keyboard focus is invisible or obscured",
+    );
+    results.keyboard_focus = {
+      ...focus,
+      contrast: contrast(focus.color, focus.background),
+    };
+    assert(
+      results.keyboard_focus.contrast >= contract.control_boundary_contrast,
+      "Keyboard focus contrast is insufficient",
     );
     assert(
       await page
@@ -402,12 +426,34 @@ module.exports = async function verifyUI(context, origin) {
       "/admin/builder",
       "/admin/settings",
     ]) {
-      for (const width of contract.viewports) {
+      const widths =
+        route === "/admin/builder"
+          ? [...new Set([...contract.viewports, 701, 1201])].sort(
+              (a, b) => a - b,
+            )
+          : contract.viewports;
+      for (const width of widths) {
         await page.setViewportSize({ width, height: contract.height });
         await page.goto(origin + route);
+        if (route === "/admin/posts/new") {
+          await page
+            .getByText("Structured content fields", { exact: true })
+            .waitFor({ state: "attached" });
+          await page
+            .getByText("Typed fields & composition", { exact: true })
+            .click();
+          await page
+            .getByText("Structured content fields", { exact: true })
+            .waitFor();
+        }
         if (route === "/admin/builder")
           await page
             .getByRole("button", { name: "Save draft", exact: true })
+            .waitFor();
+        if (route === "/admin/builder")
+          await page
+            .frameLocator("iframe")
+            .getByRole("heading", { name: "The Local Journal", exact: true })
             .waitFor();
         if (route === "/admin/builder" && width === 320) {
           const toggle = page.getByText("Design tokens", { exact: true });
