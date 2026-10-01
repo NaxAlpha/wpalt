@@ -1,7 +1,8 @@
 'use strict';
 for (const link of document.querySelectorAll('.sidebar nav a')) {
   const href = link.getAttribute('href');
-  if (href === location.pathname || (href.startsWith('/admin/') && location.pathname.startsWith(href + '/'))) link.setAttribute('aria-current', 'page');
+  const section = location.pathname.startsWith('/admin/users') ? '/admin/settings' : location.pathname;
+  if (href === section || (href.startsWith('/admin/') && section.startsWith(href + '/'))) link.setAttribute('aria-current', 'page');
 }
 const editor = document.querySelector('[data-editor]');
 if (editor) {

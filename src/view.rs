@@ -19,7 +19,7 @@ pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body:
         a class="skip" href="#main" {"Skip to content"}
         @if let Some(s)=session {
             aside class="sidebar" {
-                a class="brand" href="/admin" {span class="brand-mark" {"w"} "wpalt" span class="badge" {"M2"}}
+                a class="brand" href="/admin" {span class="brand-mark" {"w"} "wpalt"}
                 p class="sidebar-note" {"Your site. Your server."}
                 nav aria-label="Administration" {
                     a href="/admin" {"Overview"}

@@ -1,10 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
   "viewports": [320, 768, 1440],
   "height": 1000,
   "control_min_height": 44,
-  "control_radius": 8,
-  "panel_radius": 12,
+  "control_radius": 6,
+  "panel_radius": 0,
   "sidebar_width": 224,
   "desktop_workspace_padding": 32,
   "mobile_workspace_padding": 16,

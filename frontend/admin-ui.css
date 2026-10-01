@@ -151,8 +151,8 @@
 }
 .admin .sidebar nav a[aria-current="page"] {
   background: var(--ui-color-sidebar-active);
-  box-shadow: inset 3px 0 0 #91d6b6;
-  font-weight: 700;
+  box-shadow: inset 2px 0 0 var(--accent);
+  font-weight: 600;
 }
 .admin .sidebar .brand {
   min-height: 44px;
@@ -167,8 +167,13 @@
   margin-bottom: var(--ui-space-6);
 }
 .admin .panel {
-  padding: var(--ui-space-6);
+  padding: var(--ui-space-6) 0;
   margin-bottom: var(--ui-space-6);
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
   min-width: 0;
 }
 .admin .grid {
@@ -245,14 +250,14 @@
   margin: var(--ui-space-6) 0;
 }
 .admin .studio-tabs button[aria-current="page"] {
-  box-shadow: inset 0 -3px 0 #0b503c;
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 .admin .studio {
   grid-template-columns: 220px minmax(0, 1fr) 272px;
   gap: var(--ui-space-4);
 }
 .admin .studio .panel {
-  padding: var(--ui-space-4);
+  padding: var(--ui-space-4) 0;
 }
 .admin .outline {
   padding-left: var(--ui-space-2);
@@ -360,7 +365,7 @@
     padding: var(--ui-space-4);
   }
   .admin .panel {
-    padding: var(--ui-space-4);
+    padding: var(--ui-space-4) 0;
   }
   .admin .studio {
     display: grid;
@@ -390,15 +395,6 @@
     padding: var(--ui-space-6);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  :is(.admin, .auth) *,
-  :is(.admin, .auth) *::before,
-  :is(.admin, .auth) *::after {
-    scroll-behavior: auto !important;
-    transition: none !important;
-    animation: none !important;
-  }
-}
 
 :is(.admin, .auth) main :is(p, li) a:not(.button) {
   text-decoration: underline;
@@ -425,5 +421,207 @@
 }
 
 .admin .sidebar :focus-visible {
-  outline-color: var(--ui-color-focus-on-dark);
+  outline-color: var(--ui-color-sidebar-focus);
+}
+
+/* Calm, open sections: boundaries belong to controls, not enclosing cards. */
+:is(.admin, .auth) {
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+:is(.admin, .auth) :is(h1, h2, h3) {
+  font-weight: 600;
+}
+:is(.admin, .auth) h1 {
+  margin-bottom: var(--ui-space-3);
+}
+:is(.admin, .auth) h2 {
+  letter-spacing: -0.02em;
+}
+:is(.admin, .auth) :is(button, .button, input, select, textarea) {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+:is(.admin, .auth) :is(button, .button).secondary {
+  background: transparent;
+}
+:is(.admin, .auth) :is(button, .button).secondary:hover {
+  background: var(--ui-color-accent-soft);
+  color: var(--ink);
+}
+:is(.admin, .auth) label {
+  font-weight: 550;
+}
+.admin .sidebar {
+  border-right: 1px solid var(--line);
+}
+.admin .brand {
+  color: var(--ink);
+  font-size: 24px;
+  letter-spacing: -0.05em;
+}
+.admin .brand-mark {
+  border: 0;
+  background: var(--accent);
+  color: white;
+  border-radius: 6px;
+}
+.admin .sidebar nav a:hover {
+  background: var(--ui-color-sidebar-active);
+  color: var(--ink);
+}
+.admin .account {
+  border-color: var(--line);
+}
+.admin .account .quiet {
+  text-align: left;
+}
+.admin .eyebrow,
+.auth .eyebrow {
+  color: var(--muted);
+  letter-spacing: 0.09em;
+  font-weight: 600;
+}
+.admin .page-heading {
+  padding-bottom: var(--ui-space-4);
+  margin-bottom: var(--ui-space-6);
+}
+.admin .page-heading p:last-child {
+  font-size: var(--ui-type-label);
+  line-height: 1.7;
+  margin-bottom: 0;
+}
+.admin .stat {
+  border-top: 0;
+  margin-bottom: 0;
+  padding-bottom: var(--ui-space-8);
+}
+.admin .stat strong {
+  font-size: 36px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.admin .stat span {
+  font-size: var(--ui-type-label);
+}
+.admin .studio-tabs {
+  border-bottom: 1px solid var(--line);
+  gap: var(--ui-space-2);
+}
+.admin .studio-tabs button {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-weight: 500;
+}
+.admin .studio-tabs button:hover {
+  background: var(--ui-color-accent-soft);
+  color: var(--ink);
+}
+.admin .studio-tabs button[aria-current="page"] {
+  color: var(--accent);
+  background: transparent;
+  font-weight: 650;
+}
+.admin .studio-toolbar {
+  padding-bottom: var(--ui-space-4);
+}
+.admin .notice,
+.admin .callout {
+  border-radius: 0;
+  border-left-width: 2px;
+}
+.admin .status {
+  border-radius: var(--ui-radius-badge);
+  background: #eeeee8;
+  color: var(--muted);
+}
+.admin .status.published,
+.admin .status.approved {
+  background: var(--ui-color-accent-soft);
+  color: var(--accent);
+}
+.admin th {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--ui-type-small);
+  background: transparent;
+}
+.admin :is(th, td) {
+  padding: var(--ui-space-4) var(--ui-space-3);
+}
+.admin tbody tr:hover {
+  background: #f1f2ee;
+}
+.admin .table-wrap {
+  padding-top: 0;
+}
+.admin .field-definition,
+.admin fieldset {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding: var(--ui-space-4) 0;
+}
+.admin .binding {
+  background: transparent;
+  border-left: 2px solid var(--line);
+  border-radius: 0;
+}
+.admin .media-card img {
+  border-radius: 4px;
+}
+.auth .login-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: var(--ui-space-8) 0;
+}
+.auth .site-header,
+.auth .site-footer {
+  font-size: var(--ui-type-label);
+}
+@media (--ui-mobile) {
+  .admin .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .admin .sidebar nav {
+    margin: var(--ui-space-3) 0;
+  }
+  .admin .sidebar .brand {
+    font-size: 22px;
+  }
+  .admin .page-heading {
+    margin-top: var(--ui-space-4);
+  }
+  .admin .stat {
+    padding-block: var(--ui-space-2);
+  }
+  .admin .grid {
+    gap: var(--ui-space-3);
+    margin-bottom: var(--ui-space-6);
+  }
+  .auth .login-card {
+    padding-inline: 0;
+  }
+}
+
+:is(.admin, .auth) :is(input, select, textarea) {
+  font-weight: 400;
+}
+:is(body.admin, body.auth) {
+  min-height: 100vh;
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.admin, .auth) *,
+  :is(.admin, .auth) *::before,
+  :is(.admin, .auth) *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
 }
