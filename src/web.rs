@@ -420,7 +420,7 @@ async fn render_home(app: App, query: ListQuery) -> Result<Html<String>> {
     ctx.root["navigation"] = ctx.root["_discovery"]["navigation"].clone();
     let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))form class="toolbar" method="get" action=(discovery.path(locale,"search")){label for="search"{"Find something"}input id="search" type="search" name="q" value=(search);button{(language.search_label)}}
     @if items.is_empty(){p class="empty"{"No published content matches yet."}}
-    @if items.len()>20{@let last=&items[19];a class="button secondary" href=(next_url(&query,&format!("{}:{}",last.published_at,last.id))){"Older content →"}}};
+    @if items.len()>20{@let last=&items[19];a class="button secondary" href=(format!("{}{}",discovery.path(locale,""),next_url(&query,&format!("{}:{}",last.published_at,last.id)).trim_start_matches('/'))){"Older content →"}}};
     Ok(Html(crate::theme::document(
         &stored,
         &settings,
@@ -531,7 +531,7 @@ async fn render_post(
     )
     .await?;
     ctx.root["navigation"] = ctx.root["_discovery"]["navigation"].clone();
-    let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))            section class="comments" {p class="muted" {@for t in terms {a href=(format!("/?{}={}",t.get::<String,_>("kind"),t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
+    let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))            section class="comments" {p class="muted" {@for t in terms {a href=(format!("{}?{}={}",discovery.path(&locale,""),t.get::<String,_>("kind"),t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
                     h2 {"Conversation"}
                     @for c in comments {article class="comment" {strong {(c.get::<String,_>("name"))}p {(c.get::<String,_>("body"))}}}
                     form method="post" action=(format!("/{slug}/comments")) {label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}

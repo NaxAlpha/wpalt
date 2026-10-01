@@ -1,6 +1,6 @@
 # M3 verification record
 
-2026-10-01. Delivery is in progress on `milestone/m3-multilingual-discovery`; [delivery PR #6](https://github.com/NaxAlpha/wpalt/pull/6) records final-head CI and clean-artifact status. M2 and calm admin PR #5 are merged; #5's actual-main verification run 36860476634 passed all three jobs.
+2026-10-01. Implementation and verification evidence for `milestone/m3-multilingual-discovery`; [delivery PR #6](https://github.com/NaxAlpha/wpalt/pull/6) records final-head CI and clean-artifact status. M2 and calm admin PR #5 are merged; #5's actual-main verification run 36860476634 passed all three jobs.
 
 ## Reviewable behavior
 

@@ -1640,6 +1640,12 @@ async fn multilingual_publication_keeps_drafts_private_and_variants_reciprocal()
             assert!(html.contains("hreflang=\"en\"") && html.contains("hreflang=\"fr\""));
             assert!(!html.contains("hreflang=\"ar\""));
             assert_eq!(html.matches("rel=\"canonical\"").count(), 1);
+            if path.starts_with("/fr/") {
+                assert!(
+                    html.contains("/fr/?category=field-notes"),
+                    "Taxonomy navigation retains the current language"
+                );
+            }
         }
         let (status, headers, _) = request(&site.app, "GET", "/jardin", None, "", vec![]).await;
         assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
@@ -1952,6 +1958,10 @@ async fn discovery_volume_has_bounded_pages_and_indexed_language_search() {
             }
         }
         assert_eq!(all.len(), 2006 - 287);
+        assert!(
+            get(&site.app, "/fr/", None).await.1.contains("/fr/?after="),
+            "Pagination retains the language route"
+        );
         let plan_sql = if pg {
             "EXPLAIN (ANALYZE,BUFFERS) SELECT id FROM posts WHERE status='published' AND id>'' ORDER BY id LIMIT 1001"
         } else {
