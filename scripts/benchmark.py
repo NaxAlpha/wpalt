@@ -2,10 +2,10 @@
 """Reproducible HTTP/document baseline. Uses a fresh database; never clears an existing site.
 Optional PostgreSQL URL MUST identify an empty, isolated test database.
 """
-import argparse,concurrent.futures,json,math,os,platform,secrets,socket,subprocess,tempfile,time,urllib.request
+import argparse,concurrent.futures,hashlib,json,math,os,platform,secrets,socket,subprocess,tempfile,time,urllib.request
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--binary',default='target/release/wpalt');p.add_argument('--posts',type=int,default=1000);p.add_argument('--requests',type=int,default=200);p.add_argument('--postgres-url');p.add_argument('--wordpress-url');p.add_argument('--composed',action='store_true');p.add_argument('--output',default='work/benchmark.json');args=p.parse_args()
-binary=Path(args.binary).resolve();results={'machine':{'platform':platform.platform(),'cpu':platform.processor(),'logical_cpus':os.cpu_count()},'posts_requested':args.posts,'requests_per_scenario':args.requests,'binary_bytes':binary.stat().st_size,'conditions':'Full uncompressed HTML document; warm application; no browser asset/render timing; no application response cache; localhost; Python HTTP client overhead included.','profiles':[]}
+p=argparse.ArgumentParser();p.add_argument('--binary',default='target/release/wpalt');p.add_argument('--posts',type=int,default=1000);p.add_argument('--requests',type=int,default=200);p.add_argument('--postgres-url');p.add_argument('--wordpress-url');p.add_argument('--composed',action='store_true');p.add_argument('--discovery',action='store_true');p.add_argument('--output',default='work/benchmark.json');args=p.parse_args()
+binary=Path(args.binary).resolve();results={'machine':{'platform':platform.platform(),'cpu':platform.processor(),'logical_cpus':os.cpu_count()},'posts_requested':args.posts,'requests_per_scenario':args.requests,'binary_bytes':binary.stat().st_size,'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'conditions':'Full uncompressed HTML document; warm application; no browser asset/render timing; no application response cache; localhost; Python HTTP client overhead included.','profiles':[]}
 def percentile(values,p):return sorted(values)[max(0,math.ceil(len(values)*p)-1)]
 def load(url,concurrency):
     def one(_):
@@ -41,6 +41,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-benchmark-') as temporary:
                 except Exception:assert server.poll() is None;time.sleep(.1)
             else:raise AssertionError('Server readiness timeout')
             paths={'home':'/','story':'/journal-1','search':'/search?q=publishing'}
+            if args.discovery:paths.update({'sitemap':'/sitemap.xml','sitemap_index':'/sitemap-index.xml'})
             started=time.perf_counter()
             with urllib.request.urlopen(origin) as r:r.read()
             results.setdefault('cold_first_request_ms',{})[engine]=round((time.perf_counter()-started)*1000,3)
@@ -59,5 +60,6 @@ with tempfile.TemporaryDirectory(prefix='wpalt-benchmark-') as temporary:
             for _ in range(10):
                 with urllib.request.urlopen(args.wordpress_url+path) as r:r.read()
             for concurrency in [1,10]:results['profiles'].append({'system':'wordpress-reference','database':'mariadb','endpoint':endpoint,**load(args.wordpress_url+path,concurrency)})
+assert results['binary_sha256']==hashlib.sha256(binary.read_bytes()).hexdigest(),'Measured executable changed during benchmark'
 Path(args.output).parent.mkdir(parents=True,exist_ok=True);Path(args.output).write_text(json.dumps(results,indent=2)+'\n')
 print('Measured',len(results['profiles']),'HTTP scenarios. Results:',args.output)

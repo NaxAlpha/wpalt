@@ -461,9 +461,7 @@ async function freePort() {
       page,
       form.getByRole("button", { name: "Add language", exact: true }),
     );
-    await page
-      .getByRole("heading", { name: label + " · " + code, exact: true })
-      .waitFor();
+    await page.getByText(label + " · " + code, { exact: true }).waitFor();
   }
   await page.goto(origin + "/admin/posts/new");
   await page.getByLabel("Title", { exact: true }).fill("Un jardin tranquille");
@@ -543,7 +541,7 @@ async function freePort() {
   );
   await page.screenshot({
     path: path.join(output, "m3-discovery-mobile.png"),
-    fullPage: true,
+    fullPage: false,
   });
   // Without JavaScript the same editor must preserve typed SEO controls.
   const native = await browser.newContext({ javaScriptEnabled: false });

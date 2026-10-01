@@ -92,10 +92,12 @@ impl Definition {
                     || !codes.insert(&l.code)
                     || l.label.trim().is_empty()
                     || l.label.len() > 80
+                    || l.label.chars().any(char::is_control)
                     || !["ltr", "rtl"].contains(&l.direction.as_str())
                     || l.navigation.len() > 30
                     || l.search_label.is_empty()
                     || l.search_label.len() > 80
+                    || l.search_label.chars().any(char::is_control)
                     || l.navigation.iter().any(|n| {
                         n.label.is_empty()
                             || n.label.len() > 100
@@ -356,21 +358,21 @@ pub async fn metadata_with_settings(
         json!({"@context":"https://schema.org","@type":"WebSite","name":title,"url":app.config.origin(),"inLanguage":language})
     };
     Ok(
-        json!({"language":language,"direction":l.direction,"title":title,"description":description,"canonical":canonical,"noindex":seo.noindex||search,"alternates":alternates,"structured":structured,"business":d.business,"navigation":if l.navigation.is_empty(){serde_json::from_str::<Value>(&settings.navigation).unwrap_or(json!([]))}else{serde_json::to_value(&l.navigation).unwrap()},"search_label":l.search_label}),
+        json!({"origin":app.config.origin(),"language":language,"direction":l.direction,"title":title,"description":description,"canonical":canonical,"noindex":seo.noindex||search,"alternates":alternates,"structured":structured,"business":d.business,"navigation":if l.navigation.is_empty(){serde_json::from_str::<Value>(&settings.navigation).unwrap_or(json!([]))}else{serde_json::to_value(&l.navigation).unwrap()},"search_label":l.search_label}),
     )
 }
 pub fn head(meta: &Value, draft: bool) -> Markup {
     let mut structures = vec![meta["structured"].clone()];
     let b = &meta["business"];
     if b["name"].as_str().is_some_and(|s| !s.is_empty()) {
-        structures.push(json!({"@context":"https://schema.org","@type":"LocalBusiness","name":b["name"],"url":meta["canonical"],"telephone":b["telephone"],"address":{"@type":"PostalAddress","streetAddress":b["street"],"addressLocality":b["city"],"postalCode":b["postal_code"],"addressCountry":b["country"]}}));
+        structures.push(json!({"@context":"https://schema.org","@type":"LocalBusiness","@id":format!("{}#business",meta["origin"].as_str().unwrap_or("")),"name":b["name"],"url":meta["origin"],"telephone":b["telephone"],"address":{"@type":"PostalAddress","streetAddress":b["street"],"addressLocality":b["city"],"postalCode":b["postal_code"],"addressCountry":b["country"]}}));
     }
     let script = serde_json::to_string(&structures)
         .unwrap()
         .replace('<', "\\u003c")
         .replace('>', "\\u003e")
         .replace('&', "\\u0026");
-    html! {title{(meta["title"].as_str().unwrap_or(""))}meta name="description" content=(meta["description"].as_str().unwrap_or(""));meta name="robots" content=(if draft||meta["noindex"]==true{"noindex,follow"}else{"index,follow"});@if !draft{link rel="canonical" href=(meta["canonical"].as_str().unwrap_or(""));@for a in meta["alternates"].as_array().into_iter().flatten(){link rel="alternate" hreflang=(a["language"].as_str().unwrap_or("")) href=(a["url"].as_str().unwrap_or(""));}meta property="og:title" content=(meta["title"].as_str().unwrap_or(""));meta property="og:description" content=(meta["description"].as_str().unwrap_or(""));meta property="og:url" content=(meta["canonical"].as_str().unwrap_or(""));meta property="og:type" content="website";meta name="twitter:card" content="summary";script type="application/ld+json"{(PreEscaped(script))}}}
+    html! {title{(meta["title"].as_str().unwrap_or(""))}meta name="description" content=(meta["description"].as_str().unwrap_or(""));meta name="robots" content=(if draft||meta["noindex"]==true{"noindex,follow"}else{"index,follow"});@if !draft{link rel="canonical" href=(meta["canonical"].as_str().unwrap_or(""));@for a in meta["alternates"].as_array().into_iter().flatten(){link rel="alternate" hreflang=(a["language"].as_str().unwrap_or("")) href=(a["url"].as_str().unwrap_or(""));}meta property="og:title" content=(meta["title"].as_str().unwrap_or(""));meta property="og:description" content=(meta["description"].as_str().unwrap_or(""));meta property="og:url" content=(meta["canonical"].as_str().unwrap_or(""));meta property="og:type" content=(if meta["structured"]["@type"]=="Article"{"article"}else{"website"});meta name="twitter:card" content="summary";script type="application/ld+json"{(PreEscaped(script))}}}
 }
 pub fn language_nav(meta: &Value) -> Markup {
     html! { @if meta["alternates"].as_array().is_some_and(|a|a.len()>1){nav class="toolbar" aria-label="Languages"{@for a in meta["alternates"].as_array().unwrap(){a href=(a["url"].as_str().unwrap_or("")) hreflang=(a["language"].as_str().unwrap_or("")) lang=(a["language"].as_str().unwrap_or("")) aria-current=[(a["language"]==meta["language"]).then_some("page")]{(a["label"].as_str().unwrap_or(""))}}}}}
@@ -689,13 +691,13 @@ async fn admin_page(State(app): State<App>, headers: HeaderMap) -> Result<Respon
         section class="panel" {
             h2 {"Languages"}p class="muted" {"Translations share a group but publish independently. Default language: " (d.default_language)}
             @for l in &d.languages {
-                form method="post" action="/admin/discovery/languages" {
+                details open[l.code==d.default_language] {summary {(l.label) " · " (l.code)}form method="post" action="/admin/discovery/languages" {
                     (view::csrf(&s))input type="hidden" name="version" value=(version);input type="hidden" name="code" value=(l.code);
-                    h3 {(l.label) " · " (l.code)}div class="field-row" {label {"Language label" input name="label" value=(l.label) required maxlength="80";}label {"Writing direction" select name="direction" aria-label="Writing direction" {option value="ltr" selected[l.direction=="ltr"] {"Left to right"}option value="rtl" selected[l.direction=="rtl"] {"Right to left"}}}}
+                    div class="field-row" {label {"Language label" input name="label" value=(l.label) required maxlength="80";}label {"Writing direction" select name="direction" aria-label="Writing direction" {option value="ltr" selected[l.direction=="ltr"] {"Left to right"}option value="rtl" selected[l.direction=="rtl"] {"Right to left"}}}}
                     label {"Search button text" input name="search_label" value=(l.search_label) required maxlength="80";}
                     details {summary {"Translated navigation"}label {"Navigation links (JSON)" textarea name="navigation" {(serde_json::to_string_pretty(&l.navigation).unwrap())}}}
                     div class="toolbar" {button {"Save language"}@if l.code!=d.default_language {button class="secondary" name="action" value="remove" {"Remove language"}}}
-                }
+                }}
             }
             details {summary {"Add a language"}form method="post" action="/admin/discovery/languages" {(view::csrf(&s))input type="hidden" name="version" value=(version);div class="field-row" {label {"Language code" input name="code" required placeholder="fr" maxlength="7";}label {"Language label" input name="label" required placeholder="Français" maxlength="80";}}label {"Writing direction" select name="direction" aria-label="Writing direction" {option value="ltr" {"Left to right"}option value="rtl" {"Right to left"}}}label {"Search button text" input name="search_label" required value="Search" maxlength="80";}button {"Add language"}}}
         }

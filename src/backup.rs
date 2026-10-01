@@ -302,6 +302,24 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     {
         return Err(Error::invalid("Unsupported backup schema or table set."));
     }
+    // Validate every row before any writes; no archive SQL or paths are executed.
+    for (name, columns) in TABLES {
+        for row in &snapshot.tables[*name] {
+            if row.len() != columns.len()
+                || columns.iter().any(|(column, number)| {
+                    !row.get(*column).is_some_and(|v| {
+                        if *number {
+                            v.as_i64().is_some()
+                        } else {
+                            v.is_string()
+                        }
+                    })
+                })
+            {
+                return Err(Error::invalid("Backup row has an invalid shape."));
+            }
+        }
+    }
     let discovery_rows = &snapshot.tables["discovery_settings"];
     if discovery_rows.len() != 1
         || discovery_rows[0]["id"] != 1
@@ -443,24 +461,6 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             || file.data.len() as i64 != *size
         {
             return Err(Error::invalid("Backup media failed validation."));
-        }
-    }
-    // Validate every row before any writes; no archive SQL or paths are executed.
-    for (name, columns) in TABLES {
-        for row in &snapshot.tables[*name] {
-            if row.len() != columns.len()
-                || columns.iter().any(|(column, number)| {
-                    !row.get(*column).is_some_and(|v| {
-                        if *number {
-                            v.as_i64().is_some()
-                        } else {
-                            v.is_string()
-                        }
-                    })
-                })
-            {
-                return Err(Error::invalid("Backup row has an invalid shape."));
-            }
         }
     }
     let registry = crate::schema::Registry {

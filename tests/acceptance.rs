@@ -26,8 +26,12 @@ struct Site {
 }
 impl Site {
     async fn new(postgres: bool, initialize: bool) -> Self {
+        Self::with_connections(postgres, initialize, 4).await
+    }
+    async fn with_connections(postgres: bool, initialize: bool, connections: u32) -> Self {
         let directory = tempfile::tempdir().unwrap();
         let mut config = Config {
+            database_connections: connections,
             data_dir: directory.path().join("data"),
             database_url: format!(
                 "sqlite://{}?mode=rwc",
@@ -1674,6 +1678,36 @@ async fn multilingual_publication_keeps_drafts_private_and_variants_reciprocal()
         let search = get(&site.app, "/fr/search?q=jardin", None).await.1;
         assert!(search.contains("/fr/jardin") && search.contains("noindex,follow"));
         assert!(get(&site.app, "/ar/", None).await.1.contains("dir=\"rtl\""));
+        let mut scheduled = input("arabic-scheduled", "schedule");
+        scheduled.locale = "ar".into();
+        scheduled.publish_at = wpalt::now() + 60;
+        scheduled.seo = r#"{"title":"Scheduled discovery"}"#.into();
+        let scheduled = content::save(&site.app, site.session(), None, scheduled)
+            .await
+            .unwrap();
+        assert!(
+            wpalt::discovery::save_redirect(&site.app, "/ar/arabic-scheduled", "/garden", 301, 0)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            get(&site.app, "/ar/arabic-scheduled", None).await.0,
+            StatusCode::NOT_FOUND
+        );
+        sqlx::query("UPDATE posts SET publish_at=$1 WHERE id=$2")
+            .bind(wpalt::now() - 1)
+            .bind(&scheduled.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(content::publish_due(&site.app).await.unwrap(), 1);
+        assert!(
+            get(&site.app, "/ar/arabic-scheduled", None)
+                .await
+                .1
+                .contains("Scheduled discovery")
+        );
+
         let mut wrong = french.clone();
         wrong.slug = "other-fr".into();
         wrong.version = 0;
@@ -1804,7 +1838,7 @@ async fn discovery_metadata_redirects_links_and_permissions_are_one_local_system
 #[tokio::test]
 async fn discovery_recovery_preserves_configuration_and_rejects_malicious_rules() {
     for pg in engines() {
-        let site = Site::new(pg, true).await;
+        let site = Site::with_connections(pg, true, 1).await;
         multilingual(&site).await;
         let mut p = input("bonjour", "publish");
         p.locale = "fr".into();
@@ -1816,7 +1850,7 @@ async fn discovery_recovery_preserves_configuration_and_rejects_malicious_rules(
             .await
             .unwrap();
         let archive = backup::capture(&site.app).await.unwrap();
-        let target = Site::new(pg, false).await;
+        let target = Site::with_connections(pg, false, 1).await;
         backup::restore(&target.app, &archive).await.unwrap();
         assert!(
             get(&target.app, "/fr/bonjour", None)
@@ -1837,11 +1871,26 @@ async fn discovery_recovery_preserves_configuration_and_rejects_malicious_rules(
         let payload = payload.to_string();
         envelope["sha256"] = serde_json::json!(auth::digest(payload.as_bytes()));
         envelope["payload"] = serde_json::json!(payload);
-        let fresh = Site::new(pg, false).await;
+        let fresh = Site::with_connections(pg, false, 1).await;
         assert!(
             backup::restore(&fresh.app, &serde_json::to_vec(&envelope).unwrap())
                 .await
                 .is_err()
+        );
+        let mut broken: serde_json::Value =
+            serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        broken["tables"]["redirects"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("source");
+        let broken = broken.to_string();
+        envelope["sha256"] = serde_json::json!(auth::digest(broken.as_bytes()));
+        envelope["payload"] = serde_json::json!(broken);
+        assert!(
+            backup::restore(&fresh.app, &serde_json::to_vec(&envelope).unwrap())
+                .await
+                .is_err(),
+            "Missing fields are rejected before semantic access, without panic"
         );
         assert_eq!(
             sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
@@ -1915,6 +1964,18 @@ async fn discovery_volume_has_bounded_pages_and_indexed_language_search() {
             .iter()
             .map(|r| r.get::<String, _>(if pg { 0 } else { 3 }))
             .collect::<Vec<_>>();
+        let search_sql = if pg {
+            "EXPLAIN (ANALYZE,BUFFERS) SELECT id FROM posts WHERE status='published' AND published_locale='fr' AND NOT COALESCE((published_seo::jsonb->>'noindex')::boolean,false) AND to_tsvector('simple',published_title || ' ' || published_body) @@ plainto_tsquery('simple','garden') ORDER BY published_at DESC,id DESC LIMIT 21"
+        } else {
+            "EXPLAIN QUERY PLAN SELECT id FROM posts WHERE status='published' AND published_locale='fr' AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0 AND id IN (SELECT id FROM post_search WHERE post_search MATCH 'garden') ORDER BY published_at DESC,id DESC LIMIT 21"
+        };
+        let search_plan = sqlx::query(search_sql)
+            .fetch_all(&site.app.db.pool)
+            .await
+            .unwrap()
+            .iter()
+            .map(|r| r.get::<String, _>(if pg { 0 } else { 3 }))
+            .collect::<Vec<_>>();
         let search = get(&site.app, "/api/content?lang=fr&q=garden", None).await;
         assert_eq!(search.0, StatusCode::OK);
         assert!(search.1.contains("fr/volume"));
@@ -1930,7 +1991,7 @@ async fn discovery_volume_has_bounded_pages_and_indexed_language_search() {
             millis.sort_by(f64::total_cmp);
             samples.push(serde_json::json!({"path":path,"median_ms":millis[6],"max_ms":millis[11],"samples":12}));
         }
-        evidence.push(serde_json::json!({"engine":if pg {"postgres"}else{"sqlite"},"published_rows":2006,"sitemap_urls":all.len(),"sitemap_plan":plan,"http_in_process":samples,"conditions":"debug build; real DB; HTTP router in-process; no network/browser latency; observations not budgets"}));
+        evidence.push(serde_json::json!({"engine":if pg {"postgres"}else{"sqlite"},"published_rows":2006,"sitemap_urls":all.len(),"sitemap_plan":plan,"search_plan":search_plan,"http_in_process":samples,"conditions":"debug build; real DB; HTTP router in-process; no network/browser latency; observations not budgets"}));
         site.close().await;
     }
     std::fs::create_dir_all("work").unwrap();
