@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "color": {
+    "canvas": "#f5f7f6",
+    "surface": "#ffffff",
+    "text": "#172b29",
+    "muted": "#526760",
+    "border": "#d6e0db",
+    "control-border": "#71857b",
+    "accent": "#12684f",
+    "accent-hover": "#0b503c",
+    "accent-soft": "#e7f2ec",
+    "on-accent": "#ffffff",
+    "danger": "#963535",
+    "danger-soft": "#fff0ed",
+    "focus": "#185cbb",
+    "sidebar": "#132c2a",
+    "sidebar-text": "#e0eee8",
+    "sidebar-muted": "#b4ccc1",
+    "sidebar-active": "#244c40",
+    "focus-on-dark": "#b7eadd"
+  },
+  "space": {
+    "1": 4,
+    "2": 8,
+    "3": 12,
+    "4": 16,
+    "5": 20,
+    "6": 24,
+    "8": 32,
+    "10": 40
+  },
+  "radius": {
+    "control": 8,
+    "panel": 12,
+    "badge": 4
+  },
+  "size": {
+    "control": 44,
+    "sidebar": 224,
+    "workspace-max": 1680,
+    "preview-mobile": 375,
+    "preview-height": 640,
+    "control-padding-block": 10,
+    "control-line": 22
+  },
+  "type": {
+    "body": 16,
+    "label": 14,
+    "small": 13,
+    "title": 36,
+    "section": 22
+  },
+  "breakpoint": {
+    "mobile": 700,
+    "studio-stack": 1200,
+    "studio-single": 767
+  },
+  "font": {
+    "body": "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+  }
+}
