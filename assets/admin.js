@@ -35,6 +35,7 @@ if (editor) {
       } else {
         for (const input of document.querySelectorAll('input[name=version]')) input.value = result.version;
         error.hidden = true;
+        if (!dirty) editor.dispatchEvent(new Event('wpalt:saved'));
         status.textContent = dirty ? 'Unsaved changes' : 'Draft saved · live page unchanged';
       }
     } catch (_) {

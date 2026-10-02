@@ -7,7 +7,16 @@
     "format:check": "prettier --check *.jsx *.mjs *.css *.json"
   },
   "dependencies": {
-    "preact": "11.0.0"
+    "preact": "11.0.0",
+    "prosemirror-commands": "1.7.2",
+    "prosemirror-history": "1.5.1",
+    "prosemirror-inputrules": "1.5.1",
+    "prosemirror-keymap": "1.2.3",
+    "prosemirror-model": "1.25.12",
+    "prosemirror-schema-list": "1.5.1",
+    "prosemirror-state": "1.4.4",
+    "prosemirror-tables": "1.8.5",
+    "prosemirror-view": "1.42.6"
   },
   "devDependencies": {
     "axe-core": "4.13.0",

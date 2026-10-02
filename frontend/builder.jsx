@@ -1438,6 +1438,11 @@ if (form) {
         const [value, setValue] = useState(JSON.parse(raw.value || "{}")),
           [kind, setKind] = useState(select.value);
         useEffect(() => {
+          const recovered = () => setValue(JSON.parse(raw.value || "{}"));
+          form.addEventListener("wpalt:recovery", recovered);
+          return () => form.removeEventListener("wpalt:recovery", recovered);
+        }, []);
+        useEffect(() => {
           const fn = () => setKind(select.value);
           select.addEventListener("change", fn);
           fn();
@@ -1470,6 +1475,12 @@ if (form) {
       function Taxonomies() {
         const [kind, setKind] = useState(select.value),
           [values, setValues] = useState(JSON.parse(taxonomyRaw.value || "{}"));
+        useEffect(() => {
+          const recovered = () =>
+            setValues(JSON.parse(taxonomyRaw.value || "{}"));
+          form.addEventListener("wpalt:recovery", recovered);
+          return () => form.removeEventListener("wpalt:recovery", recovered);
+        }, []);
         useEffect(() => {
           const fn = () => setKind(select.value);
           select.addEventListener("change", fn);

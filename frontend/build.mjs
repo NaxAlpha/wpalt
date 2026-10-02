@@ -59,3 +59,38 @@ await build({
   target: ["es2020"],
   outfile: "../work/ui-gallery.js",
 });
+
+const editorLicenses = await Promise.all(
+  [
+    "prosemirror-model",
+    "prosemirror-state",
+    "prosemirror-view",
+    "prosemirror-history",
+    "prosemirror-commands",
+    "prosemirror-schema-list",
+    "prosemirror-tables",
+    "prosemirror-keymap",
+    "prosemirror-inputrules",
+    "orderedmap",
+    "rope-sequence",
+    "w3c-keyname",
+  ].map(
+    async (name) =>
+      name +
+      "\n" +
+      (await readFile(
+        new URL(`./node_modules/${name}/LICENSE`, import.meta.url),
+        "utf8",
+      )),
+  ),
+);
+await build({
+  entryPoints: ["editor.mjs"],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: ["es2020"],
+  outfile: "../assets/generated/editor.js",
+  banner: { js: "/*!\n" + editorLicenses.join("\n") + "*/" },
+  legalComments: "eof",
+});

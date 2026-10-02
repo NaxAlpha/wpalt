@@ -1,7 +1,4 @@
-use crate::{
-    content,
-    model::{Block, NavItem, Post, Session, Settings},
-};
+use crate::model::{NavItem, Post, Session, Settings};
 use maud::{DOCTYPE, Markup, PreEscaped, html};
 
 pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body: Markup) -> String {
@@ -54,33 +51,25 @@ pub fn public_body(post: &Post, preview: bool) -> Markup {
     } else {
         &post.published_title
     };
-    let body = if preview {
-        &post.body
-    } else {
-        &post.published_body
-    };
     let fields = if preview {
         &post.fields
     } else {
         &post.published_fields
     };
-    let blocks = if preview {
-        &post.blocks
+    let document = if preview {
+        &post.document
     } else {
-        &post.published_blocks
+        &post.published_document
     };
     let fields: serde_json::Value = serde_json::from_str(fields).unwrap_or_default();
-    let blocks: Vec<Block> = serde_json::from_str(blocks).unwrap_or_default();
+    let rendered = crate::document::Document::parse(document)
+        .map(|d| d.html())
+        .unwrap_or_default();
     html! { article class="article" {
         @if preview {p class="notice" {"Private preview — unpublished changes. " a href=(format!("/admin/posts/{}",post.id)) {"Back to editor"}}}
         p class="eyebrow" {(post.kind)} h1 {(title)}
         @if let Some(subtitle)=fields.get("subtitle").and_then(|v|v.as_str()) {p class="lead" {(subtitle)}}
-        div class="prose" {(PreEscaped(content::markdown(body)))}
-        @for block in blocks { @match block.kind.as_str() {
-            "heading"=>{h2 {(block.text)}}
-            "callout"=>{aside class="callout" {(block.text)}}
-            _=>{div class="prose" {(PreEscaped(content::markdown(&block.text)))}}
-        }}
+        div class="prose" {(PreEscaped(rendered))}
     }}
 }
 pub fn login(settings: &Settings) -> String {

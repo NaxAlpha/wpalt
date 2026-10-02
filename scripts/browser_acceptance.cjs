@@ -101,7 +101,8 @@ async function freePort() {
     page.getByRole("button", { name: "Sign in", exact: true }),
   );
   await page.waitForURL(origin + "/admin");
-  await require("./ui_contracts.cjs")(owner, origin);
+  if (!process.env.WPALT_SKIP_UI)
+    await require("./ui_contracts.cjs")(owner, origin);
   await page.screenshot({
     path: path.join(output, "admin-desktop.png"),
     fullPage: true,
@@ -112,7 +113,7 @@ async function freePort() {
     .fill("A browser-tested story");
   await page.getByRole("textbox", { name: /^URL slug/ }).fill("browser-story");
   await page
-    .getByRole("textbox", { name: /^Content/ })
+    .locator(".ProseMirror")
     .fill(
       "BROWSER_WORKING_DRAFT\n\nA useful story from our independent website.",
     );
@@ -123,6 +124,7 @@ async function freePort() {
   );
   await page.waitForURL(/\/admin\/posts\/[a-f0-9-]+$/);
   const editorUrl = page.url();
+
   assert.equal(
     (await publicContext.request.get(origin + "/browser-story")).status(),
     404,
@@ -133,10 +135,9 @@ async function freePort() {
   );
   await page.waitForURL(editorUrl);
   await visitor.goto(origin + "/browser-story");
+
   await visitor.getByText("BROWSER_WORKING_DRAFT", { exact: false }).waitFor();
-  await page
-    .getByRole("textbox", { name: /^Content/ })
-    .fill("BROWSER_PRIVATE_AUTOSAVE");
+  await page.locator(".ProseMirror").fill("BROWSER_PRIVATE_AUTOSAVE");
   await page
     .getByText("Draft saved · live page unchanged", { exact: true })
     .waitFor({ timeout: 15000 });
@@ -149,9 +150,9 @@ async function freePort() {
   );
   await page.waitForURL(editorUrl);
   assert(
-    (
-      await page.getByRole("textbox", { name: /^Content/ }).inputValue()
-    ).includes("BROWSER_WORKING_DRAFT"),
+    (await page.locator(".ProseMirror").innerText()).includes(
+      "BROWSER_WORKING_DRAFT",
+    ),
   );
   await page.screenshot({
     path: path.join(output, "editor-desktop.png"),
@@ -466,6 +467,7 @@ async function freePort() {
   await page.goto(origin + "/admin/posts/new");
   await page.getByLabel("Title", { exact: true }).fill("Un jardin tranquille");
   await page.getByLabel("URL slug", { exact: true }).fill("jardin-tranquille");
+  await page.getByText("Language & discovery", { exact: true }).click();
   await page.getByLabel("Language", { exact: true }).selectOption("fr");
   await page
     .getByLabel("Search title", { exact: true })
@@ -482,6 +484,7 @@ async function freePort() {
   assert.equal(await visitor.title(), "Notre jardin · découverte");
   assert.equal(await visitor.locator("html").getAttribute("lang"), "fr");
   assert.equal(await visitor.locator("link[rel=canonical]").count(), 1);
+  await page.getByText("Language & discovery", { exact: true }).click();
   await page
     .getByLabel("Search title", { exact: true })
     .fill("PRIVATE SEO WORKING COPY");
@@ -494,11 +497,12 @@ async function freePort() {
   await page.goto(origin + "/admin/posts/new");
   await page.getByLabel("Title", { exact: true }).fill("مساحة هادئة للكتابة");
   await page
-    .getByLabel("Content", { exact: true })
+    .locator(".ProseMirror")
     .fill(
       "أفكار وقصص في مكان مستقل.\n\n## حديقة صغيرة\n\nهذا المحتوى منشور باللغة العربية على خادمك.",
     );
   await page.getByLabel("URL slug", { exact: true }).fill("arabic-story");
+  await page.getByText("Language & discovery", { exact: true }).click();
   await page.getByLabel("Language", { exact: true }).selectOption("ar");
   await submit(
     page,
@@ -548,6 +552,7 @@ async function freePort() {
   await native.addCookies(await owner.cookies());
   const nativePage = await native.newPage();
   await nativePage.goto(translationEditor);
+  await nativePage.getByText("Language & discovery", { exact: true }).click();
   await nativePage
     .getByLabel("Search title", { exact: true })
     .fill("Découverte sans JavaScript");
@@ -558,6 +563,7 @@ async function freePort() {
   await visitor.reload();
   assert.equal(await visitor.title(), "Découverte sans JavaScript");
   await native.close();
+  await require("./authoring_acceptance.cjs")(owner, origin, output, mediaUrl);
   assert.deepEqual(errors, [], "Browser JavaScript errors");
   assert.deepEqual(remote, [], "Unexpected external runtime requests");
   fs.writeFileSync(

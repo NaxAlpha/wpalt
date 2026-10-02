@@ -247,3 +247,7 @@ The user authorized merging PR #5 and proceeding to M3. #5 merged as `29807ffb3f
 ### Integrated authoring approved — 2026-10-02
 
 The user approved M3.5 between M3 and M4, with its own delivery PR. The document model and authoring experience are shared across later milestones; existing parity requirements remain tracked. See ADR 0004 and the M3.5 contract.
+
+### M3 merged; integrated authoring implementation — 2026-10-02
+
+M3 PR #6 merged as `eb189c21d92af51f0f48577739df31a102f0d678`; actual-main run 36951433688 and its downloaded clean build were verified. M3.5 is implemented and under its own delivery verification: see [authoring operations](authoring.md), [editor decision](decisions/0005-structured-editor.md) and [evidence](evidence/m3-5-verification.md). M4 remains planned. No future parity scope was removed.

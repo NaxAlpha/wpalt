@@ -88,3 +88,7 @@ Theme package import/export/publication/activation also works through the offlin
 ## M3 discovery upgrade
 
 See [discovery operations](discovery.md#upgrade-and-recovery) for schema-3 migration, backup-v3 restoration, old-archive handling and current content API metadata requirements. M3 uses no mandatory cloud service or account.
+
+## M3.5 structured authoring upgrade
+
+See [authoring operations](authoring.md#api-and-recovery) for transactional schema-4 conversion and backup-v4 restoration. Keep an independent backup from the previous executable; current-format backups preserve canonical trees.

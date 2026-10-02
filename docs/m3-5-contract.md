@@ -1,6 +1,6 @@
 # M3.5 — Integrated content authoring
 
-Approved scope, 2026-10-02. Status: specification; not an implementation/parity claim.
+Approved scope, 2026-10-02. Status: implementation under verification; completion depends on the delivery PR and its exact-source checks.
 
 ## End-user system
 
