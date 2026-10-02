@@ -1948,10 +1948,16 @@ async fn discovery_volume_has_bounded_pages_and_indexed_language_search() {
         let mut tx = site.app.db.pool.begin().await.unwrap();
         for n in 0..2005 {
             let slug = format!("volume-{n}");
-            sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo) SELECT $1,$2,kind,title,body,fields,blocks,status,version,$2,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,$3,$3,$4,$4 FROM posts WHERE id=$5")
+            sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo,document,published_document) SELECT $1,$2,kind,title,body,fields,blocks,status,version,$2,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,$3,$3,$4,$4,document,published_document FROM posts WHERE id=$5")
                 .bind(uuid::Uuid::new_v4().to_string()).bind(slug).bind(if n%2==0 {"fr"} else {"en"}).bind(if n%7==0 {r#"{"noindex":true}"#}else{"{}"}).bind(&base.id).execute(&mut *tx).await.unwrap();
         }
         tx.commit().await.unwrap();
+        let (status, rendered) = get(&site.app, "/fr/volume-2", None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            rendered.contains("A quiet garden") && rendered.contains("Made here"),
+            "Volume rows retain and render their canonical text and callout, not empty legacy columns"
+        );
         let index = get(&site.app, "/sitemap-index.xml", None).await.1;
         assert_eq!(index.matches("<sitemap>").count(), 3);
         let mut all = HashSet::new();
