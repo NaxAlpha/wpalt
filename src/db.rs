@@ -58,12 +58,15 @@ impl Db {
             crate::migrations::from_m1(self).await?;
         } else {
             anyhow::ensure!(
-                version.is_none() || version == Some(2) || version == Some(3),
+                version.is_none() || version == Some(2) || version == Some(3) || version == Some(4),
                 "unsupported schema version; use the documented migration/reset path"
             );
         }
         if version == Some(1) || version == Some(2) {
             crate::migrations::from_m2(self).await?;
+        }
+        if version.is_some() && version != Some(4) {
+            crate::migrations::from_m3(self).await?;
         }
         let mut tx = self.pool.begin().await?;
         sqlx::raw_sql(SCHEMA).execute(&mut *tx).await?;
@@ -71,6 +74,8 @@ impl Db {
             sqlx::query("CREATE INDEX IF NOT EXISTS public_search ON posts USING GIN(to_tsvector('simple',published_title || ' ' || published_body)) WHERE status='published'").execute(&mut *tx).await?;
         } else {
             sqlx::raw_sql(SQLITE_SEARCH).execute(&mut *tx).await?;
+            // Rank compact indexable identities before reading rich content rows.
+            sqlx::raw_sql("CREATE INDEX IF NOT EXISTS indexable_identity ON posts(id,published_locale,published_at DESC) WHERE status='published' AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0;").execute(&mut *tx).await?;
         }
         sqlx::query("INSERT INTO discovery_settings(id,definition,version) VALUES(1,$1,1) ON CONFLICT(id) DO NOTHING").bind(serde_json::to_string(&crate::discovery::Definition::default())?).execute(&mut *tx).await?;
         tx.commit().await?;
@@ -133,13 +138,13 @@ impl Db {
 
 pub const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS schema_version(id BIGINT PRIMARY KEY CHECK(id=1), version BIGINT NOT NULL);
-INSERT INTO schema_version(id,version) VALUES(1,3) ON CONFLICT(id) DO NOTHING;
+INSERT INTO schema_version(id,version) VALUES(1,4) ON CONFLICT(id) DO NOTHING;
 CREATE TABLE IF NOT EXISTS settings(id BIGINT PRIMARY KEY CHECK(id=1),title TEXT NOT NULL,description TEXT NOT NULL,theme TEXT NOT NULL,navigation TEXT NOT NULL,field_schema TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,name TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('admin','editor','moderator','disabled')),password_hash TEXT NOT NULL,created_at BIGINT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,csrf TEXT NOT NULL,expires_at BIGINT NOT NULL);
 CREATE INDEX IF NOT EXISTS user_sessions ON sessions(user_id,expires_at);
 CREATE INDEX IF NOT EXISTS session_expiry ON sessions(expires_at);
-CREATE TABLE IF NOT EXISTS posts(id TEXT PRIMARY KEY,slug TEXT NOT NULL UNIQUE,kind TEXT NOT NULL,title TEXT NOT NULL,body TEXT NOT NULL,fields TEXT NOT NULL,blocks TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('draft','published','scheduled')),version BIGINT NOT NULL,published_slug TEXT NOT NULL,published_title TEXT NOT NULL,published_body TEXT NOT NULL,published_fields TEXT NOT NULL,published_blocks TEXT NOT NULL,publish_at BIGINT NOT NULL,published_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,author_id TEXT NOT NULL REFERENCES users(id),locale TEXT NOT NULL DEFAULT 'en',translation_group TEXT NOT NULL DEFAULT '',seo TEXT NOT NULL DEFAULT '{}',published_locale TEXT NOT NULL DEFAULT 'en',published_translation_group TEXT NOT NULL DEFAULT '',published_seo TEXT NOT NULL DEFAULT '{}');
+CREATE TABLE IF NOT EXISTS posts(id TEXT PRIMARY KEY,slug TEXT NOT NULL UNIQUE,kind TEXT NOT NULL,title TEXT NOT NULL,body TEXT NOT NULL,fields TEXT NOT NULL,blocks TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('draft','published','scheduled')),version BIGINT NOT NULL,published_slug TEXT NOT NULL,published_title TEXT NOT NULL,published_body TEXT NOT NULL,published_fields TEXT NOT NULL,published_blocks TEXT NOT NULL,publish_at BIGINT NOT NULL,published_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,author_id TEXT NOT NULL REFERENCES users(id),locale TEXT NOT NULL DEFAULT 'en',translation_group TEXT NOT NULL DEFAULT '',seo TEXT NOT NULL DEFAULT '{}',published_locale TEXT NOT NULL DEFAULT 'en',published_translation_group TEXT NOT NULL DEFAULT '',published_seo TEXT NOT NULL DEFAULT '{}',document TEXT NOT NULL DEFAULT '',published_document TEXT NOT NULL DEFAULT '');
 CREATE UNIQUE INDEX IF NOT EXISTS published_slugs ON posts(published_slug) WHERE published_slug<>'';
 CREATE INDEX IF NOT EXISTS public_posts ON posts(status,published_at DESC,id DESC);
 CREATE INDEX IF NOT EXISTS public_model_posts ON posts(kind,status,published_at DESC,id DESC);

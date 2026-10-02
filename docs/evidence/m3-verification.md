@@ -37,3 +37,7 @@ Schema 3 upgrades metadata and old revisions once. Current backups are v3; resto
 | sitemap_index | 1.879 / 2.268 | 11.850 / 18.159 |
 
 Common-term search scans many FTS matches and contention is visible. This modest workload does not establish maximum capacity, production SLOs or a WordPress comparison. The measured executable was 11,309,296 bytes, RSS after load 63,635,456 bytes, site files 33,199,552 bytes (database/WAL and fixture data included, server log/config excluded). Platform, fixture, client overhead and actual executable hash are recorded; these are not idle-memory or final Linux-artifact numbers.
+
+## Verified M3 merge
+
+PR #6 merged as `eb189c21d92af51f0f48577739df31a102f0d678`. [Actual-main run 36951433688](https://github.com/NaxAlpha/wpalt/actions/runs/36951433688) passed application, compiler-floor and clean-build jobs. The downloaded clean archive SHA-256 is `fde568a73e8e98fb6aeb4db01aba02e12c08d571145152aa42752d62051048c4`; executable mode, binary hash, exact merge identity and Rust/frontend/Studio/CSS/token hashes matched the merged source.

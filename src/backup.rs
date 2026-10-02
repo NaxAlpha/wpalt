@@ -94,6 +94,7 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
             ("kind", false),
             ("title", false),
             ("body", false),
+            ("document", false),
             ("fields", false),
             ("blocks", false),
             ("status", false),
@@ -101,6 +102,7 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
             ("published_slug", false),
             ("published_title", false),
             ("published_body", false),
+            ("published_document", false),
             ("published_fields", false),
             ("published_blocks", false),
             ("publish_at", true),
@@ -262,7 +264,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     }
     tx.commit().await?;
     let snapshot = Snapshot {
-        schema: 3,
+        schema: 4,
         created_at: crate::now(),
         tables,
         files,
@@ -270,7 +272,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v3".into(),
+        format: "wpalt-backup-v4".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -287,14 +289,14 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v3"
+    if envelope.format != "wpalt-backup-v4"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 3
+    if snapshot.schema != 4
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -318,6 +320,26 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             {
                 return Err(Error::invalid("Backup row has an invalid shape."));
             }
+        }
+    }
+    for row in &snapshot.tables["posts"] {
+        for key in ["document", "published_document"] {
+            crate::document::Document::parse(
+                row[key]
+                    .as_str()
+                    .ok_or(Error::invalid("Missing document"))?,
+            )?;
+        }
+    }
+    for row in &snapshot.tables["revisions"] {
+        let value: Value = serde_json::from_str(row["snapshot"].as_str().unwrap())
+            .map_err(|_| Error::invalid("Invalid revision"))?;
+        for key in ["document", "published_document"] {
+            crate::document::Document::parse(
+                value["post"][key]
+                    .as_str()
+                    .ok_or(Error::invalid("Missing revision document"))?,
+            )?;
         }
     }
     let discovery_rows = &snapshot.tables["discovery_settings"];

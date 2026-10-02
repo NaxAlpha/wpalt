@@ -40,6 +40,7 @@ pub async fn from_m1(db: &Db) -> anyhow::Result<()> {
             for table in ["posts","settings","terms"] {
                 let prefix=format!("CREATE TABLE IF NOT EXISTS {table}(");
                 let create=SCHEMA.lines().find(|line|line.starts_with(&prefix)).ok_or_else(||anyhow::anyhow!("migration table definition missing"))?;
+                let create=create.replace(",document TEXT NOT NULL DEFAULT '',published_document TEXT NOT NULL DEFAULT ''", "");
                 let create=create.replace(",locale TEXT NOT NULL DEFAULT 'en',translation_group TEXT NOT NULL DEFAULT '',seo TEXT NOT NULL DEFAULT '{}',published_locale TEXT NOT NULL DEFAULT 'en',published_translation_group TEXT NOT NULL DEFAULT '',published_seo TEXT NOT NULL DEFAULT '{}'", "");
                 sqlx::raw_sql(&create.replacen(&prefix,&format!("CREATE TABLE {table}_m2("),1)).execute(&mut *tx).await?;
                 sqlx::query(&format!("INSERT INTO {table}_m2 SELECT * FROM {table}")).execute(&mut *tx).await?;
@@ -141,6 +142,89 @@ pub async fn from_m2(db: &Db) -> anyhow::Result<()> {
         }
     }
     sqlx::query("UPDATE schema_version SET version=3 WHERE id=1")
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Atomic, bounded conversion of working/live documents and retained revisions.
+pub async fn from_m3(db: &Db) -> anyhow::Result<()> {
+    let mut tx = db.pool.begin().await?;
+    for col in ["document", "published_document"] {
+        sqlx::query(&format!(
+            "ALTER TABLE posts ADD COLUMN {col} TEXT NOT NULL DEFAULT ''"
+        ))
+        .execute(&mut *tx)
+        .await?;
+    }
+    let mut after = String::new();
+    loop {
+        let rows=sqlx::query("SELECT id,body,blocks,published_body,published_blocks FROM posts WHERE id>$1 ORDER BY id LIMIT 20").bind(&after).fetch_all(&mut *tx).await?;
+        if rows.is_empty() {
+            break;
+        }
+        for r in rows {
+            let id: String = r.get("id");
+            let draft =
+                crate::document::import(&r.get::<String, _>("body"), &r.get::<String, _>("blocks"))
+                    .map_err(|_| {
+                        anyhow::anyhow!(
+                            "document migration failed for {id}; original transaction rolled back"
+                        )
+                    })?;
+            let live = crate::document::import(
+                &r.get::<String, _>("published_body"),
+                &r.get::<String, _>("published_blocks"),
+            )
+            .map_err(|_| anyhow::anyhow!("live document migration failed for {id}"))?;
+            sqlx::query("UPDATE posts SET document=$1,published_document=$2 WHERE id=$3")
+                .bind(draft.encode())
+                .bind(live.encode())
+                .bind(&id)
+                .execute(&mut *tx)
+                .await?;
+            after = id;
+        }
+    }
+    after.clear();
+    loop {
+        let rows =
+            sqlx::query("SELECT id,snapshot FROM revisions WHERE id>$1 ORDER BY id LIMIT 20")
+                .bind(&after)
+                .fetch_all(&mut *tx)
+                .await?;
+        if rows.is_empty() {
+            break;
+        }
+        for r in rows {
+            let id: String = r.get("id");
+            let mut v: serde_json::Value = serde_json::from_str(&r.get::<String, _>("snapshot"))?;
+            for (doc, body, blocks) in [
+                ("document", "body", "blocks"),
+                ("published_document", "published_body", "published_blocks"),
+            ] {
+                let p = &mut v["post"];
+                let d = crate::document::import(
+                    p[body]
+                        .as_str()
+                        .ok_or_else(|| anyhow::anyhow!("missing revision body"))?,
+                    p[blocks]
+                        .as_str()
+                        .ok_or_else(|| anyhow::anyhow!("missing revision blocks"))?,
+                )
+                .map_err(|_| anyhow::anyhow!("revision document migration failed for {id}"))?;
+                p[doc] = d.encode().into();
+            }
+            sqlx::query("UPDATE revisions SET snapshot=$1 WHERE id=$2")
+                .bind(v.to_string())
+                .bind(&id)
+                .execute(&mut *tx)
+                .await?;
+            after = id;
+        }
+    }
+    sqlx::query("UPDATE schema_version SET version=4 WHERE id=1")
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;

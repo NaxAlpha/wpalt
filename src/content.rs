@@ -134,7 +134,7 @@ pub async fn save(
     app: &App,
     session: &Session,
     id: Option<&str>,
-    input: PostInput,
+    mut input: PostInput,
 ) -> Result<Post> {
     if !session.can_edit() {
         return Err(Error::forbidden());
@@ -142,6 +142,18 @@ pub async fn save(
     let _guard = app.mutations.lock().await;
     let settings = app.db.settings().await?;
     validate_input(&input, &settings)?;
+    let structured = !input.document.is_empty() && !input.import_markdown;
+    let doc = if !structured {
+        crate::document::import(&input.body, &input.blocks)?
+    } else {
+        crate::document::Document::parse(&input.document)?
+    };
+    input.document = doc.encode();
+    // Imported source stays in the revision; canonical editing derives the search/export projection.
+    if structured {
+        input.body = doc.markdown();
+        input.blocks = "[]".into();
+    }
     let registry = crate::schema::Registry::load(app).await?;
     let values: Value = serde_json::from_str(&input.fields)
         .map_err(|_| Error::invalid("Fields must be valid JSON."))?;
@@ -196,6 +208,7 @@ pub async fn save(
         kind: input.kind.clone(),
         title: String::new(),
         body: String::new(),
+        document: String::new(),
         fields: "{}".into(),
         blocks: "[]".into(),
         status: "draft".into(),
@@ -203,6 +216,7 @@ pub async fn save(
         published_slug: String::new(),
         published_title: String::new(),
         published_body: String::new(),
+        published_document: crate::document::empty(),
         published_fields: "{}".into(),
         published_blocks: "[]".into(),
         publish_at: 0,
@@ -222,6 +236,7 @@ pub async fn save(
     post.title = input.title.trim().into();
     post.slug = input.slug.clone();
     post.body = input.body.clone();
+    post.document = input.document.clone();
     post.fields = input.fields.clone();
     post.blocks = input.blocks.clone();
     post.version += 1;
@@ -242,16 +257,15 @@ pub async fn save(
         _ => {}
     }
     if old.is_some() {
-        let result=sqlx::query("UPDATE posts SET slug=$1,title=$2,body=$3,fields=$4,blocks=$5,status=$6,version=$7,published_slug=$8,published_title=$9,published_body=$10,published_fields=$11,published_blocks=$12,publish_at=$13,published_at=$14,updated_at=$15 WHERE id=$16 AND version=$17")
-            .bind(&post.slug).bind(&post.title).bind(&post.body).bind(&post.fields).bind(&post.blocks).bind(&post.status).bind(post.version).bind(&post.published_slug).bind(&post.published_title).bind(&post.published_body).bind(&post.published_fields).bind(&post.published_blocks).bind(post.publish_at).bind(post.published_at).bind(post.updated_at).bind(&post.id).bind(input.version).execute(&mut *tx).await?;
+        let result=sqlx::query("UPDATE posts SET slug=$1,title=$2,body=$3,fields=$4,blocks=$5,status=$6,version=$7,published_slug=$8,published_title=$9,published_body=$10,published_fields=$11,published_blocks=$12,publish_at=$13,published_at=$14,updated_at=$15,locale=$18,translation_group=$19,seo=$20,published_locale=$21,published_translation_group=$22,published_seo=$23,document=$24,published_document=$25 WHERE id=$16 AND version=$17")
+            .bind(&post.slug).bind(&post.title).bind(&post.body).bind(&post.fields).bind(&post.blocks).bind(&post.status).bind(post.version).bind(&post.published_slug).bind(&post.published_title).bind(&post.published_body).bind(&post.published_fields).bind(&post.published_blocks).bind(post.publish_at).bind(post.published_at).bind(post.updated_at).bind(&post.id).bind(input.version).bind(&post.locale).bind(&post.translation_group).bind(&post.seo).bind(&post.published_locale).bind(&post.published_translation_group).bind(&post.published_seo).bind(&post.document).bind(&post.published_document).execute(&mut *tx).await?;
         if result.rows_affected() != 1 {
             return Err(Error::conflict());
         }
     } else {
-        sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)")
-            .bind(&post.id).bind(&post.slug).bind(&post.kind).bind(&post.title).bind(&post.body).bind(&post.fields).bind(&post.blocks).bind(&post.status).bind(post.version).bind(&post.published_slug).bind(&post.published_title).bind(&post.published_body).bind(&post.published_fields).bind(&post.published_blocks).bind(post.publish_at).bind(post.published_at).bind(post.updated_at).bind(&post.author_id).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,translation_group,seo,published_locale,published_translation_group,published_seo,document,published_document) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)")
+            .bind(&post.id).bind(&post.slug).bind(&post.kind).bind(&post.title).bind(&post.body).bind(&post.fields).bind(&post.blocks).bind(&post.status).bind(post.version).bind(&post.published_slug).bind(&post.published_title).bind(&post.published_body).bind(&post.published_fields).bind(&post.published_blocks).bind(post.publish_at).bind(post.published_at).bind(post.updated_at).bind(&post.author_id).bind(&post.locale).bind(&post.translation_group).bind(&post.seo).bind(&post.published_locale).bind(&post.published_translation_group).bind(&post.published_seo).bind(&post.document).bind(&post.published_document).execute(&mut *tx).await?;
     }
-    sqlx::query("UPDATE posts SET locale=$1,translation_group=$2,seo=$3,published_locale=$4,published_translation_group=$5,published_seo=$6 WHERE id=$7").bind(&post.locale).bind(&post.translation_group).bind(&post.seo).bind(&post.published_locale).bind(&post.published_translation_group).bind(&post.published_seo).bind(&post.id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM post_terms WHERE post_id=$1")
         .bind(&post.id)
         .execute(&mut *tx)
@@ -313,6 +327,7 @@ fn promote(post: &mut Post, time: i64) {
     post.published_slug = post.slug.clone();
     post.published_title = post.title.clone();
     post.published_body = post.body.clone();
+    post.published_document = post.document.clone();
     post.published_fields = post.fields.clone();
     post.published_blocks = post.blocks.clone();
     if post.published_at == 0 {
@@ -345,7 +360,7 @@ pub async fn publish_due(app: &App) -> Result<usize> {
         promote(&mut p, now());
         p.version += 1;
         p.status = "published".into();
-        let result=sqlx::query("UPDATE posts SET status='published',published_slug=slug,published_title=title,published_body=body,published_fields=fields,published_blocks=blocks,published_locale=locale,published_translation_group=translation_group,published_seo=seo,publish_at=0,published_at=$1,version=$2 WHERE id=$3 AND status='scheduled' AND version=$4").bind(p.published_at).bind(p.version).bind(&p.id).bind(p.version-1).execute(&mut *tx).await?;
+        let result=sqlx::query("UPDATE posts SET status='published',published_slug=slug,published_title=title,published_body=body,published_document=document,published_fields=fields,published_blocks=blocks,published_locale=locale,published_translation_group=translation_group,published_seo=seo,publish_at=0,published_at=$1,version=$2 WHERE id=$3 AND status='scheduled' AND version=$4").bind(p.published_at).bind(p.version).bind(&p.id).bind(p.version-1).execute(&mut *tx).await?;
         if result.rows_affected() == 1 {
             copy_terms(&mut tx, &p.id).await?;
             let terms=sqlx::query("SELECT t.name,t.kind FROM terms t JOIN post_terms pt ON pt.term_id=t.id WHERE pt.post_id=$1 ORDER BY t.name").bind(&p.id).fetch_all(&mut *tx).await?;
@@ -406,6 +421,7 @@ pub async fn restore_revision(
         session,
         Some(id),
         PostInput {
+            import_markdown: false,
             locale: p.locale,
             translation_group: p.translation_group,
             seo: p.seo,
@@ -413,6 +429,7 @@ pub async fn restore_revision(
             slug: p.slug,
             kind: p.kind,
             body: p.body,
+            document: p.document,
             fields: p.fields,
             blocks: p.blocks,
             categories: v["categories"].as_str().unwrap_or("").into(),

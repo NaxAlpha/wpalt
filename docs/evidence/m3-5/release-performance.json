@@ -1,0 +1,148 @@
+{
+  "machine": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "cpu": "arm",
+    "logical_cpus": 8
+  },
+  "posts_requested": 3000,
+  "requests_per_scenario": 30,
+  "binary_bytes": 11706000,
+  "binary_sha256": "719c929c58f56f8ec9ee2efab3852f7581ca89f10effacdeb0d52bc1253a2838",
+  "conditions": "Full uncompressed HTML document; warm application; no browser asset/render timing; no application response cache; localhost; Python HTTP client overhead included.",
+  "profiles": [
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 1,
+      "requests": 30,
+      "p50_ms": 0.821,
+      "p95_ms": 1.452,
+      "p99_ms": 1.701,
+      "requests_per_second": 872.1,
+      "document_bytes": 6496
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 10,
+      "requests": 30,
+      "p50_ms": 2.944,
+      "p95_ms": 3.867,
+      "p99_ms": 4.516,
+      "requests_per_second": 2778.4,
+      "document_bytes": 6496
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 1,
+      "requests": 30,
+      "p50_ms": 0.556,
+      "p95_ms": 0.598,
+      "p99_ms": 0.618,
+      "requests_per_second": 1765.6,
+      "document_bytes": 3676
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 10,
+      "requests": 30,
+      "p50_ms": 1.752,
+      "p95_ms": 2.432,
+      "p99_ms": 2.476,
+      "requests_per_second": 4554.7,
+      "document_bytes": 3676
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 1,
+      "requests": 30,
+      "p50_ms": 4.713,
+      "p95_ms": 5.289,
+      "p99_ms": 5.293,
+      "requests_per_second": 208.7,
+      "document_bytes": 6251
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 10,
+      "requests": 30,
+      "p50_ms": 32.961,
+      "p95_ms": 47.821,
+      "p99_ms": 47.955,
+      "requests_per_second": 257.4,
+      "document_bytes": 6251
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap",
+      "concurrency": 1,
+      "requests": 30,
+      "p50_ms": 4.401,
+      "p95_ms": 7.58,
+      "p99_ms": 7.663,
+      "requests_per_second": 173.3,
+      "document_bytes": 56752
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap",
+      "concurrency": 10,
+      "requests": 30,
+      "p50_ms": 88.561,
+      "p95_ms": 131.65,
+      "p99_ms": 174.802,
+      "requests_per_second": 106.4,
+      "document_bytes": 56752
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap_index",
+      "concurrency": 1,
+      "requests": 30,
+      "p50_ms": 1.829,
+      "p95_ms": 1.936,
+      "p99_ms": 2.009,
+      "requests_per_second": 539.1,
+      "document_bytes": 487
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap_index",
+      "concurrency": 10,
+      "requests": 30,
+      "p50_ms": 9.322,
+      "p95_ms": 14.413,
+      "p99_ms": 17.127,
+      "requests_per_second": 949.3,
+      "document_bytes": 487
+    }
+  ],
+  "cold_first_request_ms": {
+    "sqlite": 2.433
+  },
+  "studio_asset_bytes": {
+    "raw": 36239,
+    "gzip": 13024
+  },
+  "composition_fixture": "default theme",
+  "runtime": {
+    "sqlite": {
+      "rss_after_load_bytes": 57950208,
+      "site_files_bytes": 47821744
+    }
+  }
+}

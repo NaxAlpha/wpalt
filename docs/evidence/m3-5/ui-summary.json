@@ -1,0 +1,9 @@
+{
+  "platform": "darwin",
+  "browser": "154.0.8037.59",
+  "geometry_samples": 38,
+  "accessibility_scans": 12,
+  "visual_comparisons": 3,
+  "visual_failures": [],
+  "basis": "Existing independent platform component-gallery baselines; integrated admin measurements plus new authoring canvas measurements in authoring.json."
+}

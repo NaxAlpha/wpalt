@@ -8,6 +8,8 @@ pub struct Post {
     pub kind: String,
     pub title: String,
     pub body: String,
+    #[serde(default)]
+    pub document: String,
     pub fields: String,
     pub blocks: String,
     pub status: String,
@@ -15,6 +17,7 @@ pub struct Post {
     pub published_slug: String,
     pub published_title: String,
     pub published_body: String,
+    pub published_document: String,
     pub published_fields: String,
     pub published_blocks: String,
     pub publish_at: i64,
@@ -36,6 +39,7 @@ impl Post {
             kind: r.get("kind"),
             title: r.get("title"),
             body: r.get("body"),
+            document: r.get("document"),
             fields: r.get("fields"),
             blocks: r.get("blocks"),
             status: r.get("status"),
@@ -43,6 +47,7 @@ impl Post {
             published_slug: r.get("published_slug"),
             published_title: r.get("published_title"),
             published_body: r.get("published_body"),
+            published_document: r.get("published_document"),
             published_fields: r.get("published_fields"),
             published_blocks: r.get("published_blocks"),
             publish_at: r.get("publish_at"),
@@ -116,6 +121,8 @@ pub struct Block {
 #[derive(Clone, Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PostInput {
+    #[serde(default)]
+    pub import_markdown: bool,
     #[serde(default = "default_locale")]
     pub locale: String,
     #[serde(default)]
@@ -126,6 +133,8 @@ pub struct PostInput {
     pub slug: String,
     pub kind: String,
     pub body: String,
+    #[serde(default)]
+    pub document: String,
     #[serde(default = "empty_object")]
     pub fields: String,
     #[serde(default = "empty_array")]

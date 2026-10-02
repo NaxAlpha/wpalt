@@ -1026,7 +1026,7 @@ async fn public_values(
     let mut rows = sqlx::query_with(&sql, args).fetch(&app.db.pool);
     let mut values = Vec::new();
     while let Some(row) = rows.try_next().await? {
-        let value = json!({"id":row.get::<String,_>("id"),"kind":row.get::<String,_>("kind"),"title":row.get::<String,_>("published_title"),"url":discovery.path(&row.get::<String,_>("published_locale"), &row.get::<String,_>("published_slug")),"body":row.get::<String,_>("published_body"),"fields":serde_json::from_str::<Value>(&row.get::<String,_>("published_fields")).map_err(|_|Error::invalid("Invalid published fields."))?});
+        let value = json!({"id":row.get::<String,_>("id"),"kind":row.get::<String,_>("kind"),"title":row.get::<String,_>("published_title"),"url":discovery.path(&row.get::<String,_>("published_locale"), &row.get::<String,_>("published_slug")),"body":row.get::<String,_>("published_body"),"document":row.get::<String,_>("published_document"),"fields":serde_json::from_str::<Value>(&row.get::<String,_>("published_fields")).map_err(|_|Error::invalid("Invalid published fields."))?});
         *remaining = remaining
             .checked_sub(value.to_string().len())
             .ok_or(Error::invalid("Render data exceeds the 2-MiB budget."))?;
@@ -1035,7 +1035,7 @@ async fn public_values(
     Ok(values)
 }
 fn post_value(p: &Post, draft: bool, discovery: &crate::discovery::Definition) -> Value {
-    json!({"id":p.id,"kind":p.kind,"title":if draft{&p.title}else{&p.published_title},"body":if draft{&p.body}else{&p.published_body},"url":discovery.path(if draft{&p.locale}else{&p.published_locale},if draft{&p.slug}else{&p.published_slug}),"fields":serde_json::from_str::<Value>(if draft{&p.fields}else{&p.published_fields}).unwrap_or(json!({}))})
+    json!({"id":p.id,"kind":p.kind,"title":if draft{&p.title}else{&p.published_title},"body":if draft{&p.body}else{&p.published_body},"document":if draft{&p.document}else{&p.published_document},"url":discovery.path(if draft{&p.locale}else{&p.published_locale},if draft{&p.slug}else{&p.published_slug}),"fields":serde_json::from_str::<Value>(if draft{&p.fields}else{&p.published_fields}).unwrap_or(json!({}))})
 }
 #[allow(clippy::too_many_arguments)] // Request template narrows dependency loading.
 pub async fn context(
@@ -1140,7 +1140,7 @@ pub async fn context_with_discovery(
     // Select published columns only; stream under one request-wide memory budget.
     for (kind, limit) in sets {
         let mut query = QueryBuilder::<Any>::new(
-            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_fields FROM posts WHERE status='published' AND kind=",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields FROM posts WHERE status='published' AND kind=",
         );
         query
             .push_bind(&kind)
@@ -1222,7 +1222,7 @@ pub async fn context_with_discovery(
         }
         seen.extend(ids.iter().cloned());
         let mut q = QueryBuilder::<Any>::new(
-            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_fields FROM posts WHERE status='published' AND id IN (",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields FROM posts WHERE status='published' AND id IN (",
         );
         let mut list = q.separated(",");
         for id in &ids {
@@ -1409,10 +1409,20 @@ fn render_node(
             }
         }
         "body" => {
-            if !n.text.is_null() {
+            let canonical = n
+                .text
+                .get("bind")
+                .and_then(Value::as_str)
+                .and_then(|path| path.strip_suffix(".body"))
+                .map(|prefix| {
+                    ctx.resolve(&json!({"bind":format!("{prefix}.document")}), item, params)
+                });
+            if let Some(doc) = canonical.as_ref().and_then(Value::as_str) {
+                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|d|d.html()).unwrap_or_default()))}}
+            } else if !n.text.is_null() {
                 html! {div class=(class){(maud::PreEscaped(content::markdown(&label)))}}
-            } else if let Some(body) = item.get("body").and_then(Value::as_str) {
-                html! {div class=(class){(maud::PreEscaped(content::markdown(body)))}}
+            } else if let Some(doc) = item.get("document").and_then(Value::as_str) {
+                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|d|d.html()).unwrap_or_default()))}}
             } else {
                 post.map(|p| crate::view::public_body(p, draft))
                     .unwrap_or_default()

@@ -105,6 +105,7 @@ fn engines() -> Vec<bool> {
 }
 fn input(slug: &str, action: &str) -> PostInput {
     PostInput {
+        import_markdown: false,
         locale: "en".into(),
         translation_group: String::new(),
         seo: "{}".into(),
@@ -112,6 +113,7 @@ fn input(slug: &str, action: &str) -> PostInput {
         slug: slug.into(),
         kind: "post".into(),
         body: "A quiet garden and independent publishing.".into(),
+        document: String::new(),
         fields: r#"{"subtitle":"From our garden","featured":true}"#.into(),
         blocks: r#"[{"kind":"callout","text":"Made here"}]"#.into(),
         categories: "Field notes".into(),
@@ -317,7 +319,13 @@ async fn author_preview_publish_autosave_and_restore_without_leaking_drafts() {
         )
         .await
         .unwrap();
-        assert_eq!(restored.body, "Private first draft");
+        assert!(restored.body.starts_with("Private first draft"));
+        assert!(
+            wpalt::document::Document::parse(&restored.document)
+                .unwrap()
+                .html()
+                .contains("Made here")
+        );
         assert!(
             get(&site.app, "/a-story", None)
                 .await
@@ -460,6 +468,16 @@ async fn permissions_csrf_sessions_and_origin_protect_every_write_surface() {
                 .unwrap_err()
                 .0,
             StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            get(&site.app, "/api/admin/media", Some(&mtoken)).await.0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            get(&site.app, "/api/admin/media?after=unsafe", Some(&etoken))
+                .await
+                .0,
+            StatusCode::UNPROCESSABLE_ENTITY
         );
         // Role checks protect the infrastructure and other users' write surfaces.
         for (path, fields) in [
@@ -1560,7 +1578,7 @@ async fn migrate_meaningful_m1_site(pg: bool) {
     let restored = content::restore_revision(&app, &session, &id, &revision, 2)
         .await
         .unwrap();
-    assert_eq!(restored.body, "PRIVATE_M1_WORKING");
+    assert_eq!(restored.body.trim(), "PRIVATE_M1_WORKING");
     assert_eq!(restored.version, 3);
     assert_eq!(
         wpalt::theme::load(&app, "ink", true)
@@ -1930,10 +1948,16 @@ async fn discovery_volume_has_bounded_pages_and_indexed_language_search() {
         let mut tx = site.app.db.pool.begin().await.unwrap();
         for n in 0..2005 {
             let slug = format!("volume-{n}");
-            sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo) SELECT $1,$2,kind,title,body,fields,blocks,status,version,$2,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,$3,$3,$4,$4 FROM posts WHERE id=$5")
+            sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo,document,published_document) SELECT $1,$2,kind,title,body,fields,blocks,status,version,$2,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,$3,$3,$4,$4,document,published_document FROM posts WHERE id=$5")
                 .bind(uuid::Uuid::new_v4().to_string()).bind(slug).bind(if n%2==0 {"fr"} else {"en"}).bind(if n%7==0 {r#"{"noindex":true}"#}else{"{}"}).bind(&base.id).execute(&mut *tx).await.unwrap();
         }
         tx.commit().await.unwrap();
+        let (status, rendered) = get(&site.app, "/fr/volume-2", None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            rendered.contains("A quiet garden") && rendered.contains("Made here"),
+            "Volume rows retain and render their canonical text and callout, not empty legacy columns"
+        );
         let index = get(&site.app, "/sitemap-index.xml", None).await.1;
         assert_eq!(index.matches("<sitemap>").count(), 3);
         let mut all = HashSet::new();
@@ -2057,13 +2081,21 @@ async fn schema_two_upgrade_preserves_publication_and_restorable_editor_history(
             .execute(&site.app.db.pool)
             .await
             .unwrap();
-        for index in ["language_posts", "translation_drafts", "translation_live"] {
-            sqlx::query(&format!("DROP INDEX {index}"))
+        for index in [
+            "language_posts",
+            "translation_drafts",
+            "translation_live",
+            "indexable_identity",
+        ] {
+            sqlx::query(&format!("DROP INDEX IF EXISTS {index}"))
                 .execute(&site.app.db.pool)
                 .await
                 .unwrap();
         }
-        for column in metadata {
+        for column in metadata
+            .into_iter()
+            .chain(["document", "published_document"])
+        {
             sqlx::query(&format!("ALTER TABLE posts DROP COLUMN {column}"))
                 .execute(&site.app.db.pool)
                 .await
@@ -2090,7 +2122,7 @@ async fn schema_two_upgrade_preserves_publication_and_restorable_editor_history(
         )
         .await
         .unwrap();
-        assert_eq!(restored.body, "PRIVATE_M2_HISTORY");
+        assert!(restored.body.starts_with("PRIVATE_M2_HISTORY"));
         assert_eq!(restored.locale, "en");
         assert_eq!(restored.seo, "{}");
         upgraded.db.pool.close().await;
@@ -2103,6 +2135,177 @@ async fn schema_two_upgrade_preserves_publication_and_restorable_editor_history(
             restored.version
         );
         reopened.db.pool.close().await;
+        site.close().await;
+    }
+}
+
+// M3.5: the same canonical document survives conflicts, snapshots, revisions and recovery.
+#[tokio::test]
+async fn structured_authoring_preserves_live_isolation_conflicts_and_fresh_recovery() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        assert_eq!(
+            get(&site.app, "/api/admin/media", None).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            get(&site.app, "/api/admin/media", Some(&site.token))
+                .await
+                .0,
+            StatusCode::OK
+        );
+        let mut p = input("structured-story", "publish");
+        p.document = wpalt::document::import(
+            "## Public café\n\n日本語 **story**",
+            r#"[{"kind":"callout","text":"Remember this"}]"#,
+        )
+        .unwrap()
+        .encode();
+        p.body = "ATTACKER_PROJECTION_MUST_NOT_WIN".into();
+        let published = content::save(&site.app, site.session(), None, p.clone())
+            .await
+            .unwrap();
+        let html = get(&site.app, "/structured-story", None).await.1;
+        assert!(
+            html.contains("<h2>Public café</h2>")
+                && html.contains("class=\"callout\"")
+                && !html.contains("ATTACKER_PROJECTION")
+        );
+        let revision: String =
+            sqlx::query_scalar("SELECT id FROM revisions WHERE post_id=$1 AND version=1")
+                .bind(&published.id)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        p.version = published.version;
+        p.action = "autosave".into();
+        p.document = wpalt::document::import("PRIVATE_TYPED_DOCUMENT", "[]")
+            .unwrap()
+            .encode();
+        let draft = content::save(&site.app, site.session(), Some(&published.id), p.clone())
+            .await
+            .unwrap();
+        assert!(
+            !get(&site.app, "/structured-story", None)
+                .await
+                .1
+                .contains("PRIVATE_TYPED_DOCUMENT")
+        );
+        assert!(
+            content::save(&site.app, site.session(), Some(&published.id), p.clone())
+                .await
+                .is_err()
+        );
+        p.version = draft.version;
+        let mut invalid: serde_json::Value = serde_json::from_str(&p.document).unwrap();
+        invalid["root"]["content"][0]["attrs"] = serde_json::json!({"onclick":"unsafe"});
+        p.document = invalid.to_string();
+        assert!(
+            content::save(&site.app, site.session(), Some(&published.id), p)
+                .await
+                .is_err()
+        );
+        let restored = content::restore_revision(
+            &site.app,
+            site.session(),
+            &published.id,
+            &revision,
+            draft.version,
+        )
+        .await
+        .unwrap();
+        assert_eq!(restored.document, published.document);
+        assert_eq!(
+            content::get(&site.app, &published.id)
+                .await
+                .unwrap()
+                .published_document,
+            published.document
+        );
+        let file = wpalt::backup::capture(&site.app).await.unwrap();
+        let fresh = Site::new(pg, false).await;
+        wpalt::backup::restore(&fresh.app, &file).await.unwrap();
+        let recovered = content::get(&fresh.app, &published.id).await.unwrap();
+        assert_eq!(recovered.document, published.document);
+        assert_eq!(recovered.published_document, published.document);
+        assert!(
+            get(&fresh.app, "/structured-story", None)
+                .await
+                .1
+                .contains("Remember this")
+        );
+        site.close().await;
+        fresh.close().await;
+    }
+}
+
+// Upgrade failure must leave meaningful source intact, with an explicit retry path.
+#[tokio::test]
+async fn structured_upgrade_rolls_back_unsupported_source_and_retries_after_correction() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let post = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("upgrade-source", "publish"),
+        )
+        .await
+        .unwrap();
+        let source = format!("{}nested legacy source", "> ".repeat(20));
+        sqlx::query("UPDATE posts SET body=$1 WHERE id=$2")
+            .bind(&source)
+            .bind(&post.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        for col in ["document", "published_document"] {
+            sqlx::query(&format!("ALTER TABLE posts DROP COLUMN {col}"))
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+        }
+        sqlx::query("UPDATE schema_version SET version=3 WHERE id=1")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let config = (*site.app.config).clone();
+        site.app.db.pool.close().await;
+        assert!(App::open(config.clone()).await.is_err());
+        let db = wpalt::db::Db::open(&config).await.unwrap();
+        let version: i64 = sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+        assert_eq!(version, 3);
+        let preserved: String = sqlx::query_scalar("SELECT body FROM posts WHERE id=$1")
+            .bind(&post.id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+        assert_eq!(preserved, source);
+        // The operator corrects the unsupported source with the old runtime/offline tooling.
+        sqlx::query("UPDATE posts SET body='Corrected legacy source' WHERE id=$1")
+            .bind(&post.id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        db.pool.close().await;
+        let upgraded = App::open(config).await.unwrap();
+        let migrated = content::get(&upgraded, &post.id).await.unwrap();
+        assert!(
+            wpalt::document::Document::parse(&migrated.document)
+                .unwrap()
+                .html()
+                .contains("Corrected legacy source")
+        );
+        assert!(
+            get(&upgraded, "/upgrade-source", None)
+                .await
+                .1
+                .contains("quiet garden")
+        );
+        upgraded.db.pool.close().await;
         site.close().await;
     }
 }

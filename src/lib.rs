@@ -61,3 +61,5 @@ pub fn now() -> i64 {
         .expect("clock before Unix epoch")
         .as_secs() as i64
 }
+
+pub mod document;

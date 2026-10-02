@@ -33,6 +33,7 @@ pub fn router(app: App) -> Router {
         .route("/assets/app.css", get(css))
         .route("/assets/admin-ui.css", get(admin_css))
         .route("/assets/admin.js", get(js))
+        .route("/assets/editor.js", get(editor_js))
         .route("/admin", get(dashboard))
         .route("/admin/posts", get(post_list))
         .route("/admin/posts/new", get(new_post).post(create_post))
@@ -54,6 +55,7 @@ pub fn router(app: App) -> Router {
         .route("/admin/backup", post(download_backup))
         .route("/admin/export", get(export_content))
         .route("/api/content", get(public_api))
+        .route("/api/admin/media", get(media_picker))
         .route("/api/admin/content", post(create_api))
         .route("/api/admin/content/{id}", post(update_api))
         .route("/{slug}", get(public_post))
@@ -204,6 +206,15 @@ async fn js() -> impl IntoResponse {
         include_str!("../assets/admin.js"),
     )
 }
+async fn editor_js() -> impl IntoResponse {
+    (
+        [
+            ("content-type", "text/javascript; charset=utf-8"),
+            ("cache-control", "no-cache"),
+        ],
+        include_str!("../assets/generated/editor.js"),
+    )
+}
 async fn health(State(app): State<App>) -> Result<Json<serde_json::Value>> {
     let initialized: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM settings")
         .fetch_one(&app.db.pool)
@@ -302,7 +313,7 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
     let locale = query.lang.as_deref().unwrap_or(&discovery.default_language);
     discovery.language(locale)?;
     let mut sql = QueryBuilder::<Any>::new(
-        "SELECT id,published_locale,published_seo,published_slug AS slug,kind,published_title AS title,substr(published_body,1,220) AS summary,published_fields,published_at FROM posts WHERE status='published'",
+        "WITH candidates AS MATERIALIZED (SELECT id,published_at FROM posts WHERE status='published'",
     );
     sql.push(" AND published_locale=")
         .push_bind(locale)
@@ -348,7 +359,7 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
             .push_bind(id)
             .push(")");
     }
-    sql.push(" ORDER BY published_at DESC,id DESC LIMIT 21");
+    sql.push(" ORDER BY published_at DESC,id DESC LIMIT 21) SELECT p.id,p.published_locale,p.published_slug AS slug,p.kind,p.published_title AS title,substr(p.published_body,1,220) AS summary,p.published_fields,p.published_at FROM candidates c JOIN posts p ON p.id=c.id ORDER BY c.published_at DESC,c.id DESC");
     let rows = app.db.fetch_builder(&mut sql).await?;
     Ok(rows
         .into_iter()
@@ -497,7 +508,7 @@ async fn render_post(
     slug: String,
     discovery: crate::discovery::Definition,
 ) -> Result<Response> {
-    let p = sqlx::query("SELECT * FROM posts WHERE published_slug=$1 AND published_locale=$2 AND status='published'")
+    let p = sqlx::query("SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' AS title,'' AS body,'{}' AS fields,'[]' AS blocks,'en' AS locale,'' AS translation_group,'{}' AS seo,'' AS document,published_slug,published_title,published_body,published_fields,published_blocks,published_locale,published_translation_group,published_seo,published_document FROM posts WHERE published_slug=$1 AND published_locale=$2 AND status='published'")
         .bind(&slug).bind(&locale)
         .fetch_optional(&app.db.pool)
         .await?
@@ -607,6 +618,7 @@ async fn new_post(State(app): State<App>, headers: HeaderMap) -> Result<Html<Str
     let s = admin_session(&app, &headers).await?;
     editor(&s)?;
     let input = PostInput {
+        import_markdown: false,
         locale: crate::discovery::load(&app).await?.0.default_language,
         translation_group: String::new(),
         seo: "{}".into(),
@@ -614,6 +626,7 @@ async fn new_post(State(app): State<App>, headers: HeaderMap) -> Result<Html<Str
         slug: String::new(),
         kind: "post".into(),
         body: String::new(),
+        document: String::new(),
         fields: "{}".into(),
         blocks: "[]".into(),
         categories: String::new(),
@@ -641,12 +654,12 @@ fn editor_form(
 ) -> Markup {
     let seo = crate::discovery::Seo::parse(&p.seo).unwrap_or_default();
     html! {
-        (view::heading("Publishing",if id.is_some(){"Edit content"}else{"New content"},"Write in Markdown, bind typed fields and compose reusable page sections."))
+        (view::heading("Publishing",if id.is_some(){"Edit content"}else{"New content"},"Write directly, organize your ideas, and publish when you are ready."))
         div class="notice error" data-editor-error hidden[error.is_none()] {(error.unwrap_or(""))}
-        form method="post" action=(id.map(|id|format!("/admin/posts/{id}")).unwrap_or_else(||"/admin/posts/new".into())) data-editor data-new=(if id.is_some(){"false"}else{"true"}) {
+        form method="post" action=(id.map(|id|format!("/admin/posts/{id}")).unwrap_or_else(||"/admin/posts/new".into())) data-editor data-owner=(s.user.id) data-new=(if id.is_some(){"false"}else{"true"}) {
             (view::csrf(s)) input type="hidden" name="version" value=(p.version);input type="hidden" name="publish_at" value=(p.publish_at);
-            div class="split" {section class="panel" {label {"Title" input name="title" value=(p.title) required maxlength="300";}label {"Content" textarea class="editor-body" name="body" aria-label="Content" maxlength="524288" {(p.body)}small {"Markdown is supported. Raw HTML is sanitized. Media: ![description](/media/ID)"}}
-                details open {summary {"Language & discovery"}
+            div class="split" {section class="panel" {label {"Title" input name="title" value=(p.title) required maxlength="300";}input type="hidden" name="document" value=(if p.document.is_empty(){crate::document::import(&p.body,&p.blocks).map(|d|d.encode()).unwrap_or_else(|_|crate::document::empty())}else{p.document.clone()});div data-writing-canvas hidden {}label {"Content" textarea class="editor-body" name="body" aria-label="Content" maxlength="524288" {(p.body)}small {"Markdown import replaces the rich document. Select replacement below to apply edits; use the direct editor to preserve rich blocks."}}label data-markdown-replacement {input type="checkbox" name="import_markdown" value="true" checked[p.document.is_empty()];"Replace content using Markdown"}
+                details {summary {"Language & discovery"}
                     label {"Language" select name="locale" aria-label="Language" {@for l in &discovery.languages {option value=(l.code) selected[p.locale==l.code] {(l.label)}}}}
                     label {"Translation group" input name="translation_group" aria-label="Translation group" value=(p.translation_group) maxlength="80";small {"Use the same short identifier for related translations. Each language publishes independently."}}
                     input type="hidden" name="seo" value=(p.seo) data-seo-json;
@@ -656,7 +669,7 @@ fn editor_form(
                     label {"Structured content" select name="seo_type" aria-label="Structured content" data-seo-type {option value="WebPage" selected[seo.schema_type=="WebPage"] {"Web page"}option value="Article" selected[seo.schema_type=="Article"] {"Article"}}}
                 }
                 details {summary {"Typed fields & composition"}label {"Fields (JSON)" textarea name="fields" {(p.fields)}small {"Defined in Site & theme. Example: {\"subtitle\":\"A fresh start\",\"featured\":true}"}}
-                    label {"Composition blocks (JSON)" textarea name="blocks" {(p.blocks)}small {"Example: [{\"kind\":\"callout\",\"text\":\"Made on your own server.\"}]. Kinds: text, heading, callout."}}
+                    input type="hidden" name="blocks" value="[]";
                 }
             }aside class="panel" {h2 {"Publication"}label {"URL slug" input name="slug" aria-label="URL slug" value=(p.slug) required pattern="[a-z0-9-]+" maxlength="120";small {"Lowercase ASCII letters, digits and hyphens."}}
                 label {"Content type" select name="kind" aria-label="Content type" {option value="post" selected[p.kind=="post"] {"Post"}option value="page" selected[p.kind=="page"] {"Page"}@if p.kind!="post"&&p.kind!="page"{option value=(p.kind) selected{(p.kind)}}}small {"Type is fixed after creation. Define additional models in Design studio."}}
@@ -669,6 +682,7 @@ fn editor_form(
                 p class="save-status" data-save-status {"Saved working copies do not update the live page."}
             }}
         }
+        script defer src="/assets/editor.js"{}
         @if let Some(id)=id {section class="panel" {h2 {"Revision history"}p class="muted" {"Restore a previous working copy, then preview and publish it deliberately."}
             @for r in revisions {form class="toolbar" method="post" action=(format!("/admin/posts/{id}/revisions/{}",r.get::<String,_>("id"))) {(view::csrf(s))input type="hidden" name="version" value=(p.version);span {"Revision " (r.get::<i64,_>("version"))}button class="secondary" {"Restore working copy"}}}
         }}
@@ -698,6 +712,7 @@ async fn edit_post(
     .fetch_all(&app.db.pool)
     .await?;
     let input = PostInput {
+        import_markdown: false,
         locale: p.locale,
         translation_group: p.translation_group,
         seo: p.seo,
@@ -705,6 +720,7 @@ async fn edit_post(
         slug: p.slug,
         kind: p.kind,
         body: p.body,
+        document: p.document,
         fields: p.fields,
         blocks: p.blocks,
         categories: names("category"),
@@ -883,6 +899,7 @@ async fn preview(
     let mut working = p.clone();
     working.published_title = p.title.clone();
     working.published_body = p.body.clone();
+    working.published_document = p.document.clone();
     working.published_seo = p.seo.clone();
     working.published_translation_group.clear();
     ctx.root["_discovery"] =
@@ -896,6 +913,32 @@ async fn preview(
         &p.kind,
         html! {p class="notice"{"Private content and theme draft preview. " a href=(format!("/admin/posts/{}",p.id)){"Back to editor"}}},
     )?))
+}
+/// Bounded editor picker; names/visibility are available only to content editors.
+async fn media_picker(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Query(q): Query<ListQuery>,
+) -> Result<Json<serde_json::Value>> {
+    let session = admin_session(&app, &headers).await?;
+    editor(&session)?;
+    let after = q.after.unwrap_or_default();
+    if !after.is_empty() && uuid::Uuid::parse_str(&after).is_err() {
+        return Err(Error::invalid("Invalid media cursor."));
+    }
+    let rows = sqlx::query(
+        "SELECT id,original_name,alt,visibility FROM media WHERE id>$1 ORDER BY id LIMIT 41",
+    )
+    .bind(after)
+    .fetch_all(&app.db.pool)
+    .await?;
+    let items=rows.iter().take(40).map(|r|serde_json::json!({"id":r.get::<String,_>("id"),"name":r.get::<String,_>("original_name"),"alt":r.get::<String,_>("alt"),"visibility":r.get::<String,_>("visibility")})).collect::<Vec<_>>();
+    let next = if rows.len() > 40 {
+        Some(rows[39].get::<String, _>("id"))
+    } else {
+        None
+    };
+    Ok(Json(serde_json::json!({"items":items,"next":next})))
 }
 async fn media_list(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {
     let s = admin_session(&app, &headers).await?;
@@ -1360,7 +1403,7 @@ async fn export_content(State(app): State<App>, headers: HeaderMap) -> Result<Re
             ),
             ("cache-control", "no-store"),
         ],
-        Json(serde_json::json!({"format":"wpalt-content-v1","posts":posts})),
+        Json(serde_json::json!({"format":"wpalt-content-v2","posts":posts})),
     )
         .into_response())
 }

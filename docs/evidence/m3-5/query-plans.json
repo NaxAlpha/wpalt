@@ -1,0 +1,39 @@
+{
+  "engine": "Python SQLite 3.53.3",
+  "fixture_posts": 3000,
+  "source": "production published_list builder literals; default locale and optional query branches; EXPLAIN on the release-seeded schema",
+  "plans": [
+    {
+      "endpoint": "home",
+      "returned_rows": 21,
+      "query": "WITH candidates AS MATERIALIZED (SELECT id,published_at FROM posts WHERE status='published' AND published_locale=? AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0 ORDER BY published_at DESC,id DESC LIMIT 21) SELECT p.id,p.published_locale,p.published_slug AS slug,p.kind,p.published_title AS title,substr(p.published_body,1,220) AS summary,p.published_fields,p.published_at FROM candidates c JOIN posts p ON p.id=c.id ORDER BY c.published_at DESC,c.id DESC",
+      "parameters": [
+        "en"
+      ],
+      "plan": [
+        "MATERIALIZE candidates",
+        "SEARCH posts USING INDEX language_posts (published_locale=? AND status=?)",
+        "SCAN c",
+        "SEARCH p USING INDEX sqlite_autoindex_posts_1 (id=?)"
+      ]
+    },
+    {
+      "endpoint": "search",
+      "returned_rows": 21,
+      "query": "WITH candidates AS MATERIALIZED (SELECT id,published_at FROM posts WHERE status='published' AND published_locale=? AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0 AND id IN (SELECT id FROM post_search WHERE post_search MATCH ?) ORDER BY published_at DESC,id DESC LIMIT 21) SELECT p.id,p.published_locale,p.published_slug AS slug,p.kind,p.published_title AS title,substr(p.published_body,1,220) AS summary,p.published_fields,p.published_at FROM candidates c JOIN posts p ON p.id=c.id ORDER BY c.published_at DESC,c.id DESC",
+      "parameters": [
+        "en",
+        "\"publishing\""
+      ],
+      "plan": [
+        "MATERIALIZE candidates",
+        "SEARCH posts USING INDEX indexable_identity (id=? AND published_locale=?)",
+        "LIST SUBQUERY 1",
+        "SCAN post_search VIRTUAL TABLE INDEX 0:M3",
+        "USE TEMP B-TREE FOR ORDER BY",
+        "SCAN c",
+        "SEARCH p USING INDEX sqlite_autoindex_posts_1 (id=?)"
+      ]
+    }
+  ]
+}
