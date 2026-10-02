@@ -25,6 +25,7 @@ The full parity matrix remains authoritative for capability coverage. The exampl
 | M1 | Usable publishing CMS | Install, author and publish a real content website. |
 | M2 | Composable website builder | Build complex, reusable, data-driven themes through a coherent authoring experience. |
 | M3 | Multilingual discovery platform | Run a multilingual, searchable site with integrated SEO and discovery controls. |
+| M3.5 | Integrated content authoring | Write, organize, recover and publish rich block documents through one calm editor. |
 | M4 | Business and audience platform | Collect leads, manage contacts, communicate and measure conversion locally. |
 | M5 | Membership and learning platform | Operate restricted communities and structured learning experiences. |
 | M6 | Commerce and reservations platform | Sell products and memberships and manage bookings without fragmented business state. |
@@ -82,6 +83,16 @@ This milestone must deliver capabilities beyond the basic theme model, not merel
 **Verifiable output:** A multilingual site with demonstrable language navigation, search, redirects, correct publication-dependent sitemaps and configurable SEO output. Check representative rendered output and compare supported reference behavior. Test missing translations, conflicting URLs, redirect loops and drafts excluded from discovery.
 
 **Whole-system optimization:** Inspect search and sitemap queries at meaningful content volumes, prevent unbounded crawling work, verify cache invalidation across languages and enforce access controls in search results. Review the admin experience for avoiding duplicate metadata and conflicting settings. Verify SEO and structured output against current applicable primary guidance, recording dates/versions, mapped tests and future review triggers. External provider failure must not disable local discovery features.
+
+## M3.5 — Integrated content authoring
+
+Approved 2026-10-02 after the user requested Notion-like content creation. Deliver a complete authoring system before M4; preserve M3's independently verified discovery scope.
+
+**Functional steps:** establish a versioned structured document and meaningful-data migration; deliver direct rich block editing, slash insertion, contextual formatting, keyboard/drag reordering and media/tables; integrate undo/redo, autosave, revision recovery, conflicts, previews and publication; integrate language/SEO/typed fields through progressive disclosure. Verify and optimize each step, then the complete system.
+
+**Verifiable output:** create a substantial illustrated article, format and rearrange it, recover interrupted editing, publish variants, restore a revision and verify public output. Cover cursor/selection, paste sanitization, multilingual IME, keyboard access, races, backups and long-document responsiveness. See [the completion contract](m3-5-contract.md).
+
+M4–M6 extend this shared editor with their workflow content. M8 adds supported imports and extension APIs. M9 broadens device/browser and large-document release hardening. No existing milestone requirement is removed. Real-time coediting and Notion database/workspace parity are not part of this request.
 
 ## M4 — Business and audience platform
 
@@ -232,3 +243,7 @@ Frontend foundation [PR #4](https://github.com/NaxAlpha/wpalt/pull/4) merged as 
 ### M3 active — 2026-10-01
 
 The user authorized merging PR #5 and proceeding to M3. #5 merged as `29807ffb3ff76c25fcf207259f7fa79fde424109`; [actual-main run 36860476634](https://github.com/NaxAlpha/wpalt/actions/runs/36860476634) passed all three jobs and its downloaded clean artifact/source/checksums were verified. M3 now follows [its contract](m3-contract.md), [operator guide](discovery.md), [architecture decision](decisions/0003-m3-discovery.md) and [verification record](evidence/m3-verification.md). The delivery PR remains subject to final-head CI and clean-artifact verification; merge is a separate user decision. M4–M9 remain planned.
+
+### Integrated authoring approved — 2026-10-02
+
+The user approved M3.5 between M3 and M4, with its own delivery PR. The document model and authoring experience are shared across later milestones; existing parity requirements remain tracked. See ADR 0004 and the M3.5 contract.
