@@ -587,7 +587,10 @@
         "https://prosemirror.net/docs/ref/",
         "https://www.w3.org/TR/input-events-2/",
         "https://www.w3.org/TR/WCAG22/",
-        "https://www.notion.com/help/writing-and-editing-basics"
+        "https://www.notion.com/help/writing-and-editing-basics",
+        "https://www.sqlite.org/lang_with.html",
+        "https://www.sqlite.org/partialindex.html",
+        "https://www.postgresql.org/docs/current/queries-with.html"
       ],
       "applicable_versions": [
         "ProseMirror graph pinned in frontend/package-lock.json; view 1.42.6 / model 1.25.12",

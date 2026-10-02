@@ -1,0 +1,46 @@
+{
+  "status": "passed",
+  "browser": "154.0.8037.59",
+  "journeys": [
+    "early native input before enhancement",
+    "slash/format/link/multilingual writing and synthetic composition boundary",
+    "basic table operations",
+    "duplicate/undo/redo/keyboard/drag organization",
+    "sanitized clipboard payload",
+    "canonical publication/reload",
+    "failed save and explicit document/metadata/unchecked-flag recovery",
+    "stale author conflict",
+    "1000-paragraph input",
+    "320/1440 canvas geometry"
+  ],
+  "long_document": {
+    "paragraphs": 1000,
+    "source_bytes": 74888,
+    "load_ms": 80,
+    "input_ms": 5
+  },
+  "canvas": [
+    {
+      "viewport_width": 320,
+      "x": 16,
+      "y": 854.375,
+      "width": 288,
+      "height": 591.59375,
+      "font": 18,
+      "line": 31.5,
+      "overflow": false
+    },
+    {
+      "viewport_width": 1440,
+      "x": 256,
+      "y": 402.171875,
+      "width": 752,
+      "height": 591.59375,
+      "font": 18,
+      "line": 31.5,
+      "overflow": false
+    }
+  ],
+  "elapsed_ms": 15031,
+  "limits": "Clipboard payload is programmatically supplied. Japanese/Arabic text entry is exercised; native OS IME and screen readers are not certified."
+}

@@ -203,7 +203,7 @@ function initialize() {
   ui.after(menu);
   const dialog = document.createElement("dialog");
   dialog.className = "writing-dialog";
-  host.after(dialog);
+  form.after(dialog);
   const recoveryKey = `wpalt:authoring:${form.dataset.owner}:${form.getAttribute("action")}`;
   const recoveryVersion = Number(form.elements.version.value);
   let writeTimer,
@@ -301,6 +301,8 @@ function initialize() {
       "aria-multiline": "true",
       "aria-describedby": "writing-help",
       spellcheck: "true",
+      lang: form.elements.locale.value,
+      dir: "auto",
     },
     dispatchTransaction(tr) {
       const next = view.state.apply(tr);
@@ -324,6 +326,7 @@ function initialize() {
     },
     handleDOMEvents: {
       keydown(_v, event) {
+        syncSelection();
         if (!menu.hidden && event.key === "ArrowDown") {
           menu.querySelector("button")?.focus();
           return true;
@@ -333,21 +336,6 @@ function initialize() {
           return false;
         }
         return false;
-      },
-      drop(_v, event) {
-        if (!event.dataTransfer?.types.includes("application/wpalt-block"))
-          return false;
-        event.preventDefault();
-        const source = Number(
-          event.dataTransfer.getData("application/wpalt-block"),
-        );
-        const point = view.posAtCoords({
-          left: event.clientX,
-          top: event.clientY,
-        });
-        if (!point) return true;
-        reorder(source, topIndex(point.pos));
-        return true;
       },
     },
     transformPastedHTML(html) {
@@ -373,6 +361,19 @@ function initialize() {
   form.elements.import_markdown.disabled = true;
   form.querySelector("[data-markdown-replacement]").hidden = true;
   fallback.value = "";
+  form.elements.locale.addEventListener("change", () =>
+    view.setProps({
+      attributes: {
+        ...view.props.attributes,
+        lang: form.elements.locale.value,
+        dir: "auto",
+      },
+    }),
+  );
+  form.addEventListener("input", () => {
+    clearTimeout(writeTimer);
+    writeTimer = setTimeout(storeRecovery, 400);
+  });
   fallback.closest("label").hidden = true;
   host.hidden = false;
   function button(label, action, target = ui) {
@@ -380,6 +381,8 @@ function initialize() {
     b.type = "button";
     b.className = "secondary";
     b.textContent = label;
+    if (["Apply link", "Insert image"].includes(label))
+      b.dataset.dialogConfirm = "";
     b.addEventListener("mousedown", (e) => {
       syncSelection();
       if (!b.draggable) e.preventDefault();
@@ -418,7 +421,9 @@ function initialize() {
   }
   const linkButton = button("Link", () => linkDialog(), formatting);
   button("Blocks", () => {
-    slash = false;
+    slash =
+      view.state.selection.$from.parent.type === schema.nodes.paragraph &&
+      view.state.selection.$from.parent.textContent === "/";
     openMenu();
   });
   button("Undo", () => run(undo));
@@ -437,6 +442,15 @@ function initialize() {
   button(
     "New paragraph",
     () => {
+      if (slash) {
+        const { $from } = view.state.selection;
+        view.dispatch(view.state.tr.delete($from.start(), $from.end()));
+        slash = false;
+        closeMenu();
+        view.focus();
+        return;
+      }
+      closeMenu();
       const current = positions()[topIndex(view.state.selection.from)];
       if (!current) return;
       const pos = current.offset + current.node.nodeSize;
@@ -555,6 +569,21 @@ function initialize() {
       },
       menu,
     );
+  menu.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMenu();
+      view.focus();
+    } else if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+      event.preventDefault();
+      const choices = [...menu.querySelectorAll("button")];
+      const current = choices.indexOf(document.activeElement);
+      choices[
+        (current + (event.key === "ArrowDown" ? 1 : -1) + choices.length) %
+          choices.length
+      ]?.focus();
+    }
+  });
   function openMenu() {
     menu.hidden = false;
   }
@@ -629,6 +658,7 @@ function initialize() {
   }
   function openDialog(title, build) {
     dialog.replaceChildren();
+    dialog.setAttribute("aria-label", title);
     const h = document.createElement("h2");
     h.textContent = title;
     dialog.append(h);
@@ -636,6 +666,17 @@ function initialize() {
     f.method = "dialog";
     dialog.append(f);
     build(f);
+    f.addEventListener("submit", (event) => event.preventDefault());
+    f.addEventListener("keydown", (event) => {
+      if (
+        event.key === "Enter" &&
+        event.target.tagName === "INPUT" &&
+        !event.isComposing
+      ) {
+        event.preventDefault();
+        f.querySelector("[data-dialog-confirm]")?.click();
+      }
+    });
     button(
       "Cancel",
       () => {
@@ -672,6 +713,7 @@ function initialize() {
             error.textContent = "Use a local path or an HTTP(S) URL.";
             return;
           }
+          dialog.close();
           run((state, send) => {
             send(
               state.tr.addMark(
@@ -682,13 +724,13 @@ function initialize() {
             );
             return true;
           });
-          dialog.close();
         },
         f,
       );
       button(
         "Remove link",
         () => {
+          dialog.close();
           run((state, send) => {
             send(
               state.tr.removeMark(
@@ -699,7 +741,6 @@ function initialize() {
             );
             return true;
           });
-          dialog.close();
         },
         f,
       );
@@ -794,6 +835,7 @@ function initialize() {
               "Choose an uploaded media URL and a useful description.";
             return;
           }
+          dialog.close();
           run((state, send) => {
             send(
               state.tr
@@ -809,7 +851,6 @@ function initialize() {
             );
             return true;
           });
-          dialog.close();
         },
         f,
       );
@@ -847,7 +888,15 @@ function initialize() {
           version: Number(form.elements.version.value),
           document: hidden.value,
           fields: Object.fromEntries(
-            [...new FormData(form)].filter(
+            [
+              ...new FormData(form),
+              ...Array.from(
+                form.querySelectorAll(
+                  "input[type=checkbox][name]:not(:disabled)",
+                ),
+                (el) => [el.name, String(el.checked)],
+              ),
+            ].filter(
               ([key]) =>
                 !["csrf", "document", "version", "body", "action"].includes(
                   key,
@@ -919,6 +968,9 @@ function initialize() {
             }
           }
           form.dispatchEvent(new Event("wpalt:recovery"));
+          form.elements.locale.dispatchEvent(
+            new Event("change", { bubbles: true }),
+          );
           form.elements.kind.dispatchEvent(
             new Event("change", { bubbles: true }),
           );

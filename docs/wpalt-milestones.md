@@ -250,4 +250,4 @@ The user approved M3.5 between M3 and M4, with its own delivery PR. The document
 
 ### M3 merged; integrated authoring implementation — 2026-10-02
 
-M3 PR #6 merged as `eb189c21d92af51f0f48577739df31a102f0d678`; actual-main run 36951433688 and its downloaded clean build were verified. M3.5 is implemented and under its own delivery verification: see [authoring operations](authoring.md), [editor decision](decisions/0005-structured-editor.md) and [evidence](evidence/m3-5-verification.md). M4 remains planned. No future parity scope was removed.
+M3 PR #6 merged as `eb189c21d92af51f0f48577739df31a102f0d678`; actual-main run 36951433688 and its downloaded clean build were verified. M3.5 is implemented and locally verified in [delivery PR #7](https://github.com/NaxAlpha/wpalt/pull/7); its required current-head CI and downloaded clean-artifact verification determine delivery acceptance: see [authoring operations](authoring.md), [editor decision](decisions/0005-structured-editor.md) and [evidence](evidence/m3-5-verification.md). M4 remains planned. No future parity scope was removed.

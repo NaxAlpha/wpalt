@@ -2075,8 +2075,13 @@ async fn schema_two_upgrade_preserves_publication_and_restorable_editor_history(
             .execute(&site.app.db.pool)
             .await
             .unwrap();
-        for index in ["language_posts", "translation_drafts", "translation_live"] {
-            sqlx::query(&format!("DROP INDEX {index}"))
+        for index in [
+            "language_posts",
+            "translation_drafts",
+            "translation_live",
+            "indexable_identity",
+        ] {
+            sqlx::query(&format!("DROP INDEX IF EXISTS {index}"))
                 .execute(&site.app.db.pool)
                 .await
                 .unwrap();

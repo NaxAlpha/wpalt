@@ -63,6 +63,7 @@ await build({
 const editorLicenses = await Promise.all(
   [
     "prosemirror-model",
+    "prosemirror-transform",
     "prosemirror-state",
     "prosemirror-view",
     "prosemirror-history",

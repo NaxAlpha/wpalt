@@ -1,6 +1,6 @@
 # M3.5 — Integrated content authoring
 
-Approved scope, 2026-10-02. Status: implementation under verification; completion depends on the delivery PR and its exact-source checks.
+Approved scope, 2026-10-02. Status: implemented and locally verified; delivery acceptance requires the current-head checks and exact-source clean artifact on [PR #7](https://github.com/NaxAlpha/wpalt/pull/7). See [verification evidence](evidence/m3-5-verification.md); merge remains a separate user decision.
 
 ## End-user system
 

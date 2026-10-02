@@ -74,6 +74,8 @@ impl Db {
             sqlx::query("CREATE INDEX IF NOT EXISTS public_search ON posts USING GIN(to_tsvector('simple',published_title || ' ' || published_body)) WHERE status='published'").execute(&mut *tx).await?;
         } else {
             sqlx::raw_sql(SQLITE_SEARCH).execute(&mut *tx).await?;
+            // Rank compact indexable identities before reading rich content rows.
+            sqlx::raw_sql("CREATE INDEX IF NOT EXISTS indexable_identity ON posts(id,published_locale,published_at DESC) WHERE status='published' AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0;").execute(&mut *tx).await?;
         }
         sqlx::query("INSERT INTO discovery_settings(id,definition,version) VALUES(1,$1,1) ON CONFLICT(id) DO NOTHING").bind(serde_json::to_string(&crate::discovery::Definition::default())?).execute(&mut *tx).await?;
         tx.commit().await?;

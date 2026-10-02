@@ -313,7 +313,7 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
     let locale = query.lang.as_deref().unwrap_or(&discovery.default_language);
     discovery.language(locale)?;
     let mut sql = QueryBuilder::<Any>::new(
-        "SELECT id,published_locale,published_seo,published_slug AS slug,kind,published_title AS title,substr(published_body,1,220) AS summary,published_fields,published_at FROM posts WHERE status='published'",
+        "WITH candidates AS MATERIALIZED (SELECT id,published_at FROM posts WHERE status='published'",
     );
     sql.push(" AND published_locale=")
         .push_bind(locale)
@@ -359,7 +359,7 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
             .push_bind(id)
             .push(")");
     }
-    sql.push(" ORDER BY published_at DESC,id DESC LIMIT 21");
+    sql.push(" ORDER BY published_at DESC,id DESC LIMIT 21) SELECT p.id,p.published_locale,p.published_slug AS slug,p.kind,p.published_title AS title,substr(p.published_body,1,220) AS summary,p.published_fields,p.published_at FROM candidates c JOIN posts p ON p.id=c.id ORDER BY c.published_at DESC,c.id DESC");
     let rows = app.db.fetch_builder(&mut sql).await?;
     Ok(rows
         .into_iter()

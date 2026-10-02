@@ -63,6 +63,32 @@ module.exports = async function (context, origin, output, mediaUrl) {
     JSON.stringify(await tree()).includes("Opening line"),
     "opening preserved after block insertion",
   );
+  // Composition event boundary: our caret synchronization must not corrupt composed input.
+  // This exercises engine/DOM integration; it is not a native OS IME certification.
+  await editor.press(end);
+  await editor.evaluate((el) => {
+    const p = [...el.querySelectorAll("p")].at(-1);
+    const text = p.lastChild;
+    el.dispatchEvent(
+      new CompositionEvent("compositionstart", { bubbles: true, data: "" }),
+    );
+    text.textContent += " 組成";
+    window.getSelection().setPosition(text, text.textContent.length);
+    el.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        data: "組成",
+        inputType: "insertCompositionText",
+        isComposing: true,
+      }),
+    );
+    el.dispatchEvent(
+      new CompositionEvent("compositionend", { bubbles: true, data: "組成" }),
+    );
+  });
+  await page.waitForFunction(() =>
+    document.querySelector("[name=document]").value.includes("組成"),
+  );
   await editor.press(home);
   await editor.press(lineHome);
   await editor.press(selectLine);
@@ -72,8 +98,9 @@ module.exports = async function (context, origin, output, mediaUrl) {
     "Opening line",
   );
   await click("Link");
+  await page.getByRole("dialog", { name: "Edit link", exact: true }).waitFor();
   await page.getByLabel("Link URL", { exact: true }).fill("/about");
-  await click("Apply link");
+  await page.getByLabel("Link URL", { exact: true }).press("Enter");
   assert.equal(
     await editor.locator("a").first().getAttribute("href"),
     "/about",
@@ -209,12 +236,27 @@ module.exports = async function (context, origin, output, mediaUrl) {
     });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
+  // Save a metadata baseline, then recover an unchecked privacy flag as well as text.
+  await page.getByText("Language & discovery", { exact: true }).click();
+  await page
+    .getByLabel("Exclude from search indexing", { exact: true })
+    .check();
+  await page
+    .getByText("Draft saved · live page unchanged", { exact: true })
+    .waitFor({ timeout: 15000 });
   // A network interruption keeps an explicit browser recovery copy, not an automatic overwrite.
   await page.route("**/admin/posts/*", (route) =>
     route.request().method() === "POST"
       ? route.abort("failed")
       : route.continue(),
   );
+  await page
+    .getByLabel("Exclude from search indexing", { exact: true })
+    .uncheck();
+  await page.getByLabel("Language", { exact: true }).selectOption("fr");
+  await page
+    .getByLabel("Search description", { exact: true })
+    .fill("RECOVERED_METADATA");
   await editor.fill("UNSAVED_RECOVERY 日本語");
   await page
     .getByText("Offline · changes remain in this editor", { exact: true })
@@ -228,6 +270,22 @@ module.exports = async function (context, origin, output, mediaUrl) {
   assert(!(await editor.innerText()).includes("UNSAVED_RECOVERY"));
   await click("Restore recovery copy");
   assert((await editor.innerText()).includes("UNSAVED_RECOVERY"));
+  await page.getByText("Language & discovery", { exact: true }).click();
+  assert.equal(
+    await page.getByLabel("Language", { exact: true }).inputValue(),
+    "fr",
+  );
+  assert.equal(
+    await page.getByLabel("Search description", { exact: true }).inputValue(),
+    "RECOVERED_METADATA",
+  );
+  assert.equal(
+    await page
+      .getByLabel("Exclude from search indexing", { exact: true })
+      .isChecked(),
+    false,
+  );
+  assert.equal(await editor.getAttribute("lang"), "fr");
   await page
     .getByText("Draft saved · live page unchanged", { exact: true })
     .waitFor({ timeout: 15000 });
@@ -296,12 +354,13 @@ module.exports = async function (context, origin, output, mediaUrl) {
         status: "passed",
         browser: context.browser().version(),
         journeys: [
-          "slash/format/link/multilingual writing",
+          "early native input before enhancement",
+          "slash/format/link/multilingual writing and synthetic composition boundary",
           "basic table operations",
           "duplicate/undo/redo/keyboard/drag organization",
           "sanitized clipboard payload",
           "canonical publication/reload",
-          "failed save and explicit recovery",
+          "failed save and explicit document/metadata/unchecked-flag recovery",
           "stale author conflict",
           "1000-paragraph input",
           "320/1440 canvas geometry",
