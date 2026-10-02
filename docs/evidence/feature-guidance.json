@@ -617,6 +617,40 @@
         "input regression, vulnerability or document grammar change"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-FORM-RULES",
+      "area": "Server-authoritative form validation",
+      "scope": "M4 step 1 groundwork",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 5; shared field grammar; bounded condition/calculation operations"
+      ],
+      "last_checked": "2026-10-02",
+      "next_review": "2026-12-31",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Apply type/allowlist and semantic validation on the server before storage/actions.",
+        "Reject unknown inputs; discard hidden inputs and recompute derived values; partial recovery cannot bypass final required validation.",
+        "Validation is not a replacement for SQL parameterization, authorization, request-forgery protection or output escaping.",
+        "Field/step/rule limits and earlier-field dependencies are internal product contracts, not OWASP-mandated limits."
+      ],
+      "tests": [
+        "hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "partial_drafts_preserve_valid_work_without_bypassing_final_validation",
+        "invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "publication_retries_and_fresh_restore_preserve_one_authoritative_entry"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guidance change",
+        "form grammar or worker/action change"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

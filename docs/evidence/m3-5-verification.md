@@ -52,3 +52,7 @@ Basic tables exclude merged cells and arbitrary widths. Imported remote images a
 | sitemap_index p95, concurrency 10 (ms) | 18.159 | 14.413 |
 
 These short runs include operating-system/client noise. Do not infer a guaranteed speedup, memory ceiling or regression threshold from them. The storage increase is real in this fixture; structured snapshots/history and text projections consume space. No broad WordPress-relative footprint claim is made.
+
+## Approved merge and actual-main artifact
+
+PR [#7](https://github.com/NaxAlpha/wpalt/pull/7) merged as `df8208f64c65853ec1cdabdef6a13ca1186805b1`. All three jobs in [actual-main run 37000435046](https://github.com/NaxAlpha/wpalt/actions/runs/37000435046) passed. Downloaded its clean Linux artifact and verified executable mode, archive/binary hashes, source revision and Rust/frontend locks, editor/Studio/CSS/token hashes against that merged revision. Archive SHA-256: `108274a5175bf86875b93c0b3b0379443082e7c09fae3199847eb64ffb487ad3`. This verifies the merged build separately from PR checks.

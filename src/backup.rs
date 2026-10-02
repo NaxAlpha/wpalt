@@ -166,6 +166,39 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
             ("created_at", true),
         ],
     ),
+    (
+        "business_forms",
+        &[
+            ("id", false),
+            ("owner_id", false),
+            ("draft", false),
+            ("live", false),
+            ("version", true),
+            ("published_version", true),
+            ("updated_at", true),
+        ],
+    ),
+    (
+        "form_publications",
+        &[
+            ("form_id", false),
+            ("version", true),
+            ("definition", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "form_entries",
+        &[
+            ("id", false),
+            ("form_id", false),
+            ("request_key", false),
+            ("request_hash", false),
+            ("form_version", true),
+            ("values_json", false),
+            ("created_at", true),
+        ],
+    ),
 ];
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -264,7 +297,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     }
     tx.commit().await?;
     let snapshot = Snapshot {
-        schema: 4,
+        schema: 5,
         created_at: crate::now(),
         tables,
         files,
@@ -272,7 +305,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v4".into(),
+        format: "wpalt-backup-v5".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -289,14 +322,14 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v4"
+    if envelope.format != "wpalt-backup-v5"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 4
+    if snapshot.schema != 5
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -505,6 +538,62 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             .collect::<Result<_>>()?,
     };
     registry.validate()?;
+    for row in &snapshot.tables["business_forms"] {
+        let draft: crate::business::forms::FormDefinition =
+            serde_json::from_str(row["draft"].as_str().unwrap())
+                .map_err(|_| Error::invalid("Invalid backup form."))?;
+        draft.validate(&registry.common)?;
+        if row["published_version"].as_i64().unwrap() > 0 {
+            let live: crate::business::store::PublishedForm =
+                serde_json::from_str(row["live"].as_str().unwrap())
+                    .map_err(|_| Error::invalid("Invalid backup published form."))?;
+            live.form.validate(&live.common())?;
+        }
+    }
+    let mut publications = BTreeMap::new();
+    for row in &snapshot.tables["form_publications"] {
+        let published: crate::business::store::PublishedForm =
+            serde_json::from_str(row["definition"].as_str().unwrap())
+                .map_err(|_| Error::invalid("Invalid backup publication."))?;
+        published.form.validate(&published.common())?;
+        let identity = (
+            row["form_id"].as_str().unwrap(),
+            row["version"].as_i64().unwrap(),
+        );
+        if publications.insert(identity, published).is_some() {
+            return Err(Error::invalid("Duplicate form publication."));
+        }
+    }
+    for row in &snapshot.tables["business_forms"] {
+        let version = row["published_version"].as_i64().unwrap();
+        if version > 0 {
+            let live = publications
+                .get(&(row["id"].as_str().unwrap(), version))
+                .ok_or(Error::invalid("Backup form lacks its live publication."))?;
+            let snapshot: Value = serde_json::from_str(row["live"].as_str().unwrap())
+                .map_err(|_| Error::invalid("Invalid live form snapshot."))?;
+            if serde_json::to_value(live)
+                .map_err(|_| Error::invalid("Invalid live form snapshot."))?
+                != snapshot
+            {
+                return Err(Error::invalid("Backup live form and publication disagree."));
+            }
+        }
+    }
+    for row in &snapshot.tables["form_entries"] {
+        let identity = (
+            row["form_id"].as_str().unwrap(),
+            row["form_version"].as_i64().unwrap(),
+        );
+        let live = publications
+            .get(&identity)
+            .ok_or(Error::invalid("Backup entry lacks its publication."))?;
+        let values: Value = serde_json::from_str(row["values_json"].as_str().unwrap())
+            .map_err(|_| Error::invalid("Invalid backup entry values."))?;
+        if live.form.evaluate(&live.common(), &values, false)? != values {
+            return Err(Error::invalid("Backup entry has non-authoritative values."));
+        }
+    }
     let mut relationships = BTreeMap::new();
     let mut references = Vec::new();
     for row in &snapshot.tables["posts"] {

@@ -58,18 +58,28 @@ impl Db {
             crate::migrations::from_m1(self).await?;
         } else {
             anyhow::ensure!(
-                version.is_none() || version == Some(2) || version == Some(3) || version == Some(4),
+                version.is_none()
+                    || version == Some(2)
+                    || version == Some(3)
+                    || version == Some(4)
+                    || version == Some(5),
                 "unsupported schema version; use the documented migration/reset path"
             );
         }
         if version == Some(1) || version == Some(2) {
             crate::migrations::from_m2(self).await?;
         }
-        if version.is_some() && version != Some(4) {
+        if matches!(version, Some(1..=3)) {
             crate::migrations::from_m3(self).await?;
         }
         let mut tx = self.pool.begin().await?;
         sqlx::raw_sql(SCHEMA).execute(&mut *tx).await?;
+        sqlx::raw_sql(crate::business::store::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE schema_version SET version=5 WHERE id=1")
+            .execute(&mut *tx)
+            .await?;
         if self.postgres {
             sqlx::query("CREATE INDEX IF NOT EXISTS public_search ON posts USING GIN(to_tsvector('simple',published_title || ' ' || published_body)) WHERE status='published'").execute(&mut *tx).await?;
         } else {

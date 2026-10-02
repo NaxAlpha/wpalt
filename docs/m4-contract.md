@@ -1,6 +1,6 @@
 # M4 — Business and audience platform
 
-Active, 2026-10-02. M3.5 PR #7 is merged; its actual-main build must be verified separately from its PR checks. This contract implements the approved M4 roadmap. It is not a completed-feature or full plugin-parity claim.
+Active, 2026-10-02. M3.5 PR #7 is merged; its actual-main build has been independently downloaded and hash-verified; see the M3.5 delivery evidence. This contract implements the approved M4 roadmap. It is not a completed-feature or full plugin-parity claim.
 
 ## End-user system
 

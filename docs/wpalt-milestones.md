@@ -254,4 +254,9 @@ M3 PR #6 merged as `eb189c21d92af51f0f48577739df31a102f0d678`; actual-main run 3
 
 ### M3.5 merged; M4 active — 2026-10-02
 
-The user authorized merging PR #7 and continuing with M4. M3.5 merged as `df8208f64c65853ec1cdabdef6a13ca1186805b1`; actual-main build 37000435046 is tracked separately from PR verification. M4 is active under [its contract](m4-contract.md) and [architecture decision](decisions/0006-business-audience.md). M5–M9 remain planned; existing parity requirements are retained.
+The user authorized merging PR #7 and continuing with M4. M3.5 merged as `df8208f64c65853ec1cdabdef6a13ca1186805b1`; all three actual-main jobs in run 37000435046 passed and its downloaded clean artifact was verified separately from PR verification. M4 is active under [its contract](m4-contract.md) and [architecture decision](decisions/0006-business-audience.md). M5–M9 remain planned; existing parity requirements are retained.
+
+
+### M4 first implementation step — 2026-10-02
+
+The shared form grammar and versioned persistence are implemented as groundwork, not a usable completed milestone. Hidden inputs are discarded, calculations recomputed, drafts remain typed, published reusable groups are frozen, submission keys deduplicate across pools, stale publication is rejected, and current-format backup/restore includes immutable entries. Local rule/storage/recovery tests and the existing SQLite publishing suite pass. Real PostgreSQL evidence, the form designer/public UI, remaining form workflows, audience/communications/engagement, integrated verification and delivery remain pending. No capability is marked complete from this step.

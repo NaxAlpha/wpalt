@@ -92,3 +92,8 @@ See [discovery operations](discovery.md#upgrade-and-recovery) for schema-3 migra
 ## M3.5 structured authoring upgrade
 
 See [authoring operations](authoring.md#api-and-recovery) for transactional schema-4 conversion and backup-v4 restoration. Keep an independent backup from the previous executable; current-format backups preserve canonical trees.
+
+
+## M4 development upgrade (in progress)
+
+M4's branch adds form/entry tables in transactional schema 5 and writes backup-v5 archives. Stop the server and retain an independent backup with the preceding binary before upgrading meaningful data. A schema-4 database upgrades without rewriting publishing documents. Restore a v4 archive with the corresponding M3.5 executable into a fresh target, then upgrade that database. The current executable accepts only v5 archives; downgrade by restoring the independent v4 backup into a fresh target. M4 is under development and is not a release-ready business platform.
