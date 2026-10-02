@@ -228,3 +228,7 @@ The composable studio, typed authoring, published-data bindings, theme/options p
 Frontend foundation [PR #4](https://github.com/NaxAlpha/wpalt/pull/4) merged as `c0b2ff65cc0e952da0b3fa63109f38ca801f3ef1`; actual-main checks and downloaded clean-build hashes were verified. The user then authorized a separate current-interface redesign: [calm cardless administration contract](calm-admin-design.md). This supporting PR applies the established measurement foundation to an open, coherent default admin experience; future milestone features and public theme evolution remain in their existing scope. M3 has not started.
 
 [Calm default UI PR #5](https://github.com/NaxAlpha/wpalt/pull/5) delivers this supporting redesign and its measured review evidence. It leaves M3 pending; readiness requires final-head application, compiler-floor and clean-build checks plus explicitly reviewed visual references.
+
+### M3 active — 2026-10-01
+
+The user authorized merging PR #5 and proceeding to M3. #5 merged as `29807ffb3ff76c25fcf207259f7fa79fde424109`; [actual-main run 36860476634](https://github.com/NaxAlpha/wpalt/actions/runs/36860476634) passed all three jobs and its downloaded clean artifact/source/checksums were verified. M3 now follows [its contract](m3-contract.md), [operator guide](discovery.md), [architecture decision](decisions/0003-m3-discovery.md) and [verification record](evidence/m3-verification.md). The delivery PR remains subject to final-head CI and clean-artifact verification; merge is a separate user decision. M4–M9 remain planned.

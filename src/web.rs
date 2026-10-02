@@ -23,6 +23,7 @@ pub fn router(app: App) -> Router {
     let timeout = app.config.request_timeout_seconds;
     Router::new()
         .merge(crate::builder_web::routes())
+        .merge(crate::discovery::routes())
         .route("/", get(home))
         .route("/search", get(home))
         .route("/health", get(health))
@@ -56,6 +57,9 @@ pub fn router(app: App) -> Router {
         .route("/api/admin/content", post(create_api))
         .route("/api/admin/content/{id}", post(update_api))
         .route("/{slug}", get(public_post))
+        .route("/{locale}/", get(localized_home))
+        .route("/{locale}/search", get(localized_home))
+        .route("/{locale}/{slug}", get(localized_post))
         .route("/{slug}/comments", post(comment))
         .fallback(|| async { Error::not_found() })
         .layer(DefaultBodyLimit::max(limit))
@@ -78,6 +82,7 @@ async fn security_and_trace(
     let started = std::time::Instant::now();
     let id = uuid::Uuid::new_v4().to_string();
     let method = request.method().clone();
+    let requested_path = request.uri().path().to_owned();
     let route = request
         .extensions()
         .get::<MatchedPath>()
@@ -100,6 +105,15 @@ async fn security_and_trace(
         use tracing::Instrument;
         next.run(request).instrument(span).await
     };
+    if response.status() == StatusCode::NOT_FOUND
+        && (method == axum::http::Method::GET || method == axum::http::Method::HEAD)
+    {
+        match crate::discovery::redirect_response(&app, &requested_path).await {
+            Ok(Some(redirect)) => response = redirect,
+            Ok(None) => {}
+            Err(error) => response = error.into_response(),
+        }
+    }
     if route.starts_with("/admin")
         && method == axum::http::Method::GET
         && response.status() == StatusCode::UNAUTHORIZED
@@ -107,6 +121,12 @@ async fn security_and_trace(
         response = Redirect::to("/login").into_response();
     }
     let h = response.headers_mut();
+    if route.starts_with("/admin") || route.starts_with("/api/admin") || route == "/login" {
+        h.insert(
+            "x-robots-tag",
+            HeaderValue::from_static("noindex, nofollow"),
+        );
+    }
     h.insert("x-request-id", HeaderValue::from_str(&id).unwrap());
     h.insert(
         "x-content-type-options",
@@ -261,6 +281,7 @@ async fn dashboard(State(app): State<App>, headers: HeaderMap) -> Result<Respons
 #[derive(Deserialize, Default)]
 struct ListQuery {
     q: Option<String>,
+    lang: Option<String>,
     category: Option<String>,
     tag: Option<String>,
     after: Option<String>,
@@ -277,9 +298,19 @@ struct PublicItem {
     published_at: i64,
 }
 async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>> {
+    let (discovery, _) = crate::discovery::load(app).await?;
+    let locale = query.lang.as_deref().unwrap_or(&discovery.default_language);
+    discovery.language(locale)?;
     let mut sql = QueryBuilder::<Any>::new(
-        "SELECT id,published_slug AS slug,kind,published_title AS title,substr(published_body,1,220) AS summary,published_fields,published_at FROM posts WHERE status='published'",
+        "SELECT id,published_locale,published_seo,published_slug AS slug,kind,published_title AS title,substr(published_body,1,220) AS summary,published_fields,published_at FROM posts WHERE status='published'",
     );
+    sql.push(" AND published_locale=")
+        .push_bind(locale)
+        .push(if app.db.postgres {
+            " AND NOT COALESCE((published_seo::jsonb->>'noindex')::boolean,false)"
+        } else {
+            " AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0"
+        });
     if let Some(q) = query.q.as_ref().filter(|s| !s.trim().is_empty()) {
         if q.len() > 200 {
             return Err(Error::invalid("Search must be 200 characters or fewer."));
@@ -323,7 +354,13 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
         .into_iter()
         .map(|r| PublicItem {
             id: r.get("id"),
-            slug: r.get("slug"),
+            slug: discovery
+                .path(
+                    &r.get::<String, _>("published_locale"),
+                    &r.get::<String, _>("slug"),
+                )
+                .trim_start_matches('/')
+                .to_owned(),
             kind: r.get("kind"),
             title: r.get("title"),
             summary: view::excerpt(&r.get::<String, _>("summary")),
@@ -334,12 +371,26 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
         .collect())
 }
 async fn home(State(app): State<App>, Query(query): Query<ListQuery>) -> Result<Html<String>> {
+    render_home(app, query).await
+}
+async fn localized_home(
+    State(app): State<App>,
+    Path(locale): Path<String>,
+    Query(mut query): Query<ListQuery>,
+) -> Result<Html<String>> {
+    query.lang = Some(locale);
+    render_home(app, query).await
+}
+async fn render_home(app: App, query: ListQuery) -> Result<Html<String>> {
+    let (discovery, _) = crate::discovery::load(&app).await?;
+    let locale = query.lang.as_deref().unwrap_or(&discovery.default_language);
+    let language = discovery.language(locale)?;
     let settings = app.db.settings().await?;
     let items = published_list(&app, &query).await?;
     let search = query.q.clone().unwrap_or_default();
     let stored = crate::theme::published(&app, &settings.theme).await?;
     let listing=items.iter().take(20).map(|p|serde_json::json!({"id":p.id,"kind":p.kind,"title":p.title,"url":format!("/{}",p.slug),"body":p.summary,"fields":p.fields})).collect();
-    let mut ctx = crate::theme::context(
+    let mut ctx = crate::theme::context_with_discovery(
         &app,
         &settings,
         &stored.package,
@@ -347,12 +398,29 @@ async fn home(State(app): State<App>, Query(query): Query<ListQuery>) -> Result<
         listing,
         false,
         if search.is_empty() { "home" } else { "search" },
+        Some(locale),
+        &discovery,
     )
     .await?;
-    ctx.root["navigation"] = serde_json::from_str(&settings.navigation).unwrap_or_default();
-    let extra = html! {form class="toolbar" method="get" action="/search"{label for="search"{"Find something"}input id="search" type="search" name="q" value=(search);button{"Search"}}
+    let path = if query.q.is_some() {
+        discovery.path(locale, "search")
+    } else {
+        discovery.path(locale, "")
+    };
+    ctx.root["_discovery"] = crate::discovery::metadata_with_settings(
+        &app,
+        None,
+        locale,
+        &path,
+        query.q.is_some(),
+        &discovery,
+        &settings,
+    )
+    .await?;
+    ctx.root["navigation"] = ctx.root["_discovery"]["navigation"].clone();
+    let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))form class="toolbar" method="get" action=(discovery.path(locale,"search")){label for="search"{"Find something"}input id="search" type="search" name="q" value=(search);button{(language.search_label)}}
     @if items.is_empty(){p class="empty"{"No published content matches yet."}}
-    @if items.len()>20{@let last=&items[19];a class="button secondary" href=(next_url(&query,&format!("{}:{}",last.published_at,last.id))){"Older content →"}}};
+    @if items.len()>20{@let last=&items[19];a class="button secondary" href=(format!("{}{}",discovery.path(locale,""),next_url(&query,&format!("{}:{}",last.published_at,last.id)).trim_start_matches('/'))){"Older content →"}}};
     Ok(Html(crate::theme::document(
         &stored,
         &settings,
@@ -368,6 +436,7 @@ fn next_url(query: &ListQuery, cursor: &str) -> String {
     params.append_pair("after", cursor);
     for (name, value) in [
         ("q", &query.q),
+        ("lang", &query.lang),
         ("category", &query.category),
         ("tag", &query.tag),
     ] {
@@ -393,9 +462,43 @@ async fn public_api(
         serde_json::json!({"items":items,"next_url":next.as_ref().map(|c|format!("/api/content{}",next_url(&query,c).trim_start_matches('/'))),"next":next}),
     ))
 }
-async fn public_post(State(app): State<App>, Path(slug): Path<String>) -> Result<Html<String>> {
-    let p = sqlx::query("SELECT * FROM posts WHERE published_slug=$1 AND status='published'")
-        .bind(&slug)
+async fn public_post(State(app): State<App>, Path(slug): Path<String>) -> Result<Response> {
+    let (d, _) = crate::discovery::load(&app).await?;
+    if d.languages.iter().any(|l| l.code == slug) {
+        return Ok(Redirect::permanent(&d.path(&slug, "")).into_response());
+    }
+    let candidate = sqlx::query(
+        "SELECT published_locale FROM posts WHERE published_slug=$1 AND status='published'",
+    )
+    .bind(&slug)
+    .fetch_optional(&app.db.pool)
+    .await?
+    .ok_or_else(Error::not_found)?;
+    let language: String = candidate.get("published_locale");
+    if language != d.default_language {
+        return Ok(Redirect::permanent(&d.path(&language, &slug)).into_response());
+    }
+    render_post(app, language, slug, d).await
+}
+async fn localized_post(
+    State(app): State<App>,
+    Path((locale, slug)): Path<(String, String)>,
+) -> Result<Response> {
+    let (d, _) = crate::discovery::load(&app).await?;
+    d.language(&locale)?;
+    if locale == d.default_language {
+        return Ok(Redirect::permanent(&d.path(&locale, &slug)).into_response());
+    }
+    render_post(app, locale, slug, d).await
+}
+async fn render_post(
+    app: App,
+    locale: String,
+    slug: String,
+    discovery: crate::discovery::Definition,
+) -> Result<Response> {
+    let p = sqlx::query("SELECT * FROM posts WHERE published_slug=$1 AND published_locale=$2 AND status='published'")
+        .bind(&slug).bind(&locale)
         .fetch_optional(&app.db.pool)
         .await?
         .map(Post::from_row)
@@ -404,7 +507,7 @@ async fn public_post(State(app): State<App>, Path(slug): Path<String>) -> Result
     let terms=sqlx::query("SELECT t.kind,t.name,t.slug FROM terms t JOIN published_post_terms pt ON pt.term_id=t.id WHERE pt.post_id=$1 ORDER BY t.name").bind(&p.id).fetch_all(&app.db.pool).await?;
     let settings = app.db.settings().await?;
     let stored = crate::theme::published(&app, &settings.theme).await?;
-    let mut ctx = crate::theme::context(
+    let mut ctx = crate::theme::context_with_discovery(
         &app,
         &settings,
         &stored.package,
@@ -412,10 +515,23 @@ async fn public_post(State(app): State<App>, Path(slug): Path<String>) -> Result
         Vec::new(),
         false,
         &p.kind,
+        None,
+        &discovery,
     )
     .await?;
-    ctx.root["navigation"] = serde_json::from_str(&settings.navigation).unwrap_or_default();
-    let extra = html! {            section class="comments" {p class="muted" {@for t in terms {a href=(format!("/?{}={}",t.get::<String,_>("kind"),t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
+    let path = discovery.path(&locale, &slug);
+    ctx.root["_discovery"] = crate::discovery::metadata_with_settings(
+        &app,
+        Some(&p),
+        &locale,
+        &path,
+        false,
+        &discovery,
+        &settings,
+    )
+    .await?;
+    ctx.root["navigation"] = ctx.root["_discovery"]["navigation"].clone();
+    let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))            section class="comments" {p class="muted" {@for t in terms {a href=(format!("{}?{}={}",discovery.path(&locale,""),t.get::<String,_>("kind"),t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
                     h2 {"Conversation"}
                     @for c in comments {article class="comment" {strong {(c.get::<String,_>("name"))}p {(c.get::<String,_>("body"))}}}
                     form method="post" action=(format!("/{slug}/comments")) {label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}
@@ -430,7 +546,8 @@ async fn public_post(State(app): State<App>, Path(slug): Path<String>) -> Result
         false,
         &p.kind,
         extra,
-    )?))
+    )?)
+    .into_response())
 }
 async fn feed(State(app): State<App>) -> Result<Response> {
     let settings = app.db.settings().await?;
@@ -490,6 +607,9 @@ async fn new_post(State(app): State<App>, headers: HeaderMap) -> Result<Html<Str
     let s = admin_session(&app, &headers).await?;
     editor(&s)?;
     let input = PostInput {
+        locale: crate::discovery::load(&app).await?.0.default_language,
+        translation_group: String::new(),
+        seo: "{}".into(),
         title: String::new(),
         slug: String::new(),
         kind: "post".into(),
@@ -508,7 +628,7 @@ async fn new_post(State(app): State<App>, headers: HeaderMap) -> Result<Html<Str
         "Create content",
         &app.db.settings().await?,
         Some(&s),
-        html! {(editor_form(&s, None, &input, &[], None))script defer src="/assets/builder.js"{}},
+        html! {(editor_form(&s, None, &input, &[], None, &crate::discovery::load(&app).await?.0))script defer src="/assets/builder.js"{}},
     ))
 }
 fn editor_form(
@@ -517,13 +637,24 @@ fn editor_form(
     p: &PostInput,
     revisions: &[sqlx::any::AnyRow],
     error: Option<&str>,
+    discovery: &crate::discovery::Definition,
 ) -> Markup {
+    let seo = crate::discovery::Seo::parse(&p.seo).unwrap_or_default();
     html! {
         (view::heading("Publishing",if id.is_some(){"Edit content"}else{"New content"},"Write in Markdown, bind typed fields and compose reusable page sections."))
         div class="notice error" data-editor-error hidden[error.is_none()] {(error.unwrap_or(""))}
         form method="post" action=(id.map(|id|format!("/admin/posts/{id}")).unwrap_or_else(||"/admin/posts/new".into())) data-editor data-new=(if id.is_some(){"false"}else{"true"}) {
             (view::csrf(s)) input type="hidden" name="version" value=(p.version);input type="hidden" name="publish_at" value=(p.publish_at);
             div class="split" {section class="panel" {label {"Title" input name="title" value=(p.title) required maxlength="300";}label {"Content" textarea class="editor-body" name="body" aria-label="Content" maxlength="524288" {(p.body)}small {"Markdown is supported. Raw HTML is sanitized. Media: ![description](/media/ID)"}}
+                details open {summary {"Language & discovery"}
+                    label {"Language" select name="locale" aria-label="Language" {@for l in &discovery.languages {option value=(l.code) selected[p.locale==l.code] {(l.label)}}}}
+                    label {"Translation group" input name="translation_group" aria-label="Translation group" value=(p.translation_group) maxlength="80";small {"Use the same short identifier for related translations. Each language publishes independently."}}
+                    input type="hidden" name="seo" value=(p.seo) data-seo-json;
+                    label {"Search title" input name="seo_title" aria-label="Search title" data-seo-title value=(seo.title) maxlength="300";small {"Leave blank to use the published content title."}}
+                    label {"Search description" textarea name="seo_description" data-seo-description maxlength="1000" {(seo.description)}}
+                    label {input type="checkbox" name="seo_noindex" value="true" data-seo-noindex checked[seo.noindex];"Exclude from search indexing"}
+                    label {"Structured content" select name="seo_type" aria-label="Structured content" data-seo-type {option value="WebPage" selected[seo.schema_type=="WebPage"] {"Web page"}option value="Article" selected[seo.schema_type=="Article"] {"Article"}}}
+                }
                 details {summary {"Typed fields & composition"}label {"Fields (JSON)" textarea name="fields" {(p.fields)}small {"Defined in Site & theme. Example: {\"subtitle\":\"A fresh start\",\"featured\":true}"}}
                     label {"Composition blocks (JSON)" textarea name="blocks" {(p.blocks)}small {"Example: [{\"kind\":\"callout\",\"text\":\"Made on your own server.\"}]. Kinds: text, heading, callout."}}
                 }
@@ -567,6 +698,9 @@ async fn edit_post(
     .fetch_all(&app.db.pool)
     .await?;
     let input = PostInput {
+        locale: p.locale,
+        translation_group: p.translation_group,
+        seo: p.seo,
         title: p.title,
         slug: p.slug,
         kind: p.kind,
@@ -594,7 +728,7 @@ async fn edit_post(
         "Edit content",
         &app.db.settings().await?,
         Some(&s),
-        html! {(editor_form(&s, Some(&id), &input, &revisions, None))script defer src="/assets/builder.js"{}},
+        html! {(editor_form(&s, Some(&id), &input, &revisions, None, &crate::discovery::load(&app).await?.0))script defer src="/assets/builder.js"{}},
     ))
 }
 async fn save_form(
@@ -630,7 +764,14 @@ async fn save_form(
                         "Save needs attention",
                         &app.db.settings().await?,
                         Some(&s),
-                        editor_form(&s, id, &input, &[], Some(e.1)),
+                        editor_form(
+                            &s,
+                            id,
+                            &input,
+                            &[],
+                            Some(e.1),
+                            &crate::discovery::load(app).await?.0,
+                        ),
                     ),
                 )
                     .into_response())
@@ -638,20 +779,38 @@ async fn save_form(
         }
     }
 }
+fn native_content_form(
+    mut fields: std::collections::BTreeMap<String, String>,
+) -> Result<PostInput> {
+    if fields.contains_key("seo_title") {
+        let seo = crate::discovery::Seo {
+            title: fields.remove("seo_title").unwrap_or_default(),
+            description: fields.remove("seo_description").unwrap_or_default(),
+            noindex: fields.remove("seo_noindex").is_some(),
+            schema_type: fields
+                .remove("seo_type")
+                .unwrap_or_else(|| "WebPage".into()),
+        };
+        fields.insert("seo".into(), serde_json::to_string(&seo).unwrap());
+    }
+    let encoded =
+        serde_urlencoded::to_string(fields).map_err(|_| Error::invalid("Invalid content form."))?;
+    serde_urlencoded::from_str(&encoded).map_err(|_| Error::invalid("Invalid content form."))
+}
 async fn create_post(
     State(app): State<App>,
     headers: HeaderMap,
-    Form(input): Form<PostInput>,
+    Form(fields): Form<std::collections::BTreeMap<String, String>>,
 ) -> Result<Response> {
-    save_form(&app, &headers, None, input).await
+    save_form(&app, &headers, None, native_content_form(fields)?).await
 }
 async fn update_post(
     State(app): State<App>,
     headers: HeaderMap,
     Path(id): Path<String>,
-    Form(input): Form<PostInput>,
+    Form(fields): Form<std::collections::BTreeMap<String, String>>,
 ) -> Result<Response> {
-    save_form(&app, &headers, Some(&id), input).await
+    save_form(&app, &headers, Some(&id), native_content_form(fields)?).await
 }
 async fn create_api(
     State(app): State<App>,
@@ -710,7 +869,7 @@ async fn preview(
     let p = content::get(&app, &id).await?;
     let settings = app.db.settings().await?;
     let stored = crate::theme::load(&app, &settings.theme, true).await?;
-    let ctx = crate::theme::context(
+    let mut ctx = crate::theme::context(
         &app,
         &settings,
         &stored.package,
@@ -718,8 +877,16 @@ async fn preview(
         Vec::new(),
         true,
         &p.kind,
+        None,
     )
     .await?;
+    let mut working = p.clone();
+    working.published_title = p.title.clone();
+    working.published_body = p.body.clone();
+    working.published_seo = p.seo.clone();
+    working.published_translation_group.clear();
+    ctx.root["_discovery"] =
+        crate::discovery::metadata(&app, Some(&working), &p.locale, "/", false).await?;
     Ok(Html(crate::theme::document(
         &stored,
         &settings,

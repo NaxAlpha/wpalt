@@ -1,4 +1,4 @@
-# Running and recovering M1
+# Running and recovering wpalt
 
 ## Build and initialize
 
@@ -84,3 +84,7 @@ Stop the server and take an independent M1 backup with the M1 executable before 
 M2 snapshots use `wpalt-backup-v2` and include models, shared draft/live options, themes and revision histories. Restore into an empty database/data directory only. M1 snapshots must first be restored with M1, then opened by M2. A downgrade is restoration of the independent M1 backup into a fresh target, not opening a schema-2 database with M1. Only explicitly disposable fixtures may be reset. No old-format runtime compatibility parser was added.
 
 Theme package import/export/publication/activation also works through the offline CLI; see [authoring guide](theme-authoring.md). Node/npm are needed to rebuild studio assets during development, never to run a packaged server. Both normal verification and uncached builds regenerate locked frontend assets and reject uncommitted differences before packaging. Packages preserve the binary's executable bit and commit/toolchain/checksum manifest.
+
+## M3 discovery upgrade
+
+See [discovery operations](discovery.md#upgrade-and-recovery) for schema-3 migration, backup-v3 restoration, old-archive handling and current content API metadata requirements. M3 uses no mandatory cloud service or account.

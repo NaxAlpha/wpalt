@@ -1013,6 +1013,7 @@ async fn public_values(
     app: &App,
     builder: &mut QueryBuilder<'_, Any>,
     remaining: &mut usize,
+    discovery: &crate::discovery::Definition,
 ) -> Result<Vec<Value>> {
     use futures_util::TryStreamExt;
     use sqlx::Execute;
@@ -1025,7 +1026,7 @@ async fn public_values(
     let mut rows = sqlx::query_with(&sql, args).fetch(&app.db.pool);
     let mut values = Vec::new();
     while let Some(row) = rows.try_next().await? {
-        let value = json!({"id":row.get::<String,_>("id"),"kind":row.get::<String,_>("kind"),"title":row.get::<String,_>("published_title"),"url":format!("/{}",row.get::<String,_>("published_slug")),"body":row.get::<String,_>("published_body"),"fields":serde_json::from_str::<Value>(&row.get::<String,_>("published_fields")).map_err(|_|Error::invalid("Invalid published fields."))?});
+        let value = json!({"id":row.get::<String,_>("id"),"kind":row.get::<String,_>("kind"),"title":row.get::<String,_>("published_title"),"url":discovery.path(&row.get::<String,_>("published_locale"), &row.get::<String,_>("published_slug")),"body":row.get::<String,_>("published_body"),"fields":serde_json::from_str::<Value>(&row.get::<String,_>("published_fields")).map_err(|_|Error::invalid("Invalid published fields."))?});
         *remaining = remaining
             .checked_sub(value.to_string().len())
             .ok_or(Error::invalid("Render data exceeds the 2-MiB budget."))?;
@@ -1033,8 +1034,8 @@ async fn public_values(
     }
     Ok(values)
 }
-fn post_value(p: &Post, draft: bool) -> Value {
-    json!({"id":p.id,"kind":p.kind,"title":if draft{&p.title}else{&p.published_title},"body":if draft{&p.body}else{&p.published_body},"url":format!("/{}",if draft{&p.slug}else{&p.published_slug}),"fields":serde_json::from_str::<Value>(if draft{&p.fields}else{&p.published_fields}).unwrap_or(json!({}))})
+fn post_value(p: &Post, draft: bool, discovery: &crate::discovery::Definition) -> Value {
+    json!({"id":p.id,"kind":p.kind,"title":if draft{&p.title}else{&p.published_title},"body":if draft{&p.body}else{&p.published_body},"url":discovery.path(if draft{&p.locale}else{&p.published_locale},if draft{&p.slug}else{&p.published_slug}),"fields":serde_json::from_str::<Value>(if draft{&p.fields}else{&p.published_fields}).unwrap_or(json!({}))})
 }
 #[allow(clippy::too_many_arguments)] // Request template narrows dependency loading.
 pub async fn context(
@@ -1045,7 +1046,37 @@ pub async fn context(
     listing: Vec<Value>,
     draft: bool,
     template: &str,
+    language: Option<&str>,
 ) -> Result<Context> {
+    let (discovery, _) = crate::discovery::load(app).await?;
+    context_with_discovery(
+        app, settings, package, post, listing, draft, template, language, &discovery,
+    )
+    .await
+}
+#[allow(clippy::too_many_arguments)] // Request template and already loaded discovery definition.
+pub async fn context_with_discovery(
+    app: &App,
+    settings: &Settings,
+    package: &Package,
+    post: Option<&Post>,
+    listing: Vec<Value>,
+    draft: bool,
+    template: &str,
+    language: Option<&str>,
+    discovery: &crate::discovery::Definition,
+) -> Result<Context> {
+    let locale = language.unwrap_or_else(|| {
+        post.map(|p| {
+            if draft {
+                p.locale.as_str()
+            } else {
+                p.published_locale.as_str()
+            }
+        })
+        .unwrap_or(&discovery.default_language)
+    });
+    let language_config = discovery.language(locale)?;
     let options: String = sqlx::query_scalar(if draft {
         "SELECT draft_options FROM site_design WHERE id=1"
     } else {
@@ -1054,13 +1085,18 @@ pub async fn context(
     .fetch_one(&app.db.pool)
     .await?;
     let mut ctx = Context {
-        root: json!({"site":{"title":settings.title,"description":settings.description},"navigation":serde_json::from_str::<Value>(&settings.navigation).unwrap_or(json!([])),"post":post.map(|p|post_value(p,draft)).unwrap_or(json!({})),"options":serde_json::from_str::<Value>(&options).map_err(|_|Error::invalid("Invalid shared options."))?}),
+        root: json!({"site":{"title":settings.title,"description":settings.description},"navigation":serde_json::from_str::<Value>(&settings.navigation).unwrap_or(json!([])),"post":post.map(|p|post_value(p,draft,discovery)).unwrap_or(json!({})),"options":serde_json::from_str::<Value>(&options).map_err(|_|Error::invalid("Invalid shared options."))?}),
         collections: BTreeMap::from([("listing".into(), listing)]),
         relations: BTreeMap::new(),
         media: BTreeMap::new(),
-        queries: 1,
+        queries: 2,
         reference_ids: BTreeSet::new(),
     };
+    ctx.root["language"] = locale.into();
+    ctx.root["direction"] = language_config.direction.clone().into();
+    if !language_config.navigation.is_empty() {
+        ctx.root["navigation"] = serde_json::to_value(&language_config.navigation).unwrap();
+    }
     fn dependencies<'a>(
         package: &'a Package,
         n: &'a Node,
@@ -1104,13 +1140,15 @@ pub async fn context(
     // Select published columns only; stream under one request-wide memory budget.
     for (kind, limit) in sets {
         let mut query = QueryBuilder::<Any>::new(
-            "SELECT id,kind,published_slug,published_title,published_body,published_fields FROM posts WHERE status='published' AND kind=",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_fields FROM posts WHERE status='published' AND kind=",
         );
         query
             .push_bind(&kind)
+            .push(" AND published_locale=")
+            .push_bind(locale)
             .push(" ORDER BY published_at DESC,id DESC LIMIT ")
             .push_bind(limit as i64);
-        let values = public_values(app, &mut query, &mut remaining).await?;
+        let values = public_values(app, &mut query, &mut remaining, discovery).await?;
         ctx.queries += 1;
         ctx.collections.insert(kind, values);
     }
@@ -1184,14 +1222,14 @@ pub async fn context(
         }
         seen.extend(ids.iter().cloned());
         let mut q = QueryBuilder::<Any>::new(
-            "SELECT id,kind,published_slug,published_title,published_body,published_fields FROM posts WHERE status='published' AND id IN (",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_fields FROM posts WHERE status='published' AND id IN (",
         );
         let mut list = q.separated(",");
         for id in &ids {
             list.push_bind(id);
         }
         list.push_unseparated(")");
-        let rows = public_values(app, &mut q, &mut remaining).await?;
+        let rows = public_values(app, &mut q, &mut remaining, discovery).await?;
         ctx.queries += 1;
         for value in rows {
             let kind = value["kind"]
@@ -1514,7 +1552,7 @@ pub fn document(
     let scripts = [&p.header, &p.footer, root]
         .into_iter()
         .any(|n| has_tabs(p, n));
-    let output=html!{(DOCTYPE)html lang="en"{head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);link rel="stylesheet" href="/assets/app.css";link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" class="theme-shell"{(body)(extra)}(footer)footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
+    let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" class="theme-shell"{(body)(extra)}(footer)(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
     if output.len() > 2 * 1024 * 1024 {
         return Err(Error::invalid("Rendered document exceeds 2 MiB."));
     }

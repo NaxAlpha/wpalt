@@ -455,6 +455,127 @@
         "new interaction pattern"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M3-01",
+      "area": "Language routing and direction",
+      "scope": "M3",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developers.google.com/search/docs/specialty/international/localized-versions",
+        "https://www.w3.org/International/questions/qa-html-dir"
+      ],
+      "applicable_versions": [
+        "wpalt schema 3",
+        "bundled M3 discovery contract; primary guidance reviewed 2026-10-01"
+      ],
+      "last_checked": "2026-10-01",
+      "next_review": "2026-12-30",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Published reciprocal fully qualified hreflang; omit missing/noindex variants; actual html lang and dir."
+      ],
+      "tests": [
+        "multilingual_publication_keeps_drafts_private_and_variants_reciprocal",
+        "M3 browser RTL and native authoring"
+      ],
+      "triggers": [
+        "affected release/milestone",
+        "primary guidance revision",
+        "security finding or dependency change"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M3-02",
+      "area": "Canonical and indexing",
+      "scope": "M3",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+        "https://developers.google.com/search/docs/crawling-indexing/block-indexing"
+      ],
+      "applicable_versions": [
+        "wpalt schema 3",
+        "bundled M3 discovery contract; primary guidance reviewed 2026-10-01"
+      ],
+      "last_checked": "2026-10-01",
+      "next_review": "2026-12-30",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "One local publication canonical; noindex is crawler policy, not privacy; do not disallow public noindex pages in robots."
+      ],
+      "tests": [
+        "discovery_metadata_redirects_links_and_permissions_are_one_local_system"
+      ],
+      "triggers": [
+        "affected release/milestone",
+        "primary guidance revision",
+        "security finding or dependency change"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M3-03",
+      "area": "Sitemap publication and pagination",
+      "scope": "M3",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap",
+        "https://www.sitemaps.org/protocol.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 3",
+        "bundled M3 discovery contract; primary guidance reviewed 2026-10-01"
+      ],
+      "last_checked": "2026-10-01",
+      "next_review": "2026-12-30",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Absolute XML-escaped publication URLs; no drafts/noindex; pages below protocol limits; no fabricated lastmod."
+      ],
+      "tests": [
+        "discovery_volume_has_bounded_pages_and_indexed_language_search"
+      ],
+      "triggers": [
+        "affected release/milestone",
+        "primary guidance revision",
+        "security finding or dependency change"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M3-04",
+      "area": "Truthful document and business structure",
+      "scope": "M3",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developers.google.com/search/docs/appearance/structured-data/local-business",
+        "https://developers.google.com/search/docs/appearance/structured-data/article"
+      ],
+      "applicable_versions": [
+        "wpalt schema 3",
+        "bundled M3 discovery contract; primary guidance reviewed 2026-10-01"
+      ],
+      "last_checked": "2026-10-01",
+      "next_review": "2026-12-30",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Visible business name/address match structure; minimal Article/WebPage output; no invented ratings/images/dates or rich-result eligibility claim."
+      ],
+      "tests": [
+        "discovery_metadata_redirects_links_and_permissions_are_one_local_system"
+      ],
+      "triggers": [
+        "affected release/milestone",
+        "primary guidance revision",
+        "security finding or dependency change"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

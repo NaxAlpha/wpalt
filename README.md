@@ -1,6 +1,6 @@
 # wpalt
 
-An owner-controlled Rust CMS with a bundled admin panel and public website. M2 adds a composable website builder to the publishing system on SQLite or PostgreSQL, with no vendor account or external runtime services.
+An owner-controlled Rust CMS with a bundled admin panel and public website. M3 adds multilingual publishing, integrated SEO and local redirect/link administration to the composable publishing system on SQLite or PostgreSQL, with no vendor account or external runtime services.
 
 Create posts and pages, keep drafts separate from live content, autosave, preview, restore revisions and schedule publication. Manage images, typed fields, basic compositions, navigation, Paper/Ink themes, moderated comments and local search. Export content, download a consistent manual backup and recover into a fresh database, including across database engines.
 
@@ -31,6 +31,8 @@ Configuration follows CLI > supported environment variables > explicitly selecte
 The pre-M3 supporting work uses semantic tokens and native components, measured responsive geometry, accessibility checks and reviewed platform-specific visual baselines. [Design and verification contract](docs/frontend-foundations.md) explains how to extend it and review its screenshot/measurement reports. These developer tools add no Node requirement to the running server.
 
 ## Review the delivered systems
+
+- [M3 multilingual discovery contract](docs/m3-contract.md), [publishing/discovery guide](docs/discovery.md) and [verification evidence](docs/evidence/m3-verification.md)
 
 - [M2 builder contract](docs/m2-contract.md), [authoring guide](docs/theme-authoring.md) and [M2 evidence](docs/evidence/m2-verification.md)
 - [M1 contract and deployment boundaries](docs/m1-contract.md)
