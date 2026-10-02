@@ -1,5 +1,10 @@
 import { Schema } from "prosemirror-model";
-import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
+import {
+  EditorState,
+  NodeSelection,
+  TextSelection,
+  Selection,
+} from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { history, undo, redo, closeHistory } from "prosemirror-history";
 import {
@@ -247,6 +252,37 @@ function initialize() {
     command(view.state, dispatch, view);
     view.focus();
   };
+  // Document-edge navigation is a transaction, not a browser selection followed
+  // by a delayed observer update. This also keeps rapid post-composition keys
+  // from racing with native caret reconciliation.
+  const edge =
+    (direction, extend = false) =>
+    (state, send) => {
+      const destination =
+        direction < 0
+          ? Selection.atStart(state.doc)
+          : Selection.atEnd(state.doc);
+      const selection = extend
+        ? TextSelection.between(state.selection.$anchor, destination.$head)
+        : destination;
+      if (send) send(state.tr.setSelection(selection).scrollIntoView());
+      return true;
+    };
+  const mac = /Mac|iPhone|iPad/u.test(navigator.platform);
+  const edgeKeys = {
+    "Mod-Home": edge(-1),
+    "Mod-End": edge(1),
+    "Mod-Shift-Home": edge(-1, true),
+    "Mod-Shift-End": edge(1, true),
+    ...(mac
+      ? {
+          "Mod-ArrowUp": edge(-1),
+          "Mod-ArrowDown": edge(1),
+          "Mod-Shift-ArrowUp": edge(-1, true),
+          "Mod-Shift-ArrowDown": edge(1, true),
+        }
+      : {}),
+  };
   const view = new EditorView(host, {
     state: EditorState.create({
       schema,
@@ -265,6 +301,7 @@ function initialize() {
           ],
         }),
         keymap({
+          ...edgeKeys,
           "Mod-z": undo,
           "Mod-Shift-z": redo,
           "Mod-y": redo,

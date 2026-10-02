@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "browser": "154.0.8037.59",
+  "browser": "154.0.8037.93",
   "journeys": [
     "early native input before enhancement",
     "slash/format/link/multilingual writing and synthetic composition boundary",
@@ -16,7 +16,7 @@
   "long_document": {
     "paragraphs": 1000,
     "source_bytes": 74888,
-    "load_ms": 80,
+    "load_ms": 81,
     "input_ms": 5
   },
   "canvas": [
@@ -41,6 +41,6 @@
       "overflow": false
     }
   ],
-  "elapsed_ms": 15031,
+  "elapsed_ms": 15094,
   "limits": "Clipboard payload is programmatically supplied. Japanese/Arabic text entry is exercised; native OS IME and screen readers are not certified."
 }

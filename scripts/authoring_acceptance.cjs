@@ -89,9 +89,23 @@ module.exports = async function (context, origin, output, mediaUrl) {
   await page.waitForFunction(() =>
     document.querySelector("[name=document]").value.includes("組成"),
   );
-  await editor.press(home);
+  // Rapid real document navigation immediately after composition must settle
+  // at the intended paragraph; observing the native selection is an assertion,
+  // not an injected caret or a timing sleep.
+  for (let n = 0; n < 4; n++) {
+    await editor.press(end);
+    await editor.press(home);
+    await page.waitForFunction(() => {
+      const p = document.querySelector(".ProseMirror > p");
+      const selection = window.getSelection();
+      return p?.contains(selection?.anchorNode) && selection.anchorOffset === 0;
+    });
+  }
   await editor.press(lineHome);
   await editor.press(selectLine);
+  await page.waitForFunction(
+    () => window.getSelection()?.toString() === "Opening line",
+  );
   await click("Bold");
   assert.equal(
     await editor.locator("strong").first().innerText(),
