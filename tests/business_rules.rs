@@ -151,6 +151,7 @@ async fn publication_retries_and_fresh_restore_preserve_one_authoritative_entry(
             .await
             .unwrap();
         let mut definition = quotation_form();
+        definition.max_entries = 2;
         definition.fields.push(
             serde_json::from_value(
                 json!({"name":"person","step":1,"schema":{"kind":"group","group":"person"}}),
@@ -229,6 +230,75 @@ async fn publication_retries_and_fresh_restore_preserve_one_authoritative_entry(
             store::submit(&app, &form, 2, &key, &input).await.is_ok(),
             "An accepted retry remains accepted after republishing."
         );
+        let current = json!({"business":false,"quantity":2,"rate":7,"person":{"name":"Grace","country":"Example"}});
+        let left_key = uuid::Uuid::new_v4().to_string();
+        let right_key = uuid::Uuid::new_v4().to_string();
+        let (left, right) = tokio::join!(
+            store::submit(&app, &form, 3, &left_key, &current),
+            store::submit(&other, &form, 3, &right_key, &current)
+        );
+        assert_eq!(
+            usize::from(left.is_ok()) + usize::from(right.is_ok()),
+            1,
+            "Only one independent connection can claim the last response slot."
+        );
+        let count: i64 = sqlx::query_scalar("SELECT entry_count FROM business_forms WHERE id=$1")
+            .bind(&form)
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 2);
+        use tower::ServiceExt;
+        let response = wpalt::web::router(app.clone())
+            .oneshot(
+                axum::http::Request::builder()
+                    .uri(format!("/admin/forms/{form}/entries"))
+                    .header("accept", "application/json")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), axum::http::StatusCode::SEE_OTHER);
+        assert_eq!(response.headers()["location"], "/login");
+        assert!(
+            response.headers()["cache-control"]
+                .to_str()
+                .unwrap()
+                .contains("no-store")
+        );
+        let response = wpalt::web::router(app.clone())
+            .oneshot(
+                axum::http::Request::builder()
+                    .uri(format!("/api/admin/forms/{form}"))
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::UNAUTHORIZED,
+            "Unauthenticated API requests receive no form data."
+        );
+        let mut disabled_config = (*app.config).clone();
+        disabled_config.business_enabled = false;
+        let disabled = App::open(disabled_config).await.unwrap();
+        let response = wpalt::web::router(disabled.clone())
+            .oneshot(
+                axum::http::Request::builder()
+                    .uri("/assets/forms.js")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::NOT_FOUND,
+            "Disabled forms do not serve their frontend asset."
+        );
+        disabled.db.pool.close().await;
         other.db.pool.close().await;
         restored.db.pool.close().await;
         app.db.pool.close().await;

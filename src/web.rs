@@ -21,8 +21,14 @@ use std::{io::Cursor, net::SocketAddr};
 pub fn router(app: App) -> Router {
     let limit = app.config.max_upload_bytes + 64 * 1024;
     let timeout = app.config.request_timeout_seconds;
+    let business = if app.config.business_enabled {
+        crate::business::web::routes()
+    } else {
+        Router::new()
+    };
     Router::new()
         .merge(crate::builder_web::routes())
+        .merge(business)
         .merge(crate::discovery::routes())
         .route("/", get(home))
         .route("/search", get(home))
@@ -1268,6 +1274,7 @@ async fn save_settings(
     admin(&s)?;
     auth::csrf(&s, &input.csrf)?;
     let settings = Settings {
+        business_enabled: app.config.business_enabled,
         title: input.title,
         description: input.description,
         theme: input.theme,

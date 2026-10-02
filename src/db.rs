@@ -6,6 +6,7 @@ use std::str::FromStr;
 pub struct Db {
     pub pool: AnyPool,
     pub postgres: bool,
+    pub business_enabled: bool,
 }
 impl Db {
     pub async fn open(config: &Config) -> anyhow::Result<Self> {
@@ -46,7 +47,11 @@ impl Db {
             })
             .connect_with(options)
             .await?;
-        Ok(Self { pool, postgres })
+        Ok(Self {
+            pool,
+            postgres,
+            business_enabled: config.business_enabled,
+        })
     }
     pub async fn migrate(&self) -> anyhow::Result<()> {
         sqlx::query("CREATE TABLE IF NOT EXISTS schema_version(id BIGINT PRIMARY KEY CHECK(id=1),version BIGINT NOT NULL)").execute(&self.pool).await?;
@@ -137,6 +142,7 @@ impl Db {
         .fetch_one(&self.pool)
         .await?;
         Ok(Settings {
+            business_enabled: self.business_enabled,
             title: r.get("title"),
             description: r.get("description"),
             theme: r.get("theme"),

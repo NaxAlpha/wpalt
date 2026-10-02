@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md; partial plugin groups are not blanket parity claims.",
-  "milestone": "M3",
+  "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md; M4 is in progress; partial plugin groups are not blanket parity claims.",
+  "milestone": "M4 in progress",
   "capabilities": [
     {
       "id": "F001",
@@ -548,9 +548,17 @@
       "capability": "Form designer and reusable field schema",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress-defined-M4-scope; full-group-verification-pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Initial basic form designer/public collection, bounded shared rules and versioned entries. See business.md and evidence/m4-step-1.md for exact supported behavior and required remaining work; this group is not complete.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-step-1.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs"
+      ]
     },
     {
       "id": "F038",
@@ -558,9 +566,17 @@
       "capability": "Conditional fields / notification routing",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress-defined-M4-scope; full-group-verification-pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Initial basic form designer/public collection, bounded shared rules and versioned entries. See business.md and evidence/m4-step-1.md for exact supported behavior and required remaining work; this group is not complete.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-step-1.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs"
+      ]
     },
     {
       "id": "F039",
@@ -568,9 +584,17 @@
       "capability": "Multi-step forms and repeatable inputs",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress-defined-M4-scope; full-group-verification-pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Initial basic form designer/public collection, bounded shared rules and versioned entries. See business.md and evidence/m4-step-1.md for exact supported behavior and required remaining work; this group is not complete.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-step-1.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs"
+      ]
     },
     {
       "id": "F040",
@@ -578,9 +602,17 @@
       "capability": "Entry storage, search, CSV export and permissions",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress-defined-M4-scope; full-group-verification-pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Initial basic form designer/public collection, bounded shared rules and versioned entries. See business.md and evidence/m4-step-1.md for exact supported behavior and required remaining work; this group is not complete.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-step-1.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs"
+      ]
     },
     {
       "id": "F041",
@@ -598,9 +630,17 @@
       "capability": "Calculations and pricing logic",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress-defined-M4-scope; full-group-verification-pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Initial basic form designer/public collection, bounded shared rules and versioned entries. See business.md and evidence/m4-step-1.md for exact supported behavior and required remaining work; this group is not complete.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-step-1.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs"
+      ]
     },
     {
       "id": "F043",

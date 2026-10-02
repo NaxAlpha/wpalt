@@ -43,6 +43,28 @@ export function Field({ label, description, error, children, ...input }) {
     </div>
   );
 }
+export function SelectField({ label, description, error, children, ...props }) {
+  const id = useId();
+  const hint = error || description;
+  return (
+    <div class="ui-field">
+      <label for={id}>{label}</label>
+      <select
+        {...props}
+        id={id}
+        aria-invalid={error ? "true" : undefined}
+        aria-describedby={hint ? id + "-hint" : undefined}
+      >
+        {children}
+      </select>
+      {hint && (
+        <small id={id + "-hint"} class={error ? "ui-field-error" : "help"}>
+          {hint}
+        </small>
+      )}
+    </div>
+  );
+}
 export function Notice({ children, error = false }) {
   return (
     <p

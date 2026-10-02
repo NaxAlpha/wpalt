@@ -27,7 +27,7 @@ impl PublishedForm {
 use sqlx::Row;
 
 pub const SCHEMA: &str = r#"
-CREATE TABLE IF NOT EXISTS business_forms(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL REFERENCES users(id),draft TEXT NOT NULL,live TEXT NOT NULL,version BIGINT NOT NULL CHECK(version>0),published_version BIGINT NOT NULL CHECK(published_version>=0),updated_at BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS business_forms(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL REFERENCES users(id),draft TEXT NOT NULL,live TEXT NOT NULL,version BIGINT NOT NULL CHECK(version>0),published_version BIGINT NOT NULL CHECK(published_version>=0),updated_at BIGINT NOT NULL,entry_count BIGINT NOT NULL DEFAULT 0 CHECK(entry_count>=0));
 CREATE INDEX IF NOT EXISTS business_forms_updated ON business_forms(updated_at DESC,id DESC);
 CREATE TABLE IF NOT EXISTS form_publications(form_id TEXT NOT NULL REFERENCES business_forms(id),version BIGINT NOT NULL,definition TEXT NOT NULL,created_at BIGINT NOT NULL,PRIMARY KEY(form_id,version));
 CREATE TABLE IF NOT EXISTS form_entries(id TEXT PRIMARY KEY,form_id TEXT NOT NULL REFERENCES business_forms(id),request_key TEXT NOT NULL,request_hash TEXT NOT NULL,form_version BIGINT NOT NULL,values_json TEXT NOT NULL,created_at BIGINT NOT NULL,UNIQUE(form_id,request_key),FOREIGN KEY(form_id,form_version) REFERENCES form_publications(form_id,version));
@@ -58,7 +58,7 @@ pub async fn save(
         .map_err(|_| Error::invalid("Invalid form definition."))?;
     let live = serde_json::to_string(&PublishedForm {
         form: definition.clone(),
-        groups: common.groups,
+        groups: snapshot_groups(definition, &common)?,
     })
     .map_err(|_| Error::invalid("Invalid published form."))?;
     // One atomic compare-and-swap publishes the same validated snapshot that is saved.
@@ -93,7 +93,7 @@ pub async fn submit(app: &App, id: &str, version: i64, key: &str, input: &Value)
     let mut tx = app.db.pool.begin().await?;
     // Obtain the per-form write lock before reads, avoiding SQLite deferred-read
     // upgrade failures and serializing publication with submission validation.
-    let row = sqlx::query("UPDATE business_forms SET updated_at=updated_at WHERE id=$1 AND published_version>0 RETURNING live,published_version")
+    let row = sqlx::query("UPDATE business_forms SET updated_at=updated_at WHERE id=$1 AND published_version>0 RETURNING live,published_version,entry_count")
         .bind(id).fetch_optional(&mut *tx).await?.ok_or_else(Error::not_found)?;
     let raw: String = row.get("live");
     let hash = crate::auth::digest(format!("{version}:{}", input).as_bytes());
@@ -116,13 +116,60 @@ pub async fn submit(app: &App, id: &str, version: i64, key: &str, input: &Value)
     }
     let definition: PublishedForm = serde_json::from_str(&raw)
         .map_err(|_| Error::invalid("The stored form requires repair."))?;
+    if row.get::<i64, _>("entry_count") >= definition.form.max_entries {
+        return Err(Error(
+            axum::http::StatusCode::TOO_MANY_REQUESTS,
+            "This form has reached its response limit. Contact the site owner.",
+        ));
+    }
     let values = definition
         .form
         .evaluate(&definition.common(), input, false)?;
     let entry = uuid::Uuid::new_v4().to_string();
     sqlx::query("INSERT INTO form_entries(id,form_id,request_key,request_hash,form_version,values_json,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)")
         .bind(&entry).bind(id).bind(key).bind(hash).bind(version).bind(values.to_string()).bind(now()).execute(&mut *tx).await?;
+    sqlx::query("UPDATE business_forms SET entry_count=entry_count+1 WHERE id=$1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
     tracing::info!(event="form_entry_recorded", form_id=id, entry_id=%entry, form_version=version);
     Ok(entry)
+}
+
+fn snapshot_groups(
+    form: &FormDefinition,
+    common: &Definition,
+) -> Result<BTreeMap<String, BTreeMap<String, Field>>> {
+    fn collect(
+        field: &Field,
+        common: &Definition,
+        groups: &mut BTreeMap<String, BTreeMap<String, Field>>,
+    ) -> Result<()> {
+        for name in std::iter::once(&field.group)
+            .chain(field.variants.values())
+            .filter(|name| !name.is_empty())
+        {
+            if groups.contains_key(name) {
+                continue;
+            }
+            let source = common
+                .groups
+                .get(name)
+                .ok_or(Error::invalid("A reusable form group is missing."))?;
+            groups.insert(name.clone(), source.clone());
+            for child in source.values() {
+                collect(child, common, groups)?;
+            }
+        }
+        for child in field.fields.values() {
+            collect(child, common, groups)?;
+        }
+        Ok(())
+    }
+    let mut groups = BTreeMap::new();
+    for field in &form.fields {
+        collect(&field.schema, common, &mut groups)?;
+    }
+    Ok(groups)
 }

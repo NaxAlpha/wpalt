@@ -65,6 +65,8 @@ impl Post {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
+    #[serde(skip)]
+    pub business_enabled: bool,
     pub title: String,
     pub description: String,
     pub theme: String,
@@ -74,6 +76,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            business_enabled: true,
             title: "My wpalt site".into(),
             description: "A place for ideas, built on your own server.".into(),
             theme: "paper".into(),

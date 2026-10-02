@@ -629,3 +629,7 @@ module.exports = async function verifyUI(context, origin) {
     await page.close();
   }
 };
+
+// Reuse the independently reviewed measurements in later integrated workflows.
+module.exports.geometry = geometry;
+module.exports.accessibility = accessibility;

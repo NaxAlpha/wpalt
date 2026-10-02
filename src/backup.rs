@@ -176,6 +176,7 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
             ("version", true),
             ("published_version", true),
             ("updated_at", true),
+            ("entry_count", true),
         ],
     ),
     (
@@ -476,6 +477,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             .ok_or(Error::invalid("Invalid backup settings."))
     };
     crate::content::validate_settings(&crate::model::Settings {
+        business_enabled: app.config.business_enabled,
         title: setting_string("title")?,
         description: setting_string("description")?,
         theme: setting_string("theme")?,

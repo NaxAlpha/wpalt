@@ -563,6 +563,7 @@ async function freePort() {
   await visitor.reload();
   assert.equal(await visitor.title(), "Découverte sans JavaScript");
   await native.close();
+  await require("./business_acceptance.cjs")(owner, origin, output);
   await require("./authoring_acceptance.cjs")(owner, origin, output, mediaUrl);
   assert.deepEqual(errors, [], "Browser JavaScript errors");
   assert.deepEqual(remote, [], "Unexpected external runtime requests");

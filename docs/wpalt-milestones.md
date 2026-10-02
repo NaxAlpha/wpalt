@@ -260,3 +260,8 @@ The user authorized merging PR #7 and continuing with M4. M3.5 merged as `df8208
 ### M4 first implementation step — 2026-10-02
 
 The shared form grammar and versioned persistence are implemented as groundwork, not a usable completed milestone. Hidden inputs are discarded, calculations recomputed, drafts remain typed, published reusable groups are frozen, submission keys deduplicate across pools, stale publication is rejected, and current-format backup/restore includes immutable entries. Local rule/storage/recovery tests and the existing SQLite publishing suite pass. Real PostgreSQL evidence, the form designer/public UI, remaining form workflows, audience/communications/engagement, integrated verification and delivery remain pending. No capability is marked complete from this step.
+
+
+### M4 first usable form slice — 2026-10-02
+
+[Draft milestone PR #8](https://github.com/NaxAlpha/wpalt/pull/8) tracks the full M4 delivery. Initial backend commit `7349159` passed real PostgreSQL CI and the independent clean build (run 37003012725); newer changes need their own CI. The first user-facing slice adds basic visual form design/public collection and protected response viewing, shared controls, measured narrow/desktop layouts, frozen publication groups, capacity-race protection and a module-disable configuration. Local SQLite acceptance and the full native-browser/UI regression suite pass. See [operations](business.md) and [step evidence](evidence/m4-step-1.md). M4 remains in progress; required advanced form, audience, communication, engagement and integrated delivery work remains.

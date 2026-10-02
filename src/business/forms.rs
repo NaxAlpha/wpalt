@@ -7,11 +7,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
+fn entry_limit() -> i64 {
+    10000
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FormDefinition {
     pub title: String,
     pub fields: Vec<FormField>,
+    #[serde(default = "entry_limit")]
+    pub max_entries: i64,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -40,7 +46,8 @@ pub enum Calculation {
 impl FormDefinition {
     /// Dependencies must precede the field: evaluation is linear, with no cycles.
     pub fn validate(&self, common: &Definition) -> Result<Registry> {
-        if self.title.trim().is_empty()
+        if !(1..=1000000).contains(&self.max_entries)
+            || self.title.trim().is_empty()
             || self.title.len() > 160
             || self.fields.is_empty()
             || self.fields.len() > 32
