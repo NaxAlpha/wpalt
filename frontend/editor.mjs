@@ -1008,7 +1008,7 @@ function initialize() {
           form.elements.locale.dispatchEvent(
             new Event("change", { bubbles: true }),
           );
-          form.elements.kind.dispatchEvent(
+          form.elements.kind?.dispatchEvent(
             new Event("change", { bubbles: true }),
           );
           form.dispatchEvent(new Event("input", { bubbles: true }));

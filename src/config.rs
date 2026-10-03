@@ -14,6 +14,7 @@ pub struct Config {
     pub base_url: String,
     pub debug: bool,
     pub business_enabled: bool,
+    pub mail: crate::business::mail::MailConfig,
     pub database_connections: u32,
     pub scheduler_seconds: u64,
     pub session_seconds: i64,
@@ -33,6 +34,7 @@ impl Default for Config {
             base_url: "http://127.0.0.1:3000".into(),
             debug: false,
             business_enabled: true,
+            mail: crate::business::mail::MailConfig::default(),
             database_connections: 4,
             scheduler_seconds: 5,
             session_seconds: 28800,
@@ -77,6 +79,7 @@ impl Config {
         Ok(c)
     }
     pub fn validate(&self) -> anyhow::Result<()> {
+        self.mail.validate()?;
         ensure!(
             self.database_url.starts_with("sqlite:")
                 || self.database_url.starts_with("postgres://")
@@ -143,6 +146,7 @@ impl Config {
     }
     pub fn prepare_directories(&self) -> anyhow::Result<()> {
         std::fs::create_dir_all(self.data_dir.join("media"))?;
+        std::fs::create_dir_all(self.data_dir.join("attachments"))?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -164,6 +168,10 @@ impl Config {
             } else {
                 "postgres://[REDACTED]".into()
             });
+        for connection in value["mail"]["smtp"].as_array_mut().unwrap() {
+            connection["password"] = serde_json::Value::String("[REDACTED]".into());
+            connection["username"] = serde_json::Value::String("[REDACTED]".into());
+        }
         value
     }
 }

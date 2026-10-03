@@ -14,6 +14,8 @@ use std::collections::BTreeMap;
 #[serde(deny_unknown_fields)]
 pub struct PublishedForm {
     pub form: FormDefinition,
+    #[serde(default)]
+    pub subscription_purpose: Option<String>,
     pub groups: BTreeMap<String, BTreeMap<String, Field>>,
 }
 impl PublishedForm {
@@ -56,7 +58,21 @@ pub async fn save(
     definition.validate(&common)?;
     let raw = serde_json::to_string(definition)
         .map_err(|_| Error::invalid("Invalid form definition."))?;
+    let subscription_purpose = if let Some(action) = &definition.subscription {
+        let row = sqlx::query("SELECT purpose,policy FROM audience_lists WHERE id=$1")
+            .bind(&action.list)
+            .fetch_optional(&app.db.pool)
+            .await?
+            .ok_or_else(|| Error::invalid("Select an existing audience list."))?;
+        if row.get::<String, _>("policy") != action.policy {
+            return Err(Error::conflict());
+        }
+        Some(row.get::<String, _>("purpose"))
+    } else {
+        None
+    };
     let live = serde_json::to_string(&PublishedForm {
+        subscription_purpose,
         form: definition.clone(),
         groups: snapshot_groups(definition, &common)?,
     })
@@ -122,12 +138,36 @@ pub async fn submit(app: &App, id: &str, version: i64, key: &str, input: &Value)
             "This form has reached its response limit. Contact the site owner.",
         ));
     }
-    let values = definition
+    let mut values = definition
         .form
         .evaluate(&definition.common(), input, false)?;
     let entry = uuid::Uuid::new_v4().to_string();
+    for field in &definition.form.fields {
+        if matches!(field.widget, Some(super::forms::Widget::Upload)) {
+            if let Some(capability) = values.get(&field.name).and_then(Value::as_str) {
+                let attachment = super::attachments::attach(
+                    &mut tx,
+                    id,
+                    version,
+                    &field.name,
+                    capability,
+                    &entry,
+                )
+                .await?;
+                values[&field.name] = Value::String(attachment);
+            }
+        }
+    }
     sqlx::query("INSERT INTO form_entries(id,form_id,request_key,request_hash,form_version,values_json,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)")
         .bind(&entry).bind(id).bind(key).bind(hash).bind(version).bind(values.to_string()).bind(now()).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO form_entry_search(entry_id,search_text) VALUES($1,$2)")
+        .bind(&entry)
+        .bind(values.to_string())
+        .execute(&mut *tx)
+        .await?;
+    if let Some(action) = &definition.form.subscription {
+        super::audience::subscribe(app, &mut tx, action, &values).await?;
+    }
     sqlx::query("UPDATE business_forms SET entry_count=entry_count+1 WHERE id=$1")
         .bind(id)
         .execute(&mut *tx)

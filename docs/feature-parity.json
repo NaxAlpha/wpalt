@@ -648,9 +648,10 @@
       "capability": "Signatures and signed-document records",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Working M4 slices; see docs/business.md for implemented behavior, tested limits and required unfinished contract work."
     },
     {
       "id": "F044",
@@ -658,9 +659,10 @@
       "capability": "Surveys, polls and scoring",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Working M4 slices; see docs/business.md for implemented behavior, tested limits and required unfinished contract work."
     },
     {
       "id": "F045",
@@ -668,9 +670,10 @@
       "capability": "Save/resume, partial entries and abandonment",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Working M4 slices; see docs/business.md for implemented behavior, tested limits and required unfinished contract work."
     },
     {
       "id": "F046",
@@ -678,9 +681,10 @@
       "capability": "Offline capture and later synchronization",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Working M4 slices; see docs/business.md for implemented behavior, tested limits and required unfinished contract work."
     },
     {
       "id": "F047",
@@ -1158,9 +1162,10 @@
       "capability": "SMTP settings and connection routing",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Working M4 slices; see docs/business.md for implemented behavior, tested limits and required unfinished contract work."
     },
     {
       "id": "F095",
@@ -1168,9 +1173,10 @@
       "capability": "Mail logs, resend, failure alerts and fallback",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Working M4 slices; see docs/business.md for implemented behavior, tested limits and required unfinished contract work."
     },
     {
       "id": "F096",
@@ -1188,9 +1194,10 @@
       "capability": "Mailing lists, consent records and segmentation",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Working M4 slices; see docs/business.md for implemented behavior, tested limits and required unfinished contract work."
     },
     {
       "id": "F098",
@@ -1198,9 +1205,10 @@
       "capability": "Newsletter design, queue and automation",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Working M4 slices; see docs/business.md for implemented behavior, tested limits and required unfinished contract work."
     },
     {
       "id": "F099",
@@ -1208,9 +1216,10 @@
       "capability": "Self-operated outbound mail server",
       "deployment": "W",
       "milestone": "M4",
-      "status": "planned",
+      "status": "in-progress",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Working M4 slices; see docs/business.md for implemented behavior, tested limits and required unfinished contract work."
     },
     {
       "id": "F100",

@@ -67,7 +67,8 @@ impl Db {
                     || version == Some(2)
                     || version == Some(3)
                     || version == Some(4)
-                    || version == Some(5),
+                    || version == Some(5)
+                    || version == Some(6),
                 "unsupported schema version; use the documented migration/reset path"
             );
         }
@@ -82,7 +83,28 @@ impl Db {
         sqlx::raw_sql(crate::business::store::SCHEMA)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("UPDATE schema_version SET version=5 WHERE id=1")
+        sqlx::raw_sql(crate::business::audience::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::campaigns::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::drafts::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::attachments::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::entries::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::entries::SEARCH_SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::mail::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE schema_version SET version=6 WHERE id=1")
             .execute(&mut *tx)
             .await?;
         if self.postgres {
@@ -94,6 +116,7 @@ impl Db {
         }
         sqlx::query("INSERT INTO discovery_settings(id,definition,version) VALUES(1,$1,1) ON CONFLICT(id) DO NOTHING").bind(serde_json::to_string(&crate::discovery::Definition::default())?).execute(&mut *tx).await?;
         tx.commit().await?;
+        crate::business::entries::prepare_search(self).await?;
         Ok(())
     }
     /// Run bounded planner/index maintenance after an offline bulk operation.

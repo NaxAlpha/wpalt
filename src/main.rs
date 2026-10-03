@@ -248,6 +248,12 @@ async fn main() -> anyhow::Result<()> {
                     if content::publish_due(&scheduled).await.is_err() {
                         tracing::error!(event = "scheduler_tick_failed");
                     }
+                    if wpalt::business::campaigns::tick(&scheduled).await.is_err() {
+                        tracing::error!(event = "campaign_tick_failed");
+                    }
+                    if wpalt::business::mail::tick(&scheduled).await.is_err() {
+                        tracing::error!(event = "mail_tick_failed");
+                    }
                     if let Err(_e) = cleanup(&scheduled).await {
                         tracing::error!(event = "maintenance_tick_failed");
                     }

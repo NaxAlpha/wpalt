@@ -22,13 +22,21 @@ export function Button({
     </button>
   );
 }
-export function Field({ label, description, error, children, ...input }) {
+export function Field({
+  label,
+  description,
+  error,
+  children,
+  multiline = false,
+  ...input
+}) {
   const id = useId();
   const hint = error || description;
+  const Control = multiline ? "textarea" : "input";
   return (
     <div class="ui-field">
       <label for={id}>{label}</label>
-      <input
+      <Control
         {...input}
         id={id}
         aria-invalid={error ? "true" : undefined}

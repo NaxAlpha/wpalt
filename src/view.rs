@@ -20,7 +20,7 @@ pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body:
                 p class="sidebar-note" {"Your site. Your server."}
                 nav aria-label="Administration" {
                     a href="/admin" {"Overview"}
-                    @if s.can_edit() {a href="/admin/posts" {"Content"} a href="/admin/media" {"Media library"} @if settings.business_enabled {a href="/admin/forms" {"Forms"}}}
+                    @if s.can_edit() {a href="/admin/posts" {"Content"} a href="/admin/media" {"Media library"} @if settings.business_enabled {a href="/admin/forms" {"Forms"} a href="/admin/audience" {"Audience"} a href="/admin/mail" {"Mail"}}}
                     @if s.can_moderate() {a href="/admin/comments" {"Comments"}}
                     @if s.is_admin() {a href="/admin/builder" {"Design studio"} a href="/admin/discovery" {"Discovery"} a href="/admin/settings" {"Site settings"} a href="/admin/operations" {"Operations"}}
                     a href="/" {"View website ↗"}

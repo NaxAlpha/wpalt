@@ -19,12 +19,27 @@ use sqlx::Row;
 
 pub fn routes() -> Router<App> {
     Router::new()
+        .merge(super::audience_web::routes())
         .route("/admin/forms", get(list).post(create))
         .route("/admin/forms/{id}", get(editor))
         .route("/admin/forms/{id}/entries", get(entries))
-        .route("/admin/forms/{id}/entries/{entry}", get(entry))
+        .route("/admin/forms/{id}/export", get(export_entries))
+        .route(
+            "/admin/forms/{id}/entries/{entry}",
+            get(entry).post(follow_up),
+        )
+        .route(
+            "/admin/forms/{id}/entries/{entry}/attachments/{attachment}",
+            get(attachment_download),
+        )
         .route("/api/admin/forms/{id}", get(state).post(save))
         .route("/api/forms/{id}/entries", post(submit))
+        .route(
+            "/api/forms/{id}/attachments/{field}",
+            post(super::attachments::upload).layer(DefaultBodyLimit::max(2 * 1024 * 1024)),
+        )
+        .route("/api/forms/{id}/drafts", post(draft_save))
+        .route("/api/forms/{id}/drafts/{token}", get(draft_load))
         .route("/forms/{id}", get(public))
         .route("/assets/forms.js", get(bundle))
         .layer(DefaultBodyLimit::max(128 * 1024))
@@ -39,9 +54,9 @@ async fn editor_session(app: &App, headers: &HeaderMap) -> Result<crate::model::
 async fn list(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {
     let session = editor_session(&app, &headers).await?;
     let query = if app.db.postgres {
-        "SELECT id,draft::jsonb->>'title' AS title,version,published_version FROM business_forms ORDER BY updated_at DESC,id DESC LIMIT 40"
+        "SELECT id,draft,draft::jsonb->>'title' AS title,version,published_version FROM business_forms ORDER BY updated_at DESC,id DESC LIMIT 40"
     } else {
-        "SELECT id,json_extract(draft,'$.title') AS title,version,published_version FROM business_forms ORDER BY updated_at DESC,id DESC LIMIT 40"
+        "SELECT id,draft,json_extract(draft,'$.title') AS title,version,published_version FROM business_forms ORDER BY updated_at DESC,id DESC LIMIT 40"
     };
     let rows = sqlx::query(query).fetch_all(&app.db.pool).await?;
     let settings = app.db.settings().await?;
@@ -114,8 +129,9 @@ async fn state(
         .fetch_optional(&app.db.pool)
         .await?
         .ok_or_else(Error::not_found)?;
+    let lists = sqlx::query("SELECT id,title,purpose,policy FROM audience_lists ORDER BY created_at DESC,id DESC LIMIT 100").fetch_all(&app.db.pool).await?.into_iter().map(|r| json!({"id":r.get::<String,_>("id"),"title":r.get::<String,_>("title"),"purpose":r.get::<String,_>("purpose"),"policy":r.get::<String,_>("policy")})).collect::<Vec<_>>();
     Ok(Json(
-        json!({"definition":serde_json::from_str::<Value>(&row.get::<String,_>("draft")).map_err(|_| Error::invalid("Stored form requires repair."))?,"version":row.get::<i64,_>("version"),"published_version":row.get::<i64,_>("published_version")}),
+        json!({"lists":lists,"definition":serde_json::from_str::<Value>(&row.get::<String,_>("draft")).map_err(|_| Error::invalid("Stored form requires repair."))?,"version":row.get::<i64,_>("version"),"published_version":row.get::<i64,_>("published_version")}),
     ))
 }
 #[derive(Deserialize)]
@@ -188,22 +204,36 @@ async fn entries(
     State(app): State<App>,
     headers: HeaderMap,
     Path(id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<EntryQuery>,
 ) -> Result<Html<String>> {
     let session = editor_session(&app, &headers).await?;
-    let rows = sqlx::query("SELECT id,created_at,form_version FROM form_entries WHERE form_id=$1 ORDER BY created_at DESC,id DESC LIMIT 40").bind(&id).fetch_all(&app.db.pool).await?;
+    let rows = super::entries::search(&app, &id, &query.q, query.before, &query.after).await?;
+    let next = if rows.len() > 40 {
+        let last = &rows[39];
+        let query = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("q", &query.q)
+            .append_pair("before", &last.get::<i64, _>("created_at").to_string())
+            .append_pair("after", &last.get::<String, _>("id"))
+            .finish();
+        Some(format!("/admin/forms/{id}/entries?{query}"))
+    } else {
+        None
+    };
     Ok(Html(view::layout(
         "Form responses",
         &app.db.settings().await?,
         Some(&session),
         html! {
             (view::heading("Business", "Form responses", "Accepted responses remain attached to the form version that collected them."))
-            p {a href=(format!("/admin/forms/{id}")) {"Back to form"}}
-            section class="panel" {h2 {"Recent responses"} @if rows.is_empty() {p {"No responses yet."}}
-                @for row in rows {
+            p {a href=(format!("/admin/forms/{id}")) {"Back to form"} " · " a href=(format!("/admin/forms/{id}/export")){"Export responses (500 per page)"}}
+            form method="get" class="toolbar" {label {"Search responses" input name="q" maxlength="100" value=(&query.q);} button {"Search"}}
+            section class="panel" {h2 {"Responses"} @if rows.is_empty() {p {"No responses yet."}}
+                @for row in rows.iter().take(40) {
                     @let entry: String = row.get("id");
                     p {a href=(format!("/admin/forms/{id}/entries/{entry}")) {"Response " (entry)} " · version " (row.get::<i64,_>("form_version"))}
                 }
             }
+            @if let Some(next)=next {a class="button secondary" href=(next){"Older responses"}}
         },
     )))
 }
@@ -213,12 +243,35 @@ async fn entry(
     Path((id, entry)): Path<(String, String)>,
 ) -> Result<Html<String>> {
     let session = editor_session(&app, &headers).await?;
-    let row = sqlx::query("SELECT e.values_json,e.form_version,p.definition FROM form_entries e JOIN form_publications p ON p.form_id=e.form_id AND p.version=e.form_version WHERE e.form_id=$1 AND e.id=$2").bind(&id).bind(entry).fetch_optional(&app.db.pool).await?.ok_or_else(Error::not_found)?;
+    let row = sqlx::query("SELECT e.values_json,e.form_version,p.definition FROM form_entries e JOIN form_publications p ON p.form_id=e.form_id AND p.version=e.form_version WHERE e.form_id=$1 AND e.id=$2").bind(&id).bind(&entry).fetch_optional(&app.db.pool).await?.ok_or_else(Error::not_found)?;
     let publication: store::PublishedForm =
         serde_json::from_str(&row.get::<String, _>("definition"))
             .map_err(|_| Error::invalid("Stored publication requires repair."))?;
     let values: Value = serde_json::from_str(&row.get::<String, _>("values_json"))
         .map_err(|_| Error::invalid("Stored response requires repair."))?;
+    let attachments=sqlx::query("SELECT id,original_name FROM form_attachments WHERE form_id=$1 AND entry_id=$2 ORDER BY id LIMIT 32").bind(&id).bind(&entry).fetch_all(&app.db.pool).await?;
+    let workflow =
+        sqlx::query("SELECT notes,assignee,version FROM form_entry_workflows WHERE entry_id=$1")
+            .bind(&entry)
+            .fetch_optional(&app.db.pool)
+            .await?;
+    let notes = workflow
+        .as_ref()
+        .map(|r| r.get::<String, _>("notes"))
+        .unwrap_or_default();
+    let assignee = workflow
+        .as_ref()
+        .map(|r| r.get::<String, _>("assignee"))
+        .unwrap_or_default();
+    let version = workflow
+        .as_ref()
+        .map(|r| r.get::<i64, _>("version"))
+        .unwrap_or(1);
+    let editors = sqlx::query(
+        "SELECT id,name FROM users WHERE role IN ('admin','editor') ORDER BY name,id LIMIT 100",
+    )
+    .fetch_all(&app.db.pool)
+    .await?;
     Ok(Html(view::layout(
         "Form response",
         &app.db.settings().await?,
@@ -226,11 +279,14 @@ async fn entry(
         html! {
             (view::heading("Business", &publication.form.title, "A preserved response to the published form."))
             p {a href=(format!("/admin/forms/{id}/entries")) {"All responses"} " · version " (row.get::<i64,_>("form_version"))}
+            section class="panel" {h2 {"Follow up"} form method="post" {(view::csrf(&session)) input type="hidden" name="version" value=(version); label {"Private notes" textarea name="notes" maxlength="8000" {(notes)}} label {"Assigned to" select name="assignee" {option value="" {"Unassigned"} @for person in editors {option value=(person.get::<String,_>("id")) selected[person.get::<String,_>("id")==assignee] {(person.get::<String,_>("name"))}}}} button {"Save follow-up"}}}
             section class="panel" {
                 @for field in &publication.form.fields {
                     @if let Some(value) = values.get(&field.name) {
                         h2 {(if field.schema.label.is_empty() {field.name.as_str()}else{field.schema.label.as_str()})}
-                        (entry_value(value))
+                        @if matches!(field.widget,Some(super::forms::Widget::Upload)) {
+                            @if let Some(file)=attachments.iter().find(|r|Some(r.get::<String,_>("id").as_str())==value.as_str()) {a href=(format!("/admin/forms/{id}/entries/{entry}/attachments/{}",file.get::<String,_>("id"))) {"Download " (file.get::<String,_>("original_name"))}}
+                        } @else {(entry_value(value))}
                     }
                 }
             }
@@ -248,4 +304,111 @@ fn entry_value(value: &Value) -> maud::Markup {
         Value::Null => html! {p {"No response"}},
         Value::Number(value) => html! {p {(value)}},
     }
+}
+
+async fn draft_save(
+    State(app): State<App>,
+    Path(id): Path<String>,
+    Json(input): Json<super::drafts::Save>,
+) -> Result<Json<super::drafts::Draft>> {
+    Ok(Json(super::drafts::save(&app, &id, input).await?))
+}
+async fn draft_load(
+    State(app): State<App>,
+    Path((id, token)): Path<(String, String)>,
+) -> Result<Json<super::drafts::Draft>> {
+    Ok(Json(super::drafts::load(&app, &id, &token).await?))
+}
+
+async fn attachment_download(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path((form, entry, id)): Path<(String, String, String)>,
+) -> Result<Response> {
+    editor_session(&app, &headers).await?;
+    let row=sqlx::query("SELECT filename,sha256,size FROM form_attachments WHERE id=$1 AND form_id=$2 AND entry_id=$3 AND entry_id!=''").bind(id).bind(form).bind(entry).fetch_optional(&app.db.pool).await?.ok_or_else(Error::not_found)?;
+    let filename: String = row.get("filename");
+    if !super::attachments::safe_filename(&filename) {
+        return Err(Error::invalid("Unsafe attachment path."));
+    }
+    let data = tokio::fs::read(app.config.data_dir.join("attachments").join(filename)).await?;
+    if data.len() as i64 != row.get::<i64, _>("size")
+        || crate::auth::digest(&data) != row.get::<String, _>("sha256")
+    {
+        return Err(Error::invalid("Attachment integrity check failed."));
+    }
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/octet-stream"),
+            (
+                header::CONTENT_DISPOSITION,
+                "attachment; filename=attachment.bin",
+            ),
+        ],
+        data,
+    )
+        .into_response())
+}
+
+#[derive(Deserialize)]
+struct FollowUp {
+    csrf: String,
+    version: i64,
+    notes: String,
+    assignee: String,
+}
+async fn follow_up(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path((form, entry)): Path<(String, String)>,
+    axum::extract::Form(input): axum::extract::Form<FollowUp>,
+) -> Result<Redirect> {
+    let s = editor_session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    super::entries::follow_up(
+        &app,
+        &form,
+        &entry,
+        input.version,
+        &input.notes,
+        &input.assignee,
+    )
+    .await?;
+    Ok(Redirect::to(&format!(
+        "/admin/forms/{form}/entries/{entry}"
+    )))
+}
+#[derive(Deserialize, Default)]
+struct ExportQuery {
+    #[serde(default)]
+    after: String,
+}
+async fn export_entries(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path(form): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<ExportQuery>,
+) -> Result<Response> {
+    editor_session(&app, &headers).await?;
+    Ok((
+        [
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (
+                header::CONTENT_DISPOSITION,
+                "attachment; filename=responses.csv",
+            ),
+        ],
+        super::entries::export(&app, &form, &query.after).await?,
+    )
+        .into_response())
+}
+
+#[derive(Deserialize, Default)]
+struct EntryQuery {
+    #[serde(default)]
+    q: String,
+    #[serde(default)]
+    before: i64,
+    #[serde(default)]
+    after: String,
 }

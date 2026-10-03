@@ -651,6 +651,77 @@
         "form grammar or worker/action change"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-MAIL-CONSENT",
+      "area": "Purpose-specific audience consent and durable mail",
+      "scope": "M4",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.rs/lettre/0.11.23/lettre/",
+        "https://www.postgresql.org/docs/17/sql-select.html",
+        "https://www.rfc-editor.org/rfc/rfc8058.html"
+      ],
+      "applicable_versions": [
+        "lettre 0.11.23",
+        "PostgreSQL 17",
+        "wpalt schema/backup 6"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Random hashed purpose/version-bound confirmation capabilities; GET must not change consent. Campaign eligibility requires confirmed current policy and is checked again before transport.",
+        "Atomic bounded queue claims across database connections; uncertain SMTP receipt loss is visible and never blindly resent. Owner SMTP credentials are redacted.",
+        "Ordinary withdrawal landing pages use deliberate same-origin POST. Do not claim RFC8058 one-click compliance or publish its header without an operator signing/transport implementation."
+      ],
+      "tests": [
+        "consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journey",
+        "smtp_acceptance_and_lost_receipts_have_distinct_recovery_states"
+      ],
+      "triggers": [
+        "affected release",
+        "mail transport/security advisory",
+        "consent or lease semantics change"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-PRIVATE-RESPONSE",
+      "area": "Private attachments and indexed response management",
+      "scope": "M4",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html",
+        "https://www.sqlite.org/fts5.html",
+        "https://www.postgresql.org/docs/17/textsearch-indexes.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema/backup 6",
+        "SQLite FTS5",
+        "PostgreSQL 17 GIN"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Public upload admission is restricted to a published upload field, with form/version/field-scoped hashed single-entry capabilities, bounded requests and file-storage quota. Private files use generated paths outside public media, owner-only download, restrictive permissions and integrity checks.",
+        "Re-encode accepted images with allocation/dimension limits. PDF signature checking is not malware scanning; downloaded documents can still be unsafe in their native applications.",
+        "Bounded keyset entry pagination, parameterized FTS5/GIN search, versioned notes/assignment and bounded CSV exports. Backups include protected files and rebuild derived search."
+      ],
+      "tests": [
+        "attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "publication_retries_and_fresh_restore_preserve_one_authoritative_entry"
+      ],
+      "triggers": [
+        "affected release",
+        "image/parser advisory",
+        "file-type or retention policy change",
+        "query/index or permission change"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

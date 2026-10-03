@@ -129,7 +129,12 @@ async fn security_and_trace(
         response = Redirect::to("/login").into_response();
     }
     let h = response.headers_mut();
-    if route.starts_with("/admin") || route.starts_with("/api/admin") || route == "/login" {
+    if route.starts_with("/admin")
+        || route.starts_with("/api/admin")
+        || route == "/login"
+        || route.starts_with("/audience/")
+        || route.starts_with("/api/forms/")
+    {
         h.insert(
             "x-robots-tag",
             HeaderValue::from_static("noindex, nofollow"),
@@ -144,6 +149,9 @@ async fn security_and_trace(
         "referrer-policy",
         HeaderValue::from_static("strict-origin-when-cross-origin"),
     );
+    if route.starts_with("/audience/") {
+        h.insert("referrer-policy", HeaderValue::from_static("no-referrer"));
+    }
     h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"));
     if route == "/admin/design/{id}/preview" || route == "/admin/preview/{id}" {
         h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'"));
@@ -158,7 +166,12 @@ async fn security_and_trace(
             HeaderValue::from_static("max-age=31536000"),
         );
     }
-    if route.starts_with("/admin") || route.starts_with("/api/admin") || route == "/login" {
+    if route.starts_with("/admin")
+        || route.starts_with("/api/admin")
+        || route == "/login"
+        || route.starts_with("/audience/")
+        || route.starts_with("/api/forms/")
+    {
         h.insert("cache-control", HeaderValue::from_static("no-store"));
     }
     if response.status().is_server_error() {
