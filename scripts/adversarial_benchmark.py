@@ -27,6 +27,8 @@ with tempfile.TemporaryDirectory(prefix='wpalt-adversarial-perf-') as tmp:
     selected=str(uuid.uuid4())
     target=json.dumps({'paths':['/'] if n==candidates-1 else ['/not-this-fixture'], 'device':'all','referrer':'all','starts_at':0,'ends_at':0,'max_impressions':10})
     conn.execute('INSERT INTO business_promotions(id,title,document_a,document_b,target,active,created_at) VALUES(?,?,?,?,?,1,?)',(selected,'Measured offer',document,document,target,n))
+  with sqlite3.connect(db) as conn:
+   targeting_plan=[row[-1] for row in conn.execute("EXPLAIN QUERY PLAN SELECT p.id,p.title,p.target,p.experiment,p.wheel,COALESCE(i.variant,'') AS variant,COALESCE(i.count,0) AS impressions FROM business_promotions p LEFT JOIN promotion_impressions i ON i.promotion_id=p.id AND i.session_hash=? WHERE p.active=1 ORDER BY p.created_at,p.id LIMIT 100",('fixture-session',))]
   log=root/'server.log'
   with log.open('w') as sink:
    server=subprocess.Popen([str(binary),'--config',str(cfg),'serve'],stdout=sink,stderr=sink)
@@ -50,7 +52,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-adversarial-perf-') as tmp:
   records=[json.loads(line) for line in log.read_text().splitlines() if line.startswith('{')]
   counts=[sum(record.get('target')=='sqlx::query' and any(s.get('request_id')==rid for s in record.get('spans',[])) for record in records) for rid in request_ids]
   assert all(count>0 for count in counts),'SQL telemetry must actually be correlated.'
-  result['profiles'].append({'candidates':candidates,'variant_json_bytes':len(document.encode()),'requests':6,'response_bytes':sizes,'latencies_ms':timings,'sql_queries_per_request':counts,'rss_before_bytes':before,'rss_after_bytes':after})
+  result['profiles'].append({'candidates':candidates,'targeting_plan':targeting_plan,'variant_json_bytes':len(document.encode()),'requests':6,'response_bytes':sizes,'latencies_ms':timings,'sql_queries_per_request':counts,'rss_before_bytes':before,'rss_after_bytes':after})
 assert set(result['profiles'][0]['sql_queries_per_request'])==set(result['profiles'][1]['sql_queries_per_request']), 'Selecting past 99 unmatched candidates must not add per-candidate queries.'
 assert hashlib.sha256(binary.read_bytes()).hexdigest()==sha,'Measured executable changed.'
 out=Path(args.output);out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(result,indent=2)+'\n')

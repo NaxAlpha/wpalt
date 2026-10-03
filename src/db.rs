@@ -118,6 +118,23 @@ impl Db {
         sqlx::raw_sql(crate::business::promotions::SCHEMA)
             .execute(&mut *tx)
             .await?;
+        // SQLite metadata columns after large documents can still require overflow-page
+        // traversal even when documents are absent from SELECT. Cover the bounded
+        // targeting/listing projections. PostgreSQL keeps large values out of line;
+        // do not put large target JSON in its size-limited B-tree tuples.
+        let targeting_index = if self.postgres {
+            "CREATE INDEX IF NOT EXISTS promotion_targeting ON business_promotions(active,created_at,id)"
+        } else {
+            "CREATE INDEX IF NOT EXISTS promotion_targeting ON business_promotions(active,created_at,id,title,target,experiment,wheel)"
+        };
+        let listing_index = if self.postgres {
+            "CREATE INDEX IF NOT EXISTS promotion_listing ON business_promotions(created_at DESC,id)"
+        } else {
+            "CREATE INDEX IF NOT EXISTS promotion_listing ON business_promotions(created_at DESC,id,title,active)"
+        };
+        for statement in [targeting_index, listing_index] {
+            sqlx::query(statement).execute(&mut *tx).await?;
+        }
         sqlx::raw_sql(crate::business::registration::SCHEMA)
             .execute(&mut *tx)
             .await?;
