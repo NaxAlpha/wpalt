@@ -235,7 +235,7 @@ pub async fn from_m3(db: &Db) -> anyhow::Result<()> {
 pub async fn from_m4(db: &Db) -> anyhow::Result<()> {
     let mut connection = db.pool.acquire().await?;
     if db.postgres {
-        let present:Option<String>=sqlx::query_scalar("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='users'").fetch_optional(&mut *connection).await?;
+        let present:Option<String>=sqlx::query_scalar("SELECT CAST(table_name AS TEXT) AS table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='users'").fetch_optional(&mut *connection).await?;
         if present.is_some() {
             let mut tx = connection.begin().await?;
             sqlx::raw_sql("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check; ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN ('admin','editor','moderator','subscriber','disabled'));").execute(&mut *tx).await?;
@@ -265,7 +265,7 @@ pub async fn from_m4(db: &Db) -> anyhow::Result<()> {
         }
     }
     let columns = if db.postgres {
-        sqlx::query("SELECT column_name AS name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='business_campaigns'").fetch_all(&mut *connection).await?
+        sqlx::query("SELECT CAST(column_name AS TEXT) AS name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='business_campaigns'").fetch_all(&mut *connection).await?
     } else {
         sqlx::query("PRAGMA table_info(business_campaigns)")
             .fetch_all(&mut *connection)

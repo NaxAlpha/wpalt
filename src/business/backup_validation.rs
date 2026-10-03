@@ -187,7 +187,11 @@ pub fn validate(tables: &Tables) -> Result<()> {
             return Err(fail());
         }
     }
+    let mut session_counts: BTreeMap<&str, (i64, i64)> = BTreeMap::new();
     for row in &tables["engagement_events"] {
+        let counts = session_counts.entry(text(row, "session_hash")).or_default();
+        counts.0 += 1;
+        counts.1 += i64::from(!text(row, "frame").is_empty());
         let dimensions: BTreeMap<String, String> =
             serde_json::from_str(text(row, "dimensions")).map_err(|_| fail())?;
         if !id(text(row, "id"))
@@ -209,6 +213,16 @@ pub fn validate(tables: &Tables) -> Result<()> {
             frame.validate()?;
         }
     }
+    for row in &tables["engagement_sessions"] {
+        if session_counts.remove(text(row, "hash")).unwrap_or_default()
+            != (number(row, "events"), number(row, "frames"))
+        {
+            return Err(fail());
+        }
+    }
+    if !session_counts.is_empty() {
+        return Err(fail());
+    }
     let usage = &tables["engagement_usage"][0];
     if number(usage, "events") != tables["engagement_events"].len() as i64
         || number(usage, "sessions") != tables["engagement_sessions"].len() as i64
@@ -219,9 +233,9 @@ pub fn validate(tables: &Tables) -> Result<()> {
         .iter()
         .map(|r| text(r, "id"))
         .collect();
-    let rewards: HashSet<_> = tables["promotion_rewards"]
+    let rewards: BTreeMap<_, _> = tables["promotion_rewards"]
         .iter()
-        .map(|r| text(r, "id"))
+        .map(|r| (text(r, "id"), text(r, "promotion_id")))
         .collect();
     let sessions: HashSet<_> = tables["engagement_sessions"]
         .iter()
@@ -276,7 +290,7 @@ pub fn validate(tables: &Tables) -> Result<()> {
         if !id(text(r, "id"))
             || !promotions.contains(text(r, "promotion_id"))
             || !sessions.contains(text(r, "session_hash"))
-            || !rewards.contains(text(r, "reward_id"))
+            || rewards.get(text(r, "reward_id")).copied() != Some(text(r, "promotion_id"))
             || text(r, "label").len() > 160
             || text(r, "code").len() > 64
         {

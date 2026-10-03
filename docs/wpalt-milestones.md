@@ -265,3 +265,7 @@ The shared form grammar and versioned persistence are implemented as groundwork,
 ### M4 first usable form slice — 2026-10-02
 
 [Draft milestone PR #8](https://github.com/NaxAlpha/wpalt/pull/8) tracks the full M4 delivery. Initial backend commit `7349159` passed real PostgreSQL CI and the independent clean build (run 37003012725); newer changes need their own CI. The first user-facing slice adds basic visual form design/public collection and protected response viewing, shared controls, measured narrow/desktop layouts, frozen publication groups, capacity-race protection and a module-disable configuration. Local SQLite acceptance and the full native-browser/UI regression suite pass. See [operations](business.md) and [step evidence](evidence/m4-step-1.md). M4 remains in progress; required advanced form, audience, communication, engagement and integrated delivery work remains.
+
+### M4 integrated implementation — 2026-10-03
+
+PR #8 now connects forms, private recovery/files/follow-up, consented audiences, shared communications, moderated contributions/accounts and bounded engagement/experiments/offers. The full agreed contract remains the delivery gate. See [M4 verification](evidence/m4-verification.md), [business operation and limits](business.md) and the per-group defined coverage in the parity matrix. Current-source engine/browser/security/resource and clean-artifact checks are being completed before the PR is marked ready; review/merge remains separate. M5–M9 and M6 commerce/redemption dependencies remain unchanged.

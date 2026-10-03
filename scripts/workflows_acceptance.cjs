@@ -145,7 +145,14 @@ module.exports = async function (owner, origin, output) {
     await submit(
       page.getByRole("button", { name: "Save campaign", exact: true }),
     );
-    assert.ok(await page.getByLabel("Send automatically when a subscriber confirms this list", { exact: true }).isChecked(), "Saved confirmation trigger remains enabled.");
+    assert.ok(
+      await page
+        .getByLabel("Send automatically when a subscriber confirms this list", {
+          exact: true,
+        })
+        .isChecked(),
+      "Saved confirmation trigger remains enabled.",
+    );
     await ui.accessibility(page, origin, "triggered-campaign", report);
     await visitor.goto(origin + `/forms/${id}`);
     const publicDefinition = await visitor
@@ -264,7 +271,10 @@ module.exports = async function (owner, origin, output) {
       visitor.waitForNavigation({ waitUntil: "load" }),
       visitor.getByRole("button", { name: /Confirm/i }).click(),
     ]);
-    assert.ok((await visitor.locator("body").innerText()).includes("confirmed"), "Confirmation completed before the owner inspects its triggered queue.");
+    assert.ok(
+      (await visitor.locator("body").innerText()).includes("confirmed"),
+      "Confirmation completed before the owner inspects its triggered queue.",
+    );
     await page.goto(origin + "/admin/mail");
     await page
       .getByRole("link", { name: "Welcome to release notes", exact: true })
@@ -305,7 +315,7 @@ module.exports = async function (owner, origin, output) {
     // Insert the same published form through the real writing editor.
     await page.goto(origin + "/admin/posts/new");
     await page.getByLabel("Title", { exact: true }).fill("Participate locally");
-    await page.getByLabel("Slug", { exact: true }).fill("participate-locally");
+    await page.locator("input[name=slug]").fill("participate-locally");
     await page.getByRole("button", { name: "Blocks", exact: true }).click();
     await page
       .getByRole("button", { name: "Published form", exact: true })

@@ -796,7 +796,8 @@
       "basis": "external-and-internal",
       "sources": [
         "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html",
-        "https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html"
+        "https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html"
       ],
       "applicable_versions": [
         "wpalt schema/backup 7",
@@ -810,11 +811,13 @@
       "requirements": [
         "Accepted entries and fixed-recipient conditional notifications, pending registration proof and private contribution drafts commit atomically; retries cannot repeat actions. Partial drafts never trigger actions.",
         "Registration uses expiring hashed ownership proof, deliberate password submission with bounded Argon2 workers, then explicit owner approval. Public input cannot choose a role; subscriber has no editorial/moderation/admin permissions.",
-        "Database admission counters bound record and UTF-8 body storage. Configured retention releases expired staged data and completed mail; uncertain deliveries remain available for deliberate recovery."
+        "Database admission counters bound record and UTF-8 body storage. Configured retention releases expired staged data and completed mail; uncertain deliveries remain available for deliberate recovery.",
+        "No-referrer random-capability native POSTs accept Origin:null only with exact same-origin navigation metadata; other routes keep Origin/CSRF checks; fail closed on missing/same-site/cross-site metadata."
       ],
       "tests": [
         "accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
-        "publication_retries_and_fresh_restore_preserve_one_authoritative_entry"
+        "publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_cancels_it"
       ],
       "triggers": [
         "affected release",

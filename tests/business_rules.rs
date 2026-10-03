@@ -1890,7 +1890,55 @@ async fn confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_canc
             .split_whitespace()
             .next()
             .unwrap();
-        audience::decide(&app, token, false).await.unwrap();
+        use tower::ServiceExt;
+        for site in [
+            None,
+            Some("cross-site"),
+            Some("same-site"),
+            Some("same-origin"),
+        ] {
+            let mut request = axum::http::Request::builder()
+                .method("POST")
+                .uri(format!("/audience/confirm/{token}"))
+                .header("origin", "null")
+                .header("sec-fetch-mode", "navigate")
+                .header("sec-fetch-dest", "document");
+            if let Some(site) = site {
+                request = request.header("sec-fetch-site", site);
+            }
+            let response = wpalt::web::router(app.clone())
+                .oneshot(request.body(axum::body::Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                if site == Some("same-origin") {
+                    axum::http::StatusCode::OK
+                } else {
+                    axum::http::StatusCode::FORBIDDEN
+                },
+                "No-referrer proof POSTs fail closed without exact same-origin browser metadata."
+            );
+        }
+        let response = wpalt::web::router(app.clone())
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("POST")
+                    .uri("/login")
+                    .header("origin", "null")
+                    .header("sec-fetch-site", "same-origin")
+                    .header("sec-fetch-mode", "navigate")
+                    .header("sec-fetch-dest", "document")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::FORBIDDEN,
+            "The capability exception cannot weaken account/session routes."
+        );
         audience::decide(&app, token, false).await.unwrap();
         assert_eq!(
             sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM mail_jobs WHERE kind='campaign'")

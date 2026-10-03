@@ -109,6 +109,7 @@ async fn security_and_trace(
     } else if method != axum::http::Method::GET
         && method != axum::http::Method::HEAD
         && auth::same_origin(&app, request.headers()).is_err()
+        && !capability_navigation(&route, request.headers())
     {
         Error::forbidden().into_response()
     } else {
@@ -187,6 +188,28 @@ async fn security_and_trace(
     }
     tracing::info!(event="request_completed",request_id=%id,method=%method,route=%route,status=response.status().as_u16(),elapsed_us=started.elapsed().as_micros() as u64);
     response
+}
+/// No-referrer proof pages can produce Origin:null on native form navigation.
+/// Accept only browser-asserted same-origin navigation on these random-capability
+/// routes. Missing/cross-site metadata fails closed; admin/session routes retain
+/// their Origin and CSRF checks.
+fn capability_navigation(route: &str, headers: &HeaderMap) -> bool {
+    [
+        "/audience/confirm/{token}",
+        "/audience/withdraw/{token}",
+        "/registration/{token}",
+    ]
+    .contains(&route)
+        && headers.get("origin").is_some_and(|v| v == "null")
+        && headers
+            .get("sec-fetch-site")
+            .is_some_and(|v| v == "same-origin")
+        && headers
+            .get("sec-fetch-mode")
+            .is_some_and(|v| v == "navigate")
+        && headers
+            .get("sec-fetch-dest")
+            .is_some_and(|v| v == "document")
 }
 async fn admin_session(app: &App, headers: &HeaderMap) -> Result<Session> {
     let session = auth::session(app, headers).await?;

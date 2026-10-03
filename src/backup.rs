@@ -614,7 +614,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v6".into(),
+        format: "wpalt-backup-v7".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -631,7 +631,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v6"
+    if envelope.format != "wpalt-backup-v7"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
