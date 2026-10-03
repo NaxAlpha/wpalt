@@ -816,6 +816,51 @@ async fn images_and_comments_obey_visibility_validation_and_moderation() {
             upload(&site, "broken.png", b"\x89PNG\r\n\x1a\n", "public").await,
             StatusCode::UNPROCESSABLE_ENTITY
         );
+        // A real larger image must arrive incrementally, with identical bytes.
+        let image = image::RgbImage::from_fn(256, 256, |x, y| {
+            let mut value = (x + y * 256).wrapping_mul(0x45d9f3b);
+            value = (value ^ (value >> 16)).wrapping_mul(0x45d9f3b);
+            image::Rgb([value as u8, (value >> 8) as u8, (value >> 16) as u8])
+        });
+        let mut encoded = Cursor::new(Vec::new());
+        image
+            .write_to(&mut encoded, image::ImageFormat::Png)
+            .unwrap();
+        let expected = encoded.into_inner();
+        assert!(expected.len() > 16_384);
+        assert_eq!(
+            upload(&site, "large.png", &expected, "public").await,
+            StatusCode::SEE_OTHER
+        );
+        let large_id: String = sqlx::query_scalar(
+            "SELECT id FROM media WHERE filename <> (SELECT filename FROM media WHERE id=$1)",
+        )
+        .bind(&id)
+        .fetch_one(&site.app.db.pool)
+        .await
+        .unwrap();
+        let response = wpalt::web::router(site.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/media/{large_id}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let mut body = response.into_body();
+        let mut received = Vec::new();
+        while let Some(frame) = body.frame().await {
+            if let Ok(bytes) = frame.unwrap().into_data() {
+                assert!(
+                    bytes.len() <= 8192,
+                    "media retained a whole-image response buffer"
+                );
+                received.extend_from_slice(&bytes);
+            }
+        }
+        assert_eq!(received, expected);
         let mut post = input("conversation", "publish");
         post.body = "<script>alert('unsafe')</script>\n\nA useful conversation".into();
         content::save(&site.app, site.session(), None, post)

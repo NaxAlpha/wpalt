@@ -1181,21 +1181,41 @@ async fn media_file(
     if !backup::safe_filename(&name) {
         return Err(Error::not_found());
     }
-    let bytes = backup::read_bounded(
-        &app.config.data_dir.join("media").join(name),
-        32 * 1024 * 1024,
-    )
-    .await?;
     let mime: String = row.get("mime");
     if !["image/png", "image/jpeg", "image/webp", "image/gif"].contains(&mime.as_str()) {
         return Err(Error::invalid("Unsupported stored media type."));
     }
+    use tokio::io::AsyncReadExt;
+    let file = tokio::fs::File::open(app.config.data_dir.join("media").join(name)).await?;
+    let metadata = file.metadata().await?;
+    let length = metadata.len();
+    if !metadata.is_file() || length == 0 || length > 32 * 1024 * 1024 {
+        return Err(Error::invalid("Stored media exceeds its size limit."));
+    }
+    // Keep slow downloads from retaining a complete image after handler admission ends.
+    let stream =
+        futures_util::stream::try_unfold((file, length), |(mut file, remaining)| async move {
+            if remaining == 0 {
+                return Ok::<_, std::io::Error>(None);
+            }
+            let mut buffer = vec![0; remaining.min(8192) as usize];
+            let read = file.read(&mut buffer).await?;
+            if read == 0 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    "Stored media was truncated.",
+                ));
+            }
+            buffer.truncate(read);
+            Ok(Some((buffer, (file, remaining - read as u64))))
+        });
     Ok((
         [
-            ("content-type", mime.as_str()),
-            ("cache-control", "no-store"),
+            ("content-type", mime),
+            ("cache-control", "no-store".into()),
+            ("content-length", length.to_string()),
         ],
-        bytes,
+        Body::from_stream(stream),
     )
         .into_response())
 }

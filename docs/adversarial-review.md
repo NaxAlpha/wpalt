@@ -14,7 +14,7 @@ Each round records source inspected, attack/probe, observed result, severity, re
 
 ## Review ledger
 
-In progress. Findings are provisional until reproduced. The coverage ledger will distinguish reviewed, verified, limited and pending capabilities; review is not complete while required coverage or material fixes remain pending.
+The five review rounds and confirmed fixes are documented below. Earlier round entries are historical checkpoints, including their then-pending gates. The coverage ledger maps all 49 implemented capability groups, 101 route patterns and 21 shared boundaries. Current-source CI and downloaded artifact attestation are recorded in PR #9 before it is marked ready. Future functionality and exhaustive input/feature permutations are not claimed.
 
 ## Round 1 — initial trust-boundary findings
 
@@ -86,3 +86,22 @@ A15 (functional/access): login-page redirection always sent authenticated users 
 A16 (recovery): account archive validation did not preserve the runtime's last-administrator and lowercase-login invariants. A syntactically valid rewritten archive could restore with no administrator, or store an address that normalized login cannot find. Recovery now rejects both states before insertion; the backup journey verifies rejection and subsequent successful original-archive recovery. No account is silently promoted or renamed.
 
 A06 measurement follow-through: the one/100-candidate release probe confirmed seven correlated queries in both cases, but exposed SQLite overflow-page work despite the narrow SELECT projection. SQLite now has covering targeting/listing indexes over bounded metadata; PostgreSQL uses thin ordering/filter indexes and keeps large target JSON out of B-tree tuples. Indexes are derived, created idempotently at startup, and do not require an archive-format migration. The reproducible benchmark records actual plans, payload bytes, latency samples and observed RSS; final rerun remains required.
+
+
+## Round 4 — final resource and visual reconciliation
+
+A17 (medium, resource retention): public image delivery retained an entire image buffer while a slow client consumed the response, after handler admission ended. Delivery now streams chunks of at most 8 KiB, with a fixed original length and 32 MiB file ceiling. Premature EOF fails the stream; growth cannot extend the response. The existing media/privacy/moderation journey verifies a real larger PNG frame by frame and exact byte identity. This bounds response-buffer memory, not total open connections or file descriptors; operator network/resource limits still apply.
+
+The native indexed promotion measurement records seven queries for both one and 100 candidates. On this fixture the 100-candidate latency samples are 2.89–4.74 ms, versus 27.52–109.20 ms before covering indexes. This is six sequential local samples with Python overhead and sampled RSS, not a universal throughput promise. Raw checkpoint measurements preserve their executable hashes; later source cannot inherit those hashes or timings.
+
+Visual review combines 26 actual administration screens, measured widths/text spacing, populated browser workflows, keyboard/focus/contrast probes, and inspected screenshots. The design remains open and cardless, using existing tokens. The review does not claim full WCAG certification, subjective aesthetic proof, or every possible browser/device.
+
+## Round 5 — cumulative regression and delivery gate
+
+The cumulative suite contains 37 behavior-oriented Rust tests, with real SQLite and PostgreSQL 17 in CI. Seven deliberate negative controls demonstrate that removing selected security, concurrency, privacy and resource boundaries makes their regressions fail. Real browser journeys cover publishing/composition/discovery, authoring, forms/attachments/audience/mail/recovery, engagement/stock/registration, and the subscriber login transition. CLI probes cover installation, configuration, ownership, scheduling/restart, export/fresh restore and debug secret redaction.
+
+Checkpoint `a4cf70d` passed all three GitHub jobs: application (both engines and Linux Chromium), compiler floor, and fresh-directory clean build including runtime recovery. The final media-stream revision must pass the same gates. PR #9 records the final run and downloaded archive verification: complete source tree, merge parent, executable/archive checksums, locked dependencies, bundled assets and packaged operation/configuration documents. A passing checkpoint is never substituted for changed-source validation.
+
+No confirmed material finding is intentionally deferred: A01–A17 and D01 are corrected in this PR. A02 and A07 are high priority authentication/import resource defects; caching, allocation, privacy, recovery and memory defects are medium; route/configuration/binding/navigation defects are functional correctness or UX issues. L01 remains the explicit single-owner-process deployment boundary until M9; existing database-backed M4 allocation races remain independently tested. Review coverage is scoped to implemented M1–M4 functionality, not all premium plugin features or all combinations.
+
+Reproduce using the committed test suite and `scripts/browser_acceptance.cjs`, `scripts/adversarial_ui.cjs`, `scripts/cli_acceptance.py`, `scripts/benchmark.py`, `scripts/adversarial_benchmark.py`, and `scripts/diagnostics.py`. Machine-dependent costs, synthetic fixture conditions and security proof limits must accompany results. Detailed route/feature evidence is in [the coverage ledger](evidence/adversarial-coverage.json).
