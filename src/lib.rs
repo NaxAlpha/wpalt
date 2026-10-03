@@ -7,6 +7,7 @@ pub mod content;
 pub mod db;
 pub mod discovery;
 pub mod error;
+pub mod membership;
 pub mod migrations;
 pub mod model;
 pub mod schema;

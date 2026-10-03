@@ -80,6 +80,11 @@ jobs:
         with:
           name: m4-volume-evidence
           path: work/m4-volume.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: m5-volume-evidence
+          path: work/m5-volume.json
   clean-build:
     needs: [application, compiler-floor]
     runs-on: ubuntu-24.04

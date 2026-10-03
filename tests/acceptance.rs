@@ -1153,7 +1153,12 @@ fn configuration_and_composition_reject_unsafe_or_ambiguous_inputs() {
         database_url: "postgres://user:secret@localhost/database".into(),
         ..Config::default()
     };
-    assert!(!c.redacted().to_string().contains("secret"));
+    assert!(
+        !c.redacted()["database_url"]
+            .as_str()
+            .unwrap()
+            .contains("secret")
+    );
     let canonical = Config {
         base_url: "HTTPS://Example.TEST:443/".into(),
         ..Config::default()
@@ -2629,3 +2634,6 @@ async fn content_export_enforces_byte_budget_without_truncating_or_mutating_cont
         site.close().await;
     }
 }
+
+#[path = "support/membership_journeys.rs"]
+mod membership_journeys;

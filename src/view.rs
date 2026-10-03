@@ -2,6 +2,18 @@ use crate::model::{NavItem, Post, Session, Settings};
 use maud::{DOCTYPE, Markup, PreEscaped, html};
 
 pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body: Markup) -> String {
+    layout_inner(title, settings, session, body, false)
+}
+pub fn member_layout(title: &str, settings: &Settings, body: Markup) -> String {
+    layout_inner(title, settings, None, body, true)
+}
+fn layout_inner(
+    title: &str,
+    settings: &Settings,
+    session: Option<&Session>,
+    body: Markup,
+    member: bool,
+) -> String {
     let admin = session.is_some();
     let nav: Vec<NavItem> = serde_json::from_str(&settings.navigation).unwrap_or_default();
     html! { (DOCTYPE) html lang="en" { head {
@@ -9,10 +21,10 @@ pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body:
         title {(title) " · " (settings.title)}
         meta name="description" content=(settings.description);
         link rel="stylesheet" href="/assets/app.css";
-        @if admin || title == "Sign in" {link rel="stylesheet" href="/assets/admin-ui.css";}
+        @if admin || member || title == "Sign in" {link rel="stylesheet" href="/assets/admin-ui.css";}
         @if admin {script defer src="/assets/admin.js" {}}
         link rel="alternate" type="application/rss+xml" title=(settings.title) href="/feed.xml";
-    } body class=(if admin{"admin"}else if title == "Sign in" {"auth"}else{settings.theme.as_str()}) {
+    } body class=(if admin{"admin"}else if member{"member"}else if title == "Sign in" {"auth"}else{settings.theme.as_str()}) {
         a class="skip" href="#main" {"Skip to content"}
         @if let Some(s)=session {
             aside class="sidebar" {
@@ -21,6 +33,7 @@ pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body:
                 nav aria-label="Administration" {
                     a href="/admin" {"Overview"}
                     @if s.can_edit() {a href="/admin/posts" {"Content"} a href="/admin/media" {"Media library"} @if settings.business_enabled {a href="/admin/forms" {"Forms"} a href="/admin/audience" {"Audience"} a href="/admin/mail" {"Mail"} @if settings.engagement_available && s.is_admin() {a href="/admin/engagement" {"Engagement"}}}}
+                    @if s.is_admin() && settings.membership_enabled {a href="/admin/members" {"Members"}a href="/admin/courses" {"Courses"}}
                     @if s.can_moderate() {a href="/admin/comments" {"Comments"}}
                     @if s.is_admin() {a href="/admin/builder" {"Design studio"} a href="/admin/discovery" {"Discovery"} a href="/admin/settings" {"Site settings"} a href="/admin/operations" {"Operations"}}
                     a href="/" {"View website ↗"}
@@ -35,8 +48,8 @@ pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body:
                 a href="/search" {"Search"}
             }}
         }
-        main id="main" class=(if admin{"workspace"}else{"site-main"}) {(body)}
-        @if !admin {footer class="site-footer" {span {(settings.description)} a href="/login" {"Manage site"}}}
+        main id="main" class=(if admin || member{"workspace"}else{"site-main"}) {(body)}
+        @if !admin {footer class="site-footer" {span {(settings.description)} a href=(if member {"/account"}else{"/login"}) {(if member {"Account"}else{"Manage site"})}}}
     }} }.into_string()
 }
 pub fn heading(kicker: &str, title: &str, description: &str) -> Markup {
@@ -72,15 +85,16 @@ pub fn public_body(post: &Post, preview: bool) -> Markup {
         div class="prose" {(PreEscaped(rendered))}
     }}
 }
-pub fn login(settings: &Settings) -> String {
+pub fn login(settings: &Settings, identity: bool) -> String {
     layout(
         "Sign in",
         settings,
         None,
-        html! {section class="login-card panel" {p class="eyebrow" {"Owner-controlled publishing"}h1 {"Welcome back."}p {"Sign in to manage your website."}
+        html! {section class="login-card panel" {p class="eyebrow" {"Owner-controlled publishing"}h1 {"Welcome back."}p {"Sign in to your account."}
             form method="post" action="/login" {label {"Email" input type="email" name="email" autocomplete="username" required;}
                 label {"Password" input type="password" name="password" autocomplete="current-password" required maxlength="256";}
                 button {"Sign in"}}
+            @if identity {p {a href="/members/identity/start" {"Sign in with your identity provider"}}}
             p class="muted" {"No external account required."}
         }},
     )

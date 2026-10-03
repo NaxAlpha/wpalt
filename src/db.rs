@@ -7,6 +7,8 @@ pub struct Db {
     pub pool: AnyPool,
     pub postgres: bool,
     pub business_enabled: bool,
+    pub membership_enabled: bool,
+    pub membership_max_records: i64,
     pub engagement_available: bool,
     pub respect_dnt: bool,
 }
@@ -53,6 +55,8 @@ impl Db {
             pool,
             postgres,
             business_enabled: config.business_enabled,
+            membership_enabled: config.membership_enabled,
+            membership_max_records: config.membership_max_records,
             engagement_available: config.business_enabled && config.engagement.enabled,
             respect_dnt: config.engagement.respect_dnt,
         })
@@ -73,7 +77,8 @@ impl Db {
                     || version == Some(4)
                     || version == Some(5)
                     || version == Some(6)
-                    || version == Some(7),
+                    || version == Some(7)
+                    || version == Some(8),
                 "unsupported schema version; use the documented migration/reset path"
             );
         }
@@ -150,7 +155,13 @@ impl Db {
         crate::business::quotas::initialize(&mut tx, self.postgres)
             .await
             .map_err(|e| anyhow::anyhow!(e.1))?;
-        sqlx::query("UPDATE schema_version SET version=7 WHERE id=1")
+        sqlx::raw_sql(crate::membership::identity::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::membership::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE schema_version SET version=8 WHERE id=1")
             .execute(&mut *tx)
             .await?;
         if self.postgres {
@@ -163,6 +174,9 @@ impl Db {
         sqlx::query("INSERT INTO discovery_settings(id,definition,version) VALUES(1,$1,1) ON CONFLICT(id) DO NOTHING").bind(serde_json::to_string(&crate::discovery::Definition::default())?).execute(&mut *tx).await?;
         tx.commit().await?;
         crate::business::entries::prepare_search(self).await?;
+        crate::membership::budget::prepare(self)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?;
         Ok(())
     }
     /// Run bounded planner/index maintenance after an offline bulk operation.
@@ -212,6 +226,7 @@ impl Db {
         .await?;
         Ok(Settings {
             business_enabled: self.business_enabled,
+            membership_enabled: self.membership_enabled,
             engagement_available: self.engagement_available,
             analytics: if self.engagement_available && r.get::<i64, _>("analytics_enabled") == 1 {
                 Some(crate::business::engagement::PublicState {

@@ -1,10 +1,12 @@
 # wpalt
 
-An owner-controlled Rust CMS with a bundled admin panel and public website. The composable publishing system includes multilingual discovery, integrated structured authoring and M4 business/audience workflows on SQLite or PostgreSQL, with no mandatory vendor account or external runtime services.
+An owner-controlled Rust CMS with a bundled admin panel and public website. The composable publishing system includes multilingual discovery, integrated structured authoring M4 business/audience workflows and M5 membership/learning on SQLite or PostgreSQL, with no mandatory vendor account or external runtime services.
 
 Create posts and pages, keep drafts separate from live content, autosave, preview, restore revisions and schedule publication. Manage images, typed fields, basic compositions, navigation, Paper/Ink themes, moderated comments and local search. Export content, download a consistent manual backup and recover into a fresh database, including across database engines.
 
 Design and embed typed forms; protect responses/files; manage purpose-specific confirmed audiences; compose conditional, scheduled and confirmation-triggered messages with a local outbox or configured SMTP; approve subscriber accounts and moderate contributions. Measure explicitly consented events, bounded geometry-only interactions and local A/B offers. See [business operation and limits](docs/business.md) and [M4 delivery evidence](docs/evidence/m4-verification.md).
+
+Manage locally assigned memberships, protected content/downloads, ordered courses, quizzes, assignments, grading, certificates, organizations, gifts and moderated communities. Optional configured OIDC sign-in is independent of local accounts. See [membership and learning operation/limits](docs/membership-learning.md) and [M5 verification status](docs/evidence/m5-verification.md); paid checkout and settlement remain M6.
 
 ![M1 administration panel](docs/evidence/screenshots/admin-desktop.png)
 
@@ -33,6 +35,8 @@ Configuration follows CLI > supported environment variables > explicitly selecte
 The pre-M3 supporting work uses semantic tokens and native components, measured responsive geometry, accessibility checks and reviewed platform-specific visual baselines. [Design and verification contract](docs/frontend-foundations.md) explains how to extend it and review its screenshot/measurement reports. These developer tools add no Node requirement to the running server.
 
 ## Review the delivered systems
+
+- [M5 membership/learning contract](docs/m5-contract.md), [operation and limits](docs/membership-learning.md), [connected acceptance journeys](tests/support/membership_journeys.rs) and [verification record](docs/evidence/m5-verification.md)
 
 - [M3 multilingual discovery contract](docs/m3-contract.md), [publishing/discovery guide](docs/discovery.md) and [verification evidence](docs/evidence/m3-verification.md)
 

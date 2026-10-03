@@ -2,7 +2,7 @@
 """A real install -> serve -> schedule/restart -> offline backup -> fresh restore journey.
 Uses temporary SQLite sites and generated private credentials; prints no secrets.
 """
-import argparse, http.cookiejar, json, os, secrets, socket, subprocess, tempfile, time
+import argparse, http.cookiejar, json, os, secrets, socket, sqlite3, subprocess, tempfile, time, uuid
 import urllib.request, urllib.error, xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from pathlib import Path
@@ -99,9 +99,26 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
             stop(process)
         finally:
             if process.poll() is None:stop(process)
+    # Offline membership automation is the same workflow and graph as native UI.
+    policy=run(config,'member','policy','--title','CLI academy','--entitlement','cli-academy').stdout.strip()
+    uuid.UUID(policy)
+    grant=run(config,'member','grant','--email','owner@example.test','--entitlement','cli-academy').stdout.strip()
+    run(config,'member','revoke',grant)
+    with sqlite3.connect(root/'source.db') as database:
+        lesson=database.execute("SELECT id FROM posts WHERE published_slug='journal-3'").fetchone()[0]
+        protected=database.execute("SELECT id FROM posts WHERE published_slug='journal-2'").fetchone()[0]
+    run(config,'member','protect','--kind','post','--resource',protected,'--policy',policy)
+    course={'title':'CLI course','policy_id':policy,'sequential':True,'lessons':[{'id':str(uuid.uuid4()),'title':'CLI lesson','post_id':lesson,'downloads':[],'delay_seconds':0,'opens_at':0,'questions':[],'assignment':'','pass_percent':70,'max_attempts':3}]}
+    course_file=root/'course.json';course_file.write_text(json.dumps(course))
+    course_id=run(config,'member','course-import',str(course_file),'--publish').stdout.strip()
+    exported_course=root/'course-export.json';run(config,'member','course-export',course_id,str(exported_course))
+    assert json.loads(exported_course.read_text())==course
+    assert exported_course.stat().st_mode & 0o077==0,'Course exports must be private'
     snapshot=root/'snapshot.json';run(config,'backup',str(snapshot));assert snapshot.exists()
     if os.name=='posix':assert snapshot.stat().st_mode & 0o077==0,'Backup permissions expose private data'
     run(target,'restore',str(snapshot));run(target,'restore',str(snapshot),ok=False)
+    restored_course=root/'restored-course.json';run(target,'member','course-export',course_id,str(restored_course))
+    assert json.loads(restored_course.read_text())==course
     with log.open('a') as log_file:
         process=subprocess.Popen([str(binary),'--config',str(target),'serve'],stdout=log_file,stderr=log_file)
         try:

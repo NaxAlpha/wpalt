@@ -492,6 +492,190 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
         "engagement_dimension_values",
         &[("name", false), ("value", false)],
     ),
+    (
+        "member_groups",
+        &[
+            ("id", false),
+            ("title", false),
+            ("manager_id", false),
+            ("seat_limit", true),
+            ("version", true),
+        ],
+    ),
+    (
+        "member_policies",
+        &[
+            ("id", false),
+            ("title", false),
+            ("entitlement", false),
+            ("group_id", false),
+            ("enabled", true),
+            ("version", true),
+        ],
+    ),
+    (
+        "member_group_users",
+        &[
+            ("group_id", false),
+            ("user_id", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "member_grants",
+        &[
+            ("id", false),
+            ("user_id", false),
+            ("entitlement", false),
+            ("starts_at", true),
+            ("expires_at", true),
+            ("revoked", true),
+            ("origin", false),
+            ("version", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "member_resources",
+        &[
+            ("kind", false),
+            ("resource_id", false),
+            ("policy_id", false),
+            ("opens_at", true),
+            ("delay_seconds", true),
+            ("course_id", false),
+            ("lesson_id", false),
+        ],
+    ),
+    (
+        "member_profiles",
+        &[("user_id", false), ("biography", false), ("version", true)],
+    ),
+    (
+        "member_courses",
+        &[
+            ("id", false),
+            ("title", false),
+            ("published_title", false),
+            ("policy_id", false),
+            ("draft", false),
+            ("live", false),
+            ("version", true),
+            ("published_version", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "member_course_versions",
+        &[
+            ("course_id", false),
+            ("version", true),
+            ("definition", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "member_progress",
+        &[
+            ("course_id", false),
+            ("course_version", true),
+            ("lesson_id", false),
+            ("user_id", false),
+            ("attempts", true),
+            ("best_score", true),
+            ("completed_at", true),
+        ],
+    ),
+    (
+        "member_attempts",
+        &[
+            ("id", false),
+            ("user_id", false),
+            ("course_id", false),
+            ("course_version", true),
+            ("lesson_id", false),
+            ("request_key", false),
+            ("score", true),
+            ("passed", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "member_assignments",
+        &[
+            ("id", false),
+            ("course_id", false),
+            ("course_version", true),
+            ("lesson_id", false),
+            ("lesson_title", false),
+            ("user_id", false),
+            ("body", false),
+            ("state", false),
+            ("feedback", false),
+            ("version", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "member_certificates",
+        &[
+            ("id", false),
+            ("user_id", false),
+            ("course_id", false),
+            ("course_version", true),
+            ("issued_at", true),
+            ("revoked", true),
+        ],
+    ),
+    (
+        "member_discussions",
+        &[
+            ("id", false),
+            ("group_id", false),
+            ("user_id", false),
+            ("body", false),
+            ("state", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "member_gifts",
+        &[
+            ("id", false),
+            ("token_hash", false),
+            ("entitlement", false),
+            ("expires_at", true),
+            ("duration_seconds", true),
+            ("claimed_by", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "member_referrals",
+        &[
+            ("id", false),
+            ("user_id", false),
+            ("title", false),
+            ("visits", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "member_commissions",
+        &[
+            ("id", false),
+            ("referral_id", false),
+            ("reference", false),
+            ("amount_minor", true),
+            ("currency", false),
+            ("state", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "member_identities",
+        &[("issuer", false), ("subject", false), ("user_id", false)],
+    ),
 ];
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -626,7 +810,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     }
     let snapshot = Snapshot {
         private_files,
-        schema: 7,
+        schema: 8,
         created_at: crate::now(),
         tables,
         files,
@@ -658,7 +842,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 7
+    if snapshot.schema != 8
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -837,6 +1021,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     };
     crate::content::validate_settings(&crate::model::Settings {
         business_enabled: app.config.business_enabled,
+        membership_enabled: app.config.membership_enabled,
         engagement_available: app.config.engagement.enabled,
         analytics: None,
         title: setting_string("title")?,
@@ -1017,6 +1202,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
         }
     }
     crate::business::backup_validation::validate(&snapshot.tables)?;
+    crate::membership::backup::validate(&snapshot.tables)?;
     let post_kinds: BTreeMap<_, _> = snapshot.tables["posts"]
         .iter()
         .map(|row| (row["id"].as_str().unwrap(), row["kind"].as_str().unwrap()))
