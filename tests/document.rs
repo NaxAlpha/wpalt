@@ -28,6 +28,23 @@ fn document_import_and_render_preserve_meaning_without_executing_source() {
 }
 #[test]
 fn document_trust_boundary_rejects_unsafe_links_geometry_and_unbounded_work() {
+    let id = "b96dab5c-7b48-456a-943a-bc89163cb133";
+    let mut form = json!({"version":1,"root":{"type":"doc","content":[{"type":"form","attrs":{"id":id,"title":"Participate"}}]}});
+    let doc = Document::parse(&form.to_string()).unwrap();
+    assert!(doc.html().contains("embedded=true"));
+    assert!(
+        !doc.preview_html().contains("iframe"),
+        "Draft inspection cannot create a live collector."
+    );
+    let email = doc.mail_html("https://local.example");
+    assert!(
+        email.contains(&format!("https://local.example/forms/{id}")) && !email.contains("iframe")
+    );
+    form["root"]["content"][0]["attrs"]["id"] = "https://remote.example".into();
+    assert!(
+        Document::parse(&form.to_string()).is_err(),
+        "Form atoms cannot become arbitrary remote embeds."
+    );
     let valid = json!({"version":1,"root":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"safe","marks":[{"type":"link","attrs":{"href":"/safe","title":null}}]}]}]}});
     Document::parse(&valid.to_string()).unwrap();
     for href in [

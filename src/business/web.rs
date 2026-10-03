@@ -429,7 +429,15 @@ async fn attachment_download(
     if !super::attachments::safe_filename(&filename) {
         return Err(Error::invalid("Unsafe attachment path."));
     }
-    let data = tokio::fs::read(app.config.data_dir.join("attachments").join(filename)).await?;
+    let path = app.config.data_dir.join("attachments").join(filename);
+    let metadata = tokio::fs::metadata(&path).await?;
+    if !metadata.is_file()
+        || metadata.len() > 2 * 1024 * 1024
+        || metadata.len() as i64 != row.get::<i64, _>("size")
+    {
+        return Err(Error::invalid("Attachment integrity check failed."));
+    }
+    let data = tokio::fs::read(path).await?;
     if data.len() as i64 != row.get::<i64, _>("size")
         || crate::auth::digest(&data) != row.get::<String, _>("sha256")
     {

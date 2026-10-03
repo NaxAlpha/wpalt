@@ -2,7 +2,7 @@
 """Release admin-read latency, native RSS and correlated SQL counts on a disposable site.
 This is a measurement tool, not a timing assertion or substitute for browser acceptance.
 """
-import http.cookiejar,json,secrets,socket,subprocess,tempfile,time,urllib.request,urllib.parse
+import http.cookiejar,json,secrets,socket,subprocess,tempfile,time,urllib.request,urllib.parse,re,uuid,hashlib
 from pathlib import Path
 binary=Path('target/release/wpalt').resolve()
 with tempfile.TemporaryDirectory(prefix='wpalt-diagnostics-') as tmp:
@@ -20,22 +20,27 @@ with tempfile.TemporaryDirectory(prefix='wpalt-diagnostics-') as tmp:
     try:urllib.request.urlopen(origin+'/health',timeout=1).close();break
     except Exception:assert server.poll() is None;time.sleep(.1)
    rss=lambda:int(subprocess.check_output(['ps','-o','rss=','-p',str(server.pid)],text=True).strip())*1024
-   result={'conditions':'macOS native release; 1000 stories + About; debug SQL enabled; 50 warm admin reads; latency includes Python localhost client, excludes browser render; no timing assertions.','idle_initialized_rss_bytes':rss(),'routes':[]}
+   result={'conditions':'macOS native release; 1000 stories + About; debug SQL enabled; 50 warm admin reads; latency includes Python localhost client, excludes browser render; no timing assertions.','idle_initialized_rss_bytes':rss(),'routes':[],'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest()}
    opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
    opener.open(urllib.request.Request(origin+'/login',data=urllib.parse.urlencode({'email':'review@example.test','password':password}).encode(),headers={'Origin':origin})).read()
    items=json.load(opener.open(origin+'/api/content'))['items'];id=items[0]['id']
-   for route in ['/','/journal-1','/search?q=publishing','/admin/posts',f'/admin/posts/{id}','/admin/builder','/api/admin/design','/admin/forms','/admin/audience','/admin/campaigns','/admin/mail','/admin/engagement','/admin/promotions','/admin/registrations']:
+   form_html=opener.open(origin+'/admin/forms').read().decode();csrf=re.search(r'name="csrf" value="([^"]+)"',form_html)[1]
+   created=opener.open(urllib.request.Request(origin+'/admin/forms',data=urllib.parse.urlencode({'csrf':csrf,'title':'Measured response'}).encode(),headers={'Origin':origin}));form_id=created.url.split('/')[-1];created.read()
+   state=json.load(opener.open(origin+'/api/admin/forms/'+form_id))
+   opener.open(urllib.request.Request(origin+'/api/admin/forms/'+form_id,data=json.dumps({'csrf':csrf,'version':state['version'],'definition':state['definition'],'publish':True}).encode(),headers={'Origin':origin,'Content-Type':'application/json'})).read()
+   for route in ['/','/journal-1','/search?q=publishing','/admin/posts',f'/admin/posts/{id}','/admin/builder','/api/admin/design','/admin/forms','/admin/audience','/admin/campaigns','/admin/mail','/admin/engagement','/admin/promotions','/admin/registrations',f'/forms/{form_id}',f'/api/forms/{form_id}/entries']:
     times=[];request_ids=[]
     for _ in range(50):
      start=time.perf_counter()
-     with opener.open(origin+route) as response:response.read();request_ids.append(response.headers['x-request-id'])
+     request=urllib.request.Request(origin+route,data=json.dumps({'key':str(uuid.uuid4()),'version':2,'values':{'message':'Measured local response'}}).encode(),headers={'Origin':origin,'Content-Type':'application/json'}) if route.endswith('/entries') else origin+route
+     with opener.open(request) as response:response.read();request_ids.append(response.headers['x-request-id'])
      times.append((time.perf_counter()-start)*1000)
     time.sleep(.05)
     records=[json.loads(line) for line in log.read_text().splitlines() if line.startswith('{')]
     counts=[]
     for request_id in request_ids:
      counts.append(sum(1 for record in records if record.get('target')=='sqlx::query' and any(span.get('request_id')==request_id for span in record.get('spans',[]))))
-    result['routes'].append({'route':route if not route.startswith('/admin/posts/') else '/admin/posts/{id}','p50_ms':round(sorted(times)[24],3),'p95_ms':round(sorted(times)[47],3),'sql_queries_per_request':sorted(set(counts))})
+    result['routes'].append({'route':route.replace(form_id,'{form_id}') if not route.startswith('/admin/posts/') else '/admin/posts/{id}','p50_ms':round(sorted(times)[24],3),'p95_ms':round(sorted(times)[47],3),'sql_queries_per_request':sorted(set(counts))})
    result['rss_after_authoring_reads_bytes']=rss()
    Path('work/diagnostics.json').write_text(json.dumps(result,indent=2)+'\n')
    print('Recorded idle/active RSS, admin-read timings and correlated SQL counts.')

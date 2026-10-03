@@ -324,7 +324,9 @@ module.exports = async function (owner, origin, output) {
       name: "Insert published form",
       exact: true,
     });
-    await dialog.getByLabel("Published form", { exact: true }).selectOption(id);
+    await dialog
+      .getByRole("combobox", { name: /^Published form/ })
+      .selectOption(id);
     await dialog
       .getByRole("button", { name: "Insert form", exact: true })
       .click();

@@ -340,6 +340,30 @@ async fn publication_retries_and_fresh_restore_preserve_one_authoritative_entry(
             axum::http::StatusCode::NOT_FOUND,
             "Disabled forms do not serve their frontend asset."
         );
+        for route in [
+            "/assets/engagement.js",
+            "/assets/form-embed.js",
+            "/admin/registrations",
+            "/admin/promotions",
+            "/admin/engagement",
+        ] {
+            let response = wpalt::web::router(disabled.clone())
+                .oneshot(
+                    axum::http::Request::builder()
+                        .uri(route)
+                        .body(axum::body::Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                axum::http::StatusCode::NOT_FOUND,
+                "A hard-disabled business module cannot expose {route}."
+            );
+        }
+        assert_eq!(wpalt::business::mail::tick(&disabled).await.unwrap(), 0);
+        wpalt::business::quotas::cleanup(&disabled).await.unwrap();
         disabled.db.pool.close().await;
         other.db.pool.close().await;
         restored.db.pool.close().await;
@@ -1434,6 +1458,86 @@ async fn accepted_response_routes_once_creates_only_a_draft_and_requires_verifie
         });
         let id = store::create(&app, &owner, &form).await.unwrap();
         store::save(&app, &id, 1, &form, true).await.unwrap();
+        // A theme form reference is validated once and rendered through the same public collector.
+        let mut package = wpalt::theme::load(&app, "paper", true)
+            .await
+            .unwrap()
+            .package;
+        package.templates.get_mut("home").unwrap().children.push(
+            serde_json::from_value(json!({"id":"local-contribution-form","kind":"form","text":id}))
+                .unwrap(),
+        );
+        let mut invalid = package.clone();
+        invalid
+            .templates
+            .get_mut("home")
+            .unwrap()
+            .children
+            .last_mut()
+            .unwrap()
+            .text = json!(uuid::Uuid::new_v4().to_string());
+        assert!(
+            wpalt::theme::save(&app, "paper", invalid, 1, true)
+                .await
+                .is_err(),
+            "Themes cannot publish nonexistent forms."
+        );
+        wpalt::theme::save(&app, "paper", package, 1, true)
+            .await
+            .unwrap();
+        let settings = app.db.settings().await.unwrap();
+        let theme = wpalt::theme::load(&app, "paper", true).await.unwrap();
+        let ctx = wpalt::theme::context(
+            &app,
+            &settings,
+            &theme.package,
+            None,
+            Vec::new(),
+            true,
+            "home",
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(
+            !wpalt::theme::document(
+                &theme,
+                &settings,
+                &ctx,
+                None,
+                true,
+                "home",
+                maud::Markup::default()
+            )
+            .unwrap()
+            .contains("<iframe"),
+            "Theme draft preview never starts live collection."
+        );
+        let ctx = wpalt::theme::context(
+            &app,
+            &settings,
+            &theme.package,
+            None,
+            Vec::new(),
+            false,
+            "home",
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(
+            wpalt::theme::document(
+                &theme,
+                &settings,
+                &ctx,
+                None,
+                false,
+                "home",
+                maud::Markup::default()
+            )
+            .unwrap()
+            .contains(&format!("/forms/{id}?embedded=true"))
+        );
         let key = uuid::Uuid::new_v4().to_string();
         let values = json!({"name":"Applicant","email":"applicant@example.test","title":"Visitor contribution","body":"<script>private literal</script>","priority":true});
         let entry = store::submit(&app, &id, 2, &key, &values).await.unwrap();
