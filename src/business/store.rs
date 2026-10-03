@@ -42,8 +42,11 @@ pub async fn create(app: &App, owner: &str, definition: &FormDefinition) -> Resu
     let id = uuid::Uuid::new_v4().to_string();
     let raw = serde_json::to_string(definition)
         .map_err(|_| Error::invalid("Invalid form definition."))?;
+    let mut tx = app.db.pool.begin().await?;
+    super::quotas::reserve(app, &mut tx, "forms", 1, 0).await?;
     sqlx::query("INSERT INTO business_forms(id,owner_id,draft,live,version,published_version,updated_at) VALUES($1,$2,$3,'',1,0,$4)")
-        .bind(&id).bind(owner).bind(raw).bind(now()).execute(&app.db.pool).await?;
+        .bind(&id).bind(owner).bind(raw).bind(now()).execute(&mut *tx).await?;
+    tx.commit().await?;
     Ok(id)
 }
 pub async fn save(
@@ -141,6 +144,19 @@ pub async fn submit(app: &App, id: &str, version: i64, key: &str, input: &Value)
     let mut values = definition
         .form
         .evaluate(&definition.common(), input, false)?;
+    // Shared actions take admission counters in a fixed order before contact,
+    // registration and queue rows; deletion uses this same order.
+    let form = &definition.form;
+    if form.subscription.is_some() {
+        super::quotas::release(&mut tx, "contacts", 0, 0).await?;
+    }
+    if form.registration.is_some() {
+        super::quotas::release(&mut tx, "registrations", 0, 0).await?;
+    }
+    if form.subscription.is_some() || form.registration.is_some() || !form.notifications.is_empty()
+    {
+        super::quotas::release(&mut tx, "mail", 0, 0).await?;
+    }
     let entry = uuid::Uuid::new_v4().to_string();
     for field in &definition.form.fields {
         if matches!(field.widget, Some(super::forms::Widget::Upload)) {
@@ -158,6 +174,7 @@ pub async fn submit(app: &App, id: &str, version: i64, key: &str, input: &Value)
             }
         }
     }
+    super::quotas::reserve(app, &mut tx, "entries", 1, values.to_string().len() as i64).await?;
     sqlx::query("INSERT INTO form_entries(id,form_id,request_key,request_hash,form_version,values_json,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)")
         .bind(&entry).bind(id).bind(key).bind(hash).bind(version).bind(values.to_string()).bind(now()).execute(&mut *tx).await?;
     sqlx::query("INSERT INTO form_entry_search(entry_id,search_text) VALUES($1,$2)")
@@ -168,6 +185,7 @@ pub async fn submit(app: &App, id: &str, version: i64, key: &str, input: &Value)
     if let Some(action) = &definition.form.subscription {
         super::audience::subscribe(app, &mut tx, action, &values).await?;
     }
+    super::workflows::apply(app, &mut tx, &definition.form, &entry, id, &values).await?;
     sqlx::query("UPDATE business_forms SET entry_count=entry_count+1 WHERE id=$1")
         .bind(id)
         .execute(&mut *tx)

@@ -59,7 +59,7 @@ jobs:
         if: always()
         with:
           name: browser-review
-          path: work/browser-evidence/*.png
+          path: work/browser-evidence/
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wpalt-linux-x86_64
@@ -75,6 +75,11 @@ jobs:
         with:
           name: m3-volume-evidence
           path: work/m3-volume.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: m4-volume-evidence
+          path: work/m4-volume.json
   clean-build:
     needs: [application, compiler-floor]
     runs-on: ubuntu-24.04

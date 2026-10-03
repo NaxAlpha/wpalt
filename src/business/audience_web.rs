@@ -188,9 +188,10 @@ async fn campaign_editor(
         (view::csrf(&s)) input type="hidden" name="version" value=(row.get::<i64,_>("version")); input type="hidden" name="locale" value="en";
         section class="panel" {label {"Subject" input name="subject" value=(row.get::<String,_>("subject")) maxlength="200" required;}
         input type="hidden" name="document" value=(row.get::<String,_>("document")); div data-writing-canvas hidden {}
+        label {input type="checkbox" name="triggered" value="true" checked[row.get::<String,_>("trigger_kind")=="confirmation"];"Send automatically when a subscriber confirms this list"}p {"Triggered messages use the declared segment and current consent. Keep the schedule empty for a reusable confirmation template."}
         label {"Content" textarea name="body" class="editor-body" {}}
         label data-markdown-replacement {input type="checkbox" name="import_markdown" value="true"; "Replace content using Markdown"}
-        label {"Send time (UTC epoch seconds)" input name="send_at" type="number" min="0" value=(row.get::<i64,_>("send_at")); small {"Use 0 to keep a draft. Send now uses the current server time."}}
+        input type="hidden" name="send_at" value=(row.get::<i64,_>("send_at")); label {"Schedule delivery" input type="datetime-local" data-epoch-for="send_at";small {"Uses your browser’s local time. Leave empty to keep a draft, or choose Send now."}}
         fieldset {legend {"Recipient segment (all conditions must match)"} label {"Company equals" input name="company" maxlength="160" value=(segment.company.unwrap_or_default());} label {"Source equals" input name="source" maxlength="160" value=(segment.source.unwrap_or_default());} label {"Minimum contact score" input name="minimum_score" type="number" step="any" value=(segment.minimum_score.map(|v|v.to_string()).unwrap_or_default());}}
         div class="toolbar" {button name="action" value="save" {"Save campaign"} button name="action" value="send" {"Send now"}}}
         } script defer src="/assets/editor.js" {}}
@@ -200,6 +201,12 @@ async fn campaign_editor(
 }
 #[derive(Deserialize)]
 struct CampaignSave {
+    #[serde(default)]
+    body: String,
+    #[serde(default)]
+    import_markdown: String,
+    #[serde(default)]
+    triggered: String,
     csrf: String,
     version: i64,
     subject: String,
@@ -221,12 +228,17 @@ async fn campaign_save(
 ) -> Result<Redirect> {
     let s = session(&app, &headers).await?;
     auth::csrf(&s, &input.csrf)?;
-    super::campaigns::save(
+    let document = if input.import_markdown == "true" {
+        crate::document::import(&input.body, "[]")?.encode()
+    } else {
+        input.document
+    };
+    super::campaigns::save_with_trigger(
         &app,
         &id,
         input.version,
         &input.subject,
-        &input.document,
+        &document,
         if input.action == "send" {
             crate::now()
         } else {
@@ -246,6 +258,7 @@ async fn campaign_save(
                 )
             },
         },
+        Some(input.triggered == "true"),
     )
     .await?;
     Ok(Redirect::to(&format!("/admin/campaigns/{id}")))

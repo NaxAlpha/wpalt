@@ -106,7 +106,10 @@ pub async fn subscribe(
         return Err(Error::conflict());
     }
     let id = uuid::Uuid::new_v4().to_string();
-    sqlx::query("INSERT INTO audience_contacts(id,email,name,created_at) VALUES($1,$2,'',$3) ON CONFLICT(email) DO NOTHING").bind(id).bind(&email).bind(now()).execute(&mut **tx).await?;
+    let inserted=sqlx::query("INSERT INTO audience_contacts(id,email,name,created_at) VALUES($1,$2,'',$3) ON CONFLICT(email) DO NOTHING").bind(id).bind(&email).bind(now()).execute(&mut **tx).await?;
+    if inserted.rows_affected() == 1 {
+        super::quotas::reserve(app, tx, "contacts", 1, 0).await?;
+    }
     // Lock the shared contact before membership reads on both engines.
     let contact = sqlx::query(
         "UPDATE audience_contacts SET suppressed=suppressed WHERE email=$1 RETURNING id,suppressed",
@@ -185,6 +188,7 @@ pub async fn review(app: &App, token: &str, withdraw: bool) -> Result<(String, S
 pub async fn decide(app: &App, token: &str, withdraw: bool) -> Result<()> {
     review(app, token, withdraw).await?;
     let mut tx = app.db.pool.begin().await?;
+    super::quotas::release(&mut tx, "mail", 0, 0).await?;
     let query = if withdraw {
         "UPDATE audience_memberships SET state='withdrawn' WHERE (withdraw_hash=$1 OR EXISTS(SELECT 1 FROM audience_withdrawal_tokens t WHERE t.hash=$1 AND t.contact_id=audience_memberships.contact_id AND t.list_id=audience_memberships.list_id)) AND state!='withdrawn' RETURNING contact_id,list_id,policy"
     } else {
@@ -208,6 +212,9 @@ pub async fn decide(app: &App, token: &str, withdraw: bool) -> Result<()> {
             &purpose,
         )
         .await?;
+        if !withdraw {
+            super::workflows::confirmed(app, &mut tx, &contact, &list).await?;
+        }
         if withdraw {
             sqlx::query("UPDATE mail_jobs SET state='cancelled',lease_owner='',lease_until=0 WHERE contact_id=$1 AND list_id=$2 AND kind='campaign' AND state IN ('pending','retry','leased')").bind(contact).bind(list).execute(&mut *tx).await?;
         }
@@ -312,6 +319,8 @@ pub async fn update_contact(
 pub async fn delete_contact(app: &App, id: &str) -> Result<()> {
     let _guard = app.mutations.lock().await;
     let mut tx = app.db.pool.begin().await?;
+    super::quotas::release(&mut tx, "contacts", 0, 0).await?;
+    super::quotas::release(&mut tx, "mail", 0, 0).await?;
     if !app.db.postgres {
         sqlx::query("UPDATE audience_contacts SET suppressed=suppressed WHERE id=$1")
             .bind(id)
@@ -331,10 +340,23 @@ pub async fn delete_contact(app: &App, id: &str) -> Result<()> {
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    let jobs = sqlx::query("DELETE FROM mail_jobs WHERE contact_id=$1 RETURNING id")
-        .bind(id)
-        .fetch_all(&mut *tx)
-        .await?;
+    super::quotas::release(&mut tx, "contacts", 1, 0).await?;
+    super::quotas::release(&mut tx, "mail", 0, 0).await?;
+    let jobs =
+        sqlx::query("DELETE FROM mail_jobs WHERE contact_id=$1 RETURNING id,html,plain,subject")
+            .bind(id)
+            .fetch_all(&mut *tx)
+            .await?;
+    let mail_bytes: i64 = jobs
+        .iter()
+        .map(|r| {
+            r.get::<String, _>("html").len() as i64
+                + r.get::<String, _>("plain").len() as i64
+                + r.get::<String, _>("subject").len() as i64
+        })
+        .sum();
+    super::quotas::release(&mut tx, "mail", jobs.len() as i64, mail_bytes).await?;
+
     sqlx::query("DELETE FROM audience_contacts WHERE id=$1")
         .bind(id)
         .execute(&mut *tx)

@@ -20,6 +20,12 @@ pub struct FormDefinition {
     pub max_entries: i64,
     #[serde(default)]
     pub subscription: Option<super::audience::SubscriptionAction>,
+    #[serde(default)]
+    pub notifications: Vec<super::workflows::Notification>,
+    #[serde(default)]
+    pub draft_post: Option<super::workflows::DraftPost>,
+    #[serde(default)]
+    pub registration: Option<super::registration::Action>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -77,6 +83,36 @@ impl FormDefinition {
             return Err(Error::invalid(
                 "A form needs a title and between 1 and 32 fields.",
             ));
+        }
+        if let Some(action) = &self.registration {
+            for name in [&action.email_field, &action.name_field] {
+                if !self.fields.iter().any(|f| {
+                    &f.name == name && f.schema.kind == "string" && f.visible_when.is_none()
+                }) {
+                    return Err(Error::invalid(
+                        "Registration requires unconditional email/name text fields.",
+                    ));
+                }
+            }
+        }
+        if self.notifications.len() > 8 {
+            return Err(Error::invalid(
+                "At most eight conditional notification routes are supported.",
+            ));
+        }
+        for rule in &self.notifications {
+            rule.validate(&self.fields)?;
+        }
+        if let Some(action) = &self.draft_post {
+            for name in [&action.title_field, &action.body_field] {
+                if !self.fields.iter().any(|f| {
+                    &f.name == name && f.schema.kind == "string" && f.visible_when.is_none()
+                }) {
+                    return Err(Error::invalid(
+                        "Draft post actions require unconditional title/body text fields.",
+                    ));
+                }
+            }
         }
         if let Some(action) = &self.subscription {
             action.validate(&self.fields)?;

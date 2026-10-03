@@ -34,3 +34,7 @@ wpalt --config wpalt.local.toml theme activate custom
 Exports create a new private file and refuse overwrites. Advanced package editing uses **Validate and save package**; an invalid JSON/package does not replace the valid graph.
 
 Current graph ceilings: 32 models/themes/components, 512 unique definition nodes, depth 12, expanded/rendered work 5,000 nodes, 50 items per collection/repeater, 128 distinct related records/media, four relationship loading rounds, 2 MiB aggregate render data and document output, 1 MiB assembled section, 256 KiB package. A request loads only the selected template's component dependencies. These are intentional development limits; multi-server coordination and arbitrary executable extensions are later milestones.
+
+## Published form composition (M4)
+
+The `form` node takes a literal published form UUID in `text`. The visual builder offers a published-form picker. Saving verifies referenced forms with a bounded batched query; arbitrary URLs or visitor-selected destinations are not accepted. Public output uses a same-origin iframe with only the form, shared styles and automatic value-free sizing. Theme draft previews show a placeholder. Canonical body documents can also contain form blocks; email projects them to absolute links.

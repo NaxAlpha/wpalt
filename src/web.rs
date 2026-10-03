@@ -22,7 +22,7 @@ pub fn router(app: App) -> Router {
     let limit = app.config.max_upload_bytes + 64 * 1024;
     let timeout = app.config.request_timeout_seconds;
     let business = if app.config.business_enabled {
-        crate::business::web::routes()
+        crate::business::web::routes(&app)
     } else {
         Router::new()
     };
@@ -33,6 +33,7 @@ pub fn router(app: App) -> Router {
         .route("/", get(home))
         .route("/search", get(home))
         .route("/health", get(health))
+        .route("/account", get(account))
         .route("/login", get(login_page).post(login))
         .route("/logout", post(logout))
         .route("/feed.xml", get(feed))
@@ -40,6 +41,7 @@ pub fn router(app: App) -> Router {
         .route("/assets/admin-ui.css", get(admin_css))
         .route("/assets/admin.js", get(js))
         .route("/assets/editor.js", get(editor_js))
+        .route("/assets/form-embed.js", get(form_embed_js))
         .route("/admin", get(dashboard))
         .route("/admin/posts", get(post_list))
         .route("/admin/posts/new", get(new_post).post(create_post))
@@ -132,8 +134,10 @@ async fn security_and_trace(
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
         || route == "/login"
-        || route.starts_with("/audience/")
+        || route == "/account"
+        || (route.starts_with("/audience/") || route.starts_with("/registration/"))
         || route.starts_with("/api/forms/")
+        || route.starts_with("/api/engagement/")
     {
         h.insert(
             "x-robots-tag",
@@ -149,10 +153,13 @@ async fn security_and_trace(
         "referrer-policy",
         HeaderValue::from_static("strict-origin-when-cross-origin"),
     );
-    if route.starts_with("/audience/") {
+    if route.starts_with("/audience/") || route.starts_with("/registration/") {
         h.insert("referrer-policy", HeaderValue::from_static("no-referrer"));
     }
     h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"));
+    if route == "/forms/{id}" {
+        h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"));
+    }
     if route == "/admin/design/{id}/preview" || route == "/admin/preview/{id}" {
         h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'"));
     }
@@ -169,8 +176,9 @@ async fn security_and_trace(
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
         || route == "/login"
-        || route.starts_with("/audience/")
+        || (route.starts_with("/audience/") || route.starts_with("/registration/"))
         || route.starts_with("/api/forms/")
+        || route.starts_with("/api/engagement/")
     {
         h.insert("cache-control", HeaderValue::from_static("no-store"));
     }
@@ -181,7 +189,11 @@ async fn security_and_trace(
     response
 }
 async fn admin_session(app: &App, headers: &HeaderMap) -> Result<Session> {
-    auth::session(app, headers).await
+    let session = auth::session(app, headers).await?;
+    if session.user.role == "subscriber" {
+        return Err(Error::forbidden());
+    }
+    Ok(session)
 }
 fn editor(s: &Session) -> Result<()> {
     if s.can_edit() {
@@ -260,8 +272,13 @@ struct Login {
     password: String,
 }
 async fn login(State(app): State<App>, Form(input): Form<Login>) -> Result<Response> {
-    let (token, _) = auth::login(&app, &input.email, &input.password).await?;
-    let mut response = Redirect::to("/admin").into_response();
+    let (token, session) = auth::login(&app, &input.email, &input.password).await?;
+    let mut response = Redirect::to(if session.user.role == "subscriber" {
+        "/account"
+    } else {
+        "/admin"
+    })
+    .into_response();
     response.headers_mut().insert(
         "set-cookie",
         HeaderValue::from_str(&auth::cookie(&app, &token)).unwrap(),
@@ -675,7 +692,7 @@ fn editor_form(
     html! {
         (view::heading("Publishing",if id.is_some(){"Edit content"}else{"New content"},"Write directly, organize your ideas, and publish when you are ready."))
         div class="notice error" data-editor-error hidden[error.is_none()] {(error.unwrap_or(""))}
-        form method="post" action=(id.map(|id|format!("/admin/posts/{id}")).unwrap_or_else(||"/admin/posts/new".into())) data-editor data-owner=(s.user.id) data-new=(if id.is_some(){"false"}else{"true"}) {
+        form method="post" action=(id.map(|id|format!("/admin/posts/{id}")).unwrap_or_else(||"/admin/posts/new".into())) data-editor data-autosave data-owner=(s.user.id) data-new=(if id.is_some(){"false"}else{"true"}) {
             (view::csrf(s)) input type="hidden" name="version" value=(p.version);input type="hidden" name="publish_at" value=(p.publish_at);
             div class="split" {section class="panel" {label {"Title" input name="title" value=(p.title) required maxlength="300";}input type="hidden" name="document" value=(if p.document.is_empty(){crate::document::import(&p.body,&p.blocks).map(|d|d.encode()).unwrap_or_else(|_|crate::document::empty())}else{p.document.clone()});div data-writing-canvas hidden {}label {"Content" textarea class="editor-body" name="body" aria-label="Content" maxlength="524288" {(p.body)}small {"Markdown import replaces the rich document. Select replacement below to apply edits; use the direct editor to preserve rich blocks."}}label data-markdown-replacement {input type="checkbox" name="import_markdown" value="true" checked[p.document.is_empty()];"Replace content using Markdown"}
                 details {summary {"Language & discovery"}
@@ -1288,6 +1305,8 @@ async fn save_settings(
     auth::csrf(&s, &input.csrf)?;
     let settings = Settings {
         business_enabled: app.config.business_enabled,
+        engagement_available: app.config.engagement.enabled,
+        analytics: None,
         title: input.title,
         description: input.description,
         theme: input.theme,
@@ -1320,7 +1339,7 @@ async fn users(State(app): State<App>, headers: HeaderMap) -> Result<Html<String
             (view::heading("Access","People & access","Administrators manage the site, editors manage content/media, and moderators review comments."))
             section class="panel table-wrap" {table {thead {tr {th {"Name"}th {"Email"}th {"Access"}}}tbody {@for r in rows {tr {td {(r.get::<String,_>("name"))}td {(r.get::<String,_>("email"))}td {
                 form method="post" action=(format!("/admin/users/{}",r.get::<String,_>("id"))) {(view::csrf(&s))input type="hidden" name="name" value=(r.get::<String,_>("name"));
-                    select name="role" aria-label="Account role" {@for role in ["admin","editor","moderator","disabled"] {option value=(role) selected[r.get::<String,_>("role")==role] {(role)}}}
+                    select name="role" aria-label="Account role" {@for role in ["admin","editor","moderator","subscriber","disabled"] {option value=(role) selected[r.get::<String,_>("role")==role] {(role)}}}
                     input type="password" name="new_password" placeholder="Optional new password" aria-label="New password" autocomplete="new-password" maxlength="256";
                     button class="secondary" {"Update & revoke sessions"}
                 }
@@ -1447,4 +1466,23 @@ async fn update_user(
     auth::csrf(&s, &input.csrf)?;
     auth::update_user(&app, &id, &input.name, &input.role, &input.new_password).await?;
     Ok(Redirect::to("/admin/users"))
+}
+
+async fn account(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
+    let s = auth::session(&app, &headers).await?;
+    Ok(html_page("Your account",&app.db.settings().await?,None,html!{h1 {"Your account"}p {"Signed in as " (&s.user.name)}p {"Role: " (&s.user.role)}p {"This subscriber account does not grant access to site administration."}form method="post" action="/logout" {(view::csrf(&s))button {"Sign out"}}}).into_response())
+}
+
+async fn form_embed_js(State(app): State<App>) -> Result<Response> {
+    if !app.config.business_enabled {
+        return Err(Error::not_found());
+    }
+    Ok((
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/javascript; charset=utf-8",
+        )],
+        include_str!("../assets/form-embed.js"),
+    )
+        .into_response())
 }

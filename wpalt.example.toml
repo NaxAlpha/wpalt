@@ -16,3 +16,40 @@ worker_concurrency = 2
 request_timeout_seconds = 30
 # For PostgreSQL, prefer WPALT_DATABASE_URL so credentials stay out of version control.
 # Non-local sites require an HTTPS base_url and a TLS reverse proxy.
+
+# Disable the entire business platform to omit its public assets/routes/jobs.
+business_enabled = true
+
+[mail]
+enabled = true
+from = "site@localhost.test"
+max_attempts = 5
+batch_size = 64
+# No SMTP routes means a private local .eml outbox, not internet delivery.
+# [[mail.smtp]]
+# host = "127.0.0.1"
+# port = 2525
+# tls = "local" # Plain transport is restricted to explicit loopback IPs.
+# username = ""
+# password = "" # Supply production credentials outside version control.
+
+[engagement]
+enabled = true # Module availability; collection starts OFF in administration.
+max_events = 100000
+max_sessions = 10000
+retention_days = 30
+respect_dnt = true
+
+[business_limits]
+forms = 1000
+entries = 100000
+entry_bytes = 268435456
+contacts = 100000
+drafts = 10000
+draft_bytes = 67108864
+uploads = 10000
+upload_bytes = 268435456
+registrations = 10000
+mail_jobs = 100000
+mail_bytes = 268435456
+mail_retention_days = 30

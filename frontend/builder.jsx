@@ -1,6 +1,6 @@
 import { h, render, Fragment } from "preact";
 import { useState, useEffect, useRef } from "preact/hooks";
-import { Button, Field, Notice, Disclosure } from "./ui.jsx";
+import { Button, Field, Notice, Disclosure, SelectField } from "./ui.jsx";
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const kinds = [
   "section",
@@ -10,6 +10,7 @@ const kinds = [
   "text",
   "body",
   "image",
+  "form",
   "link",
   "navigation",
   "component",
@@ -927,6 +928,22 @@ function App() {
                     value={current.text}
                     onChange={(v) => update((p) => (at(p, selected).text = v))}
                   />
+                )}
+                {current.kind === "form" && (
+                  <SelectField
+                    label="Published form"
+                    value={current.text || ""}
+                    onChange={(event) =>
+                      update((p) => {
+                        at(p, selected).text = event.currentTarget.value;
+                      })
+                    }
+                  >
+                    <option value="">Choose a published form…</option>
+                    {(state.forms || []).map((form) => (
+                      <option value={form.id}>{form.title}</option>
+                    ))}
+                  </SelectField>
                 )}
                 {current.kind === "link" && (
                   <Binding

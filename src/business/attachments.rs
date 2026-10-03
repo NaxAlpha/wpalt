@@ -34,12 +34,21 @@ pub async fn upload(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<i64>().ok())
         .ok_or_else(|| Error::invalid("Choose the published form version."))?;
-    let name = headers
+    let encoded_name = headers
         .get("x-file-name")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("attachment");
+    if encoded_name.len() > 600 {
+        return Err(Error::invalid("File name exceeds its header limit."));
+    }
+    let encoded = format!("file={encoded_name}");
+    let names = url::form_urlencoded::parse(encoded.as_bytes()).collect::<Vec<_>>();
+    if names.len() != 1 || names[0].0 != "file" {
+        return Err(Error::invalid("Use a percent-encoded file name."));
+    }
+    let name = names[0].1.as_ref();
     if name.len() > 200
-        || name.contains(['\r', '\n', '/', '\\'])
+        || name.contains(['\r', '\n', '/', '\\', '\0', '\u{fffd}'])
         || body.is_empty()
         || body.len() > app.config.max_upload_bytes.min(2 * 1024 * 1024)
     {
@@ -68,6 +77,20 @@ pub async fn upload(
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
+    let extension = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+    let extensions: &[&str] = match mime {
+        "text/plain" => &["txt"],
+        "application/pdf" => &["pdf"],
+        "image/png" => &["png"],
+        "image/jpeg" => &["jpg", "jpeg"],
+        "image/webp" => &["webp"],
+        _ => &[],
+    };
+    if !extensions.contains(&extension.as_str()) {
+        return Err(Error::invalid(
+            "Use a supported file extension that matches its media type.",
+        ));
+    }
     let (bytes, mime) = match mime {
         "text/plain" if std::str::from_utf8(&body).is_ok() && !body.contains(&0) => {
             (body.to_vec(), "text/plain")
@@ -134,6 +157,7 @@ pub async fn upload(
     .bind(&form)
     .execute(&mut *tx)
     .await?;
+    super::quotas::reserve(&app, &mut tx, "uploads", 1, bytes.len() as i64).await?;
     if sqlx::query("UPDATE form_upload_usage SET bytes=bytes+$1,files=files+1 WHERE form_id=$2 AND bytes+$1<=67108864 AND files<1000").bind(bytes.len() as i64).bind(&form).execute(&mut *tx).await?.rows_affected()!=1 {return Err(Error::invalid("This form's private attachment storage is full (64 MiB / 1,000 files)."));}
     sqlx::query("INSERT INTO form_attachments(id,form_id,field_name,form_version,token_hash,filename,original_name,mime,size,sha256,expires_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)").bind(&id).bind(form).bind(field).bind(version).bind(auth::digest(token.as_bytes())).bind(&filename).bind(name).bind(mime).bind(bytes.len() as i64).bind(hash).bind(now()+86400).bind(now()).execute(&mut *tx).await?;
     let path = app.config.data_dir.join("attachments").join(filename);

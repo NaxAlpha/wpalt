@@ -4,7 +4,7 @@ for (const link of document.querySelectorAll('.sidebar nav a')) {
   const section = location.pathname.startsWith('/admin/users') ? '/admin/settings' : location.pathname;
   if (href === section || (href.startsWith('/admin/') && section.startsWith(href + '/'))) link.setAttribute('aria-current', 'page');
 }
-const editor = document.querySelector('[data-editor]');
+const editor = document.querySelector('[data-editor][data-autosave]');
 if (editor) {
   const seo = editor.querySelector('[data-seo-json]');
   if (seo) editor.addEventListener('input', () => { seo.value = JSON.stringify({title:editor.querySelector('[data-seo-title]').value,description:editor.querySelector('[data-seo-description]').value,noindex:editor.querySelector('[data-seo-noindex]').checked,schema_type:editor.querySelector('[data-seo-type]').value}); });
@@ -60,4 +60,13 @@ for (const input of document.querySelectorAll('[data-schedule-time]')) {
     const target = document.querySelector('[name=publish_at]');
     target.value = input.value ? Math.floor(new Date(input.value).getTime() / 1000) : 0;
   });
+}
+
+// Native date/time inputs share an epoch transport with CLI/configuration.
+for (const input of document.querySelectorAll('[data-epoch-for]')) {
+  const hidden=input.form?.elements.namedItem(input.dataset.epochFor);
+  if(!hidden)continue;
+  const pad=value=>String(value).padStart(2,'0');
+  if(Number(hidden.value)>0){const date=new Date(Number(hidden.value)*1000);input.value=`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;}
+  input.addEventListener('input',()=>{hidden.value=input.value?String(Math.floor(new Date(input.value).getTime()/1000)):'0';});
 }

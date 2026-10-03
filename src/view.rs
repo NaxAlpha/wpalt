@@ -20,7 +20,7 @@ pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body:
                 p class="sidebar-note" {"Your site. Your server."}
                 nav aria-label="Administration" {
                     a href="/admin" {"Overview"}
-                    @if s.can_edit() {a href="/admin/posts" {"Content"} a href="/admin/media" {"Media library"} @if settings.business_enabled {a href="/admin/forms" {"Forms"} a href="/admin/audience" {"Audience"} a href="/admin/mail" {"Mail"}}}
+                    @if s.can_edit() {a href="/admin/posts" {"Content"} a href="/admin/media" {"Media library"} @if settings.business_enabled {a href="/admin/forms" {"Forms"} a href="/admin/audience" {"Audience"} a href="/admin/mail" {"Mail"} @if settings.engagement_available {a href="/admin/engagement" {"Engagement"}}}}
                     @if s.can_moderate() {a href="/admin/comments" {"Comments"}}
                     @if s.is_admin() {a href="/admin/builder" {"Design studio"} a href="/admin/discovery" {"Discovery"} a href="/admin/settings" {"Site settings"} a href="/admin/operations" {"Operations"}}
                     a href="/" {"View website ↗"}
@@ -63,7 +63,7 @@ pub fn public_body(post: &Post, preview: bool) -> Markup {
     };
     let fields: serde_json::Value = serde_json::from_str(fields).unwrap_or_default();
     let rendered = crate::document::Document::parse(document)
-        .map(|d| d.html())
+        .map(|d| if preview { d.preview_html() } else { d.html() })
         .unwrap_or_default();
     html! { article class="article" {
         @if preview {p class="notice" {"Private preview — unpublished changes. " a href=(format!("/admin/posts/{}",post.id)) {"Back to editor"}}}

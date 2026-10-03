@@ -8,7 +8,7 @@ use crate::{
 };
 use sqlx::Row;
 pub const SCHEMA: &str = r#"
-CREATE TABLE IF NOT EXISTS business_campaigns(id TEXT PRIMARY KEY,title TEXT NOT NULL,subject TEXT NOT NULL,document TEXT NOT NULL,segment TEXT NOT NULL DEFAULT '{}',list_id TEXT NOT NULL REFERENCES audience_lists(id),state TEXT NOT NULL CHECK(state IN ('draft','scheduled','expanding','complete','cancelled')),version BIGINT NOT NULL DEFAULT 1,send_at BIGINT NOT NULL DEFAULT 0,cutoff BIGINT NOT NULL DEFAULT 0,cursor TEXT NOT NULL DEFAULT '',created_at BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS business_campaigns(id TEXT PRIMARY KEY,title TEXT NOT NULL,subject TEXT NOT NULL,document TEXT NOT NULL,segment TEXT NOT NULL DEFAULT '{}',trigger_kind TEXT NOT NULL DEFAULT '',list_id TEXT NOT NULL REFERENCES audience_lists(id),state TEXT NOT NULL CHECK(state IN ('draft','scheduled','expanding','complete','cancelled')),version BIGINT NOT NULL DEFAULT 1,send_at BIGINT NOT NULL DEFAULT 0,cutoff BIGINT NOT NULL DEFAULT 0,cursor TEXT NOT NULL DEFAULT '',created_at BIGINT NOT NULL);
 CREATE INDEX IF NOT EXISTS campaign_due ON business_campaigns(state,send_at,id);
 CREATE TABLE IF NOT EXISTS audience_withdrawal_tokens(hash TEXT PRIMARY KEY,contact_id TEXT NOT NULL,list_id TEXT NOT NULL,created_at BIGINT NOT NULL,FOREIGN KEY(contact_id,list_id) REFERENCES audience_memberships(contact_id,list_id) ON DELETE CASCADE);
 "#;
@@ -36,6 +36,19 @@ pub async fn save(
     send_at: i64,
     segment: super::audience::Segment,
 ) -> Result<()> {
+    save_with_trigger(app, id, version, subject, document, send_at, segment, None).await
+}
+#[allow(clippy::too_many_arguments)] // Shared save operation carries an optional owner-selected trigger.
+pub async fn save_with_trigger(
+    app: &App,
+    id: &str,
+    version: i64,
+    subject: &str,
+    document: &str,
+    send_at: i64,
+    segment: super::audience::Segment,
+    trigger: Option<bool>,
+) -> Result<()> {
     if subject.trim().is_empty()
         || subject.len() > 200
         || subject.contains(['\r', '\n'])
@@ -49,10 +62,30 @@ pub async fn save(
     let segment =
         serde_json::to_string(&segment).map_err(|_| Error::invalid("Invalid segment."))?;
     let doc = Document::parse(document)?;
-    let result=sqlx::query("UPDATE business_campaigns SET subject=$1,document=$2,send_at=$3,state=$4,segment=$7,version=version+1 WHERE id=$5 AND version=$6 AND state IN ('draft','scheduled')").bind(subject).bind(doc.encode()).bind(send_at).bind(if send_at>0{"scheduled"}else{"draft"}).bind(id).bind(version).bind(segment).execute(&app.db.pool).await?;
+    let mut tx = app.db.pool.begin().await?;
+    sqlx::query("UPDATE audience_lists SET policy=policy WHERE id=(SELECT list_id FROM business_campaigns WHERE id=$1)").bind(id).execute(&mut *tx).await?;
+    let old: Option<String> =
+        sqlx::query_scalar("SELECT trigger_kind FROM business_campaigns WHERE id=$1")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let trigger_kind = trigger
+        .map(|value| if value { "confirmation" } else { "" })
+        .map(str::to_owned)
+        .unwrap_or(old.ok_or_else(Error::not_found)?);
+    if trigger_kind == "confirmation" {
+        let count:i64=sqlx::query_scalar("SELECT COUNT(*) FROM business_campaigns WHERE trigger_kind='confirmation' AND id<>$1 AND list_id=(SELECT list_id FROM business_campaigns WHERE id=$1)").bind(id).fetch_one(&mut *tx).await?;
+        if count >= 16 {
+            return Err(Error::invalid(
+                "At most sixteen confirmation templates per list are supported.",
+            ));
+        }
+    }
+    let result=sqlx::query("UPDATE business_campaigns SET subject=$1,document=$2,send_at=$3,state=$4,segment=$7,trigger_kind=$8,version=version+1 WHERE id=$5 AND version=$6 AND state IN ('draft','scheduled')").bind(subject).bind(doc.encode()).bind(send_at).bind(if trigger_kind=="confirmation"{"draft"}else if send_at>0{"scheduled"}else{"draft"}).bind(id).bind(version).bind(segment).bind(trigger_kind).execute(&mut *tx).await?;
     if result.rows_affected() != 1 {
         return Err(Error::conflict());
     }
+    tx.commit().await?;
     Ok(())
 }
 pub async fn tick(app: &App) -> Result<usize> {
@@ -98,7 +131,7 @@ pub async fn tick(app: &App) -> Result<usize> {
             app.config.base_url.trim_end_matches('/')
         );
         let footer=maud::html!{hr; p {(row.get::<String,_>("purpose"))} p {a href=(&url){"Withdraw subscription"}}}.into_string();
-        let html = format!("{}{}", doc.html(), footer);
+        let html = format!("{}{}", doc.mail_html(&app.config.base_url), footer);
         let plain = format!("{}\nWithdraw subscription: {url}", doc.markdown());
         mail::enqueue(
             app,

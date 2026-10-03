@@ -665,7 +665,7 @@
       "applicable_versions": [
         "lettre 0.11.23",
         "PostgreSQL 17",
-        "wpalt schema/backup 6"
+        "wpalt schema/backup 7"
       ],
       "last_checked": "2026-10-03",
       "next_review": "2027-01-01",
@@ -698,7 +698,7 @@
         "https://www.postgresql.org/docs/17/textsearch-indexes.html"
       ],
       "applicable_versions": [
-        "wpalt schema/backup 6",
+        "wpalt schema/backup 7",
         "SQLite FTS5",
         "PostgreSQL 17 GIN"
       ],
@@ -720,6 +720,106 @@
         "image/parser advisory",
         "file-type or retention policy change",
         "query/index or permission change"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-ENGAGEMENT",
+      "area": "Consented local analytics, bounded categories and masked playback",
+      "scope": "M4",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://globalprivacycontrol.org/",
+        "https://www.w3.org/TR/WCAG22/"
+      ],
+      "applicable_versions": [
+        "wpalt schema/backup 7",
+        "PostgreSQL 17",
+        "WCAG 2.2"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Capture is opt-in and purpose/version-bound; recording additionally requires explicit consent. Honor Sec-GPC independently on the server and configured DNT. GPC is used conservatively to disable local collection; this is a product rule, not a general legal-compliance claim.",
+        "Geometry-only recording accepts bounded coordinates/categories and rejects text, field values, links and extra properties. Withdrawal cascades visitor-linked events and receipts. Hard module disable removes assets/routes and skips jobs."
+      ],
+      "tests": [
+        "engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal",
+        "scripts/engagement_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected release",
+        "privacy, permission, retention or parser change",
+        "upstream guidance/security advisory"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-OFFERS",
+      "area": "Accessible targeting, stable experiments and local reward allocation",
+      "scope": "M4",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.w3.org/TR/WCAG22/",
+        "https://www.postgresql.org/docs/17/sql-select.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema/backup 7",
+        "PostgreSQL 17",
+        "WCAG 2.2"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Owner-composed canonical messages use native modal keyboard/focus behavior and measured mobile targets. No forced motion or remote frontend dependencies.",
+        "Server targeting requires current consent, declared device/referrer categories, public paths, schedule and persisted frequency. DB transactions serialize last-stock allocation and retry recovers the same receipt. Cookie sessions are not verified people; commerce/redemption belongs to M6."
+      ],
+      "tests": [
+        "local_offers_keep_variants_bound_frequency_and_allocate_last_reward_atomically",
+        "scripts/engagement_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected release",
+        "privacy, permission, retention or parser change",
+        "upstream guidance/security advisory"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-MODERATED-ACTIONS",
+      "area": "Frozen notifications, contributions and approved account requests",
+      "scope": "M4",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema/backup 7",
+        "PostgreSQL 17",
+        "Argon2 0.5"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Accepted entries and fixed-recipient conditional notifications, pending registration proof and private contribution drafts commit atomically; retries cannot repeat actions. Partial drafts never trigger actions.",
+        "Registration uses expiring hashed ownership proof, deliberate password submission with bounded Argon2 workers, then explicit owner approval. Public input cannot choose a role; subscriber has no editorial/moderation/admin permissions.",
+        "Database admission counters bound record and UTF-8 body storage. Configured retention releases expired staged data and completed mail; uncertain deliveries remain available for deliberate recovery."
+      ],
+      "tests": [
+        "accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "publication_retries_and_fresh_restore_preserve_one_authoritative_entry"
+      ],
+      "triggers": [
+        "affected release",
+        "privacy, permission, retention or parser change",
+        "upstream guidance/security advisory"
       ],
       "status": "reviewed"
     }

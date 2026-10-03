@@ -223,6 +223,7 @@ impl Package {
             "text",
             "body",
             "image",
+            "form",
             "link",
             "navigation",
             "component",
@@ -237,6 +238,15 @@ impl Package {
         .contains(&n.kind.as_str())
         {
             return Err(Error::invalid("Unknown composition node."));
+        }
+        if n.kind == "form"
+            && n.text
+                .as_str()
+                .is_none_or(|id| uuid::Uuid::parse_str(id).is_err())
+        {
+            return Err(Error::invalid(
+                "A form block needs a literal published form ID.",
+            ));
         }
         let s = &n.style;
         if !["", "grid", "row", "stack"].contains(&s.layout.as_str())
@@ -829,7 +839,16 @@ pub async fn load(app: &App, id: &str, draft: bool) -> Result<Stored> {
     })
 }
 async fn validate_literal_references(app: &App, package: &Package) -> Result<()> {
-    fn gather(p: &Package, n: &Node, media: &mut BTreeSet<String>, posts: &mut BTreeSet<String>) {
+    fn gather(
+        p: &Package,
+        n: &Node,
+        media: &mut BTreeSet<String>,
+        posts: &mut BTreeSet<String>,
+        forms: &mut BTreeSet<String>,
+    ) {
+        if n.kind == "form" {
+            forms.insert(n.text.as_str().unwrap_or("").to_owned());
+        }
         if let Some(id) = n.image.as_str() {
             if uuid::Uuid::parse_str(id).is_ok() {
                 media.insert(id.into());
@@ -851,25 +870,30 @@ async fn validate_literal_references(app: &App, package: &Package) -> Result<()>
             }
         }
         for c in &n.children {
-            gather(p, c, media, posts)
+            gather(p, c, media, posts, forms)
         }
     }
     let mut media = BTreeSet::new();
     let mut posts = BTreeSet::new();
+    let mut forms = BTreeSet::new();
     for n in package
         .templates
         .values()
         .chain([&package.header, &package.footer])
         .chain(package.components.values().map(|c| &c.root))
     {
-        gather(package, n, &mut media, &mut posts)
+        gather(package, n, &mut media, &mut posts, &mut forms)
     }
-    if media.len() + posts.len() > 128 {
+    if media.len() + posts.len() + forms.len() > 128 {
         return Err(Error::invalid(
             "Use at most 128 literal media/relationship references in a theme.",
         ));
     }
-    for (table, ids) in [("media", media), ("posts", posts)] {
+    for (table, ids) in [
+        ("media", media),
+        ("posts", posts),
+        ("business_forms", forms),
+    ] {
         if ids.is_empty() {
             continue;
         }
@@ -879,6 +903,14 @@ async fn validate_literal_references(app: &App, package: &Package) -> Result<()>
             list.push_bind(id);
         }
         list.push_unseparated(")");
+        if table == "business_forms" {
+            q.push(" AND published_version>0");
+            if !app.config.business_enabled {
+                return Err(Error::invalid(
+                    "Enable the business module before publishing an embedded form.",
+                ));
+            }
+        }
         if app.db.fetch_builder(&mut q).await?.len() != ids.len() {
             return Err(Error::invalid(
                 "Theme references missing media or content; install dependencies or replace their UUIDs.",
@@ -1383,6 +1415,13 @@ fn render_node(
         }
     }
     Ok(match n.kind.as_str() {
+        "form" => {
+            if draft {
+                html! {p {a href=(format!("/forms/{label}")) {"Open published form"}}}
+            } else {
+                html! {(maud::PreEscaped(crate::document::form_embed(&label,"Embedded form")))}
+            }
+        }
         "heading" => match n.level {
             1 => html! {h1 class=(class){(label)}},
             3 => html! {h3 class=(class){(label)}},
@@ -1418,11 +1457,11 @@ fn render_node(
                     ctx.resolve(&json!({"bind":format!("{prefix}.document")}), item, params)
                 });
             if let Some(doc) = canonical.as_ref().and_then(Value::as_str) {
-                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|d|d.html()).unwrap_or_default()))}}
+                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|d|if draft {d.preview_html()} else {d.html()}).unwrap_or_default()))}}
             } else if !n.text.is_null() {
                 html! {div class=(class){(maud::PreEscaped(content::markdown(&label)))}}
             } else if let Some(doc) = item.get("document").and_then(Value::as_str) {
-                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|d|d.html()).unwrap_or_default()))}}
+                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|d|if draft {d.preview_html()} else {d.html()}).unwrap_or_default()))}}
             } else {
                 post.map(|p| crate::view::public_body(p, draft))
                     .unwrap_or_default()
@@ -1562,7 +1601,7 @@ pub fn document(
     let scripts = [&p.header, &p.footer, root]
         .into_iter()
         .any(|n| has_tabs(p, n));
-    let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" class="theme-shell"{(body)(extra)}(footer)(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
+    let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" class="theme-shell"{(body)(extra)}(footer)(crate::business::engagement::markup(settings,draft))(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
     if output.len() > 2 * 1024 * 1024 {
         return Err(Error::invalid("Rendered document exceeds 2 MiB."));
     }

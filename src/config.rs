@@ -14,7 +14,9 @@ pub struct Config {
     pub base_url: String,
     pub debug: bool,
     pub business_enabled: bool,
+    pub business_limits: crate::business::quotas::Config,
     pub mail: crate::business::mail::MailConfig,
+    pub engagement: crate::business::engagement::Config,
     pub database_connections: u32,
     pub scheduler_seconds: u64,
     pub session_seconds: i64,
@@ -34,7 +36,9 @@ impl Default for Config {
             base_url: "http://127.0.0.1:3000".into(),
             debug: false,
             business_enabled: true,
+            business_limits: Default::default(),
             mail: crate::business::mail::MailConfig::default(),
+            engagement: crate::business::engagement::Config::default(),
             database_connections: 4,
             scheduler_seconds: 5,
             session_seconds: 28800,
@@ -79,7 +83,9 @@ impl Config {
         Ok(c)
     }
     pub fn validate(&self) -> anyhow::Result<()> {
+        self.business_limits.validate()?;
         self.mail.validate()?;
+        self.engagement.validate()?;
         ensure!(
             self.database_url.starts_with("sqlite:")
                 || self.database_url.starts_with("postgres://")

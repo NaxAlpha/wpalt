@@ -7,7 +7,7 @@ use crate::{
 };
 use axum::{
     Json, Router,
-    extract::{DefaultBodyLimit, Path, State},
+    extract::{DefaultBodyLimit, Path, Query, State},
     http::{HeaderMap, header},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
@@ -17,9 +17,18 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::Row;
 
-pub fn routes() -> Router<App> {
+pub fn routes(app: &App) -> Router<App> {
+    let engagement = if app.config.engagement.enabled {
+        super::engagement_web::routes()
+    } else {
+        Router::new()
+    };
     Router::new()
         .merge(super::audience_web::routes())
+        .merge(super::workflows_web::routes())
+        .merge(super::registration_web::routes())
+        .merge(engagement)
+        .route("/api/admin/forms/catalog", get(catalog))
         .route("/admin/forms", get(list).post(create))
         .route("/admin/forms/{id}", get(editor))
         .route("/admin/forms/{id}/entries", get(entries))
@@ -51,14 +60,55 @@ async fn editor_session(app: &App, headers: &HeaderMap) -> Result<crate::model::
     }
     Ok(session)
 }
-async fn list(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {
+#[derive(Deserialize, Default)]
+struct FormsPage {
+    after: Option<String>,
+}
+async fn list(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Query(page): Query<FormsPage>,
+) -> Result<Html<String>> {
     let session = editor_session(&app, &headers).await?;
-    let query = if app.db.postgres {
-        "SELECT id,draft,draft::jsonb->>'title' AS title,version,published_version FROM business_forms ORDER BY updated_at DESC,id DESC LIMIT 40"
+    let (time, id) = if let Some(after) = page.after {
+        let (time, id) = after
+            .split_once(':')
+            .ok_or_else(|| Error::invalid("Invalid form cursor."))?;
+        let time = time
+            .parse::<i64>()
+            .map_err(|_| Error::invalid("Invalid form cursor."))?;
+        if time < 0 || uuid::Uuid::parse_str(id).is_err() {
+            return Err(Error::invalid("Invalid form cursor."));
+        }
+        (time, id.to_owned())
     } else {
-        "SELECT id,draft,json_extract(draft,'$.title') AS title,version,published_version FROM business_forms ORDER BY updated_at DESC,id DESC LIMIT 40"
+        (i64::MAX, String::new())
     };
-    let rows = sqlx::query(query).fetch_all(&app.db.pool).await?;
+    let query = if app.db.postgres {
+        "SELECT id,draft::jsonb->>'title' AS title,published_version,updated_at FROM business_forms WHERE updated_at<$1 OR (updated_at=$1 AND id<$2) ORDER BY updated_at DESC,id DESC LIMIT 41"
+    } else {
+        "SELECT id,json_extract(draft,'$.title') AS title,published_version,updated_at FROM business_forms WHERE updated_at<$1 OR (updated_at=$1 AND id<$2) ORDER BY updated_at DESC,id DESC LIMIT 41"
+    };
+    let mut rows = sqlx::query(query)
+        .bind(time)
+        .bind(id)
+        .fetch_all(&app.db.pool)
+        .await?;
+    let more = rows.len() > 40;
+    if more {
+        rows.pop();
+    }
+    let next = if more {
+        rows.last().map(|r| {
+            format!(
+                "/admin/forms?after={}:{}",
+                r.get::<i64, _>("updated_at"),
+                r.get::<String, _>("id")
+            )
+        })
+    } else {
+        None
+    };
     let settings = app.db.settings().await?;
     Ok(Html(view::layout(
         "Forms",
@@ -69,11 +119,11 @@ async fn list(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>
             section class="panel" {h2 {"Create a form"} form method="post" action="/admin/forms" {
                 (view::csrf(&session)) label {"Title" input name="title" required maxlength="160";} button {"Create form"}
             }}
+            @if let Some(next)=next{p {a href=(next){"Older forms"}}}
             section class="panel" {h2 {"Recent forms"} @if rows.is_empty() {p {"Your forms will appear here."}}
                 @for row in rows {
                     @let id: String = row.get("id");
-                    @let form: FormDefinition = serde_json::from_str(&row.get::<String,_>("draft")).map_err(|_| Error::invalid("Stored form requires repair."))?;
-                    div class="toolbar" {a href=(format!("/admin/forms/{id}")) {(form.title)} span class="status" {(if row.get::<i64,_>("published_version")>0 {"Published"}else{"Draft"})}}
+                    div class="toolbar" {a href=(format!("/admin/forms/{id}")) {(row.get::<String,_>("title"))} span class="status" {(if row.get::<i64,_>("published_version")>0 {"Published"}else{"Draft"})}}
                 }
             }
         },
@@ -150,12 +200,35 @@ async fn save(
 ) -> Result<Json<Value>> {
     let session = editor_session(&app, &headers).await?;
     auth::csrf(&session, &input.csrf)?;
+    if session.user.role != "admin" {
+        let previous: String = sqlx::query_scalar("SELECT draft FROM business_forms WHERE id=$1")
+            .bind(&id)
+            .fetch_optional(&app.db.pool)
+            .await?
+            .ok_or_else(Error::not_found)?;
+        let previous: FormDefinition = serde_json::from_str(&previous)
+            .map_err(|_| Error::invalid("Stored form requires repair."))?;
+        let actions =
+            |form: &FormDefinition| json!([form.notifications, form.draft_post, form.registration]);
+        if actions(&previous) != actions(&input.definition) {
+            return Err(Error::forbidden());
+        }
+    }
     store::save(&app, &id, input.version, &input.definition, input.publish).await?;
     Ok(Json(
         json!({"version":input.version+1,"published":input.publish}),
     ))
 }
-async fn public(State(app): State<App>, Path(id): Path<String>) -> Result<Html<String>> {
+#[derive(Deserialize, Default)]
+struct Embed {
+    #[serde(default)]
+    embedded: bool,
+}
+async fn public(
+    State(app): State<App>,
+    Path(id): Path<String>,
+    Query(embed): Query<Embed>,
+) -> Result<Html<String>> {
     let row = sqlx::query(
         "SELECT live,published_version FROM business_forms WHERE id=$1 AND published_version>0",
     )
@@ -164,14 +237,26 @@ async fn public(State(app): State<App>, Path(id): Path<String>) -> Result<Html<S
     .await?
     .ok_or_else(Error::not_found)?;
     let raw: String = row.get("live");
-    let definition: store::PublishedForm =
+    let mut definition: store::PublishedForm =
         serde_json::from_str(&raw).map_err(|_| Error::invalid("Stored form requires repair."))?;
+    // Public rendering needs field grammar and consent purpose, never private
+    // recipients, message templates or owner-configured contribution actions.
+    definition.form.notifications.clear();
+    definition.form.draft_post = None;
+    definition.form.registration = None;
+    let raw = serde_json::to_string(&definition)
+        .map_err(|_| Error::invalid("Stored form requires repair."))?;
+    let settings = app.db.settings().await?;
+    if embed.embedded {
+        return Ok(Html(html!{(maud::DOCTYPE)html lang="en"{head{meta charset="utf-8";meta name="viewport" content="width=device-width, initial-scale=1";title {(definition.form.title)}link rel="stylesheet" href="/assets/app.css";}body class=(format!("{} embedded-form",settings.theme)){main{h1 {(definition.form.title)}div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw){p{"Loading form…"}noscript{"Enable JavaScript to complete this form."}}}script defer src="/assets/forms.js"{}script defer src="/assets/form-embed.js"{}}}}.into_string()));
+    }
     Ok(Html(view::layout(
         &definition.form.title,
-        &app.db.settings().await?,
+        &settings,
         None,
         html! {
             h1 {(definition.form.title)}
+            (super::engagement::markup(&settings,false))
             div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) {p {"Loading form…"}noscript {"Enable JavaScript to complete this form."}}
             script defer src="/assets/forms.js" {}
         },
@@ -186,10 +271,23 @@ struct Submission {
 }
 async fn submit(
     State(app): State<App>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(input): Json<Submission>,
 ) -> Result<Json<Value>> {
     let entry = store::submit(&app, &id, input.version, &input.key, &input.values).await?;
+    if super::engagement::conversion(
+        &app,
+        &headers,
+        &entry,
+        &format!("/forms/{id}"),
+        "form_submit",
+    )
+    .await
+    .is_err()
+    {
+        tracing::warn!(event = "form_conversion_not_recorded");
+    }
     Ok(Json(json!({"accepted":true,"entry":entry})))
 }
 async fn bundle() -> Response {
@@ -411,4 +509,22 @@ struct EntryQuery {
     before: i64,
     #[serde(default)]
     after: String,
+}
+
+async fn catalog(State(app): State<App>, headers: HeaderMap) -> Result<Json<Value>> {
+    let session = auth::session(&app, &headers).await?;
+    if !session.can_edit() {
+        return Err(Error::forbidden());
+    }
+    let rows=sqlx::query("SELECT id,live FROM business_forms WHERE published_version>0 ORDER BY updated_at DESC,id LIMIT 100").fetch_all(&app.db.pool).await?;
+    let forms = rows
+        .into_iter()
+        .map(|row| {
+            let definition: store::PublishedForm =
+                serde_json::from_str(&row.get::<String, _>("live"))
+                    .map_err(|_| Error::invalid("Stored form needs repair."))?;
+            Ok(json!({"id":row.get::<String,_>("id"),"title":definition.form.title}))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(Json(json!({"forms":forms})))
 }

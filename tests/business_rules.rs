@@ -481,6 +481,12 @@ async fn consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journ
             "pending",
             "GET review must not confirm email-prefetches."
         );
+        let (a, b) = tokio::join!(mail::tick(&app), mail::tick(&other));
+        assert_eq!(
+            a.unwrap() + b.unwrap(),
+            1,
+            "Independent workers claim a job once."
+        );
         audience::decide(&app, token, false).await.unwrap();
         audience::decide(&app, token, false).await.unwrap();
         assert_eq!(
@@ -491,12 +497,6 @@ async fn consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journ
             .await
             .unwrap(),
             1
-        );
-        let (a, b) = tokio::join!(mail::tick(&app), mail::tick(&other));
-        assert_eq!(
-            a.unwrap() + b.unwrap(),
-            1,
-            "Independent workers claim a job once."
         );
         let expected = mail::download(&app, &job).await.unwrap();
         assert_eq!(
@@ -1006,6 +1006,926 @@ async fn attachments_follow_up_and_search_remain_private_and_survive_fresh_resto
                     .await
                     .unwrap();
             }
+            pool.close().await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal() {
+    use axum::http::HeaderMap;
+    use wpalt::{
+        App, auth, backup,
+        business::engagement::{self, Capture, Frame, Rectangle},
+    };
+    let postgres = std::env::var("TEST_DATABASE_URL").ok();
+    if std::env::var("WPALT_REQUIRE_POSTGRES").is_ok() {
+        assert!(postgres.is_some());
+    }
+    for engine in std::iter::once(None).chain(postgres.as_deref().map(Some)) {
+        let data = tempfile::tempdir().unwrap();
+        let (config, source_schema) = database_config(&data, "engagement", engine).await;
+        let app = App::open(config).await.unwrap();
+        auth::initialize(
+            &app,
+            "owner@example.test",
+            "Owner",
+            "a strong local password",
+        )
+        .await
+        .unwrap();
+        let event = || Capture {
+            id: uuid::Uuid::new_v4().to_string(),
+            path: "/".into(),
+            name: "pageview".into(),
+            dimensions: [("device".into(), "mobile".into())].into(),
+            frame: None,
+        };
+        assert!(
+            !engagement::capture(&app, &HeaderMap::new(), event())
+                .await
+                .unwrap()
+        );
+        assert!(
+            app.db.settings().await.unwrap().analytics.is_none(),
+            "A fresh blog has no analytics asset or consent UI."
+        );
+        sqlx::query("UPDATE engagement_settings SET enabled=1,recording=1,version=2 WHERE id=1")
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+        let token = engagement::consent(&app, &HeaderMap::new(), true, false, 2)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", format!("wpalt_visitor={token}").parse().unwrap());
+        let id = uuid::Uuid::new_v4().to_string();
+        let mut input = event();
+        input.id = id.clone();
+        assert!(engagement::capture(&app, &headers, input).await.unwrap());
+        let mut replay = event();
+        replay.id = id;
+        assert!(engagement::capture(&app, &headers, replay).await.unwrap());
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM engagement_events")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            1,
+            "Repeated event IDs do not inflate reports."
+        );
+        let frame = Frame {
+            width: 320,
+            height: 900,
+            scroll_y: 0,
+            elapsed: 1,
+            rectangles: vec![Rectangle {
+                x: 16,
+                y: 40,
+                width: 280,
+                height: 44,
+                kind: "control".into(),
+            }],
+            click: Some([40, 48]),
+        };
+        let mut recording = event();
+        recording.name = "interaction".into();
+        recording.frame = Some(frame.clone());
+        assert!(
+            !engagement::capture(&app, &headers, recording)
+                .await
+                .unwrap(),
+            "Analytics consent alone never enables optional recording."
+        );
+        let token = engagement::consent(&app, &HeaderMap::new(), true, true, 2)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut recording_headers = HeaderMap::new();
+        recording_headers.insert("cookie", format!("wpalt_visitor={token}").parse().unwrap());
+        let mut recording = event();
+        recording.name = "interaction".into();
+        recording.frame = Some(frame);
+        assert!(
+            engagement::capture(&app, &recording_headers, recording)
+                .await
+                .unwrap()
+        );
+        assert!(serde_json::from_value::<Frame>(json!({"width":320,"height":900,"scroll_y":0,"elapsed":1,"rectangles":[],"text":"must never capture"})).is_err());
+        let mut forged = event();
+        forged.name = "form_submit".into();
+        assert!(
+            engagement::capture(&app, &headers, forged).await.is_err(),
+            "Conversion events require server-confirmed actions."
+        );
+        let mut private = event();
+        private.path = "/admin/posts".into();
+        assert!(engagement::capture(&app, &headers, private).await.is_err());
+        let mut pii = event();
+        pii.dimensions
+            .insert("email".into(), "private@example.test".into());
+        assert!(engagement::capture(&app, &headers, pii).await.is_err());
+        let mut gpc = recording_headers.clone();
+        gpc.insert("sec-gpc", "1".parse().unwrap());
+        assert!(!engagement::capture(&app, &gpc, event()).await.unwrap());
+        let archive = backup::capture(&app).await.unwrap();
+        let (config, restored_schema) = database_config(&data, "engagement_restored", engine).await;
+        let restored = App::open(config).await.unwrap();
+        backup::restore(&restored, &archive).await.unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM engagement_events")
+                .fetch_one(&restored.db.pool)
+                .await
+                .unwrap(),
+            2
+        );
+        engagement::consent(&app, &recording_headers, false, false, 2)
+            .await
+            .unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM engagement_events WHERE frame<>''")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            0,
+            "Withdrawal erases recorded interaction geometry."
+        );
+        sqlx::query("UPDATE engagement_settings SET version=3 WHERE id=1")
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            !engagement::capture(&app, &headers, event()).await.unwrap(),
+            "Changed purpose/version requires renewed consent."
+        );
+        let other = App::open((*app.config).clone()).await.unwrap();
+        let token = engagement::consent(&app, &HeaderMap::new(), true, false, 3)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut race_headers = HeaderMap::new();
+        race_headers.insert("cookie", format!("wpalt_visitor={token}").parse().unwrap());
+        let (recorded, withdrawn) = tokio::join!(
+            engagement::capture(&app, &race_headers, event()),
+            engagement::consent(&other, &race_headers, false, false, 3)
+        );
+        recorded.unwrap();
+        withdrawn.unwrap();
+        let hash = engagement::token(&race_headers).unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM engagement_events WHERE session_hash=$1"
+            )
+            .bind(hash)
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap(),
+            0
+        );
+        for pool in [&other.db.pool, &restored.db.pool, &app.db.pool] {
+            pool.close().await;
+        }
+        if let Some(url) = engine {
+            let pool = sqlx::PgPool::connect(url).await.unwrap();
+            for schema in [source_schema, restored_schema].into_iter().flatten() {
+                sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+            }
+            pool.close().await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn local_offers_keep_variants_bound_frequency_and_allocate_last_reward_atomically() {
+    use axum::http::HeaderMap;
+    use wpalt::{
+        App, auth, backup,
+        business::{
+            engagement,
+            promotions::{self, Target, Visit},
+        },
+    };
+    let postgres = std::env::var("TEST_DATABASE_URL").ok();
+    if std::env::var("WPALT_REQUIRE_POSTGRES").is_ok() {
+        assert!(postgres.is_some());
+    }
+    for engine in std::iter::once(None).chain(postgres.as_deref().map(Some)) {
+        let data = tempfile::tempdir().unwrap();
+        let (config, source_schema) = database_config(&data, "offers", engine).await;
+        let app = App::open(config).await.unwrap();
+        auth::initialize(
+            &app,
+            "owner@example.test",
+            "Owner",
+            "a strong local password",
+        )
+        .await
+        .unwrap();
+        sqlx::query("UPDATE engagement_settings SET enabled=1 WHERE id=1")
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+        let id = promotions::create(&app, "Local launch offer")
+            .await
+            .unwrap();
+        promotions::save(
+            &app,
+            &id,
+            1,
+            "a",
+            &wpalt::document::empty(),
+            Target {
+                device: "mobile".into(),
+                max_impressions: 2,
+                ..Default::default()
+            },
+            true,
+            true,
+            true,
+        )
+        .await
+        .unwrap();
+        promotions::reward(&app, &id, "Last invitation", 1, 1)
+            .await
+            .unwrap();
+        let policy: i64 = sqlx::query_scalar("SELECT version FROM engagement_settings WHERE id=1")
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        let visit = |device: &str| Visit {
+            path: "/".into(),
+            device: device.into(),
+            referrer: "direct".into(),
+        };
+        assert!(
+            promotions::visit(&app, &HeaderMap::new(), visit("mobile"))
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let mut visitors = vec![];
+        for _ in 0..2 {
+            let token = engagement::consent(&app, &HeaderMap::new(), true, false, policy)
+                .await
+                .unwrap()
+                .unwrap();
+            let mut h = HeaderMap::new();
+            h.insert("cookie", format!("wpalt_visitor={token}").parse().unwrap());
+            visitors.push(h);
+        }
+        assert!(
+            promotions::visit(&app, &visitors[0], visit("desktop"))
+                .await
+                .unwrap()
+                .is_none(),
+            "Device targeting is enforced before an impression is reserved."
+        );
+        let first = promotions::visit(&app, &visitors[0], visit("mobile"))
+            .await
+            .unwrap()
+            .unwrap();
+        let second = promotions::visit(&app, &visitors[0], visit("mobile"))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            first["variant"], second["variant"],
+            "Assignment remains stable for this consented session."
+        );
+        assert!(
+            promotions::visit(&app, &visitors[0], visit("mobile"))
+                .await
+                .unwrap()
+                .is_none(),
+            "Repeated visits cannot bypass the frequency cap."
+        );
+        promotions::visit(&app, &visitors[1], visit("mobile"))
+            .await
+            .unwrap()
+            .unwrap();
+        let other = App::open((*app.config).clone()).await.unwrap();
+        let (a, b) = tokio::join!(
+            promotions::claim(&app, &visitors[0], &id),
+            promotions::claim(&other, &visitors[1], &id)
+        );
+        assert_eq!(
+            usize::from(a.is_ok()) + usize::from(b.is_ok()),
+            1,
+            "Two real pools may allocate the last reward exactly once."
+        );
+        let (winner, receipt) = if let Ok(receipt) = a {
+            (&visitors[0], receipt)
+        } else {
+            (&visitors[1], b.unwrap())
+        };
+        assert_eq!(
+            promotions::claim(&app, winner, &id).await.unwrap(),
+            receipt,
+            "Interrupted draw recovery returns the same receipt without consuming stock again."
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT remaining FROM promotion_rewards")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            0
+        );
+        let mut gpc = winner.clone();
+        gpc.insert("sec-gpc", "1".parse().unwrap());
+        assert!(promotions::claim(&app, &gpc, &id).await.is_err());
+        let archive = backup::capture(&app).await.unwrap();
+        let (config, restore_schema) = database_config(&data, "offers_restored", engine).await;
+        let restored = App::open(config).await.unwrap();
+        backup::restore(&restored, &archive).await.unwrap();
+        assert_eq!(
+            promotions::claim(&restored, winner, &id).await.unwrap(),
+            receipt,
+            "Current-format fresh restore preserves recoverable receipt and inventory."
+        );
+        engagement::consent(&app, winner, false, false, policy)
+            .await
+            .unwrap();
+        assert!(promotions::claim(&app, winner, &id).await.is_err());
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM promotion_claims")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            0,
+            "Withdrawal removes the session-linked receipt."
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT issued FROM promotion_rewards")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            1,
+            "Withdrawal does not silently replenish already-issued inventory."
+        );
+        for pool in [&other.db.pool, &restored.db.pool, &app.db.pool] {
+            pool.close().await;
+        }
+        if let Some(url) = engine {
+            let pool = sqlx::PgPool::connect(url).await.unwrap();
+            for schema in [source_schema, restore_schema].into_iter().flatten() {
+                sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+            }
+            pool.close().await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account()
+{
+    use sqlx::Row;
+    use wpalt::{
+        App, auth, backup,
+        business::{
+            forms::Condition,
+            registration, store,
+            workflows::{DraftPost, Notification},
+        },
+    };
+    let postgres = std::env::var("TEST_DATABASE_URL").ok();
+    if std::env::var("WPALT_REQUIRE_POSTGRES").is_ok() {
+        assert!(postgres.is_some());
+    }
+    for engine in std::iter::once(None).chain(postgres.as_deref().map(Some)) {
+        let data = tempfile::tempdir().unwrap();
+        let (config, source_schema) = database_config(&data, "actions", engine).await;
+        let app = App::open(config).await.unwrap();
+        auth::initialize(
+            &app,
+            "owner@example.test",
+            "Owner",
+            "a strong local password",
+        )
+        .await
+        .unwrap();
+        let owner: String = sqlx::query_scalar("SELECT id FROM users WHERE role='admin'")
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        let mut form:FormDefinition=serde_json::from_value(json!({"title":"Contribute","fields":[{"name":"name","schema":{"kind":"string","required":true}},{"name":"email","schema":{"kind":"string","required":true},"widget":{"kind":"Email"}},{"name":"title","schema":{"kind":"string","required":true}},{"name":"body","schema":{"kind":"string","required":true}},{"name":"priority","schema":{"kind":"boolean","required":true}}]})).unwrap();
+        form.notifications.push(Notification {
+            recipient: "editor@example.test".into(),
+            subject: "Review contribution".into(),
+            document: wpalt::document::empty(),
+            when: Some(Condition::Equal {
+                field: "priority".into(),
+                value: json!(true),
+            }),
+        });
+        form.draft_post = Some(DraftPost {
+            title_field: "title".into(),
+            body_field: "body".into(),
+        });
+        form.registration = Some(registration::Action {
+            email_field: "email".into(),
+            name_field: "name".into(),
+        });
+        let id = store::create(&app, &owner, &form).await.unwrap();
+        store::save(&app, &id, 1, &form, true).await.unwrap();
+        let key = uuid::Uuid::new_v4().to_string();
+        let values = json!({"name":"Applicant","email":"applicant@example.test","title":"Visitor contribution","body":"<script>private literal</script>","priority":true});
+        let entry = store::submit(&app, &id, 2, &key, &values).await.unwrap();
+        assert_eq!(
+            store::submit(&app, &id, 2, &key, &values).await.unwrap(),
+            entry
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM mail_jobs")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            2,
+            "A proof and one matching fixed-recipient notification are queued atomically, even after a retry."
+        );
+        let post=sqlx::query("SELECT p.status,p.published_title,p.document FROM posts p JOIN form_contributions c ON c.post_id=p.id WHERE c.entry_id=$1").bind(&entry).fetch_one(&app.db.pool).await.unwrap();
+        assert_eq!(post.get::<String, _>("status"), "draft");
+        assert_eq!(post.get::<String, _>("published_title"), "");
+        assert!(
+            wpalt::document::Document::parse(&post.get::<String, _>("document"))
+                .unwrap()
+                .html()
+                .contains("&lt;script&gt;")
+        );
+        let request = sqlx::query("SELECT id,version FROM registration_requests WHERE entry_id=$1")
+            .bind(&entry)
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        let request_id: String = request.get("id");
+        assert!(
+            registration::decide(&app, &request_id, 1, true)
+                .await
+                .is_err(),
+            "Approval cannot bypass mailbox proof."
+        );
+        let plain: String = sqlx::query_scalar("SELECT plain FROM mail_jobs WHERE dedupe=$1")
+            .bind(format!("registration:{request_id}"))
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        let token = plain
+            .split("/registration/")
+            .nth(1)
+            .unwrap()
+            .split_whitespace()
+            .next()
+            .unwrap();
+        registration::review(&app, token).await.unwrap();
+        assert!(
+            auth::login(&app, "applicant@example.test", "applicant password")
+                .await
+                .is_err()
+        );
+        registration::verify(&app, token, "applicant password")
+            .await
+            .unwrap();
+        assert!(
+            registration::verify(&app, token, "different password")
+                .await
+                .is_err()
+        );
+        assert!(
+            auth::login(&app, "applicant@example.test", "applicant password")
+                .await
+                .is_err(),
+            "Mailbox proof alone does not approve an account."
+        );
+        let archive = backup::capture(&app).await.unwrap();
+        let (config, restored_schema) = database_config(&data, "actions_restored", engine).await;
+        let restored = App::open(config).await.unwrap();
+        backup::restore(&restored, &archive).await.unwrap();
+        registration::decide(&restored, &request_id, 2, true)
+            .await
+            .unwrap();
+        let (_, subscriber) =
+            auth::login(&restored, "applicant@example.test", "applicant password")
+                .await
+                .unwrap();
+        assert_eq!(subscriber.user.role, "subscriber");
+        assert!(!subscriber.can_edit() && !subscriber.can_moderate() && !subscriber.is_admin());
+        assert!(
+            registration::decide(&restored, &request_id, 2, true)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, String>(
+                "SELECT password_hash FROM registration_requests WHERE id=$1"
+            )
+            .bind(&request_id)
+            .fetch_one(&restored.db.pool)
+            .await
+            .unwrap(),
+            "",
+            "After approval no duplicate password hash remains in the request record."
+        );
+        for pool in [&restored.db.pool, &app.db.pool] {
+            pool.close().await;
+        }
+        if let Some(url) = engine {
+            let pool = sqlx::PgPool::connect(url).await.unwrap();
+            for schema in [source_schema, restored_schema].into_iter().flatten() {
+                sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+            }
+            pool.close().await;
+        }
+    }
+}
+
+/// Admission bounds must be shared by independent servers, not process mutexes.
+#[tokio::test]
+async fn site_wide_admission_is_atomic_replayable_and_preserves_unicode_bytes() {
+    use wpalt::{
+        App, auth, backup,
+        business::{store, workflows::Notification},
+    };
+    let postgres = std::env::var("TEST_DATABASE_URL").ok();
+    if std::env::var("WPALT_REQUIRE_POSTGRES").is_ok() {
+        assert!(postgres.is_some());
+    }
+    for engine in std::iter::once(None).chain(postgres.as_deref().map(Some)) {
+        let data = tempfile::tempdir().unwrap();
+        let (mut config, schema) = database_config(&data, "quotas", engine).await;
+        config.business_limits.entries = 1;
+        config.business_limits.mail_jobs = 1;
+        let app = App::open(config).await.unwrap();
+        auth::initialize(
+            &app,
+            "owner@example.test",
+            "Owner",
+            "a strong local password",
+        )
+        .await
+        .unwrap();
+        let owner: String = sqlx::query_scalar("SELECT id FROM users WHERE role='admin'")
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        let mut form = quotation_form();
+        form.notifications.push(Notification {
+            recipient: "editor@example.test".into(),
+            subject: "Review".into(),
+            document: wpalt::document::empty(),
+            when: None,
+        });
+        let a = store::create(&app, &owner, &form).await.unwrap();
+        let b = store::create(&app, &owner, &form).await.unwrap();
+        store::save(&app, &a, 1, &form, true).await.unwrap();
+        store::save(&app, &b, 1, &form, true).await.unwrap();
+        let other = App::open((*app.config).clone()).await.unwrap();
+        let key_a = uuid::Uuid::new_v4().to_string();
+        let key_b = uuid::Uuid::new_v4().to_string();
+        let values = json!({"business":true,"company":"参考会社","quantity":2,"rate":3});
+        let (left, right) = tokio::join!(
+            store::submit(&app, &a, 2, &key_a, &values),
+            store::submit(&other, &b, 2, &key_b, &values)
+        );
+        assert_eq!(
+            usize::from(left.is_ok()) + usize::from(right.is_ok()),
+            1,
+            "Two server pools cannot overrun one global response slot."
+        );
+        let (id, key, accepted) = if let Ok(entry) = left {
+            (a, key_a, entry)
+        } else {
+            (b, key_b, right.unwrap())
+        };
+        assert_eq!(
+            store::submit(&app, &id, 2, &key, &values).await.unwrap(),
+            accepted,
+            "A full site still acknowledges its original accepted retry."
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM mail_jobs")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            1,
+            "The rejected response leaves no workflow mail."
+        );
+        let archive = backup::capture(&app).await.unwrap();
+        let (restore_config, restore_schema) =
+            database_config(&data, "quotas_restore", engine).await;
+        let restored = App::open(restore_config).await.unwrap();
+        backup::restore(&restored, &archive).await.unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT items FROM business_usage WHERE kind='entries'")
+                .fetch_one(&restored.db.pool)
+                .await
+                .unwrap(),
+            1
+        );
+        for pool in [&restored.db.pool, &other.db.pool, &app.db.pool] {
+            pool.close().await;
+        }
+        if let Some(url) = engine {
+            let pool = sqlx::PgPool::connect(url).await.unwrap();
+            for name in [schema, restore_schema].into_iter().flatten() {
+                sqlx::query(&format!("DROP SCHEMA {name} CASCADE"))
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+            }
+            pool.close().await;
+        }
+    }
+}
+
+/// Measures a populated local business system without fragile timing assertions.
+#[tokio::test]
+async fn populated_business_paths_have_bounded_queries_and_reproducible_measurements() {
+    use sqlx::Row;
+    use wpalt::{
+        App, auth,
+        business::{engagement, mail, store, workflows::Notification},
+    };
+    let postgres = std::env::var("TEST_DATABASE_URL").ok();
+    if std::env::var("WPALT_REQUIRE_POSTGRES").is_ok() {
+        assert!(postgres.is_some());
+    }
+    let mut measurements = Vec::new();
+    for engine in std::iter::once(None).chain(postgres.as_deref().map(Some)) {
+        let data = tempfile::tempdir().unwrap();
+        let (config, schema) = database_config(&data, "business_volume", engine).await;
+        let app = App::open(config).await.unwrap();
+        auth::initialize(
+            &app,
+            "owner@example.test",
+            "Owner",
+            "a strong local password",
+        )
+        .await
+        .unwrap();
+        let owner: String = sqlx::query_scalar("SELECT id FROM users WHERE role='admin'")
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        let mut form:FormDefinition=serde_json::from_value(json!({"title":"Measured response","fields":[{"name":"message","schema":{"kind":"string","required":true}}]})).unwrap();
+        form.notifications.push(Notification {
+            recipient: "fixture@example.test".into(),
+            subject: "A local response".into(),
+            document: wpalt::document::empty(),
+            when: None,
+        });
+        let id = store::create(&app, &owner, &form).await.unwrap();
+        store::save(&app, &id, 1, &form, true).await.unwrap();
+        let mut times = Vec::new();
+        for index in 0..1000 {
+            let started = std::time::Instant::now();
+            store::submit(
+                &app,
+                &id,
+                2,
+                &uuid::Uuid::new_v4().to_string(),
+                &json!({"message":format!("参考 local response {index}")}),
+            )
+            .await
+            .unwrap();
+            times.push(started.elapsed().as_secs_f64() * 1000.0);
+        }
+        sqlx::query("UPDATE engagement_settings SET enabled=1 WHERE id=1")
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+        for _ in 0..5 {
+            let token = engagement::consent(&app, &axum::http::HeaderMap::new(), true, false, 1)
+                .await
+                .unwrap()
+                .unwrap();
+            let mut h = axum::http::HeaderMap::new();
+            h.insert("cookie", format!("wpalt_visitor={token}").parse().unwrap());
+            for _ in 0..400 {
+                assert!(
+                    engagement::capture(
+                        &app,
+                        &h,
+                        engagement::Capture {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            name: "pageview".into(),
+                            path: "/".into(),
+                            dimensions: Default::default(),
+                            frame: None
+                        }
+                    )
+                    .await
+                    .unwrap()
+                );
+            }
+        }
+        let mut plans = serde_json::Map::new();
+        for (name, sql) in [
+            (
+                "entries",
+                "SELECT id,created_at FROM form_entries WHERE form_id=$1 ORDER BY created_at DESC,id DESC LIMIT 40",
+            ),
+            (
+                "events",
+                "SELECT name,path,COUNT(*) FROM engagement_events WHERE created_at>=$1 GROUP BY name,path LIMIT 50",
+            ),
+            (
+                "mail",
+                "SELECT id FROM mail_jobs WHERE state IN ('pending','retry') AND next_at<=$1 ORDER BY next_at,id LIMIT 64",
+            ),
+        ] {
+            let prefix = if app.db.postgres {
+                "EXPLAIN "
+            } else {
+                "EXPLAIN QUERY PLAN "
+            };
+            let statement = format!("{prefix}{sql}");
+            let query = sqlx::query(&statement);
+            let rows = if name == "entries" {
+                query.bind(&id).fetch_all(&app.db.pool).await.unwrap()
+            } else {
+                query
+                    .bind(wpalt::now() - 86400)
+                    .fetch_all(&app.db.pool)
+                    .await
+                    .unwrap()
+            };
+            plans.insert(
+                name.into(),
+                json!(
+                    rows.iter()
+                        .map(|r| if app.db.postgres {
+                            r.get::<String, _>(0)
+                        } else {
+                            r.get::<String, _>("detail")
+                        })
+                        .collect::<Vec<_>>()
+                ),
+            );
+        }
+        let started = std::time::Instant::now();
+        let mut delivered = 0;
+        while delivered < 1000 {
+            let batch = mail::tick(&app).await.unwrap();
+            assert!(batch > 0 && batch <= 64);
+            delivered += batch;
+        }
+        let spool_seconds = started.elapsed().as_secs_f64();
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM mail_jobs WHERE state='spooled'")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            1000
+        );
+        times.sort_by(f64::total_cmp);
+        measurements.push(json!({"engine":if app.db.postgres{"postgres"}else{"sqlite"},"conditions":"Integration API, debug test binary, 1000 responses and fixed notification jobs, 2000 consented events; no timing assertions; not HTTP or production capacity","responses":1000,"events":2000,"submission_p50_ms":times[499],"submission_p95_ms":times[949],"local_spool_jobs_per_second":1000.0/spool_seconds,"plans":plans}));
+        app.db.pool.close().await;
+        if let Some(url) = engine {
+            let pool = sqlx::PgPool::connect(url).await.unwrap();
+            sqlx::query(&format!("DROP SCHEMA {} CASCADE", schema.unwrap()))
+                .execute(&pool)
+                .await
+                .unwrap();
+            pool.close().await;
+        }
+    }
+    std::fs::create_dir_all("work").unwrap();
+    std::fs::write(
+        "work/m4-volume.json",
+        serde_json::to_vec_pretty(&measurements).unwrap(),
+    )
+    .unwrap();
+}
+
+#[tokio::test]
+async fn confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_cancels_it() {
+    use wpalt::{
+        App, auth,
+        business::{audience, campaigns, store},
+    };
+    let postgres = std::env::var("TEST_DATABASE_URL").ok();
+    if std::env::var("WPALT_REQUIRE_POSTGRES").is_ok() {
+        assert!(postgres.is_some());
+    }
+    for engine in std::iter::once(None).chain(postgres.as_deref().map(Some)) {
+        let data = tempfile::tempdir().unwrap();
+        let (config, schema) = database_config(&data, "trigger", engine).await;
+        let app = App::open(config).await.unwrap();
+        auth::initialize(
+            &app,
+            "owner@example.test",
+            "Owner",
+            "a strong local password",
+        )
+        .await
+        .unwrap();
+        let owner: String = sqlx::query_scalar("SELECT id FROM users WHERE role='admin'")
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        let list = audience::create_list(&app, "News", "Send news", "1")
+            .await
+            .unwrap();
+        let campaign = campaigns::create(&app, "Welcome", &list).await.unwrap();
+        campaigns::save_with_trigger(
+            &app,
+            &campaign,
+            1,
+            "Welcome",
+            &wpalt::document::empty(),
+            0,
+            audience::Segment::default(),
+            Some(true),
+        )
+        .await
+        .unwrap();
+        let excluded = campaigns::create(&app, "Other segment", &list)
+            .await
+            .unwrap();
+        campaigns::save_with_trigger(
+            &app,
+            &excluded,
+            1,
+            "Excluded",
+            &wpalt::document::empty(),
+            0,
+            audience::Segment {
+                company: Some("Other".into()),
+                ..Default::default()
+            },
+            Some(true),
+        )
+        .await
+        .unwrap();
+        let form:FormDefinition=serde_json::from_value(json!({"title":"Subscribe","fields":[{"name":"email","schema":{"kind":"string","required":true}},{"name":"consent","schema":{"kind":"boolean"}}],"subscription":{"list":list,"policy":"1","email_field":"email","consent_field":"consent"}})).unwrap();
+        let id = store::create(&app, &owner, &form).await.unwrap();
+        store::save(&app, &id, 1, &form, true).await.unwrap();
+        store::submit(
+            &app,
+            &id,
+            2,
+            &uuid::Uuid::new_v4().to_string(),
+            &json!({"email":"trigger@example.test","consent":true}),
+        )
+        .await
+        .unwrap();
+        let plain: String =
+            sqlx::query_scalar("SELECT plain FROM mail_jobs WHERE kind='confirmation'")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap();
+        let token = plain
+            .split("/audience/confirm/")
+            .nth(1)
+            .unwrap()
+            .split_whitespace()
+            .next()
+            .unwrap();
+        audience::decide(&app, token, false).await.unwrap();
+        audience::decide(&app, token, false).await.unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM mail_jobs WHERE kind='campaign'")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            1,
+            "Only the matching template runs; a confirmation replay cannot duplicate its mail."
+        );
+        let plain: String = sqlx::query_scalar("SELECT plain FROM mail_jobs WHERE kind='campaign'")
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        let withdrawal = plain
+            .split("/audience/withdraw/")
+            .nth(1)
+            .unwrap()
+            .split_whitespace()
+            .next()
+            .unwrap();
+        audience::decide(&app, withdrawal, true).await.unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, String>("SELECT state FROM mail_jobs WHERE kind='campaign'")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            "cancelled"
+        );
+        app.db.pool.close().await;
+        if let Some(url) = engine {
+            let pool = sqlx::PgPool::connect(url).await.unwrap();
+            sqlx::query(&format!("DROP SCHEMA {} CASCADE", schema.unwrap()))
+                .execute(&pool)
+                .await
+                .unwrap();
             pool.close().await;
         }
     }

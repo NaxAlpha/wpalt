@@ -93,6 +93,21 @@ async fn state(
     .fetch_all(&app.db.pool)
     .await?;
     let mut out = json!({"registry":registry,"model_versions":versions,"posts":posts.iter().map(|r|json!({"id":r.get::<String,_>("id"),"title":r.get::<String,_>("title"),"kind":r.get::<String,_>("kind"),"status":r.get::<String,_>("status")})).collect::<Vec<_>>(),"media":media.iter().map(|r|json!({"id":r.get::<String,_>("id"),"label":r.get::<String,_>("original_name"),"alt":r.get::<String,_>("alt"),"visibility":r.get::<String,_>("visibility")})).collect::<Vec<_>>()});
+    if app.config.business_enabled {
+        let query = if app.db.postgres {
+            "SELECT id,live::jsonb->'form'->>'title' AS title FROM business_forms WHERE published_version>0 ORDER BY updated_at DESC,id DESC LIMIT 100"
+        } else {
+            "SELECT id,json_extract(live,'$.form.title') AS title FROM business_forms WHERE published_version>0 ORDER BY updated_at DESC,id DESC LIMIT 100"
+        };
+        out["forms"] = json!(
+            sqlx::query(query)
+                .fetch_all(&app.db.pool)
+                .await?
+                .iter()
+                .map(|r| json!({"id":r.get::<String,_>("id"),"title":r.get::<String,_>("title")}))
+                .collect::<Vec<_>>()
+        );
+    }
     if s.is_admin() {
         let themes =
             sqlx::query("SELECT id,name,version,published_version FROM themes ORDER BY name")

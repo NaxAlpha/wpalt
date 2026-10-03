@@ -19,6 +19,7 @@ pub struct MailConfig {
     pub smtp: Vec<Connection>,
     pub enabled: bool,
     pub max_attempts: i64,
+    pub batch_size: usize,
 }
 impl Default for MailConfig {
     fn default() -> Self {
@@ -27,6 +28,7 @@ impl Default for MailConfig {
             smtp: vec![],
             enabled: true,
             max_attempts: 5,
+            batch_size: 64,
         }
     }
 }
@@ -56,7 +58,9 @@ impl MailConfig {
     pub fn validate(&self) -> anyhow::Result<()> {
         email(&self.from).map_err(|_| anyhow::anyhow!("invalid mail.from"))?;
         anyhow::ensure!(
-            self.smtp.len() <= 4 && (1..=10).contains(&self.max_attempts),
+            self.smtp.len() <= 4
+                && (1..=10).contains(&self.max_attempts)
+                && (1..=128).contains(&self.batch_size),
             "Use at most four SMTP routes and 1..10 attempts."
         );
         for c in &self.smtp {
@@ -86,6 +90,7 @@ CREATE TABLE IF NOT EXISTS mail_jobs(id TEXT PRIMARY KEY,dedupe TEXT NOT NULL UN
 CREATE INDEX IF NOT EXISTS mail_ready ON mail_jobs(next_at,id) WHERE state IN ('pending','retry');
 CREATE INDEX IF NOT EXISTS mail_lease_expiry ON mail_jobs(lease_until,id) WHERE state='leased';
 CREATE INDEX IF NOT EXISTS mail_contact ON mail_jobs(contact_id,state);
+CREATE INDEX IF NOT EXISTS mail_terminal_retention ON mail_jobs(created_at,id) WHERE state IN ('sent','spooled','dead','cancelled');
 CREATE TABLE IF NOT EXISTS mail_attempts(id TEXT PRIMARY KEY,job_id TEXT NOT NULL REFERENCES mail_jobs(id) ON DELETE CASCADE,outcome TEXT NOT NULL,created_at BIGINT NOT NULL);
 CREATE INDEX IF NOT EXISTS mail_attempt_history ON mail_attempts(job_id,created_at DESC,id DESC);
 "#;
@@ -114,6 +119,17 @@ pub async fn enqueue(
     {
         return Err(Error::invalid("Invalid mail content."));
     }
+    let bytes = (input.html.len() + input.plain.len() + input.subject.len()) as i64;
+    // Serialize deduplication with admission; a replay still succeeds at capacity.
+    super::quotas::release(tx, "mail", 0, 0).await?;
+    if let Some(id) = sqlx::query_scalar("SELECT id FROM mail_jobs WHERE dedupe=$1")
+        .bind(input.dedupe)
+        .fetch_optional(&mut **tx)
+        .await?
+    {
+        return Ok(id);
+    }
+    super::quotas::reserve(app, tx, "mail", 1, bytes).await?;
     let id = uuid::Uuid::new_v4().to_string();
     let host = url::Url::parse(&app.config.base_url)
         .map_err(|_| Error::invalid("Invalid mail origin."))?
@@ -121,8 +137,11 @@ pub async fn enqueue(
         .unwrap_or("localhost")
         .to_owned();
     let message_id = format!("<{id}@{host}>");
-    sqlx::query("INSERT INTO mail_jobs(id,dedupe,contact_id,list_id,kind,recipient,sender,subject,html,plain,message_id,state,next_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',$12,$12) ON CONFLICT(dedupe) DO NOTHING")
+    let inserted=sqlx::query("INSERT INTO mail_jobs(id,dedupe,contact_id,list_id,kind,recipient,sender,subject,html,plain,message_id,state,next_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',$12,$12) ON CONFLICT(dedupe) DO NOTHING")
         .bind(&id).bind(input.dedupe).bind(input.contact).bind(input.list).bind(input.kind).bind(recipient).bind(&app.config.mail.from).bind(input.subject).bind(input.html).bind(input.plain).bind(message_id).bind(now()).execute(&mut **tx).await?;
+    if inserted.rows_affected() == 0 {
+        super::quotas::release(tx, "mail", 1, bytes).await?;
+    }
     Ok(
         sqlx::query_scalar("SELECT id FROM mail_jobs WHERE dedupe=$1")
             .bind(input.dedupe)
@@ -192,6 +211,14 @@ async fn eligible(app: &App, row: &sqlx::any::AnyRow) -> Result<bool> {
             return Ok(false);
         }
     }
+    if let Some(id) = row.get::<String, _>("dedupe").strip_prefix("registration:") {
+        let pending:Option<String>=sqlx::query_scalar("SELECT id FROM registration_requests WHERE id=$1 AND state='pending' AND expires_at>$2").bind(id).bind(now()).fetch_optional(&app.db.pool).await?;
+        return Ok(pending.is_some());
+    }
+    if row.get::<String, _>("kind") == "confirmation" {
+        let pending:Option<String>=sqlx::query_scalar("SELECT contact_id FROM audience_memberships WHERE contact_id=$1 AND list_id=$2 AND state='pending' AND expires_at>$3").bind(&contact).bind(row.get::<String,_>("list_id")).bind(now()).fetch_optional(&app.db.pool).await?;
+        return Ok(pending.is_some());
+    }
     if row.get::<String, _>("kind") != "campaign" {
         return Ok(true);
     }
@@ -249,7 +276,12 @@ pub async fn tick(app: &App) -> Result<usize> {
     // An expired network lease may already have delivered. Do not blindly replay.
     sqlx::query("UPDATE mail_jobs SET state='uncertain',last_code='expired_lease',lease_owner='',lease_until=0 WHERE state='leased' AND lease_until<$1").bind(now()).execute(&app.db.pool).await?;
     let mut processed = 0;
-    for _ in 0..8 {
+    let batch = if app.config.mail.smtp.is_empty() {
+        app.config.mail.batch_size.min(64)
+    } else {
+        app.config.mail.batch_size.min(8)
+    };
+    for _ in 0..batch {
         let Some(row) = claim(app).await? else {
             break;
         };

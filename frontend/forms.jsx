@@ -159,6 +159,11 @@ function Designer({ host }) {
       </section>
       <section class="panel">
         <h2>Audience subscription</h2>
+        <p>
+          <a href={`/admin/forms/${host.dataset.id}/workflows`}>
+            Conditional notifications and moderated contributions
+          </a>
+        </p>
         <Select
           label="Subscription list"
           value={definition.subscription?.list || ""}
@@ -785,7 +790,7 @@ function ValueInput({
                   headers: {
                     "Content-Type": file.type || "application/octet-stream",
                     "x-form-version": String(version),
-                    "x-file-name": file.name,
+                    "x-file-name": encodeURIComponent(file.name),
                   },
                   body: file,
                   credentials: "same-origin",
@@ -1154,20 +1159,31 @@ function VisitorForm({ host }) {
     }
   }
   useEffect(() => {
-    const token = location.hash.match(/^#draft=([a-f0-9]{64})$/)?.[1];
-    if (!token) return;
-    history.replaceState(null, "", location.pathname);
-    request(`/api/forms/${host.dataset.id}/drafts/${token}`)
-      .then((saved) => {
-        if (saved.version !== Number(host.dataset.version))
-          throw new Error(
-            "The published form has changed. Ask the owner to review the older draft.",
-          );
-        recovery.current = { token, revision: saved.revision };
-        setValues(saved.values);
-        setRecoveryNotice("Server draft restored. Review it before sending.");
-      })
-      .catch((error) => setRecoveryNotice(error.message));
+    function restore() {
+      const token = location.hash.match(/^#draft=([a-f0-9]{64})$/)?.[1];
+      if (!token) return;
+      history.replaceState(null, "", location.pathname);
+      if (pending.current) {
+        setRecoveryNotice(
+          "Retry the interrupted response before loading another draft.",
+        );
+        return;
+      }
+      request(`/api/forms/${host.dataset.id}/drafts/${token}`)
+        .then((saved) => {
+          if (saved.version !== Number(host.dataset.version))
+            throw new Error(
+              "The published form has changed. Ask the owner to review the older draft.",
+            );
+          recovery.current = { token, revision: saved.revision };
+          setValues(saved.values);
+          setRecoveryNotice("Server draft restored. Review it before sending.");
+        })
+        .catch((error) => setRecoveryNotice(error.message));
+    }
+    restore();
+    window.addEventListener("hashchange", restore);
+    return () => window.removeEventListener("hashchange", restore);
   }, []);
   const current = evaluated(definition.fields, values);
   const last = Math.max(...definition.fields.map((field) => field.step || 0));
@@ -1193,7 +1209,7 @@ function VisitorForm({ host }) {
       } catch {}
       setAccepted(true);
     } catch (err) {
-      if (err.status) pending.current = null;
+      if (err.status && err.status < 500) pending.current = null;
       setError(err.message);
     } finally {
       setBusy(false);

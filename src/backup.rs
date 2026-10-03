@@ -288,6 +288,7 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
             ("subject", false),
             ("document", false),
             ("segment", false),
+            ("trigger_kind", false),
             ("list_id", false),
             ("state", false),
             ("version", true),
@@ -357,6 +358,125 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
     (
         "audience_suppressions",
         &[("hash", false), ("suppressed", true), ("created_at", true)],
+    ),
+    (
+        "registration_requests",
+        &[
+            ("id", false),
+            ("entry_id", false),
+            ("email", false),
+            ("name", false),
+            ("token_hash", false),
+            ("password_hash", false),
+            ("state", false),
+            ("expires_at", true),
+            ("version", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "form_contributions",
+        &[("entry_id", false), ("post_id", false)],
+    ),
+    (
+        "business_usage",
+        &[("kind", false), ("items", true), ("bytes", true)],
+    ),
+    (
+        "engagement_settings",
+        &[
+            ("id", true),
+            ("enabled", true),
+            ("recording", true),
+            ("purpose", false),
+            ("version", true),
+        ],
+    ),
+    (
+        "engagement_sessions",
+        &[
+            ("hash", false),
+            ("policy", true),
+            ("purpose", false),
+            ("recording", true),
+            ("events", true),
+            ("frames", true),
+            ("expires_at", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "engagement_event_names",
+        &[("name", false), ("label", false)],
+    ),
+    (
+        "engagement_events",
+        &[
+            ("id", false),
+            ("session_hash", false),
+            ("path", false),
+            ("name", false),
+            ("dimensions", false),
+            ("frame", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "engagement_usage",
+        &[("id", true), ("events", true), ("sessions", true)],
+    ),
+    (
+        "business_promotions",
+        &[
+            ("id", false),
+            ("title", false),
+            ("document_a", false),
+            ("document_b", false),
+            ("experiment", true),
+            ("wheel", true),
+            ("target", false),
+            ("active", true),
+            ("version", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "promotion_rewards",
+        &[
+            ("id", false),
+            ("promotion_id", false),
+            ("label", false),
+            ("weight", true),
+            ("remaining", true),
+            ("issued", true),
+        ],
+    ),
+    (
+        "promotion_impressions",
+        &[
+            ("promotion_id", false),
+            ("session_hash", false),
+            ("variant", false),
+            ("path", false),
+            ("count", true),
+            ("last_at", true),
+        ],
+    ),
+    (
+        "promotion_claims",
+        &[
+            ("id", false),
+            ("promotion_id", false),
+            ("session_hash", false),
+            ("reward_id", false),
+            ("label", false),
+            ("code", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "engagement_dimension_values",
+        &[("name", false), ("value", false)],
     ),
 ];
 #[derive(Serialize, Deserialize)]
@@ -462,7 +582,13 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
         if !crate::business::attachments::safe_filename(filename) {
             return Err(Error::invalid("Unsafe private attachment path."));
         }
-        let data = tokio::fs::read(app.config.data_dir.join("attachments").join(filename)).await?;
+        let path = app.config.data_dir.join("attachments").join(filename);
+        if tokio::fs::metadata(&path).await?.len() > 2 * 1024 * 1024 {
+            return Err(Error::invalid(
+                "Private attachment exceeds its maximum file size.",
+            ));
+        }
+        let data = tokio::fs::read(path).await?;
         budget += data.len() * 5;
         if budget > app.config.max_backup_bytes
             || data.len() as i64 != row["size"].as_i64().unwrap()
@@ -480,7 +606,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     }
     let snapshot = Snapshot {
         private_files,
-        schema: 6,
+        schema: 7,
         created_at: crate::now(),
         tables,
         files,
@@ -512,7 +638,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 6
+    if snapshot.schema != 7
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -660,6 +786,8 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     };
     crate::content::validate_settings(&crate::model::Settings {
         business_enabled: app.config.business_enabled,
+        engagement_available: app.config.engagement.enabled,
+        analytics: None,
         title: setting_string("title")?,
         description: setting_string("description")?,
         theme: setting_string("theme")?,
@@ -837,6 +965,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             )?;
         }
     }
+    crate::business::backup_validation::validate(&snapshot.tables)?;
     let post_kinds: BTreeMap<_, _> = snapshot.tables["posts"]
         .iter()
         .map(|row| (row["id"].as_str().unwrap(), row["kind"].as_str().unwrap()))
@@ -911,6 +1040,22 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             .bind(serde_json::to_string(&crate::discovery::Definition::default()).unwrap())
             .fetch_one(&mut *tx)
             .await?
+        } else if *name == "business_usage" {
+            sqlx::query_scalar("SELECT COUNT(*) FROM business_usage WHERE items<>0 OR bytes<>0")
+                .fetch_one(&mut *tx)
+                .await?
+        } else if *name == "engagement_settings" {
+            sqlx::query_scalar("SELECT COUNT(*) FROM engagement_settings WHERE enabled<>0 OR recording<>0 OR version<>1 OR purpose<>'Understand and improve this site using local interaction data.'").fetch_one(&mut *tx).await?
+        } else if *name == "engagement_dimension_values" {
+            sqlx::query_scalar("SELECT COUNT(*) FROM engagement_dimension_values WHERE NOT ((name='device' AND value IN ('mobile','desktop')) OR (name='referrer' AND value IN ('direct','same_site','external')))").fetch_one(&mut *tx).await?
+        } else if *name == "engagement_usage" {
+            sqlx::query_scalar(
+                "SELECT COUNT(*) FROM engagement_usage WHERE events<>0 OR sessions<>0",
+            )
+            .fetch_one(&mut *tx)
+            .await?
+        } else if *name == "engagement_event_names" {
+            sqlx::query_scalar("SELECT COUNT(*) FROM engagement_event_names WHERE NOT ((name='pageview' AND label='Page view') OR (name='form_submit' AND label='Accepted form response') OR (name='offer_claim' AND label='Offer claimed') OR (name='interaction' AND label='Masked interaction'))").fetch_one(&mut *tx).await?
         } else {
             sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {name}"))
                 .fetch_one(&mut *tx)
@@ -925,6 +1070,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     sqlx::query("DELETE FROM discovery_settings")
         .execute(&mut *tx)
         .await?;
+    sqlx::raw_sql("DELETE FROM business_usage; DELETE FROM engagement_settings; DELETE FROM engagement_usage; DELETE FROM engagement_event_names; DELETE FROM engagement_dimension_values;").execute(&mut *tx).await?;
     for (name, columns) in TABLES {
         for row in &snapshot.tables[*name] {
             let mut q = QueryBuilder::<Any>::new(format!(

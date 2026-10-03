@@ -15,3 +15,7 @@ Structured saves include `body:""` and send `document` as a JSON string containi
 Stop the server and capture an independent backup with the M3 executable before upgrading meaningful data. Schema 4 upgrades working/live documents and retained revisions atomically. Migration failures preserve the original transaction; test on a restored copy first. M3.5 snapshots use `wpalt-backup-v4`; the M4 development branch uses v6 as documented in operations. Restore older snapshots using their corresponding binary into a fresh target, then run the new binary to migrate the database. Downgrade by restoring the independent old backup to a fresh target. Do not open schema 4 with the old executable.
 
 Maintain the authoring guidance record when the editor engine, browser input behavior, document grammar, accessibility guidance or relevant vulnerability changes. Rebuild assets from the locked frontend graph, run document/database and authoring/browser clusters, measure representative long documents, and review real screenshots before changing the UI contract.
+
+## Published forms (M4)
+
+Choose **Blocks → Published form**, then select an existing published form. The canonical atom stores its UUID and title; it does not duplicate private workflow definitions. Public rendering embeds the current published form with one site navigation. Draft preview is inactive; email rendering links to the public form. Publishing validates references in a bounded batch. Responses always use the form's immutable publication and stale/retry protections.

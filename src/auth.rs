@@ -37,7 +37,7 @@ pub fn valid_user(email: &str, name: &str, role: &str) -> Result<()> {
         || email.chars().any(char::is_whitespace)
         || name.trim().is_empty()
         || name.len() > 100
-        || !["admin", "editor", "moderator", "disabled"].contains(&role)
+        || !["admin", "editor", "moderator", "subscriber", "disabled"].contains(&role)
     {
         return Err(Error::invalid(
             "Use a valid email, a name up to 100 characters and a supported role.",
@@ -260,7 +260,7 @@ pub async fn update_user(
 ) -> Result<()> {
     if name.trim().is_empty()
         || name.len() > 100
-        || !["admin", "editor", "moderator", "disabled"].contains(&role)
+        || !["admin", "editor", "moderator", "subscriber", "disabled"].contains(&role)
         || (!password.is_empty() && !(12..=256).contains(&password.len()))
     {
         return Err(Error::invalid("Check name, role and password length."));
