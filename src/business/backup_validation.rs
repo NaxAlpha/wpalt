@@ -310,8 +310,9 @@ pub fn validate(tables: &Tables) -> Result<()> {
             return Err(fail());
         }
         if text(r, "state") == "verified" {
-            argon2::password_hash::PasswordHash::new(text(r, "password_hash"))
-                .map_err(|_| fail())?;
+            if !crate::auth::supported_password_hash(text(r, "password_hash")) {
+                return Err(fail());
+            }
         } else if !text(r, "password_hash").is_empty() {
             return Err(fail());
         }

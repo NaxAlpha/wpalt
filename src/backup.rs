@@ -664,6 +664,18 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             }
         }
     }
+    for row in &snapshot.tables["users"] {
+        crate::auth::valid_user(
+            row["email"].as_str().unwrap(),
+            row["name"].as_str().unwrap(),
+            row["role"].as_str().unwrap(),
+        )?;
+        if !crate::auth::supported_password_hash(row["password_hash"].as_str().unwrap()) {
+            return Err(Error::invalid(
+                "Backup contains an unsupported or excessive-cost password hash.",
+            ));
+        }
+    }
     for row in &snapshot.tables["posts"] {
         for key in ["document", "published_document"] {
             crate::document::Document::parse(

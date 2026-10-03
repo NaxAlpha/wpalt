@@ -1,0 +1,719 @@
+{
+  "baseline": "91cbe6c7fbf1d34f1e7f4ba475da22f45dcf9436",
+  "status": "in-progress",
+  "routes": [
+    {
+      "route": "/admin/discovery",
+      "source": "src/discovery.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/discovery/redirects",
+      "source": "src/discovery.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/discovery/languages",
+      "source": "src/discovery.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/discovery/business",
+      "source": "src/discovery.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/discovery/links",
+      "source": "src/discovery.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/sitemap.xml",
+      "source": "src/discovery.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/sitemap-index.xml",
+      "source": "src/discovery.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/robots.txt",
+      "source": "src/discovery.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/search",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/health",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/account",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/login",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/logout",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/feed.xml",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/assets/app.css",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/assets/admin-ui.css",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/assets/admin.js",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/assets/editor.js",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/assets/form-embed.js",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/posts",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/posts/new",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/posts/{id}",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/posts/{id}/revisions/{revision}",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/preview/{id}",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/media",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/media/{id}",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/media/{id}",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/comments",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/comments/{id}",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/settings",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/users",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/users/{id}",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/operations",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/backup",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/export",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/content",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/media",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/content",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/content/{id}",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/{slug}",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/{locale}/",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/{locale}/search",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/{locale}/{slug}",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/{slug}/comments",
+      "source": "src/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/builder",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/assets/builder.js",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/assets/widgets.js",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/design",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/design/{id}",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/design/{id}/activate",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/design/{id}/restore/{version}",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/schema",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/models/{id}",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/options",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/design/{id}/preview",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/design/{id}/style.css",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/themes/{id}/{version}/style.css",
+      "source": "src/builder_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/engagement/catalog",
+      "source": "src/business/engagement_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/engagement",
+      "source": "src/business/engagement_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/engagement/status",
+      "source": "src/business/engagement_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/engagement/consent",
+      "source": "src/business/engagement_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/engagement/events",
+      "source": "src/business/engagement_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/assets/engagement.js",
+      "source": "src/business/engagement_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/engagement/sessions/{hash}",
+      "source": "src/business/engagement_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/engagement/sessions/{hash}",
+      "source": "src/business/engagement_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/assets/engagement-review.js",
+      "source": "src/business/engagement_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/registration/{token}",
+      "source": "src/business/registration_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/registrations",
+      "source": "src/business/registration_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/registrations/{id}",
+      "source": "src/business/registration_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/forms/{id}/workflows",
+      "source": "src/business/workflows_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/audience/contacts/{id}",
+      "source": "src/business/audience_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/audience/contacts/{id}/export",
+      "source": "src/business/audience_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/mail/{id}",
+      "source": "src/business/audience_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/mail/{id}/download",
+      "source": "src/business/audience_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/campaigns",
+      "source": "src/business/audience_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/campaigns/{id}",
+      "source": "src/business/audience_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/audience",
+      "source": "src/business/audience_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/audience/confirm/{token}",
+      "source": "src/business/audience_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/audience/withdraw/{token}",
+      "source": "src/business/audience_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/mail",
+      "source": "src/business/audience_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/forms/catalog",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/forms",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/forms/{id}",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/forms/{id}/entries",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/forms/{id}/export",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/forms/{id}/entries/{entry}",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/forms/{id}/entries/{entry}/attachments/{attachment}",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/admin/forms/{id}",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/forms/{id}/entries",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/forms/{id}/attachments/{field}",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/forms/{id}/drafts",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/forms/{id}/drafts/{token}",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/forms/{id}",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/assets/forms.js",
+      "source": "src/business/web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/promotions",
+      "source": "src/business/promotions_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/promotions/{id}",
+      "source": "src/business/promotions_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/admin/promotions/{id}/rewards",
+      "source": "src/business/promotions_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/engagement/offers",
+      "source": "src/business/promotions_web.rs",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "route": "/api/engagement/offers/{id}/claim",
+      "source": "src/business/promotions_web.rs",
+      "review": "pending",
+      "evidence": []
+    }
+  ],
+  "shared_boundaries": [
+    {
+      "name": "configuration/install/CLI",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "authentication/revocation/rate limits",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "authorization/CSRF/private caching",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "content/revisions/scheduling/taxonomies",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "models/options/theme composition/publication",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "structured editor/recovery/undo/clipboard",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "media/private files/processing",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "comments/moderation",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "languages/metadata/schema/sitemap/redirects/links",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "forms/conditions/calculations/steps/repeaters",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "submissions/drafts/offline/files/entry management",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "consent/contacts/segments/suppression/erasure",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "campaigns/triggers/mail/leases/SMTP",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "registration/contributions/approval",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "engagement/privacy/geometry/reports",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "promotions/targeting/variants/stock",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "quotas/retention/module-disable",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "backup/migrations/fresh cross-engine recovery",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "design system/accessibility/responsive UX",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "queries/request budgets/resource footprint",
+      "review": "pending",
+      "evidence": []
+    },
+    {
+      "name": "diagnostics/secrets/dependencies/build pipeline",
+      "review": "pending",
+      "evidence": []
+    }
+  ]
+}

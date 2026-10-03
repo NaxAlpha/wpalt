@@ -177,6 +177,8 @@ async fn security_and_trace(
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
         || route == "/login"
+        || route == "/account"
+        || route == "/logout"
         || (route.starts_with("/audience/") || route.starts_with("/registration/"))
         || route.starts_with("/api/forms/")
         || route.starts_with("/api/engagement/")

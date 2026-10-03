@@ -29,6 +29,26 @@ pub fn hash_password(password: &str) -> anyhow::Result<String> {
         .map(|h| h.to_string())
         .map_err(|_| anyhow::anyhow!("password hashing failed"))
 }
+/// Current archives must never turn a password verification into unbounded work.
+/// Generated hashes use Argon2id v19, 19 MiB, two passes and one lane.
+pub fn supported_password_hash(raw: &str) -> bool {
+    if raw.len() > 512 {
+        return false;
+    }
+    let Ok(hash) = PasswordHash::new(raw) else {
+        return false;
+    };
+    let Ok(params) = argon2::Params::try_from(&hash) else {
+        return false;
+    };
+    hash.algorithm.as_str() == "argon2id"
+        && hash.version == Some(19)
+        && hash.salt.is_some()
+        && hash.hash.is_some()
+        && (8..=65536).contains(&params.m_cost())
+        && (1..=10).contains(&params.t_cost())
+        && (1..=4).contains(&params.p_cost())
+}
 pub fn valid_user(email: &str, name: &str, role: &str) -> Result<()> {
     if email.len() > 254
         || !email.is_ascii()
@@ -138,6 +158,7 @@ pub async fn login(app: &App, email: &str, password: &str) -> Result<(String, Se
         .as_ref()
         .map(|r| r.get("password_hash"))
         .unwrap_or_else(|| app.dummy_hash.as_ref().clone());
+    let verified_hash = hash.clone();
     let password = password.to_string();
     let permit = app
         .password_work
@@ -152,11 +173,12 @@ pub async fn login(app: &App, email: &str, password: &str) -> Result<(String, Se
         })?;
     let verified = tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        PasswordHash::new(&hash).is_ok_and(|h| {
-            Argon2::default()
-                .verify_password(password.as_bytes(), &h)
-                .is_ok()
-        })
+        supported_password_hash(&hash)
+            && PasswordHash::new(&hash).is_ok_and(|h| {
+                Argon2::default()
+                    .verify_password(password.as_bytes(), &h)
+                    .is_ok()
+            })
     })
     .await
     .unwrap_or(false);
@@ -186,20 +208,34 @@ pub async fn login(app: &App, email: &str, password: &str) -> Result<(String, Se
         csrf: random_token(),
         hash: digest(token.as_bytes()),
     };
+    persist_session(app, &session, &verified_hash).await?;
+    tracing::info!(event = "login_succeeded");
+    Ok((token, session))
+}
+/// Password work runs outside the mutation coordinator. Recheck the verified
+/// credential at the session commit boundary so concurrent revocation wins.
+async fn persist_session(app: &App, session: &Session, verified_hash: &str) -> Result<()> {
     let _guard = app.mutations.lock().await;
     sqlx::query("DELETE FROM sessions WHERE expires_at<$1")
         .bind(now())
         .execute(&app.db.pool)
         .await?;
-    sqlx::query("INSERT INTO sessions(token_hash,user_id,csrf,expires_at) VALUES($1,$2,$3,$4)")
+    let inserted = sqlx::query("INSERT INTO sessions(token_hash,user_id,csrf,expires_at) SELECT $1,id,$3,$4 FROM users WHERE id=$2 AND password_hash=$5 AND role=$6")
         .bind(&session.hash)
         .bind(&session.user.id)
         .bind(&session.csrf)
         .bind(now() + app.config.session_seconds)
+        .bind(verified_hash)
+        .bind(&session.user.role)
         .execute(&app.db.pool)
         .await?;
-    tracing::info!(event = "login_succeeded");
-    Ok((token, session))
+    if inserted.rows_affected() != 1 {
+        return Err(Error(
+            StatusCode::UNAUTHORIZED,
+            "Email or password is incorrect.",
+        ));
+    }
+    Ok(())
 }
 pub async fn session(app: &App, headers: &HeaderMap) -> Result<Session> {
     let token = headers
@@ -308,4 +344,106 @@ pub async fn update_user(
     tx.commit().await?;
     tracing::info!(event = "account_access_updated", sessions_revoked = true);
     Ok(())
+}
+
+#[cfg(test)]
+mod adversarial_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn credential_change_between_password_verification_and_session_commit_wins() {
+        let postgres = std::env::var("TEST_DATABASE_URL").ok();
+        if std::env::var("WPALT_REQUIRE_POSTGRES").is_ok() {
+            assert!(postgres.is_some());
+        }
+        for url in std::iter::once(None).chain(postgres.as_deref().map(Some)) {
+            let directory = tempfile::tempdir().unwrap();
+            let mut config = crate::config::Config {
+                data_dir: directory.path().join("data"),
+                database_url: format!(
+                    "sqlite://{}?mode=rwc",
+                    directory.path().join("site.db").display()
+                ),
+                ..Default::default()
+            };
+            let schema = if let Some(root) = url {
+                let schema = format!("wpalt_auth_review_{}", uuid::Uuid::new_v4().simple());
+                let pool = sqlx::PgPool::connect(root).await.unwrap();
+                sqlx::query(&format!("CREATE SCHEMA {schema}"))
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+                pool.close().await;
+                let mut scoped = url::Url::parse(root).unwrap();
+                scoped
+                    .query_pairs_mut()
+                    .append_pair("options", &format!("-c search_path={schema}"));
+                config.database_url = scoped.to_string();
+                Some(schema)
+            } else {
+                None
+            };
+            let app = App::open(config).await.unwrap();
+            let password = "original test-only password";
+            initialize(&app, "owner@example.test", "Owner", password)
+                .await
+                .unwrap();
+            let (_, session) = login(&app, "owner@example.test", password).await.unwrap();
+            let verified_hash: String =
+                sqlx::query_scalar("SELECT password_hash FROM users WHERE id=$1")
+                    .bind(&session.user.id)
+                    .fetch_one(&app.db.pool)
+                    .await
+                    .unwrap();
+            assert!(
+                Argon2::default()
+                    .verify_password(
+                        password.as_bytes(),
+                        &PasswordHash::new(&verified_hash).unwrap()
+                    )
+                    .is_ok()
+            );
+            // Freeze the boundary after successful verification, before session insertion.
+            // A password reset commits while that login is still in flight.
+            update_user(
+                &app,
+                &session.user.id,
+                "Owner",
+                "admin",
+                "replacement test-only password",
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                persist_session(&app, &session, &verified_hash)
+                    .await
+                    .unwrap_err()
+                    .0,
+                StatusCode::UNAUTHORIZED
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sessions")
+                    .fetch_one(&app.db.pool)
+                    .await
+                    .unwrap(),
+                0,
+                "No old-credential session may survive the reset."
+            );
+            assert!(login(&app, "owner@example.test", password).await.is_err());
+            assert!(
+                login(&app, "owner@example.test", "replacement test-only password")
+                    .await
+                    .is_ok()
+            );
+            app.db.pool.close().await;
+            if let (Some(root), Some(schema)) = (url, schema) {
+                let pool = sqlx::PgPool::connect(root).await.unwrap();
+                sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+                pool.close().await;
+            }
+        }
+    }
 }

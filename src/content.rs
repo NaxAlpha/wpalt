@@ -16,7 +16,20 @@ pub fn valid_slug(slug: &str) -> bool {
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
         && ![
-            "admin", "login", "logout", "assets", "media", "api", "health", "search", "preview",
+            "admin",
+            "login",
+            "logout",
+            "account",
+            "assets",
+            "media",
+            "api",
+            "health",
+            "search",
+            "preview",
+            "forms",
+            "audience",
+            "registration",
+            "themes",
         ]
         .contains(&slug)
 }

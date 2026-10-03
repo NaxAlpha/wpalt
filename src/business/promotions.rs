@@ -211,7 +211,10 @@ pub async fn visit(
     if valid.is_none() {
         return Ok(None);
     }
-    let rows=sqlx::query("SELECT id,title,target,experiment,wheel,document_a,document_b FROM business_promotions WHERE active=1 ORDER BY created_at,id LIMIT 100").fetch_all(&mut *tx).await?;
+    // Target and frequency selection needs small metadata only. Loading both
+    // canonical variants of every promotion amplifies a visitor request by up to
+    // 400 MiB even though at most one document can be displayed.
+    let rows=sqlx::query("SELECT p.id,p.title,p.target,p.experiment,p.wheel,COALESCE(i.variant,'') AS variant,COALESCE(i.count,0) AS impressions FROM business_promotions p LEFT JOIN promotion_impressions i ON i.promotion_id=p.id AND i.session_hash=$1 WHERE p.active=1 ORDER BY p.created_at,p.id LIMIT 100").bind(&hash).fetch_all(&mut *tx).await?;
     for row in rows {
         let target: Target = serde_json::from_str(&row.get::<String, _>("target"))
             .map_err(|_| Error::invalid("Stored targeting needs repair."))?;
@@ -219,32 +222,33 @@ pub async fn visit(
             continue;
         }
         let id: String = row.get("id");
-        let existing=sqlx::query("SELECT variant,count FROM promotion_impressions WHERE promotion_id=$1 AND session_hash=$2").bind(&id).bind(&hash).fetch_optional(&mut *tx).await?;
-        if existing
-            .as_ref()
-            .is_some_and(|r| r.get::<i64, _>("count") >= target.max_impressions)
-        {
+        if row.get::<i64, _>("impressions") >= target.max_impressions {
             continue;
         }
-        let variant = existing
-            .as_ref()
-            .map(|r| r.get::<String, _>("variant"))
-            .unwrap_or_else(|| {
-                if row.get::<i64, _>("experiment") == 1
-                    && auth::digest(format!("{id}:{hash}").as_bytes()).as_bytes()[0] & 1 == 1
-                {
-                    "b".into()
-                } else {
-                    "a".into()
-                }
-            });
+        let previous: String = row.get("variant");
+        let variant = if !previous.is_empty() {
+            previous
+        } else if row.get::<i64, _>("experiment") == 1
+            && auth::digest(format!("{id}:{hash}").as_bytes()).as_bytes()[0] & 1 == 1
+        {
+            "b".to_owned()
+        } else {
+            "a".to_owned()
+        };
         sqlx::query("INSERT INTO promotion_impressions(promotion_id,session_hash,variant,last_at,path) VALUES($1,$2,$3,$4,$5) ON CONFLICT(promotion_id,session_hash) DO UPDATE SET count=promotion_impressions.count+1,last_at=$4,path=$5").bind(&id).bind(&hash).bind(&variant).bind(now()).bind(&input.path).execute(&mut *tx).await?;
         let rewards=sqlx::query("SELECT id,label,weight FROM promotion_rewards WHERE promotion_id=$1 AND remaining>0 ORDER BY id LIMIT 16").bind(&id).fetch_all(&mut *tx).await?.into_iter().map(|r|serde_json::json!({"id":r.get::<String,_>("id"),"label":r.get::<String,_>("label"),"weight":r.get::<i64,_>("weight")})).collect::<Vec<_>>();
-        let doc = Document::parse(&row.get::<String, _>(if variant == "b" {
+        let column = if variant == "b" {
             "document_b"
         } else {
             "document_a"
-        }))?;
+        };
+        let raw: String = sqlx::query_scalar(&format!(
+            "SELECT {column} FROM business_promotions WHERE id=$1"
+        ))
+        .bind(&id)
+        .fetch_one(&mut *tx)
+        .await?;
+        let doc = Document::parse(&raw)?;
         let output = serde_json::json!({"id":id,"title":row.get::<String,_>("title"),"variant":variant,"html":doc.html(),"wheel":row.get::<i64,_>("wheel")==1,"rewards":rewards});
         tx.commit().await?;
         return Ok(Some(output));
@@ -273,7 +277,7 @@ pub async fn claim(app: &App, headers: &HeaderMap, promotion: &str) -> Result<se
     valid.ok_or_else(Error::forbidden)?;
 
     let valid: Option<String> = sqlx::query_scalar(
-        "UPDATE business_promotions SET version=version WHERE id=$1 AND active=1 RETURNING target",
+        "UPDATE business_promotions SET version=version WHERE id=$1 AND active=1 AND wheel=1 RETURNING target",
     )
     .bind(promotion)
     .fetch_optional(&mut *tx)

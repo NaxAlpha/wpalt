@@ -901,6 +901,44 @@ async fn attachments_follow_up_and_search_remain_private_and_survive_fresh_resto
             .await
             .is_err()
         );
+        // Hold the snapshot coordinator at its file-read boundary. Retention must
+        // wait, preserving the recovery point, then remove only the expired staging file.
+        let staged = attachments::upload(
+            State(app.clone()),
+            Path((form.clone(), "file".into())),
+            headers.clone(),
+            Bytes::from_static(b"expired staging only"),
+        )
+        .await
+        .unwrap()
+        .0;
+        let staged_id = staged["capability"]
+            .as_str()
+            .unwrap()
+            .split_once(':')
+            .unwrap()
+            .0;
+        let filename: String = sqlx::query_scalar(
+            "UPDATE form_attachments SET expires_at=0 WHERE id=$1 RETURNING filename",
+        )
+        .bind(staged_id)
+        .fetch_one(&app.db.pool)
+        .await
+        .unwrap();
+        let path = app.config.data_dir.join("attachments").join(filename);
+        let snapshot_guard = app.mutations.lock().await;
+        let cleanup = wpalt::business::quotas::cleanup(&app);
+        tokio::pin!(cleanup);
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(50), &mut cleanup)
+                .await
+                .is_err(),
+            "Retention must wait while a snapshot owns the file-read boundary."
+        );
+        assert!(path.exists());
+        drop(snapshot_guard);
+        cleanup.await.unwrap();
+        assert!(!path.exists());
         let input = json!({"name":"Ada Lovelace","file":uploaded["capability"]});
         let key = uuid::Uuid::new_v4().to_string();
         let entry = store::submit(&app, &form, 2, &key, &input).await.unwrap();
@@ -1360,6 +1398,28 @@ async fn local_offers_keep_variants_bound_frequency_and_allocate_last_reward_ato
         promotions::visit(&app, &visitors[1], visit("mobile"))
             .await
             .unwrap()
+            .unwrap();
+        // A visible promotion is not authority to allocate inventory when its wheel is off.
+        sqlx::query("UPDATE business_promotions SET wheel=0 WHERE id=$1")
+            .bind(&id)
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            promotions::claim(&app, &visitors[0], &id).await.is_err(),
+            "The disabled allocation capability must fail closed even with a valid impression."
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT remaining FROM promotion_rewards")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            1
+        );
+        sqlx::query("UPDATE business_promotions SET wheel=1 WHERE id=$1")
+            .bind(&id)
+            .execute(&app.db.pool)
+            .await
             .unwrap();
         let other = App::open((*app.config).clone()).await.unwrap();
         let (a, b) = tokio::join!(

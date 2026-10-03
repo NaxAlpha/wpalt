@@ -577,6 +577,13 @@ async fn permissions_csrf_sessions_and_origin_protect_every_write_surface() {
         let (s, h, _) = request(&site.app, "GET", "/admin", Some(&etoken), "", vec![]).await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(h["cache-control"], "no-store");
+        for path in ["/account", "/logout"] {
+            let (_, headers, _) = request(&site.app, "GET", path, Some(&etoken), "", vec![]).await;
+            assert_eq!(
+                headers["cache-control"], "no-store",
+                "private response: {path}"
+            );
+        }
         assert!(
             h["content-security-policy"]
                 .to_str()
@@ -842,6 +849,34 @@ async fn backup_restores_content_users_media_and_revisions_into_a_fresh_engine()
                 .await
                 .is_err()
         );
+        let mut hostile: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let mut payload: serde_json::Value =
+            serde_json::from_str(hostile["payload"].as_str().unwrap()).unwrap();
+        let expensive = payload["tables"]["users"][0]["password_hash"]
+            .as_str()
+            .unwrap()
+            .replace("m=19456", "m=4294967295");
+        assert!(
+            argon2::password_hash::PasswordHash::new(&expensive).is_ok(),
+            "This attack is valid syntax, not a malformed hash."
+        );
+        payload["tables"]["users"][0]["password_hash"] = expensive.into();
+        let payload = payload.to_string();
+        hostile["payload"] = payload.clone().into();
+        hostile["sha256"] = auth::digest(payload.as_bytes()).into();
+        assert!(
+            backup::restore(&target.app, &serde_json::to_vec(&hostile).unwrap())
+                .await
+                .is_err(),
+            "A recomputed archive checksum cannot authorize unbounded password work."
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap(),
+            0
+        );
         backup::restore(&target.app, &bytes).await.unwrap();
         assert_eq!(
             content::get(&target.app, &post.id)
@@ -943,6 +978,26 @@ fn configuration_and_composition_reject_unsafe_or_ambiguous_inputs() {
         ..Config::default()
     };
     assert!(!c.redacted().to_string().contains("secret"));
+    let canonical = Config {
+        base_url: "HTTPS://Example.TEST:443/".into(),
+        ..Config::default()
+    };
+    canonical.validate().unwrap();
+    assert_eq!(canonical.origin(), "https://example.test");
+    assert!(
+        canonical.secure_cookie(),
+        "Accepted HTTPS URL syntax cannot bypass Secure cookies or HSTS."
+    );
+    for protected in [
+        "/account",
+        "/audience/confirm/private",
+        "/registration/private",
+    ] {
+        assert!(
+            !wpalt::discovery::safe_path(protected),
+            "Proof/session routes are not public redirect rules."
+        );
+    }
     let mut c = Config {
         base_url: "http://public.example".into(),
         ..Config::default()
@@ -974,7 +1029,19 @@ fn configuration_and_composition_reject_unsafe_or_ambiguous_inputs() {
     p.blocks = r#"[{"kind":"executable","text":"code"}]"#.into();
     assert!(content::validate_input(&p, &s).is_err());
     assert!(!backup::safe_filename("../../image.png"));
-    assert!(!content::valid_slug("admin"));
+    for reserved in [
+        "admin",
+        "account",
+        "forms",
+        "audience",
+        "registration",
+        "themes",
+    ] {
+        assert!(
+            !content::valid_slug(reserved),
+            "A content route must not be shadowed by a system route: {reserved}"
+        );
+    }
 }
 
 // M2 cluster 1: one schema connects structured authoring, relationships, options and templates.
@@ -993,8 +1060,17 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
             )]),
         );
         schema::save_common(&site.app, common, 1).await.unwrap();
-        let model: schema::Model =
+        let mut model: schema::Model =
             serde_json::from_str(include_str!("fixtures/project-model.json")).unwrap();
+        model.fields.insert(
+            "inline-group".into(),
+            serde_json::from_value(json!({"kind":"group","fields":{"headline":{"kind":"string"}}}))
+                .unwrap(),
+        );
+        model.fields.insert(
+            "shared-object".into(),
+            serde_json::from_value(json!({"kind":"object","group":"hero"})).unwrap(),
+        );
         assert_eq!(
             upload(&site, "public.png", &png(), "public").await,
             StatusCode::SEE_OTHER
@@ -1030,7 +1106,7 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
         let public_identifier = uuid::Uuid::new_v4().to_string();
         let mut project = input("project-one", "publish");
         project.kind = "project".into();
-        project.fields=json!({"subtitle":public_identifier,"client":client.id,"steps":[{"label":"First useful step"},{"label":"Second useful step"}],"gallery":[public_media,private_media],"photo":public_media,"sections":[{"type":"hero","values":{"headline":"FLEXIBLE_HERO"}}],"shared":{"headline":"REUSED_GROUP"},"details":{"count":7}}).to_string();
+        project.fields=json!({"subtitle":public_identifier,"client":client.id,"steps":[{"label":"First useful step"},{"label":"Second useful step"}],"gallery":[public_media,private_media],"photo":public_media,"sections":[{"type":"hero","values":{"headline":"FLEXIBLE_HERO"}}],"shared":{"headline":"REUSED_GROUP"},"details":{"count":7},"inline-group":{"headline":"INLINE_GROUP"},"shared-object":{"headline":"SHARED_OBJECT"}}).to_string();
         project.taxonomies = json!({"sector":["Local businesses"]}).to_string();
         let record = content::save(&site.app, site.session(), None, project.clone())
             .await
@@ -1062,6 +1138,16 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
             "project".into(),
             serde_json::from_str(include_str!("fixtures/project-template.json")).unwrap(),
         );
+        for (id, path) in [
+            ("inline-group-output", "post.fields.inline-group.headline"),
+            ("shared-object-output", "post.fields.shared-object.headline"),
+            ("gallery-projection", "post.fields.gallery"),
+        ] {
+            package.templates.get_mut("project").unwrap().children.push(
+                serde_json::from_value(json!({"id":id,"kind":"text","text":{"bind":path}}))
+                    .unwrap(),
+            );
+        }
         package.templates.get_mut("home").unwrap().children.push(serde_json::from_value(json!({"id":"project-list","kind":"collection","source":"project","limit":30,"children":[{"id":"project-card","kind":"component","component":"card","arguments":{"title":{"bind":"item.fields.client.title"}}}]})).unwrap());
         theme::save(&site.app, "paper", package, 1, true)
             .await
@@ -1075,6 +1161,11 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
                 && public.contains("Second useful step")
         );
         assert!(!public.contains("PRIVATE_"));
+        assert!(public.contains("INLINE_GROUP") && public.contains("SHARED_OBJECT"));
+        assert!(
+            !public.contains(&private_media),
+            "Binding an entire gallery must not leak its private identifiers as JSON text."
+        );
         assert!(
             public.contains(&public_identifier),
             "Ordinary UUID-shaped strings are not mistaken for private relationship references"
