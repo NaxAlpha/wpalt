@@ -162,7 +162,7 @@ pub fn validate(t: &Tables) -> Result<()> {
             return Err(bad());
         }
         let course = text(r, "course_id");
-        if !course.is_empty() && (!courses.contains(course) || kind != "post") {
+        if !course.is_empty() && (!courses.contains(course) || !["post", "media"].contains(&kind)) {
             return Err(bad());
         }
     }
@@ -191,6 +191,23 @@ pub fn validate(t: &Tables) -> Result<()> {
                     || number(rule, "delay_seconds") != l.delay_seconds
                 {
                     return Err(bad());
+                }
+            }
+            for l in &c.lessons {
+                for download in &l.downloads {
+                    let rule = t["member_resources"]
+                        .iter()
+                        .find(|r| text(r, "kind") == "media" && text(r, "resource_id") == download)
+                        .ok_or_else(bad)?;
+                    if !media.contains(download.as_str())
+                        || text(rule, "course_id") != text(r, "id")
+                        || text(rule, "lesson_id") != l.id
+                        || text(rule, "policy_id") != c.policy_id
+                        || number(rule, "opens_at") != l.opens_at
+                        || number(rule, "delay_seconds") != l.delay_seconds
+                    {
+                        return Err(bad());
+                    }
                 }
             }
         }
@@ -257,16 +274,17 @@ pub fn validate(t: &Tables) -> Result<()> {
             .ok_or_else(bad)?;
         if !users.contains(text(r, "user_id"))
             || !(0..=1).contains(&number(r, "revoked"))
-            || !c.lessons.iter().all(|l| {
-                progress
-                    .get(&(
-                        text(r, "course_id"),
-                        number(r, "course_version"),
-                        l.id.as_str(),
-                        text(r, "user_id"),
-                    ))
-                    .is_some_and(|p| number(p, "completed_at") > 0)
-            })
+            || (number(r, "revoked") == 0
+                && !c.lessons.iter().all(|l| {
+                    progress
+                        .get(&(
+                            text(r, "course_id"),
+                            number(r, "course_version"),
+                            l.id.as_str(),
+                            text(r, "user_id"),
+                        ))
+                        .is_some_and(|p| number(p, "completed_at") > 0)
+                }))
         {
             return Err(bad());
         }

@@ -8,6 +8,7 @@ pub struct Db {
     pub postgres: bool,
     pub business_enabled: bool,
     pub membership_enabled: bool,
+    pub membership_max_records: i64,
     pub engagement_available: bool,
     pub respect_dnt: bool,
 }
@@ -55,6 +56,7 @@ impl Db {
             postgres,
             business_enabled: config.business_enabled,
             membership_enabled: config.membership_enabled,
+            membership_max_records: config.membership_max_records,
             engagement_available: config.business_enabled && config.engagement.enabled,
             respect_dnt: config.engagement.respect_dnt,
         })
@@ -172,6 +174,9 @@ impl Db {
         sqlx::query("INSERT INTO discovery_settings(id,definition,version) VALUES(1,$1,1) ON CONFLICT(id) DO NOTHING").bind(serde_json::to_string(&crate::discovery::Definition::default())?).execute(&mut *tx).await?;
         tx.commit().await?;
         crate::business::entries::prepare_search(self).await?;
+        crate::membership::budget::prepare(self)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?;
         Ok(())
     }
     /// Run bounded planner/index maintenance after an offline bulk operation.

@@ -60,6 +60,11 @@ enum Command {
         #[command(subcommand)]
         command: ThemeCommand,
     },
+    /// Offline membership and course operations using the shared policy engine.
+    Member {
+        #[command(subcommand)]
+        command: MemberCommand,
+    },
     /// Populate an initialized empty site with reviewable example content.
     SeedDemo {
         #[arg(long, default_value_t = 8)]
@@ -86,6 +91,183 @@ enum ThemeCommand {
     Activate {
         id: String,
     },
+}
+#[derive(Subcommand)]
+enum MemberCommand {
+    Policy {
+        #[arg(long)]
+        title: String,
+        #[arg(long, default_value = "")]
+        entitlement: String,
+        #[arg(long, default_value = "")]
+        group: String,
+    },
+    Grant {
+        #[arg(long)]
+        email: String,
+        #[arg(long)]
+        entitlement: String,
+        #[arg(long)]
+        starts: Option<i64>,
+        #[arg(long, default_value_t = 0)]
+        expires: i64,
+        #[arg(long, default_value = "local-cli")]
+        origin: String,
+    },
+    Revoke {
+        id: String,
+    },
+    Protect {
+        #[arg(long)]
+        kind: String,
+        #[arg(long)]
+        resource: String,
+        #[arg(long)]
+        policy: String,
+        #[arg(long, default_value_t = 0)]
+        opens: i64,
+        #[arg(long, default_value_t = 0)]
+        delay: i64,
+    },
+    CourseImport {
+        input: PathBuf,
+        #[arg(long)]
+        id: Option<String>,
+        #[arg(long)]
+        publish: bool,
+    },
+    CourseExport {
+        id: String,
+        output: PathBuf,
+        #[arg(long)]
+        draft: bool,
+    },
+    IdentityBind {
+        #[arg(long)]
+        email: String,
+        #[arg(long)]
+        issuer: String,
+        #[arg(long)]
+        subject: String,
+    },
+}
+async fn member_command(app: &App, command: MemberCommand) -> wpalt::error::Result<()> {
+    use wpalt::{error::Error, membership as m};
+    match command {
+        MemberCommand::Policy {
+            title,
+            entitlement,
+            group,
+        } => println!("{}", m::policy(app, &title, &entitlement, &group).await?),
+        MemberCommand::Grant {
+            email,
+            entitlement,
+            starts,
+            expires,
+            origin,
+        } => {
+            let id: String =
+                sqlx::query_scalar("SELECT id FROM users WHERE email=$1 AND role<>'disabled'")
+                    .bind(email.to_ascii_lowercase())
+                    .fetch_optional(&app.db.pool)
+                    .await?
+                    .ok_or_else(Error::not_found)?;
+            println!(
+                "{}",
+                m::grant(
+                    app,
+                    &id,
+                    &entitlement,
+                    starts.unwrap_or_else(wpalt::now),
+                    expires,
+                    &origin
+                )
+                .await?
+            );
+        }
+        MemberCommand::Revoke { id } => {
+            m::uuid(&id)?;
+            if sqlx::query("UPDATE member_grants SET revoked=1,version=version+1 WHERE id=$1")
+                .bind(id)
+                .execute(&app.db.pool)
+                .await?
+                .rows_affected()
+                != 1
+            {
+                return Err(Error::not_found());
+            }
+            println!("Membership revoked.");
+        }
+        MemberCommand::Protect {
+            kind,
+            resource,
+            policy,
+            opens,
+            delay,
+        } => {
+            m::protect(app, &kind, &resource, &policy, opens, delay).await?;
+            println!("Resource protected.");
+        }
+        MemberCommand::CourseImport { input, id, publish } => {
+            let bytes = backup::read_bounded(&input, 256 * 1024).await?;
+            let c: m::Course = serde_json::from_slice(&bytes)
+                .map_err(|_| Error::invalid("Invalid course file."))?;
+            c.validate()?;
+            let id = match id {
+                Some(id) => {
+                    m::uuid(&id)?;
+                    id
+                }
+                None => m::create_course(app, &c).await?,
+            };
+            let version: i64 = sqlx::query_scalar("SELECT version FROM member_courses WHERE id=$1")
+                .bind(&id)
+                .fetch_optional(&app.db.pool)
+                .await?
+                .ok_or_else(Error::not_found)?;
+            m::save_course(app, &id, version, &c, publish).await?;
+            println!("{id}");
+        }
+        MemberCommand::CourseExport { id, output, draft } => {
+            let sql = if draft {
+                "SELECT draft FROM member_courses WHERE id=$1"
+            } else {
+                "SELECT live FROM member_courses WHERE id=$1 AND published_version>0"
+            };
+            let raw: String = sqlx::query_scalar(sql)
+                .bind(id)
+                .fetch_optional(&app.db.pool)
+                .await?
+                .ok_or_else(Error::not_found)?;
+            backup::write_private(&output, raw.as_bytes())
+                .map_err(|_| Error::invalid("Cannot create a new private course export."))?;
+            println!("Course exported.");
+        }
+        MemberCommand::IdentityBind {
+            email,
+            issuer,
+            subject,
+        } => {
+            let url = url::Url::parse(&issuer).map_err(|_| Error::invalid("Invalid issuer."))?;
+            if url.scheme() != "https" || subject.is_empty() || subject.len() > 255 {
+                return Err(Error::invalid("Use an HTTPS issuer and a stable subject."));
+            }
+            let id: String =
+                sqlx::query_scalar("SELECT id FROM users WHERE email=$1 AND role<>'disabled'")
+                    .bind(email.to_ascii_lowercase())
+                    .fetch_optional(&app.db.pool)
+                    .await?
+                    .ok_or_else(Error::not_found)?;
+            sqlx::query("INSERT INTO member_identities(issuer,subject,user_id) VALUES($1,$2,$3)")
+                .bind(issuer)
+                .bind(subject)
+                .bind(id)
+                .execute(&app.db.pool)
+                .await?;
+            println!("Identity bound.");
+        }
+    }
+    Ok(())
 }
 fn password() -> anyhow::Result<String> {
     let mut value = String::new();
@@ -232,6 +414,9 @@ async fn main() -> anyhow::Result<()> {
             result.map_err(|e| anyhow::anyhow!(e.1))?;
             println!("Theme operation completed.");
         }
+        Command::Member { command } => member_command(&app, command)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?,
         Command::SeedDemo { posts } => seed(&app, posts).await?,
         Command::Serve => {
             app.db.settings().await.map_err(|_| {

@@ -1453,8 +1453,8 @@ async fn users(State(app): State<App>, headers: HeaderMap) -> Result<Html<String
                     button class="secondary" {"Update & revoke sessions"}
                 }
             }}}}}}
-            form class="panel" method="post" action="/admin/users" {(view::csrf(&s))h2 {"Add a collaborator"}div class="field-row" {label {"Name" input name="name" required maxlength="100";}label {"Email" input type="email" name="email" required maxlength="254";}}
-                div class="field-row" {label {"Role" select name="role" aria-label="Role" {option value="editor" {"Editor"}option value="moderator" {"Moderator"}option value="admin" {"Administrator"}}}label {"Initial password" input type="password" name="password" required minlength="12" maxlength="256" autocomplete="new-password";}}
+            form class="panel" method="post" action="/admin/users" {(view::csrf(&s))h2 {"Add an account"}div class="field-row" {label {"Name" input name="name" required maxlength="100";}label {"Email" input type="email" name="email" required maxlength="254";}}
+                div class="field-row" {label {"Role" select name="role" aria-label="Role" {option value="subscriber" {"Member"}option value="editor" {"Editor"}option value="moderator" {"Moderator"}option value="admin" {"Administrator"}}}label {"Initial password" input type="password" name="password" required minlength="12" maxlength="256" autocomplete="new-password";}}
                 button {"Create account"}
             }
         },

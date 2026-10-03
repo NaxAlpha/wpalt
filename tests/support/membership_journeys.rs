@@ -21,6 +21,7 @@ fn lesson(post: String, title: &str) -> Lesson {
         id: uuid::Uuid::new_v4().to_string(),
         title: title.into(),
         post_id: post,
+        downloads: vec![],
         delay_seconds: 0,
         opens_at: 0,
         questions: vec![],
@@ -226,6 +227,16 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
         }];
         let mut second = lesson(b.clone(), "Practice");
         second.assignment = "Explain your approach".into();
+        assert_eq!(
+            upload(&site, "course-download.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let download: String =
+            sqlx::query_scalar("SELECT id FROM media WHERE original_name='course-download.png'")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        second.downloads.push(download.clone());
         let course = Course {
             title: "Local learning".into(),
             policy_id: policy,
@@ -242,6 +253,19 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
             StatusCode::FORBIDDEN
         );
         assert!(!m::learner_state(&site.app, &learner, &id).await.unwrap().2[1].unlocked);
+        assert_eq!(
+            request(
+                &site.app,
+                "GET",
+                &format!("/media/{download}"),
+                Some(&token),
+                "",
+                vec![]
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
         let api = get(
             &site.app,
             &format!("/api/members/courses/{id}"),
@@ -256,10 +280,12 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
             &learner,
             &id,
             &first.id,
-            v,
-            &uuid::Uuid::new_v4().to_string(),
-            &[1],
-            "",
+            m::AttemptInput {
+                version: v,
+                key: &uuid::Uuid::new_v4().to_string(),
+                answers: &[1],
+                assignment: "",
+            },
         )
         .await
         .unwrap();
@@ -267,8 +293,30 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
         assert!(!failed.completed);
         let key = uuid::Uuid::new_v4().to_string();
         let (a, b) = tokio::join!(
-            m::assess(&site.app, &learner, &id, &first.id, v, &key, &[0], ""),
-            m::assess(&site.app, &learner, &id, &first.id, v, &key, &[0], "")
+            m::assess(
+                &site.app,
+                &learner,
+                &id,
+                &first.id,
+                m::AttemptInput {
+                    version: v,
+                    key: &key,
+                    answers: &[0],
+                    assignment: ""
+                }
+            ),
+            m::assess(
+                &site.app,
+                &learner,
+                &id,
+                &first.id,
+                m::AttemptInput {
+                    version: v,
+                    key: &key,
+                    answers: &[0],
+                    assignment: ""
+                }
+            )
         );
         assert!(a.unwrap().completed);
         assert!(b.unwrap().completed);
@@ -287,10 +335,12 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
             &learner,
             &id,
             &second.id,
-            v,
-            &uuid::Uuid::new_v4().to_string(),
-            &[],
-            "I enforce authoritative policy before delivery.",
+            m::AttemptInput {
+                version: v,
+                key: &uuid::Uuid::new_v4().to_string(),
+                answers: &[],
+                assignment: "I enforce authoritative policy before delivery.",
+            },
         )
         .await
         .unwrap();
@@ -317,6 +367,42 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
                 .await
                 .is_err()
         );
+        assert_eq!(
+            request(
+                &site.app,
+                "GET",
+                &format!("/media/{download}"),
+                Some(&token),
+                "",
+                vec![]
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        // Approved work cannot silently return to submitted while retaining completion.
+        assert!(
+            m::assess(
+                &site.app,
+                &learner,
+                &id,
+                &second.id,
+                m::AttemptInput {
+                    version: v,
+                    key: &uuid::Uuid::new_v4().to_string(),
+                    answers: &[],
+                    assignment: "Unreviewed replacement"
+                }
+            )
+            .await
+            .is_err()
+        );
+        let state: String = sqlx::query_scalar("SELECT state FROM member_assignments WHERE id=$1")
+            .bind(&assignment)
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(state, "approved");
         let cert = m::certificate(&site.app, &learner, &id).await.unwrap();
         assert_eq!(
             get(
@@ -340,10 +426,12 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
                 &learner,
                 &id,
                 &first.id,
-                v,
-                &uuid::Uuid::new_v4().to_string(),
-                &[0],
-                ""
+                m::AttemptInput {
+                    version: v,
+                    key: &uuid::Uuid::new_v4().to_string(),
+                    answers: &[0],
+                    assignment: ""
+                }
             )
             .await
             .is_err()
@@ -634,6 +722,100 @@ async fn identity_subject_binding_and_signed_claims_cannot_bypass_local_account_
                 .to_string()
                 .contains("fixture-secret-must-be-redacted")
         );
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn membership_budget_rolls_back_publication_and_counts_only_persisted_rows() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let post = publish(&site, "budget-lesson", "Budget protected content").await;
+        let policy = m::policy(&site.app, "Budget academy", "budget", "")
+            .await
+            .unwrap();
+        let course = Course {
+            title: "Budget course".into(),
+            policy_id: policy,
+            sequential: true,
+            lessons: vec![lesson(post, "Lesson")],
+        };
+        let id = m::create_course(&site.app, &course).await.unwrap();
+        let before: i64 = sqlx::query_scalar("SELECT records FROM member_usage WHERE id=1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        // Publication writes a lesson rule, course rule and edition. A mid-transaction
+        // quota failure must leave none of those writes or a changed course version.
+        sqlx::query("UPDATE member_usage SET limit_records=$1 WHERE id=1")
+            .bind(before + 1)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            m::save_course(&site.app, &id, 1, &course, true)
+                .await
+                .is_err()
+        );
+        assert!(m::live(&site.app, &id).await.is_err());
+        let count: i64 = sqlx::query_scalar("SELECT records FROM member_usage WHERE id=1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            count, before,
+            "Failed publication rolls back the budget as well"
+        );
+        let resources: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM member_resources WHERE course_id=$1 OR resource_id=$1",
+        )
+        .bind(&id)
+        .fetch_one(&site.app.db.pool)
+        .await
+        .unwrap();
+        assert_eq!(resources, 0);
+        sqlx::query("UPDATE member_usage SET limit_records=$1 WHERE id=1")
+            .bind(before + 10)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let edition = m::save_course(&site.app, &id, 1, &course, true)
+            .await
+            .unwrap();
+        // Re-publication upserts existing rules; only the new edition consumes a row.
+        let published: i64 = sqlx::query_scalar("SELECT records FROM member_usage WHERE id=1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        m::save_course(&site.app, &id, edition, &course, true)
+            .await
+            .unwrap();
+        let republished: i64 = sqlx::query_scalar("SELECT records FROM member_usage WHERE id=1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(republished, published + 1);
+        let archive = backup::capture(&site.app).await.unwrap();
+        let fresh = Site::new(pg, false).await;
+        backup::restore(&fresh.app, &archive).await.unwrap();
+        for app in [&site.app, &fresh.app] {
+            let mut actual = 0i64;
+            for table in m::budget::TABLES {
+                actual += sqlx::query_scalar::<_, i64>(&format!("SELECT COUNT(*) FROM {table}"))
+                    .fetch_one(&app.db.pool)
+                    .await
+                    .unwrap();
+            }
+            let stored: i64 = sqlx::query_scalar("SELECT records FROM member_usage WHERE id=1")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap();
+            assert_eq!(
+                stored, actual,
+                "Derived counters agree after publication and fresh recovery"
+            );
+        }
+        fresh.close().await;
         site.close().await;
     }
 }

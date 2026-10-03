@@ -15,6 +15,7 @@ pub struct Config {
     pub debug: bool,
     pub business_enabled: bool,
     pub membership_enabled: bool,
+    pub membership_max_records: i64,
     pub identity: crate::membership::identity::Config,
     pub business_limits: crate::business::quotas::Config,
     pub mail: crate::business::mail::MailConfig,
@@ -39,6 +40,7 @@ impl Default for Config {
             debug: false,
             business_enabled: true,
             membership_enabled: true,
+            membership_max_records: 1_000_000,
             identity: Default::default(),
             business_limits: Default::default(),
             mail: crate::business::mail::MailConfig::default(),
@@ -96,6 +98,14 @@ impl Config {
     }
     pub fn validate(&self) -> anyhow::Result<()> {
         self.identity.validate()?;
+        ensure!(
+            (1..=1_000_000_000).contains(&self.membership_max_records),
+            "membership_max_records must be between 1 and one billion"
+        );
+        ensure!(
+            !self.identity.enabled || self.secure_cookie(),
+            "OIDC sign-in requires an HTTPS site origin"
+        );
         self.business_limits.validate()?;
         self.mail.validate()?;
         self.engagement.validate()?;

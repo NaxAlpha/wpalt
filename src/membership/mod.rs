@@ -1,5 +1,6 @@
 //! Owner-controlled access and versioned learning; policy is evaluated from durable state.
 pub mod backup;
+pub mod budget;
 pub mod identity;
 pub mod referrals;
 pub mod web;
@@ -244,6 +245,8 @@ pub struct Lesson {
     pub title: String,
     pub post_id: String,
     #[serde(default)]
+    pub downloads: Vec<String>,
+    #[serde(default)]
     pub delay_seconds: i64,
     #[serde(default)]
     pub opens_at: i64,
@@ -283,9 +286,16 @@ impl Course {
         }
         let mut ids = HashSet::new();
         let mut posts = HashSet::new();
+        let mut downloads = HashSet::new();
         for l in &self.lessons {
             uuid(&l.id)?;
             uuid(&l.post_id)?;
+            for id in &l.downloads {
+                uuid(id)?;
+                if !downloads.insert(id) || downloads.len() > 128 {
+                    return Err(Error::invalid("Use at most 128 distinct lesson downloads."));
+                }
+            }
             label(&l.title, 160)?;
             if !ids.insert(&l.id)
                 || !posts.insert(&l.post_id)
@@ -373,6 +383,29 @@ pub async fn save_course(
             }
             sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id,opens_at,delay_seconds,course_id,lesson_id) VALUES('post',$1,$2,$3,$4,$5,$6) ON CONFLICT(kind,resource_id) DO UPDATE SET policy_id=excluded.policy_id,opens_at=excluded.opens_at,delay_seconds=excluded.delay_seconds,course_id=excluded.course_id,lesson_id=excluded.lesson_id").bind(&l.post_id).bind(&c.policy_id).bind(l.opens_at).bind(l.delay_seconds).bind(id).bind(&l.id).execute(&mut *tx).await?;
         }
+        for l in &c.lessons {
+            for media in &l.downloads {
+                let exists: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM media WHERE id=$1")
+                    .bind(media)
+                    .fetch_one(&mut *tx)
+                    .await?;
+                if exists != 1 {
+                    return Err(Error::invalid("A lesson download is missing."));
+                }
+                let owner: Option<String> = sqlx::query_scalar(
+                    "SELECT course_id FROM member_resources WHERE kind='media' AND resource_id=$1",
+                )
+                .bind(media)
+                .fetch_optional(&mut *tx)
+                .await?;
+                if owner.is_some_and(|owner| owner != id) {
+                    return Err(Error::invalid(
+                        "A download already belongs to another access rule or course.",
+                    ));
+                }
+                sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id,opens_at,delay_seconds,course_id,lesson_id) VALUES('media',$1,$2,$3,$4,$5,$6) ON CONFLICT(kind,resource_id) DO UPDATE SET policy_id=excluded.policy_id,opens_at=excluded.opens_at,delay_seconds=excluded.delay_seconds,course_id=excluded.course_id,lesson_id=excluded.lesson_id").bind(media).bind(&c.policy_id).bind(l.opens_at).bind(l.delay_seconds).bind(id).bind(&l.id).execute(&mut *tx).await?;
+            }
+        }
         // Removed lessons stay protected: release is a deliberate owner action, not a publication side effect.
         sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('course',$1,$2) ON CONFLICT(kind,resource_id) DO UPDATE SET policy_id=excluded.policy_id").bind(id).bind(&c.policy_id).execute(&mut *tx).await?;
         sqlx::query(
@@ -412,16 +445,25 @@ pub struct Assessment {
     pub completed: bool,
 }
 /// Concurrent retries of the same key never consume another attempt.
+pub struct AttemptInput<'a> {
+    pub version: i64,
+    pub key: &'a str,
+    pub answers: &'a [usize],
+    pub assignment: &'a str,
+}
 pub async fn assess(
     app: &App,
     s: &Session,
     course: &str,
     lesson: &str,
-    version: i64,
-    key: &str,
-    answers: &[usize],
-    assignment: &str,
+    input: AttemptInput<'_>,
 ) -> Result<Assessment> {
+    let AttemptInput {
+        version,
+        key,
+        answers,
+        assignment,
+    } = input;
     uuid(key)?;
     if assignment.len() > 16000 {
         return Err(Error::invalid("Assignment is limited to 16,000 bytes."));
@@ -440,6 +482,13 @@ pub async fn assess(
     require(app, "post", &l.post_id, Some(&s.user.id)).await?;
     let mut tx = app.db.pool.begin().await?;
     if let Some(r)=sqlx::query("SELECT score,passed FROM member_attempts WHERE user_id=$1 AND course_id=$2 AND course_version=$3 AND lesson_id=$4 AND request_key=$5").bind(&s.user.id).bind(course).bind(version).bind(lesson).bind(key).fetch_optional(&mut *tx).await?{let complete:Option<i64>=sqlx::query_scalar("SELECT completed_at FROM member_progress WHERE user_id=$1 AND course_id=$2 AND course_version=$3 AND lesson_id=$4").bind(&s.user.id).bind(course).bind(version).bind(lesson).fetch_optional(&mut *tx).await?;return Ok(Assessment{score:r.get("score"),passed:r.get::<i64,_>("passed")==1,completed:complete.is_some_and(|t|t>0)})}
+    let completed: Option<i64> = sqlx::query_scalar("SELECT completed_at FROM member_progress WHERE user_id=$1 AND course_id=$2 AND course_version=$3 AND lesson_id=$4")
+        .bind(&s.user.id).bind(course).bind(version).bind(lesson).fetch_optional(&mut *tx).await?;
+    if completed.is_some_and(|time| time > 0) {
+        return Err(Error::invalid(
+            "This lesson is complete. Ask the operator to reset it before submitting new work.",
+        ));
+    }
     if answers.len() != l.questions.len()
         || answers
             .iter()
@@ -508,6 +557,10 @@ pub async fn grade(
             .ok_or_else(Error::not_found)?;
         sqlx::query("UPDATE member_progress SET completed_at=$1 WHERE course_id=$2 AND course_version=$3 AND lesson_id=$4 AND user_id=$5 AND best_score>=$6").bind(now()).bind(r.get::<String,_>("course_id")).bind(r.get::<i64,_>("course_version")).bind(r.get::<String,_>("lesson_id")).bind(r.get::<String,_>("user_id")).bind(l.pass_percent).execute(&mut *tx).await?;
     }
+    if !approved {
+        sqlx::query("UPDATE member_progress SET completed_at=0 WHERE course_id=$1 AND course_version=$2 AND lesson_id=$3 AND user_id=$4").bind(r.get::<String,_>("course_id")).bind(r.get::<i64,_>("course_version")).bind(r.get::<String,_>("lesson_id")).bind(r.get::<String,_>("user_id")).execute(&mut *tx).await?;
+        sqlx::query("UPDATE member_certificates SET revoked=1 WHERE course_id=$1 AND course_version=$2 AND user_id=$3").bind(r.get::<String,_>("course_id")).bind(r.get::<i64,_>("course_version")).bind(r.get::<String,_>("user_id")).execute(&mut *tx).await?;
+    }
     tx.commit().await?;
     Ok(())
 }
@@ -536,7 +589,15 @@ pub async fn viewer(app: &App, h: &axum::http::HeaderMap) -> Result<Option<Sessi
 pub async fn group(app: &App, title: &str, manager: &str, seats: i64) -> Result<String> {
     label(title, 160)?;
     if !manager.is_empty() {
-        uuid(manager)?
+        uuid(manager)?;
+        let exists: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE id=$1 AND role<>'disabled'")
+                .bind(manager)
+                .fetch_one(&app.db.pool)
+                .await?;
+        if exists != 1 {
+            return Err(Error::invalid("Select an active organization manager."));
+        }
     }
     if !(0..=1000).contains(&seats) {
         return Err(Error::invalid("Use at most 1,000 organization seats."));
@@ -630,6 +691,7 @@ pub async fn claim_gift(app: &App, s: &Session, token: &str) -> Result<()> {
 }
 pub async fn discuss(app: &App, s: &Session, group: &str, body: &str) -> Result<()> {
     label(body, 4000)?;
+    let _guard = app.mutations.lock().await;
     let n: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM member_group_users WHERE group_id=$1 AND user_id=$2",
     )
@@ -714,4 +776,24 @@ pub async fn learner_state(
         prior &= completed;
     }
     Ok((c, v, out))
+}
+
+pub async fn reset_progress(
+    app: &App,
+    course: &str,
+    version: i64,
+    lesson: &str,
+    user: &str,
+) -> Result<()> {
+    let _guard = app.mutations.lock().await;
+    let mut tx = app.db.pool.begin().await?;
+    let updated=sqlx::query("UPDATE member_progress SET attempts=0,best_score=0,completed_at=0 WHERE course_id=$1 AND course_version=$2 AND lesson_id=$3 AND user_id=$4").bind(course).bind(version).bind(lesson).bind(user).execute(&mut *tx).await?;
+    if updated.rows_affected() != 1 {
+        return Err(Error::not_found());
+    }
+    sqlx::query("UPDATE member_assignments SET state='changes',feedback='Progress reset by the operator.',version=version+1 WHERE course_id=$1 AND course_version=$2 AND lesson_id=$3 AND user_id=$4").bind(course).bind(version).bind(lesson).bind(user).execute(&mut *tx).await?;
+    sqlx::query("UPDATE member_certificates SET revoked=1 WHERE course_id=$1 AND course_version=$2 AND user_id=$3").bind(course).bind(version).bind(user).execute(&mut *tx).await?;
+    tx.commit().await?;
+    tracing::info!(event="learning_progress_reset",course_id=%course,course_version=version);
+    Ok(())
 }

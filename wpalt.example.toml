@@ -20,6 +20,10 @@ request_timeout_seconds = 30
 # Disable the entire business platform to omit its public assets/routes/jobs.
 business_enabled = true
 
+# Local membership/learning; disabling it preserves access rules and fails closed.
+membership_enabled = true
+membership_max_records = 1000000
+
 [mail]
 enabled = true
 from = "site@localhost.test"
@@ -53,3 +57,14 @@ registrations = 10000
 mail_jobs = 100000
 mail_bytes = 268435456
 mail_retention_days = 30
+
+# Optional provider sign-in. Local accounts need none of these services.
+[identity]
+enabled = false
+issuer = ""
+client_id = ""
+client_secret = "" # Prefer WPALT_IDENTITY_CLIENT_SECRET from a secret manager.
+authorization_url = ""
+token_url = ""
+jwks_url = ""
+# Enabling requires an HTTPS base_url and explicit HTTPS provider endpoints.

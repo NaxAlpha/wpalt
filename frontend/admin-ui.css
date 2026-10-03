@@ -820,3 +820,10 @@ img.ProseMirror-separator {
   gap: 12px;
   margin-bottom: 32px;
 }
+
+.member fieldset label {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 400;
+}

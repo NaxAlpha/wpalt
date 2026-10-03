@@ -64,6 +64,22 @@ async fn member_page(app: &App, title: &str, body: Markup) -> Result<Html<String
         html! {nav aria-label="Member area" {a href="/members" {"My learning"} " · " a href="/members/profile" {"Profile"} " · " a href="/account" {"Account"}}(body)},
     )))
 }
+fn utc_input(value: i64) -> String {
+    if value == 0 {
+        return String::new();
+    }
+    chrono::DateTime::from_timestamp(value, 0)
+        .map(|d| d.format("%Y-%m-%dT%H:%M").to_string())
+        .unwrap_or_default()
+}
+fn utc_date(raw: &str) -> Result<i64> {
+    if raw.is_empty() {
+        return Ok(0);
+    }
+    chrono::NaiveDateTime::parse_from_str(raw, "%Y-%m-%dT%H:%M")
+        .map(|d| d.and_utc().timestamp())
+        .map_err(|_| Error::invalid("Enter a valid date and time in UTC."))
+}
 fn hidden(name: &str, value: &str) -> Markup {
     html! {input type="hidden" name=(name) value=(value);}
 }
@@ -90,15 +106,15 @@ async fn admin(State(app): State<App>, h: HeaderMap) -> Result<Html<String>> {
     let pending=sqlx::query("SELECT d.id,d.body,u.name,g.title FROM member_discussions d JOIN users u ON u.id=d.user_id JOIN member_groups g ON g.id=d.group_id WHERE d.state='pending' ORDER BY d.created_at LIMIT 40").fetch_all(&app.db.pool).await?;
     admin_page(&app,&s,"Members",html!{
  (view::heading("Community & learning","Members","Assign access, manage communities and review learning in one place."))
- p {a href="/admin/courses" {"Courses"} " · " a href="/admin/members/referrals" {"Referrals"} " · " a href="/admin/members/identity" {"Identity bindings"} " · " a href="/admin/registrations" {"Account requests"} " · " a href="/admin/settings/access" {"User roles"}}
+ p {a href="/admin/courses" {"Courses"} " · " a href="/admin/members/referrals" {"Referrals"} " · " a href="/admin/members/identity" {"Identity bindings"} " · " a href="/admin/registrations" {"Account requests"} " · " a href="/admin/users" {"User roles"}}
  section class="panel" {h2 {"Create an access policy"}p class="muted" {"When both are set, the member needs the entitlement and group."}form method="post" {(view::csrf(&s))(hidden("operation","policy"))label {"Policy title" input name="title" required maxlength="160";}label {"Entitlement key" input name="key" maxlength="80" placeholder="e.g. academy";}label {"Required group" select name="group" {option value="" {"No group requirement"}@for g in &groups {option value=(g.get::<String,_>("id")){(g.get::<String,_>("title"))}}}}button {"Create policy"}}}
- section class="panel" {h2 {"Assign a membership"}form method="post" {(view::csrf(&s))(hidden("operation","grant"))label {"Member" select name="user" required {@for u in &users {option value=(u.get::<String,_>("id")){(u.get::<String,_>("name")) " · " (u.get::<String,_>("email"))}}}}label {"Entitlement key" input name="key" required maxlength="80";}label {"Starts at (UTC Unix seconds)" input type="number" name="starts" value=(now()) min="0" required;}label {"Expires at (0 means no expiry)" input type="number" name="expires" value="0" min="0" required;}button {"Assign access"}}
+ section class="panel" {h2 {"Assign a membership"}form method="post" {(view::csrf(&s))(hidden("operation","grant"))label {"Member" select name="user" required {@for u in &users {option value=(u.get::<String,_>("id")){(u.get::<String,_>("name")) " · " (u.get::<String,_>("email"))}}}}label {"Entitlement key" input name="key" required maxlength="80";}label {"Starts at (UTC)" input type="datetime-local" name="starts" value=(utc_input(now())) required;}label {"Expires at (UTC, leave blank for no expiry)" input type="datetime-local" name="expires";}button {"Assign access"}}
  @for g in &grants {div class="toolbar" {strong {(g.get::<String,_>("name"))}span {(g.get::<String,_>("entitlement"))}span class="status" {(if g.get::<i64,_>("revoked")==1{"Revoked"}else if g.get::<i64,_>("expires_at")>0&&g.get::<i64,_>("expires_at")<=now(){"Expired"}else{"Assigned"})}form method="post" {(view::csrf(&s))(hidden("operation","revoke"))(hidden("id",&g.get::<String,_>("id")))(hidden("version",&g.get::<i64,_>("version").to_string()))button class="quiet" {"Revoke"}}}}}
- section class="panel" {h2 {"Protect content or a download"}p {"Public files remain public until a media rule is assigned. Course lesson rules are managed by their course."}form method="post" {(view::csrf(&s))(hidden("operation","protect"))label {"Resource" select name="resource" {@for p in &posts {option value=(format!("post:{}",p.get::<String,_>("id"))){"Content · " (p.get::<String,_>("title"))}}@for m in &media {option value=(format!("media:{}",m.get::<String,_>("id"))){"Media · " (m.get::<String,_>("alt")) " " (m.get::<String,_>("filename"))}}}}label {"Access policy" select name="policy" required {@for p in &policies {option value=(p.get::<String,_>("id")){(p.get::<String,_>("title"))}}}}label {"Opens at (0 means immediately)" input type="number" name="opens" value="0" min="0";}label {"Delay after membership starts (seconds)" input type="number" name="delay" value="0" min="0" max="31536000";}button {"Protect resource"}}
+ section class="panel" {h2 {"Protect content or a download"}p {"Public files remain public until a media rule is assigned. Course lesson rules are managed by their course."}form method="post" {(view::csrf(&s))(hidden("operation","protect"))label {"Resource" select name="resource" {@for p in &posts {option value=(format!("post:{}",p.get::<String,_>("id"))){"Content · " (p.get::<String,_>("title"))}}@for m in &media {option value=(format!("media:{}",m.get::<String,_>("id"))){"Media · " (m.get::<String,_>("alt")) " " (m.get::<String,_>("filename"))}}}}label {"Access policy" select name="policy" required {@for p in &policies {option value=(p.get::<String,_>("id")){(p.get::<String,_>("title"))}}}}label {"Opens at (UTC, leave blank for immediately)" input type="datetime-local" name="opens";}label {"Delay after membership starts (seconds)" input type="number" name="delay" value="0" min="0" max="31536000";}button {"Protect resource"}}
  @for r in resources {p {(r.get::<String,_>("kind")) " · " (r.get::<String,_>("resource_id")) " → " (r.get::<String,_>("title"))}}}
  section class="panel" {h2 {"Policies"}@for p in &policies {form method="post" class="toolbar" {(view::csrf(&s))(hidden("operation","policy-toggle"))(hidden("id",&p.get::<String,_>("id")))(hidden("version",&p.get::<i64,_>("version").to_string()))strong {(p.get::<String,_>("title"))}span {(p.get::<String,_>("entitlement"))}button class="quiet" {(if p.get::<i64,_>("enabled")==1{"Suspend policy"}else{"Enable policy"})}}}}
  section class="panel" {h2 {"Create a group or organization"}form method="post" {(view::csrf(&s))(hidden("operation","group"))label {"Group title" input name="title" required maxlength="160";}label {"Seat manager" select name="user" {option value="" {"Site owner only"}@for u in &users {option value=(u.get::<String,_>("id")){(u.get::<String,_>("name"))}}}}label {"Seat limit (0 means ordinary group)" input type="number" name="seats" value="0" min="0" max="1000";}button {"Create group"}}@for g in &groups {p {a href=(format!("/members/groups/{}",g.get::<String,_>("id"))){(g.get::<String,_>("title"))}}}}
- section class="panel" {h2 {"Create a single-use gift"}form method="post" {(view::csrf(&s))(hidden("operation","gift"))label {"Entitlement key" input name="key" required maxlength="80";}label {"Claim before (UTC Unix seconds)" input type="number" name="expires" value=(now()+86400) required;}label {"Access duration (seconds)" input type="number" name="duration" min="1" max="31536000" value="2592000" required;}button {"Create gift link"}}}
+ section class="panel" {h2 {"Create a single-use gift"}form method="post" {(view::csrf(&s))(hidden("operation","gift"))label {"Entitlement key" input name="key" required maxlength="80";}label {"Claim before (UTC)" input type="datetime-local" name="expires" value=(utc_input(now()+86400)) required;}label {"Access duration (seconds)" input type="number" name="duration" min="1" max="31536000" value="2592000" required;}button {"Create gift link"}}}
  section class="panel" {h2 {"Assignments & gradebook"}p {a href="/admin/courses" {"Open a course to inspect member progress."}}@for a in assignments {article {h3 {(a.get::<String,_>("name")) " · " (a.get::<String,_>("title"))}p class="status" {(a.get::<String,_>("state"))}p {(a.get::<String,_>("body"))}form method="post" {(view::csrf(&s))(hidden("operation","grade"))(hidden("id",&a.get::<String,_>("id")))(hidden("version",&a.get::<i64,_>("version").to_string()))label {"Feedback" textarea name="feedback" maxlength="4000" {}}button name="decision" value="approve" {"Approve work"}button name="decision" value="changes" class="quiet" {"Request changes"}}}}}
  section class="panel" {h2 {"Discussion moderation"}@for d in pending {article {h3 {(d.get::<String,_>("title")) " · " (d.get::<String,_>("name"))}p {(d.get::<String,_>("body"))}form method="post" {(view::csrf(&s))(hidden("operation","moderate"))(hidden("id",&d.get::<String,_>("id")))button name="decision" value="approve" {"Approve"}button name="decision" value="reject" class="quiet" {"Reject"}}}}}
  }).await
@@ -114,11 +130,11 @@ struct Action {
     user: String,
     id: String,
     version: i64,
-    starts: i64,
-    expires: i64,
+    starts: String,
+    expires: String,
     resource: String,
     policy: String,
-    opens: i64,
+    opens: String,
     delay: i64,
     seats: i64,
     duration: i64,
@@ -137,7 +153,15 @@ async fn admin_action(
             policy(&app, &i.title, &i.key, &i.group).await?;
         }
         "grant" => {
-            grant(&app, &i.user, &i.key, i.starts, i.expires, "local-owner").await?;
+            grant(
+                &app,
+                &i.user,
+                &i.key,
+                utc_date(&i.starts)?,
+                utc_date(&i.expires)?,
+                "local-owner",
+            )
+            .await?;
         }
         "revoke" => {
             let _guard = app.mutations.lock().await;
@@ -165,16 +189,36 @@ async fn admin_action(
                 .resource
                 .split_once(':')
                 .ok_or(Error::invalid("Select a resource."))?;
-            protect(&app, k, id, &i.policy, i.opens, i.delay).await?
+            protect(&app, k, id, &i.policy, utc_date(&i.opens)?, i.delay).await?
         }
         "group" => {
             group(&app, &i.title, &i.user, i.seats).await?;
         }
         "gift" => {
-            let token = gift(&app, &i.key, i.expires, i.duration).await?;
+            let token = gift(&app, &i.key, utc_date(&i.expires)?, i.duration).await?;
             return Ok(admin_page(&app,&s,"Gift link",html!{h1 {"Gift link ready"}p {"Copy this link now. It is shown once and can be claimed by one signed-in member."}p {a href=(format!("/members/gifts/{token}")){(format!("{}/members/gifts/{token}",app.config.origin()))}}a href="/admin/members" {"Back to members"}}).await?.into_response());
         }
         "grade" => grade(&app, &i.id, i.version, i.decision == "approve", &i.feedback).await?,
+        "identity-remove" => {
+            let _guard = app.mutations.lock().await;
+            staff(&app, &s).await?;
+            let mut tx = app.db.pool.begin().await?;
+            let user: Option<String> = sqlx::query_scalar(
+                "DELETE FROM member_identities WHERE issuer=$1 AND subject=$2 RETURNING user_id",
+            )
+            .bind(&i.title)
+            .bind(&i.key)
+            .fetch_optional(&mut *tx)
+            .await?;
+            if let Some(user) = user {
+                // Revoke existing sessions too: removing a provider binding ends that account's active sign-ins.
+                sqlx::query("DELETE FROM sessions WHERE user_id=$1")
+                    .bind(user)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+            tx.commit().await?;
+        }
         "moderate" => {
             sqlx::query("UPDATE member_discussions SET state=$1 WHERE id=$2 AND state='pending'")
                 .bind(if i.decision == "approve" {
@@ -221,6 +265,7 @@ async fn new_course(
         id: uuid::Uuid::new_v4().to_string(),
         title: "First lesson".into(),
         post_id: i.post,
+        downloads: vec![],
         delay_seconds: 0,
         opens_at: 0,
         questions: vec![],
@@ -259,11 +304,18 @@ async fn course_editor(
     )
     .fetch_all(&app.db.pool)
     .await?;
-    let progress=sqlx::query("SELECT u.name,p.lesson_id,p.course_version,p.attempts,p.best_score,p.completed_at FROM member_progress p JOIN users u ON u.id=p.user_id WHERE p.course_id=$1 ORDER BY p.course_version DESC,u.name,p.lesson_id LIMIT 100").bind(&id).fetch_all(&app.db.pool).await?;
+    let media = sqlx::query("SELECT id,alt,filename FROM media ORDER BY created_at DESC LIMIT 100")
+        .fetch_all(&app.db.pool)
+        .await?;
+    let progress=sqlx::query("SELECT u.name,p.user_id,p.lesson_id,p.course_version,p.attempts,p.best_score,p.completed_at FROM member_progress p JOIN users u ON u.id=p.user_id WHERE p.course_id=$1 ORDER BY p.course_version DESC,u.name,p.lesson_id LIMIT 100").bind(&id).fetch_all(&app.db.pool).await?;
     admin_page(&app,&s,"Edit course",html!{(view::heading("Learning",&c.title,"Draft edits stay private. Publish deliberately; a new edition has its own progress."))p {a href="/admin/courses" {"All courses"} " · " a href=(format!("/members/courses/{id}")){"Member view"}}section class="panel" {form method="post" {(view::csrf(&s))(hidden("version",&version))(hidden("operation","publish"))p {"Published edition: " (r.get::<i64,_>("published_version"))}button {"Publish course edition"}}}
- @for (index,l) in c.lessons.iter().enumerate(){section class="panel" {h2 {(index+1) ". " (&l.title)}p {a href=(format!("/admin/posts/{}",l.post_id)){"Edit shared lesson content"}}form method="post" {(view::csrf(&s))(hidden("version",&version))(hidden("lesson",&l.id))(hidden("operation","lesson"))label {"Lesson title" input name="title" value=(&l.title) required maxlength="160";}label {"Opens at (UTC seconds; 0 means now)" input name="opens" type="number" value=(l.opens_at) min="0";}label {"Delay after access starts (seconds)" input name="delay" type="number" value=(l.delay_seconds) min="0" max="31536000";}label {"Assignment instructions (optional)" textarea name="assignment" maxlength="4000" {(&l.assignment)}}label {"Quiz prompt (leave blank for no quiz)" textarea name="prompt" maxlength="1000" {(l.questions.first().map(|q|q.prompt.as_str()).unwrap_or(""))}}label {"Choices, one per line" textarea name="choices" maxlength="4000" {(l.questions.first().map(|q|q.choices.join("\n")).unwrap_or_default())}}label {"Correct choice number" input name="correct" type="number" min="1" max="8" value=(l.questions.first().map(|q|q.correct+1).unwrap_or(1));}label {"Required score (%)" input name="pass" type="number" min="1" max="100" value=(l.pass_percent);}label {"Attempt limit" input name="attempts" type="number" min="1" max="10" value=(l.max_attempts);}button {"Save lesson draft"}}}}
+ @for (index,l) in c.lessons.iter().enumerate(){section class="panel" {h2 {(index+1) ". " (&l.title)}p {a href=(format!("/admin/posts/{}",l.post_id)){"Edit shared lesson content"}}form method="post" {(view::csrf(&s))(hidden("version",&version))(hidden("lesson",&l.id))(hidden("operation","lesson"))label {"Lesson title" input name="title" value=(&l.title) required maxlength="160";}label {"Opens at (UTC, leave blank for now)" input name="opens" type="datetime-local" value=(utc_input(l.opens_at));}label {"Delay after access starts (seconds)" input name="delay" type="number" value=(l.delay_seconds) min="0" max="31536000";}label {"Assignment instructions (optional)" textarea name="assignment" maxlength="4000" {(&l.assignment)}}label {"Quiz prompt (leave blank for no quiz)" textarea name="prompt" maxlength="1000" {(l.questions.first().map(|q|q.prompt.as_str()).unwrap_or(""))}}label {"Choices, one per line" textarea name="choices" maxlength="4000" {(l.questions.first().map(|q|q.choices.join("\n")).unwrap_or_default())}}label {"Correct choice number" input name="correct" type="number" min="1" max="8" value=(l.questions.first().map(|q|q.correct+1).unwrap_or(1));}label {"Required score (%)" input name="pass" type="number" min="1" max="100" value=(l.pass_percent);}label {"Attempt limit" input name="attempts" type="number" min="1" max="10" value=(l.max_attempts);}button {"Save lesson draft"}}}}
+ section class="panel" {h2 {"Course settings & order"}form method="post" {(view::csrf(&s))(hidden("version",&version))(hidden("operation","settings"))label {"Course title" input name="title" value=(&c.title) required maxlength="160";}label {input type="checkbox" name="sequential" value="yes" checked[c.sequential]; " Complete lessons in order"}button {"Save course settings"}}
+ @for (index,l) in c.lessons.iter().enumerate(){form method="post" class="toolbar" {(view::csrf(&s))(hidden("version",&version))(hidden("lesson",&l.id))span {(&l.title)}button name="operation" value="up" disabled[index==0] class="quiet" {"Move earlier"}button name="operation" value="down" disabled[index+1==c.lessons.len()] class="quiet" {"Move later"}button name="operation" value="remove" disabled[c.lessons.len()==1] class="quiet" {"Remove lesson"}}}}
+ @for l in &c.lessons {section class="panel" {h2 {"Quiz questions · " (&l.title)}@for(index,q) in l.questions.iter().enumerate(){form method="post" class="toolbar" {(view::csrf(&s))(hidden("version",&version))(hidden("lesson",&l.id))(hidden("question",&index.to_string()))span {(&q.prompt)}button name="operation" value="quiz-remove" class="quiet" {"Remove question"}}}details {summary {"Add a quiz question"}form method="post" {(view::csrf(&s))(hidden("version",&version))(hidden("lesson",&l.id))(hidden("operation","quiz-add"))label {"Question prompt" textarea name="prompt" required maxlength="1000" {}}label {"Answer choices, one per line" textarea name="choices" required maxlength="4000" {}}label {"Correct answer number" input type="number" name="correct" min="1" max="8" value="1" required;}button {"Add question"}}}}}
+ @for l in &c.lessons {section class="panel" {h2 {"Protected downloads · " (&l.title)}p {"Assign files here to enforce this lesson's access and prerequisites."}@for id in &l.downloads{form method="post" class="toolbar" {(view::csrf(&s))(hidden("version",&version))(hidden("lesson",&l.id))(hidden("media",id))span {(id)}button name="operation" value="media-remove" class="quiet" {"Remove download"}}}form method="post" {(view::csrf(&s))(hidden("version",&version))(hidden("lesson",&l.id))(hidden("operation","media-add"))label {"Uploaded file" select name="media" required {@for m in &media{option value=(m.get::<String,_>("id")){(m.get::<String,_>("alt")) " " (m.get::<String,_>("filename"))}}}}button {"Assign protected download"}}}}
  section class="panel" {h2 {"Add a lesson"}form method="post" {(view::csrf(&s))(hidden("version",&version))(hidden("operation","add"))label {"Lesson title" input name="title" required maxlength="160";}label {"Shared content" select name="post" required {@for p in posts {option value=(p.get::<String,_>("id")){(p.get::<String,_>("title"))}}}}button {"Add lesson"}}}
- section class="panel" {h2 {"Gradebook"}@for p in progress {p {(p.get::<String,_>("name")) " · edition " (p.get::<i64,_>("course_version")) " · " (p.get::<String,_>("lesson_id")) " · score " (p.get::<i64,_>("best_score")) "% · " (p.get::<i64,_>("attempts")) " attempts · " (if p.get::<i64,_>("completed_at")>0{"Complete"}else{"In progress"})}}}
+ section class="panel" {h2 {"Gradebook"}@for p in progress {p {(p.get::<String,_>("name")) " · edition " (p.get::<i64,_>("course_version")) " · " (p.get::<String,_>("lesson_id")) " · score " (p.get::<i64,_>("best_score")) "% · " (p.get::<i64,_>("attempts")) " attempts · " (if p.get::<i64,_>("completed_at")>0{"Complete"}else{"In progress"})}form method="post" {(view::csrf(&s))(hidden("version",&version))(hidden("lesson",&p.get::<String,_>("lesson_id")))(hidden("user",&p.get::<String,_>("user_id")))(hidden("edition",&p.get::<i64,_>("course_version").to_string()))button name="operation" value="reset-progress" class="quiet" {"Reset attempts and completion"}}}}
  }).await
 }
 #[derive(Deserialize, Default)]
@@ -275,7 +327,7 @@ struct Edit {
     lesson: String,
     title: String,
     post: String,
-    opens: i64,
+    opens: String,
     delay: i64,
     assignment: String,
     prompt: String,
@@ -283,6 +335,11 @@ struct Edit {
     correct: usize,
     pass: i64,
     attempts: i64,
+    sequential: String,
+    question: usize,
+    media: String,
+    user: String,
+    edition: i64,
 }
 async fn edit_course(
     State(app): State<App>,
@@ -305,6 +362,7 @@ async fn edit_course(
             id: uuid::Uuid::new_v4().to_string(),
             title: i.title,
             post_id: i.post,
+            downloads: vec![],
             delay_seconds: 0,
             opens_at: 0,
             questions: vec![],
@@ -312,6 +370,70 @@ async fn edit_course(
             pass_percent: 70,
             max_attempts: 3,
         }),
+        "media-add" | "media-remove" => {
+            let l = c
+                .lessons
+                .iter_mut()
+                .find(|l| l.id == i.lesson)
+                .ok_or_else(Error::not_found)?;
+            uuid(&i.media)?;
+            if i.operation == "media-add" {
+                l.downloads.push(i.media)
+            } else {
+                l.downloads.retain(|id| id != &i.media)
+            }
+        }
+        "reset-progress" => {
+            reset_progress(&app, &id, i.edition, &i.lesson, &i.user).await?;
+            return Ok(Redirect::to(&format!("/admin/courses/{id}")));
+        }
+        "settings" => {
+            c.title = i.title;
+            c.sequential = i.sequential == "yes";
+        }
+        "up" | "down" | "remove" => {
+            let pos = c
+                .lessons
+                .iter()
+                .position(|l| l.id == i.lesson)
+                .ok_or_else(Error::not_found)?;
+            match i.operation.as_str() {
+                "up" if pos > 0 => c.lessons.swap(pos, pos - 1),
+                "down" if pos + 1 < c.lessons.len() => c.lessons.swap(pos, pos + 1),
+                "remove" if c.lessons.len() > 1 => {
+                    c.lessons.remove(pos);
+                }
+                _ => return Err(Error::invalid("Cannot move or remove this lesson.")),
+            }
+        }
+        "quiz-add" | "quiz-remove" => {
+            let l = c
+                .lessons
+                .iter_mut()
+                .find(|l| l.id == i.lesson)
+                .ok_or_else(Error::not_found)?;
+            if i.operation == "quiz-remove" {
+                if i.question >= l.questions.len() {
+                    return Err(Error::conflict());
+                }
+                l.questions.remove(i.question);
+            } else {
+                l.questions.push(Question {
+                    prompt: i.prompt,
+                    choices: i
+                        .choices
+                        .lines()
+                        .map(str::trim)
+                        .filter(|v| !v.is_empty())
+                        .map(str::to_owned)
+                        .collect(),
+                    correct: i
+                        .correct
+                        .checked_sub(1)
+                        .ok_or(Error::invalid("Answer numbers begin at one."))?,
+                });
+            }
+        }
         "lesson" => {
             let l = c
                 .lessons
@@ -319,15 +441,17 @@ async fn edit_course(
                 .find(|l| l.id == i.lesson)
                 .ok_or_else(Error::not_found)?;
             l.title = i.title;
-            l.opens_at = i.opens;
+            l.opens_at = utc_date(&i.opens)?;
             l.delay_seconds = i.delay;
             l.assignment = i.assignment;
             l.pass_percent = i.pass;
             l.max_attempts = i.attempts;
-            l.questions = if i.prompt.trim().is_empty() {
-                vec![]
+            if i.prompt.trim().is_empty() {
+                if !l.questions.is_empty() {
+                    l.questions.remove(0);
+                }
             } else {
-                vec![Question {
+                let q = Question {
                     prompt: i.prompt,
                     choices: i
                         .choices
@@ -340,8 +464,13 @@ async fn edit_course(
                         .correct
                         .checked_sub(1)
                         .ok_or(Error::invalid("Correct choice numbers begin at one."))?,
-                }]
-            };
+                };
+                if l.questions.is_empty() {
+                    l.questions.push(q)
+                } else {
+                    l.questions[0] = q
+                }
+            }
         }
         _ => return Err(Error::invalid("Unknown course operation.")),
     }
@@ -400,7 +529,7 @@ async fn lesson_page(
     .ok_or_else(Error::not_found)?;
     let document = crate::document::Document::parse(&p.get::<String, _>("published_document"))?;
     let assignment=sqlx::query("SELECT state,feedback,body FROM member_assignments WHERE course_id=$1 AND course_version=$2 AND lesson_id=$3 AND user_id=$4").bind(&id).bind(v).bind(&lesson).bind(&s.user.id).fetch_optional(&app.db.pool).await?;
-    member_page(&app,&l.title,html!{p {a href=(format!("/members/courses/{id}")){(&c.title)}}(view::heading("Lesson",&l.title,"Read the lesson, then record your learning."))section class="prose" {(maud::PreEscaped(document.html()))}
+    member_page(&app,&l.title,html!{p {a href=(format!("/members/courses/{id}")){(&c.title)}}(view::heading("Lesson",&l.title,"Read the lesson, then record your learning."))section class="prose" {(maud::PreEscaped(document.html()))}@if !l.downloads.is_empty(){section class="panel" {h2 {"Lesson downloads"}@for download in &l.downloads{p {a href=(format!("/media/{download}")){"Open protected lesson download"}}}}}
  @if let Some(a)=&assignment {section class="panel" {h2 {"Assignment review"}p class="status" {(a.get::<String,_>("state"))}p {(a.get::<String,_>("feedback"))}}}
  section class="panel" {h2 {"Your assessment"}form method="post" {(view::csrf(&s))(hidden("version",&v.to_string()))(hidden("key",&uuid::Uuid::new_v4().to_string()))
  @for (index,q) in l.questions.iter().enumerate(){fieldset {legend {(&q.prompt)}@for (choice,text) in q.choices.iter().enumerate(){label {input type="radio" name=(format!("answer_{index}")) value=(choice) required; (text)}}}}
@@ -440,10 +569,12 @@ async fn attempt(
         &s,
         &id,
         &lesson,
-        version,
-        fields.get("key").map(String::as_str).unwrap_or(""),
-        &answers,
-        fields.get("assignment").map(String::as_str).unwrap_or(""),
+        AttemptInput {
+            version,
+            key: fields.get("key").map(String::as_str).unwrap_or(""),
+            answers: &answers,
+            assignment: fields.get("assignment").map(String::as_str).unwrap_or(""),
+        },
     )
     .await?;
     Ok(member_page(&app,"Assessment saved",html!{h1 {"Assessment saved"}p role="status" {"Score: " (result.score) "% · " (if result.completed{"Lesson complete"}else if result.passed{"Awaiting assignment review"}else{"Review the lesson and try again within your attempt limit."})}p {a href=(format!("/members/courses/{id}")){"Continue learning"}}p {a href=(format!("/members/courses/{id}/lessons/{lesson}")){"Return to lesson"}}}).await?.into_response())
@@ -654,7 +785,7 @@ async fn identity_admin(State(app): State<App>, h: HeaderMap) -> Result<Html<Str
             .fetch_all(&app.db.pool)
             .await?;
     let bindings=sqlx::query("SELECT i.issuer,i.subject,u.name FROM member_identities i JOIN users u ON u.id=i.user_id ORDER BY u.name LIMIT 100").fetch_all(&app.db.pool).await?;
-    admin_page(&app,&s,"Identity bindings",html!{(view::heading("Members","Identity bindings","Bind an approved provider's stable subject to an existing local account. Email matching never grants access."))p {a href="/admin/members" {"Members"}}@if !app.config.identity.enabled{p {"Optional provider sign-in is disabled. Local sign-in and learning continue independently. Configure the provider through the site's configuration file."}}@else{section class="panel" {h2 {"Add binding"}p {"Issuer: " (&app.config.identity.issuer)}form method="post" {(view::csrf(&s))label {"Member" select name="user" {@for u in users{option value=(u.get::<String,_>("id")){(u.get::<String,_>("name"))}}}}label {"Provider subject" input name="subject" required maxlength="255";}button {"Bind identity"}}}}section class="panel" {h2 {"Current bindings"}@for i in bindings{p {(i.get::<String,_>("name")) " · " (i.get::<String,_>("issuer")) " · " (i.get::<String,_>("subject"))}}}}).await
+    admin_page(&app,&s,"Identity bindings",html!{(view::heading("Members","Identity bindings","Bind an approved provider's stable subject to an existing local account. Email matching never grants access."))p {a href="/admin/members" {"Members"}}@if !app.config.identity.enabled{p {"Optional provider sign-in is disabled. Local sign-in and learning continue independently. Configure the provider through the site's configuration file."}}@else{section class="panel" {h2 {"Add binding"}p {"Issuer: " (&app.config.identity.issuer)}form method="post" {(view::csrf(&s))label {"Member" select name="user" {@for u in users{option value=(u.get::<String,_>("id")){(u.get::<String,_>("name"))}}}}label {"Provider subject" input name="subject" required maxlength="255";}button {"Bind identity"}}}}section class="panel" {h2 {"Current bindings"}@for i in bindings{form action="/admin/members" method="post" {(view::csrf(&s))(hidden("operation","identity-remove"))(hidden("title",&i.get::<String,_>("issuer")))(hidden("key",&i.get::<String,_>("subject")))p {(i.get::<String,_>("name")) " · " (i.get::<String,_>("issuer")) " · " (i.get::<String,_>("subject"))}button class="quiet" {"Remove binding and revoke account sessions"}}}}}).await
 }
 #[derive(Deserialize)]
 struct Binding {
