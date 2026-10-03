@@ -97,9 +97,12 @@ def publish(directory, archive, plan):
         if not existing['draft']:
             with tempfile.TemporaryDirectory() as temporary:
                 subprocess.run(['gh', 'release', 'download', tag, '--dir', temporary], cwd=ROOT, check=True)
-                for path in [archive, directory / 'SHA256SUMS']:
-                    if (Path(temporary) / path.name).read_bytes() != path.read_bytes():
-                        raise ValueError('Published release differs; refusing overwrite')
+                try:
+                    _, _, published = verify(Path(temporary), plan['source_commit'])
+                except (ValueError, KeyError, OSError, tarfile.TarError) as error:
+                    raise ValueError('Published release differs; refusing overwrite') from error
+                if published['binary_sha256'] != plan['binary_sha256']:
+                    raise ValueError('Published executable differs; refusing overwrite')
             print('Existing published release verified:', tag)
             return
     else:

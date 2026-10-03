@@ -106,3 +106,34 @@ class Delivery(unittest.TestCase):
                         release.publish(self.path, archive, plan)
                     self.assertEqual(len(calls.call_args_list), 1)
                     self.assertEqual(calls.call_args.args[0][2], 'download')
+
+    def test_valid_published_source_survives_repackaging_without_overwriting_assets(self):
+        import shutil
+        published = self.path / 'published'
+        published.mkdir()
+        for name in ['fixture.tar.gz', 'SHA256SUMS']:
+            shutil.copy2(self.path / name, published / name)
+        self.metadata['workflow_attempt'] = '2'
+        self.files['BUILD.json'] = json.dumps(self.metadata).encode(); self.write_archive()
+        self.assertNotEqual((published / 'fixture.tar.gz').read_bytes(), (self.path / 'fixture.tar.gz').read_bytes())
+        archive, _, plan = release.verify(self.path, self.source)
+        existing = [[{'tag_name':plan['tag'], 'draft':False}]]
+        original_command = release.command
+        def gh_command(*args):
+            if args[0] == 'gh': return json.dumps(existing)
+            if args[:2] == ('git', 'ls-remote'): return self.source + '\trefs/tags/' + plan['tag']
+            return original_command(*args)
+        original_run = release.subprocess.run
+        # Mock only the external release download; git source inspection remains real.
+        def run(args, **kwargs):
+            if args[0] != 'gh': return original_run(args, **kwargs)
+            destination = Path(args[args.index('--dir') + 1])
+            for name in ['fixture.tar.gz', 'SHA256SUMS']:
+                shutil.copy2(published / name, destination / name)
+        with patch.dict('os.environ', {'GITHUB_EVENT_NAME':'push','GITHUB_REF':'refs/heads/main','GITHUB_SHA':self.source}, clear=True):
+            with patch.object(release, 'command', side_effect=gh_command):
+                with patch.object(release.subprocess, 'run', side_effect=run) as calls:
+                    release.publish(self.path, archive, plan)
+                    gh_calls = [c for c in calls.call_args_list if c.args[0][0] == 'gh']
+                    self.assertEqual(len(gh_calls), 1)
+                    self.assertEqual(gh_calls[0].args[0][2], 'download')
