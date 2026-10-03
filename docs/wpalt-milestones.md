@@ -273,3 +273,8 @@ PR #8 now connects forms, private recovery/files/follow-up, consented audiences,
 ### M4 merged; cumulative review active — 2026-10-03
 
 PR #8 merged as `91cbe6c7fbf1d34f1e7f4ba475da22f45dcf9436`. [Actual-main run 37098749832](https://github.com/NaxAlpha/wpalt/actions/runs/37098749832) passed all three jobs; the downloaded clean archive and its source/checksums were verified. The user requested a multi-round adversarial review before the next milestone. [Review PR #9](https://github.com/NaxAlpha/wpalt/pull/9) remains a draft under [the review protocol](adversarial-review.md); M5 has not started.
+
+
+## M5 active — 2026-10-03
+
+The user authorized merging review PR #9 and continuing with M5. PR #9 merged as `e7e58745a0de07b8a0af3814152fdaaf8c2fec21`; its final-source review gates passed before merge. Actual-main build verification is tracked separately. M5 follows [its contract](m5-contract.md) and [shared policy decision](decisions/0007-membership-learning.md). M6 purchase/settlement and M9 distributed coordination remain assigned to those milestones.
