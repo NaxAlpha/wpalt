@@ -1,0 +1,1 @@
+The identity key/JWK pair is a randomly generated, public test-only RSA fixture for signed OIDC token verification and malicious-claim regressions. It is intentionally disclosed, has no relationship to any service/account, and must never be used for deployment. Production uses the configured provider's HTTPS JWKS and has no copy of its signing key.

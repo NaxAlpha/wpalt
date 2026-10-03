@@ -1,5 +1,5 @@
 /* Product UI uses generated semantic tokens; public theme styling stays independent. */
-.admin,
+:is(.admin, .member),
 .auth {
   --bg: var(--ui-color-canvas);
   --panel: var(--ui-color-surface);
@@ -14,57 +14,59 @@
   color: var(--ink);
   background: var(--bg);
 }
-:is(.admin, .auth)
+:is(:is(.admin, .member), .auth)
   :is(button, .button, input:not([type="hidden"]), select, summary) {
   min-height: var(--ui-size-control);
   border-radius: var(--ui-radius-control);
   font-size: var(--ui-type-label);
 }
-:is(.admin, .auth) :is(button, .button) {
+:is(:is(.admin, .member), .auth) :is(button, .button) {
   padding: var(--ui-size-control-padding-block) var(--ui-space-4);
   line-height: var(--ui-size-control-line);
   border: 1px solid transparent;
   font-weight: 650;
 }
-:is(.admin, .auth) button {
+:is(:is(.admin, .member), .auth) button {
   min-width: var(--ui-size-control);
 }
-:is(.admin, .auth) :is(button, .button):hover {
+:is(:is(.admin, .member), .auth) :is(button, .button):hover {
   filter: none;
   background: var(--ui-color-accent-hover);
   color: var(--ui-color-on-accent);
 }
-:is(.admin, .auth) :is(button, .button).secondary {
+:is(:is(.admin, .member), .auth) :is(button, .button).secondary {
   background: var(--ui-color-accent-soft);
   color: var(--ui-color-text);
   border-color: var(--ui-color-control-border);
 }
-:is(.admin, .auth) :is(button, .button).danger {
+:is(:is(.admin, .member), .auth) :is(button, .button).danger {
   background: var(--ui-color-danger);
   color: white;
 }
-:is(.admin, .auth) button:disabled {
+:is(:is(.admin, .member), .auth) button:disabled {
   opacity: 1;
   background: #e9eeeb;
   color: #63736b;
   border-color: #bcc8c0;
   cursor: not-allowed;
 }
-:is(.admin, .auth) button[aria-busy="true"] {
+:is(:is(.admin, .member), .auth) button[aria-busy="true"] {
   cursor: progress;
 }
-:is(.admin, .auth) button.quiet {
+:is(:is(.admin, .member), .auth) button.quiet {
   background: transparent;
   color: inherit;
   padding: var(--ui-space-2);
 }
-:is(.admin, .auth) :is(input:not([type="hidden"]), select, textarea) {
+:is(:is(.admin, .member), .auth)
+  :is(input:not([type="hidden"]), select, textarea) {
   border-color: var(--ui-color-control-border);
   padding: var(--ui-size-control-padding-block) var(--ui-space-3);
   max-width: 100%;
   min-width: 0;
 }
-:is(.admin, .auth) :is(input[type="checkbox"], input[type="radio"]) {
+:is(:is(.admin, .member), .auth)
+  :is(input[type="checkbox"], input[type="radio"]) {
   width: var(--ui-space-6);
   height: var(--ui-space-6);
   min-height: var(--ui-space-6);
@@ -72,17 +74,17 @@
   accent-color: var(--accent);
   flex: none;
 }
-:is(.admin, .auth) input[type="color"] {
+:is(:is(.admin, .member), .auth) input[type="color"] {
   padding: var(--ui-space-1);
   width: 100%;
   height: var(--ui-size-control);
 }
-:is(.admin, .auth) input[type="file"] {
+:is(:is(.admin, .member), .auth) input[type="file"] {
   height: auto;
   white-space: normal;
   padding: var(--ui-space-2);
 }
-:is(.admin, .auth) input::file-selector-button {
+:is(:is(.admin, .member), .auth) input::file-selector-button {
   font: inherit;
   min-height: var(--ui-space-8);
   border: 0;
@@ -92,56 +94,58 @@
   background: var(--ui-color-accent-soft);
   color: var(--ink);
 }
-:is(.admin, .auth) label {
+:is(:is(.admin, .member), .auth) label {
   font-size: var(--ui-type-label);
   margin: var(--ui-space-4) 0;
   overflow-wrap: anywhere;
 }
-:is(.admin, .auth) label :is(input:not([type="checkbox"]), select, textarea) {
+:is(:is(.admin, .member), .auth)
+  label
+  :is(input:not([type="checkbox"]), select, textarea) {
   display: block;
   margin-top: var(--ui-space-2);
 }
-:is(.admin, .auth) :is(small, .save-status, .outline small) {
+:is(:is(.admin, .member), .auth) :is(small, .save-status, .outline small) {
   font-size: var(--ui-type-small);
 }
-:is(.admin, .auth) h1 {
+:is(:is(.admin, .member), .auth) h1 {
   font-size: clamp(28px, 3vw, var(--ui-type-title));
   line-height: 1.2;
   letter-spacing: -0.035em;
 }
-:is(.admin, .auth) h2 {
+:is(:is(.admin, .member), .auth) h2 {
   font-size: var(--ui-type-section);
   line-height: 1.3;
 }
-:is(.admin, .auth) :focus-visible {
+:is(:is(.admin, .member), .auth) :focus-visible {
   outline: 3px solid var(--ui-color-focus);
   outline-offset: 3px;
   scroll-margin: var(--ui-space-4);
 }
-:is(.admin, .auth) summary {
+:is(:is(.admin, .member), .auth) summary {
   display: flex;
   align-items: center;
   padding: var(--ui-space-2);
 }
-:is(.admin, .auth) summary::before {
+:is(:is(.admin, .member), .auth) summary::before {
   content: "▸";
   margin-right: var(--ui-space-2);
 }
-:is(.admin, .auth) details[open] > summary::before {
+:is(:is(.admin, .member), .auth) details[open] > summary::before {
   content: "▾";
 }
-.admin .sidebar {
+:is(.admin, .member) .sidebar {
   width: var(--ui-size-sidebar);
   padding: var(--ui-space-6) var(--ui-space-4);
   background: var(--ui-color-sidebar);
   color: var(--ui-color-sidebar-text);
   overflow-y: auto;
 }
-.admin .sidebar-note,
-.admin .account span {
+:is(.admin, .member) .sidebar-note,
+:is(.admin, .member) .account span {
   color: var(--ui-color-sidebar-muted);
 }
-.admin .sidebar nav a {
+:is(.admin, .member) .sidebar nav a {
   min-height: 44px;
   display: flex;
   align-items: center;
@@ -149,24 +153,24 @@
   font-size: 14px;
   color: var(--ui-color-sidebar-text);
 }
-.admin .sidebar nav a[aria-current="page"] {
+:is(.admin, .member) .sidebar nav a[aria-current="page"] {
   background: var(--ui-color-sidebar-active);
   box-shadow: inset 2px 0 0 var(--accent);
   font-weight: 600;
 }
-.admin .sidebar .brand {
+:is(.admin, .member) .sidebar .brand {
   min-height: 44px;
 }
-.admin .workspace {
+:is(.admin, .member) .workspace {
   margin-left: var(--ui-size-sidebar);
   max-width: var(--ui-size-workspace-max);
   padding: var(--ui-space-8);
   min-width: 0;
 }
-.admin .page-heading {
+:is(.admin, .member) .page-heading {
   margin-bottom: var(--ui-space-6);
 }
-.admin .panel {
+:is(.admin, .member) .panel {
   padding: var(--ui-space-6) 0;
   margin-bottom: var(--ui-space-6);
   background: transparent;
@@ -176,221 +180,221 @@
   box-shadow: none;
   min-width: 0;
 }
-.admin .grid {
+:is(.admin, .member) .grid {
   gap: var(--ui-space-6);
 }
-.admin .toolbar {
+:is(.admin, .member) .toolbar {
   gap: var(--ui-space-3);
 }
-.admin .toolbar form {
+:is(.admin, .member) .toolbar form {
   flex-wrap: wrap;
   min-width: 0;
 }
-.admin .notice {
+:is(.admin, .member) .notice {
   padding: var(--ui-space-4);
   margin: var(--ui-space-4) 0;
   overflow-wrap: anywhere;
   background: var(--ui-color-accent-soft);
 }
-.admin .notice.error {
+:is(.admin, .member) .notice.error {
   background: var(--ui-color-danger-soft);
   color: var(--ui-color-danger);
   border-color: var(--ui-color-danger);
 }
-.admin .field-row {
+:is(.admin, .member) .field-row {
   gap: var(--ui-space-4);
 }
-.admin .field-row > button {
+:is(.admin, .member) .field-row > button {
   align-self: end;
   justify-self: start;
 }
 
-.admin .ui-field {
+:is(.admin, .member) .ui-field {
   margin: var(--ui-space-4) 0;
   min-width: 0;
 }
-.admin .ui-field label {
+:is(.admin, .member) .ui-field label {
   margin: 0 0 var(--ui-space-2);
 }
-.admin .ui-field small {
+:is(.admin, .member) .ui-field small {
   display: block;
   margin-top: var(--ui-space-2);
 }
-.admin .ui-field-error {
+:is(.admin, .member) .ui-field-error {
   color: var(--ui-color-danger);
 }
-.admin .ui-field input[aria-invalid="true"] {
+:is(.admin, .member) .ui-field input[aria-invalid="true"] {
   border: 2px solid var(--ui-color-danger);
 }
-.admin .ui-check {
+:is(.admin, .member) .ui-check {
   display: flex;
   align-items: center;
   gap: var(--ui-space-3);
   min-height: 44px;
 }
-.admin .studio-toolbar {
+:is(.admin, .member) .studio-toolbar {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) repeat(4, max-content);
   gap: var(--ui-space-3);
   align-items: end;
   margin-bottom: var(--ui-space-4);
 }
-.admin .studio-toolbar label {
+:is(.admin, .member) .studio-toolbar label {
   margin: 0;
   min-width: 0;
 }
-.admin .studio-toolbar .file-button {
+:is(.admin, .member) .studio-toolbar .file-button {
   grid-column: 1/-1;
   display: flex;
   align-items: center;
   gap: var(--ui-space-4);
 }
-.admin .file-button input {
+:is(.admin, .member) .file-button input {
   max-width: 360px;
   margin: 0;
   flex: 1;
 }
-.admin .studio-tabs {
+:is(.admin, .member) .studio-tabs {
   gap: var(--ui-space-2);
   margin: var(--ui-space-6) 0;
 }
-.admin .studio-tabs button[aria-current="page"] {
+:is(.admin, .member) .studio-tabs button[aria-current="page"] {
   box-shadow: inset 0 -2px 0 var(--accent);
 }
-.admin .studio {
+:is(.admin, .member) .studio {
   grid-template-columns: 220px minmax(0, 1fr) 272px;
   gap: var(--ui-space-4);
 }
-.admin .studio .panel {
+:is(.admin, .member) .studio .panel {
   padding: var(--ui-space-4) 0;
 }
-.admin .outline {
+:is(.admin, .member) .outline {
   padding-left: var(--ui-space-2);
   border-color: var(--line);
 }
-.admin .outline button {
+:is(.admin, .member) .outline button {
   white-space: normal;
   overflow-wrap: anywhere;
   min-width: 0;
   line-height: 1.4;
   padding: var(--ui-space-2);
 }
-.admin .outline .selected {
+:is(.admin, .member) .outline .selected {
   background: var(--ui-color-accent-soft);
   color: var(--ink);
   box-shadow: inset 3px 0 0 var(--accent);
 }
-.admin .outline small {
+:is(.admin, .member) .outline small {
   color: var(--muted);
   font-size: var(--ui-type-small);
 }
-.admin .preview-panel .toolbar {
+:is(.admin, .member) .preview-panel .toolbar {
   align-items: end;
 }
-.admin .preview-panel .toolbar label {
+:is(.admin, .member) .preview-panel .toolbar label {
   flex: 1;
   min-width: 120px;
   margin: 0;
 }
-.admin .preview-panel iframe {
+:is(.admin, .member) .preview-panel iframe {
   height: var(--ui-size-preview-height);
   max-width: 100%;
   border: 1px solid var(--ui-color-control-border);
   border-radius: var(--ui-space-2);
 }
-.admin .preview-panel .preview-mobile {
+:is(.admin, .member) .preview-panel .preview-mobile {
   width: var(--ui-size-preview-mobile);
 }
-.admin .properties {
+:is(.admin, .member) .properties {
   max-height: none;
   overflow: visible;
 }
-.admin .field-definition,
-.admin .typed-value fieldset {
+:is(.admin, .member) .field-definition,
+:is(.admin, .member) .typed-value fieldset {
   padding: var(--ui-space-4);
   border-color: var(--ui-color-control-border);
 }
-.admin .binding {
+:is(.admin, .member) .binding {
   background: var(--bg);
   padding: var(--ui-space-3);
 }
-.admin .status {
+:is(.admin, .member) .status {
   font-size: 13px;
   padding: var(--ui-space-1) var(--ui-space-3);
 }
-.admin .status.scheduled {
+:is(.admin, .member) .status.scheduled {
   color: #685010;
 }
-.admin .table-wrap {
+:is(.admin, .member) .table-wrap {
   border-radius: var(--ui-radius-panel);
   scroll-padding: var(--ui-space-2);
 }
-.admin .ui-gallery {
+:is(.admin, .member) .ui-gallery {
   margin-left: 0;
   max-width: 960px;
   margin-inline: auto;
 }
 @media (--ui-studio-stack) {
-  .admin .studio {
+  :is(.admin, .member) .studio {
     grid-template-columns: 200px minmax(0, 1fr);
   }
-  .admin .properties {
+  :is(.admin, .member) .properties {
     grid-column: 1/-1;
   }
-  .admin .studio-toolbar {
+  :is(.admin, .member) .studio-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .admin .studio-toolbar label:first-child {
+  :is(.admin, .member) .studio-toolbar label:first-child {
     grid-column: 1/-1;
   }
 }
 @media (--ui-studio-single) {
-  .admin .studio {
+  :is(.admin, .member) .studio {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (--ui-mobile) {
-  .admin .sidebar {
+  :is(.admin, .member) .sidebar {
     position: relative;
     width: 100%;
     padding: var(--ui-space-4);
     overflow: visible;
   }
-  .admin .sidebar nav {
+  :is(.admin, .member) .sidebar nav {
     gap: var(--ui-space-1);
   }
-  .admin .sidebar nav a {
+  :is(.admin, .member) .sidebar nav a {
     padding: var(--ui-space-2);
   }
-  .admin .account {
+  :is(.admin, .member) .account {
     flex-wrap: wrap;
   }
-  .admin .workspace {
+  :is(.admin, .member) .workspace {
     margin-left: 0;
     padding: var(--ui-space-4);
   }
-  .admin .panel {
+  :is(.admin, .member) .panel {
     padding: var(--ui-space-4) 0;
   }
-  .admin .studio {
+  :is(.admin, .member) .studio {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
   }
-  .admin .studio-toolbar .file-button {
+  :is(.admin, .member) .studio-toolbar .file-button {
     display: block;
   }
-  .admin .file-button input {
+  :is(.admin, .member) .file-button input {
     width: 100%;
     max-width: 100%;
     margin-top: var(--ui-space-2);
   }
-  .admin .preview-panel .toolbar > * {
+  :is(.admin, .member) .preview-panel .toolbar > * {
     flex: 1 1 100%;
   }
-  .admin .studio-tabs button {
+  :is(.admin, .member) .studio-tabs button {
     flex: 1 1 auto;
   }
-  .admin .ui-gallery {
+  :is(.admin, .member) .ui-gallery {
     padding: var(--ui-space-4);
   }
   .auth .site-main {
@@ -401,182 +405,182 @@
   }
 }
 
-:is(.admin, .auth) main :is(p, li) a:not(.button) {
+:is(:is(.admin, .member), .auth) main :is(p, li) a:not(.button) {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.admin fieldset {
+:is(.admin, .member) fieldset {
   border: 1px solid var(--ui-color-control-border);
   border-radius: var(--ui-radius-control);
   padding: var(--ui-space-4);
   min-inline-size: 0;
   margin: 0 0 var(--ui-space-4);
 }
-.admin legend {
+:is(.admin, .member) legend {
   font-size: var(--ui-type-label);
   font-weight: 650;
   padding-inline: var(--ui-space-2);
 }
-.admin label:has(> input[type="checkbox"]) {
+:is(.admin, .member) label:has(> input[type="checkbox"]) {
   display: flex;
   align-items: center;
   gap: var(--ui-space-3);
   min-height: var(--ui-size-control);
 }
 
-.admin .sidebar :focus-visible {
+:is(.admin, .member) .sidebar :focus-visible {
   outline-color: var(--ui-color-sidebar-focus);
 }
 
 /* Calm, open sections: boundaries belong to controls, not enclosing cards. */
-:is(.admin, .auth) {
+:is(:is(.admin, .member), .auth) {
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
 }
-:is(.admin, .auth) :is(h1, h2, h3) {
+:is(:is(.admin, .member), .auth) :is(h1, h2, h3) {
   font-weight: 600;
 }
-:is(.admin, .auth) h1 {
+:is(:is(.admin, .member), .auth) h1 {
   margin-bottom: var(--ui-space-3);
 }
-:is(.admin, .auth) h2 {
+:is(:is(.admin, .member), .auth) h2 {
   letter-spacing: -0.02em;
 }
-:is(.admin, .auth) :is(button, .button, input, select, textarea) {
+:is(:is(.admin, .member), .auth) :is(button, .button, input, select, textarea) {
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
     color 120ms ease;
 }
-:is(.admin, .auth) :is(button, .button).secondary {
+:is(:is(.admin, .member), .auth) :is(button, .button).secondary {
   background: transparent;
 }
-:is(.admin, .auth) :is(button, .button).secondary:hover {
+:is(:is(.admin, .member), .auth) :is(button, .button).secondary:hover {
   background: var(--ui-color-accent-soft);
   color: var(--ink);
 }
-:is(.admin, .auth) label {
+:is(:is(.admin, .member), .auth) label {
   font-weight: 550;
 }
-.admin .sidebar {
+:is(.admin, .member) .sidebar {
   border-right: 1px solid var(--line);
 }
-.admin .brand {
+:is(.admin, .member) .brand {
   color: var(--ink);
   font-size: 24px;
   letter-spacing: -0.05em;
 }
-.admin .brand-mark {
+:is(.admin, .member) .brand-mark {
   border: 0;
   background: var(--accent);
   color: white;
   border-radius: 6px;
 }
-.admin .sidebar nav a:hover {
+:is(.admin, .member) .sidebar nav a:hover {
   background: var(--ui-color-sidebar-active);
   color: var(--ink);
 }
-.admin .account {
+:is(.admin, .member) .account {
   border-color: var(--line);
 }
-.admin .account .quiet {
+:is(.admin, .member) .account .quiet {
   text-align: left;
 }
-.admin .eyebrow,
+:is(.admin, .member) .eyebrow,
 .auth .eyebrow {
   color: var(--muted);
   letter-spacing: 0.09em;
   font-weight: 600;
 }
-.admin .page-heading {
+:is(.admin, .member) .page-heading {
   padding-bottom: var(--ui-space-4);
   margin-bottom: var(--ui-space-6);
 }
-.admin .page-heading p:last-child {
+:is(.admin, .member) .page-heading p:last-child {
   font-size: var(--ui-type-label);
   line-height: 1.7;
   margin-bottom: 0;
 }
-.admin .stat {
+:is(.admin, .member) .stat {
   border-top: 0;
   margin-bottom: 0;
   padding-bottom: var(--ui-space-8);
 }
-.admin .stat strong {
+:is(.admin, .member) .stat strong {
   font-size: 36px;
   font-weight: 500;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
-.admin .stat span {
+:is(.admin, .member) .stat span {
   font-size: var(--ui-type-label);
 }
-.admin .studio-tabs {
+:is(.admin, .member) .studio-tabs {
   border-bottom: 1px solid var(--line);
   gap: var(--ui-space-2);
 }
-.admin .studio-tabs button {
+:is(.admin, .member) .studio-tabs button {
   background: transparent;
   border: 0;
   color: var(--muted);
   font-weight: 500;
 }
-.admin .studio-tabs button:hover {
+:is(.admin, .member) .studio-tabs button:hover {
   background: var(--ui-color-accent-soft);
   color: var(--ink);
 }
-.admin .studio-tabs button[aria-current="page"] {
+:is(.admin, .member) .studio-tabs button[aria-current="page"] {
   color: var(--accent);
   background: transparent;
   font-weight: 650;
 }
-.admin .studio-toolbar {
+:is(.admin, .member) .studio-toolbar {
   padding-bottom: var(--ui-space-4);
 }
-.admin .notice,
-.admin .callout {
+:is(.admin, .member) .notice,
+:is(.admin, .member) .callout {
   border-radius: 0;
   border-left-width: 2px;
 }
-.admin .status {
+:is(.admin, .member) .status {
   border-radius: var(--ui-radius-badge);
   background: #eeeee8;
   color: var(--muted);
 }
-.admin .status.published,
-.admin .status.approved {
+:is(.admin, .member) .status.published,
+:is(.admin, .member) .status.approved {
   background: var(--ui-color-accent-soft);
   color: var(--accent);
 }
-.admin th {
+:is(.admin, .member) th {
   text-transform: none;
   letter-spacing: 0;
   font-size: var(--ui-type-small);
   background: transparent;
 }
-.admin :is(th, td) {
+:is(.admin, .member) :is(th, td) {
   padding: var(--ui-space-4) var(--ui-space-3);
 }
-.admin tbody tr:hover {
+:is(.admin, .member) tbody tr:hover {
   background: #f1f2ee;
 }
-.admin .table-wrap {
+:is(.admin, .member) .table-wrap {
   padding-top: 0;
 }
-.admin .field-definition,
-.admin fieldset {
+:is(.admin, .member) .field-definition,
+:is(.admin, .member) fieldset {
   border: 0;
   border-top: 1px solid var(--line);
   border-radius: 0;
   padding: var(--ui-space-4) 0;
 }
-.admin .binding {
+:is(.admin, .member) .binding {
   background: transparent;
   border-left: 2px solid var(--line);
   border-radius: 0;
 }
-.admin .media-card img {
+:is(.admin, .member) .media-card img {
   border-radius: 4px;
 }
 .auth .login-card {
@@ -590,23 +594,23 @@
   font-size: var(--ui-type-label);
 }
 @media (--ui-mobile) {
-  .admin .sidebar {
+  :is(.admin, .member) .sidebar {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
-  .admin .sidebar nav {
+  :is(.admin, .member) .sidebar nav {
     margin: var(--ui-space-3) 0;
   }
-  .admin .sidebar .brand {
+  :is(.admin, .member) .sidebar .brand {
     font-size: 22px;
   }
-  .admin .page-heading {
+  :is(.admin, .member) .page-heading {
     margin-top: var(--ui-space-4);
   }
-  .admin .stat {
+  :is(.admin, .member) .stat {
     padding-block: var(--ui-space-2);
   }
-  .admin .grid {
+  :is(.admin, .member) .grid {
     gap: var(--ui-space-3);
     margin-bottom: var(--ui-space-6);
   }
@@ -615,16 +619,16 @@
   }
 }
 
-:is(.admin, .auth) :is(input, select, textarea) {
+:is(:is(.admin, .member), .auth) :is(input, select, textarea) {
   font-weight: 400;
 }
-:is(body.admin, body.auth) {
+:is(body:is(.admin, .member), body.auth) {
   min-height: 100vh;
 }
 @media (prefers-reduced-motion: reduce) {
-  :is(.admin, .auth) *,
-  :is(.admin, .auth) *::before,
-  :is(.admin, .auth) *::after {
+  :is(:is(.admin, .member), .auth) *,
+  :is(:is(.admin, .member), .auth) *::before,
+  :is(:is(.admin, .member), .auth) *::after {
     scroll-behavior: auto !important;
     transition: none !important;
     animation: none !important;
@@ -780,11 +784,39 @@ img.ProseMirror-separator {
   overflow-y: auto;
 }
 
-.admin #forms-studio .field-row {
+:is(.admin, .member) #forms-studio .field-row {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(96px, 0.7fr);
 }
 @media (--ui-mobile) {
-  .admin #forms-studio .field-row {
+  :is(.admin, .member) #forms-studio .field-row {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.member .workspace {
+  margin: 0 auto;
+  max-width: 960px;
+}
+.member .site-header,
+.member .site-footer {
+  max-width: 960px;
+  margin: auto;
+}
+.member fieldset {
+  min-width: 0;
+  margin: 24px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 16px 0;
+}
+.member input[type="radio"] {
+  width: 20px;
+  min-height: 20px;
+  margin-right: 12px;
+}
+.member nav[aria-label="Member area"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 32px;
 }

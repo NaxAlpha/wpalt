@@ -14,6 +14,8 @@ pub struct Config {
     pub base_url: String,
     pub debug: bool,
     pub business_enabled: bool,
+    pub membership_enabled: bool,
+    pub identity: crate::membership::identity::Config,
     pub business_limits: crate::business::quotas::Config,
     pub mail: crate::business::mail::MailConfig,
     pub engagement: crate::business::engagement::Config,
@@ -36,6 +38,8 @@ impl Default for Config {
             base_url: "http://127.0.0.1:3000".into(),
             debug: false,
             business_enabled: true,
+            membership_enabled: true,
+            identity: Default::default(),
             business_limits: Default::default(),
             mail: crate::business::mail::MailConfig::default(),
             engagement: crate::business::engagement::Config::default(),
@@ -80,9 +84,18 @@ impl Config {
                 .parse()
                 .context("WPALT_BUSINESS_ENABLED must be true or false")?;
         }
+        if let Ok(v) = std::env::var("WPALT_MEMBERSHIP_ENABLED") {
+            c.membership_enabled = v
+                .parse()
+                .context("WPALT_MEMBERSHIP_ENABLED must be true or false")?;
+        }
+        if let Ok(v) = std::env::var("WPALT_IDENTITY_CLIENT_SECRET") {
+            c.identity.client_secret = v;
+        }
         Ok(c)
     }
     pub fn validate(&self) -> anyhow::Result<()> {
+        self.identity.validate()?;
         self.business_limits.validate()?;
         self.mail.validate()?;
         self.engagement.validate()?;
@@ -180,6 +193,7 @@ impl Config {
             connection["password"] = serde_json::Value::String("[REDACTED]".into());
             connection["username"] = serde_json::Value::String("[REDACTED]".into());
         }
+        value["identity"]["client_secret"] = "[REDACTED]".into();
         value
     }
 }

@@ -2629,3 +2629,6 @@ async fn content_export_enforces_byte_budget_without_truncating_or_mutating_cont
         site.close().await;
     }
 }
+
+#[path = "support/membership_journeys.rs"]
+mod membership_journeys;

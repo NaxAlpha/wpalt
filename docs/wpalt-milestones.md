@@ -277,4 +277,4 @@ PR #8 merged as `91cbe6c7fbf1d34f1e7f4ba475da22f45dcf9436`. [Actual-main run 370
 
 ## M5 active — 2026-10-03
 
-The user authorized merging review PR #9 and continuing with M5. PR #9 merged as `e7e58745a0de07b8a0af3814152fdaaf8c2fec21`; its final-source review gates passed before merge. Actual-main build verification is tracked separately. M5 follows [its contract](m5-contract.md) and [shared policy decision](decisions/0007-membership-learning.md). M6 purchase/settlement and M9 distributed coordination remain assigned to those milestones.
+The user authorized merging review PR #9 and continuing with M5. PR #9 merged as `e7e58745a0de07b8a0af3814152fdaaf8c2fec21`; its final-source review gates passed before merge. [Actual-main run 37109400864](https://github.com/NaxAlpha/wpalt/actions/runs/37109400864) passed all three gates; downloaded archive verification is recorded separately from PR verification. M5 follows [its contract](m5-contract.md) and [shared policy decision](decisions/0007-membership-learning.md). M6 purchase/settlement and M9 distributed coordination remain assigned to those milestones.

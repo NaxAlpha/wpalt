@@ -336,7 +336,7 @@ pub async fn metadata_with_settings(
     let mut alternates = Vec::new();
     if let Some(p) = p {
         if !p.published_translation_group.is_empty() {
-            let rows=sqlx::query("SELECT published_locale,published_slug,published_seo FROM posts WHERE status='published' AND published_translation_group=$1 ORDER BY published_locale LIMIT 16").bind(&p.published_translation_group).fetch_all(&app.db.pool).await?;
+            let rows=sqlx::query("SELECT published_locale,published_slug,published_seo FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND published_translation_group=$1 ORDER BY published_locale LIMIT 16").bind(&p.published_translation_group).fetch_all(&app.db.pool).await?;
             for r in rows {
                 let code: String = r.get("published_locale");
                 if !Seo::parse(&r.get::<String, _>("published_seo"))?.noindex {
@@ -393,7 +393,7 @@ async fn sitemap(State(app): State<App>, Query(q): Query<SitemapQuery>) -> Resul
     if !q.after.is_empty() && uuid::Uuid::parse_str(&q.after).is_err() {
         return Err(Error::invalid("Invalid sitemap cursor."));
     }
-    let rows=sqlx::query("SELECT id,published_slug,published_locale,published_seo FROM posts WHERE status='published' AND id>$1 ORDER BY id LIMIT 1001").bind(&q.after).fetch_all(&app.db.pool).await?;
+    let rows=sqlx::query("SELECT id,published_slug,published_locale,published_seo FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND id>$1 ORDER BY id LIMIT 1001").bind(&q.after).fetch_all(&app.db.pool).await?;
     let (d, _) = load(&app).await?;
     let mut output = String::from(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">",
@@ -434,7 +434,7 @@ async fn sitemap_index(State(app): State<App>) -> Result<Response> {
         "<?xml version=\"1.0\"?><sitemapindex xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">",
     );
     // A single bounded ordered-index scan; return page boundaries, not content bodies.
-    let rows = sqlx::query("SELECT id,n FROM (SELECT id,ROW_NUMBER() OVER (ORDER BY id) AS n FROM (SELECT id FROM posts WHERE status='published' ORDER BY id LIMIT 500001) bounded) numbered WHERE n % 1000 = 0 OR n = 500001 ORDER BY n")
+    let rows = sqlx::query("SELECT id,n FROM (SELECT id,ROW_NUMBER() OVER (ORDER BY id) AS n FROM (SELECT id FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) ORDER BY id LIMIT 500001) bounded) numbered WHERE n % 1000 = 0 OR n = 500001 ORDER BY n")
         .fetch_all(&app.db.pool).await?;
     if rows.iter().any(|r| r.get::<i64, _>("n") > 500000) {
         return Err(Error::invalid(
@@ -442,7 +442,7 @@ async fn sitemap_index(State(app): State<App>) -> Result<Response> {
         ));
     }
     let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM (SELECT id FROM posts WHERE status='published' LIMIT 500001) bounded",
+        "SELECT COUNT(*) FROM (SELECT id FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) LIMIT 500001) bounded",
     )
     .fetch_one(&app.db.pool)
     .await?;
@@ -557,7 +557,7 @@ pub async fn save_redirect(
         .collect();
     graph.insert(source.into(), target.into());
     validate_redirect_graph(&graph)?;
-    let posts=sqlx::query("SELECT published_slug,published_locale FROM posts WHERE status='published' AND published_slug=$1").bind(source.rsplit('/').next().unwrap_or("")).fetch_all(&app.db.pool).await?;
+    let posts=sqlx::query("SELECT published_slug,published_locale FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND published_slug=$1").bind(source.rsplit('/').next().unwrap_or("")).fetch_all(&app.db.pool).await?;
     if posts.iter().any(|r| {
         d.path(
             &r.get::<String, _>("published_locale"),
@@ -853,7 +853,7 @@ async fn links_page(
         return Err(Error::invalid("Invalid link-check cursor."));
     }
     let (d, _) = load(&app).await?;
-    let rows=sqlx::query("SELECT id,published_title,published_body,published_locale,published_slug FROM posts WHERE status='published' AND id>$1 ORDER BY id LIMIT 21").bind(&q.after).fetch_all(&app.db.pool).await?;
+    let rows=sqlx::query("SELECT id,published_title,published_body,published_locale,published_slug FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND id>$1 ORDER BY id LIMIT 21").bind(&q.after).fetch_all(&app.db.pool).await?;
     let mut found = Vec::new();
     let mut candidates = BTreeSet::new();
     let mut media = BTreeSet::new();
@@ -913,7 +913,7 @@ async fn links_page(
     }
     if !candidates.is_empty() {
         let mut sql = sqlx::QueryBuilder::<sqlx::Any>::new(
-            "SELECT published_locale,published_slug FROM posts WHERE status='published' AND published_slug IN (",
+            "SELECT published_locale,published_slug FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND published_slug IN (",
         );
         let mut list = sql.separated(",");
         for slug in &candidates {
