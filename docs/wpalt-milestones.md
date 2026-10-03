@@ -269,3 +269,7 @@ The shared form grammar and versioned persistence are implemented as groundwork,
 ### M4 integrated implementation — 2026-10-03
 
 PR #8 now connects forms, private recovery/files/follow-up, consented audiences, shared communications, moderated contributions/accounts and bounded engagement/experiments/offers. The full agreed contract remains the delivery gate. See [M4 verification](evidence/m4-verification.md), [business operation and limits](business.md) and the per-group defined coverage in the parity matrix. Defined scope is locally verified; PR #8 is marked ready only after current-source PostgreSQL/browser CI and clean-artifact verification. Its delivery record supplies the exact run/hashes; review/merge remains separate. M5–M9 and M6 commerce/redemption dependencies remain unchanged.
+
+### M4 merged; cumulative review active — 2026-10-03
+
+PR #8 merged as `91cbe6c7fbf1d34f1e7f4ba475da22f45dcf9436`. [Actual-main run 37098749832](https://github.com/NaxAlpha/wpalt/actions/runs/37098749832) passed all three jobs; the downloaded clean archive and its source/checksums were verified. The user requested a multi-round adversarial review before the next milestone. [Review PR #9](https://github.com/NaxAlpha/wpalt/pull/9) remains a draft under [the review protocol](adversarial-review.md); M5 has not started.

@@ -12,6 +12,20 @@ use std::{
     path::Path,
 };
 
+/// Bound the read itself: metadata alone cannot prevent growth between stat and read.
+pub async fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>> {
+    use tokio::io::AsyncReadExt;
+    let file = tokio::fs::File::open(path).await?;
+    let mut bytes = Vec::new();
+    file.take(limit as u64 + 1).read_to_end(&mut bytes).await?;
+    if bytes.len() > limit {
+        return Err(Error::invalid(
+            "Stored file exceeds its supported size or backup budget.",
+        ));
+    }
+    Ok(bytes)
+}
+
 // Types and table names are an allowlist, never supplied by an archive.
 const TABLES: &[(&str, &[(&str, bool)])] = &[
     (
@@ -560,7 +574,12 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
         if !safe_filename(filename) {
             return Err(Error::invalid("Unsafe stored media filename."));
         }
-        let data = tokio::fs::read(app.config.data_dir.join("media").join(filename)).await?;
+        let remaining = (app.config.max_backup_bytes / 2).saturating_sub(budget) / 5;
+        let data = read_bounded(
+            &app.config.data_dir.join("media").join(filename),
+            remaining.min(32 * 1024 * 1024),
+        )
+        .await?;
         budget += data.len() * 5;
         if budget > app.config.max_backup_bytes / 2 {
             return Err(Error::invalid("Backup exceeds the configured size limit."));
@@ -588,7 +607,8 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
                 "Private attachment exceeds its maximum file size.",
             ));
         }
-        let data = tokio::fs::read(path).await?;
+        let remaining = app.config.max_backup_bytes.saturating_sub(budget) / 5;
+        let data = read_bounded(&path, remaining.min(2 * 1024 * 1024)).await?;
         budget += data.len() * 5;
         if budget > app.config.max_backup_bytes
             || data.len() as i64 != row["size"].as_i64().unwrap()
@@ -663,6 +683,32 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
                 return Err(Error::invalid("Backup row has an invalid shape."));
             }
         }
+    }
+    for row in &snapshot.tables["users"] {
+        crate::auth::valid_user(
+            row["email"].as_str().unwrap(),
+            row["name"].as_str().unwrap(),
+            row["role"].as_str().unwrap(),
+        )?;
+        let email = row["email"].as_str().unwrap();
+        if email != email.to_ascii_lowercase() {
+            return Err(Error::invalid(
+                "Backup account emails must use canonical lowercase addresses.",
+            ));
+        }
+        if !crate::auth::supported_password_hash(row["password_hash"].as_str().unwrap()) {
+            return Err(Error::invalid(
+                "Backup contains an unsupported or excessive-cost password hash.",
+            ));
+        }
+    }
+    if !snapshot.tables["users"]
+        .iter()
+        .any(|row| row["role"] == "admin")
+    {
+        return Err(Error::invalid(
+            "Backup must preserve at least one active administrator.",
+        ));
     }
     for row in &snapshot.tables["posts"] {
         for key in ["document", "published_document"] {
@@ -745,6 +791,11 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             let slug = row[&format!("{prefix}slug")]
                 .as_str()
                 .ok_or(Error::invalid("Invalid published slug."))?;
+            if !crate::content::valid_slug(slug) {
+                return Err(Error::invalid(
+                    "Content conflicts with a reserved or invalid route.",
+                ));
+            }
             if definition.languages.iter().any(|l| l.code == slug) {
                 return Err(Error::invalid("Content conflicts with a language route."));
             }

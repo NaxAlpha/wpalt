@@ -448,9 +448,83 @@ async fn permissions_csrf_sessions_and_origin_protect_every_write_surface() {
         )
         .await
         .unwrap();
+        auth::add_user(
+            &site.app,
+            "reader@example.test",
+            "Reader",
+            "subscriber",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (reader_token, _) = auth::login(&site.app, "reader@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let (status, headers, _) = request(
+            &site.app,
+            "GET",
+            "/login",
+            Some(&reader_token),
+            "",
+            Vec::new(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        assert_eq!(
+            headers["location"], "/account",
+            "A signed-in subscriber must not enter a login/admin redirect loop."
+        );
+        assert_eq!(
+            get(&site.app, "/admin", Some(&reader_token)).await.0,
+            StatusCode::FORBIDDEN
+        );
+        let account = get(&site.app, "/account", Some(&reader_token)).await.1;
+        assert!(account.contains("Your account"));
+        assert!(
+            !account.contains("href=\"/admin\""),
+            "Account navigation must stay inside the subscriber's permitted experience."
+        );
+        let inventory: serde_json::Value =
+            serde_json::from_str(include_str!("../docs/evidence/adversarial-coverage.json"))
+                .unwrap();
+        for route in inventory["routes"].as_array().unwrap() {
+            let pattern = route["route"].as_str().unwrap();
+            if !pattern.starts_with("/admin") && !pattern.starts_with("/api/admin") {
+                continue;
+            }
+            let mut path = pattern.to_owned();
+            while let Some(start) = path.find('{') {
+                let end = path[start..].find('}').unwrap() + start;
+                path.replace_range(start..=end, "00000000-0000-4000-8000-000000000001");
+            }
+            for token in [None, Some(reader_token.as_str())] {
+                let (status, _, _) = request(&site.app, "GET", &path, token, "", Vec::new()).await;
+                assert!(
+                    matches!(
+                        status,
+                        StatusCode::SEE_OTHER
+                            | StatusCode::UNAUTHORIZED
+                            | StatusCode::FORBIDDEN
+                            | StatusCode::METHOD_NOT_ALLOWED
+                    ),
+                    "Administrative route {pattern} must deny anonymous/subscriber reads before looking up data: {status}"
+                );
+            }
+        }
         let (etoken, editor) = auth::login(&site.app, "editor@example.test", PASSWORD)
             .await
             .unwrap();
+        let editor_page = get(&site.app, "/admin/posts", Some(&etoken)).await.1;
+        assert!(
+            !editor_page.contains("href=\"/admin/engagement\""),
+            "Navigation must not advertise owner-only reports to editors."
+        );
+        assert!(
+            get(&site.app, "/admin/posts", Some(&site.token))
+                .await
+                .1
+                .contains("href=\"/admin/engagement\"")
+        );
         let (mtoken, moderator) = auth::login(&site.app, "moderator@example.test", PASSWORD)
             .await
             .unwrap();
@@ -577,6 +651,13 @@ async fn permissions_csrf_sessions_and_origin_protect_every_write_surface() {
         let (s, h, _) = request(&site.app, "GET", "/admin", Some(&etoken), "", vec![]).await;
         assert_eq!(s, StatusCode::OK);
         assert_eq!(h["cache-control"], "no-store");
+        for path in ["/account", "/logout"] {
+            let (_, headers, _) = request(&site.app, "GET", path, Some(&etoken), "", vec![]).await;
+            assert_eq!(
+                headers["cache-control"], "no-store",
+                "private response: {path}"
+            );
+        }
         assert!(
             h["content-security-policy"]
                 .to_str()
@@ -735,6 +816,51 @@ async fn images_and_comments_obey_visibility_validation_and_moderation() {
             upload(&site, "broken.png", b"\x89PNG\r\n\x1a\n", "public").await,
             StatusCode::UNPROCESSABLE_ENTITY
         );
+        // A real larger image must arrive incrementally, with identical bytes.
+        let image = image::RgbImage::from_fn(256, 256, |x, y| {
+            let mut value = (x + y * 256).wrapping_mul(0x45d9f3b);
+            value = (value ^ (value >> 16)).wrapping_mul(0x45d9f3b);
+            image::Rgb([value as u8, (value >> 8) as u8, (value >> 16) as u8])
+        });
+        let mut encoded = Cursor::new(Vec::new());
+        image
+            .write_to(&mut encoded, image::ImageFormat::Png)
+            .unwrap();
+        let expected = encoded.into_inner();
+        assert!(expected.len() > 16_384);
+        assert_eq!(
+            upload(&site, "large.png", &expected, "public").await,
+            StatusCode::SEE_OTHER
+        );
+        let large_id: String = sqlx::query_scalar(
+            "SELECT id FROM media WHERE filename <> (SELECT filename FROM media WHERE id=$1)",
+        )
+        .bind(&id)
+        .fetch_one(&site.app.db.pool)
+        .await
+        .unwrap();
+        let response = wpalt::web::router(site.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/media/{large_id}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let mut body = response.into_body();
+        let mut received = Vec::new();
+        while let Some(frame) = body.frame().await {
+            if let Ok(bytes) = frame.unwrap().into_data() {
+                assert!(
+                    bytes.len() <= 8192,
+                    "media retained a whole-image response buffer"
+                );
+                received.extend_from_slice(&bytes);
+            }
+        }
+        assert_eq!(received, expected);
         let mut post = input("conversation", "publish");
         post.body = "<script>alert('unsafe')</script>\n\nA useful conversation".into();
         content::save(&site.app, site.session(), None, post)
@@ -815,6 +941,35 @@ async fn backup_restores_content_users_media_and_revisions_into_a_fresh_engine()
             upload(&source, "green.png", &png(), "private").await,
             StatusCode::SEE_OTHER
         );
+        let filename: String = sqlx::query_scalar("SELECT filename FROM media LIMIT 1")
+            .fetch_one(&source.app.db.pool)
+            .await
+            .unwrap();
+        let stored_path = source.app.config.data_dir.join("media").join(filename);
+        let original = std::fs::read(&stored_path).unwrap();
+        // Corrupted disk data must not turn a small upload into an unbounded response.
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&stored_path)
+            .unwrap()
+            .set_len(33 * 1024 * 1024)
+            .unwrap();
+        let media_id: String = sqlx::query_scalar("SELECT id FROM media LIMIT 1")
+            .fetch_one(&source.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            get(
+                &source.app,
+                &format!("/media/{media_id}"),
+                Some(&source.token)
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert!(backup::capture(&source.app).await.is_err());
+        std::fs::write(&stored_path, original).unwrap();
         let bytes = backup::capture(&source.app).await.unwrap();
         let other_engine = !pg && std::env::var("TEST_DATABASE_URL").is_ok();
         let target = Site::new(other_engine, false).await;
@@ -841,6 +996,62 @@ async fn backup_restores_content_users_media_and_revisions_into_a_fresh_engine()
             backup::restore(&target.app, &serde_json::to_vec(&malicious).unwrap())
                 .await
                 .is_err()
+        );
+        let mut hostile: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let mut payload: serde_json::Value =
+            serde_json::from_str(hostile["payload"].as_str().unwrap()).unwrap();
+        let expensive = payload["tables"]["users"][0]["password_hash"]
+            .as_str()
+            .unwrap()
+            .replace("m=19456", "m=4294967295");
+        assert!(
+            argon2::password_hash::PasswordHash::new(&expensive).is_ok(),
+            "This attack is valid syntax, not a malformed hash."
+        );
+        payload["tables"]["users"][0]["password_hash"] = expensive.into();
+        let payload = payload.to_string();
+        hostile["payload"] = payload.clone().into();
+        hostile["sha256"] = auth::digest(payload.as_bytes()).into();
+        assert!(
+            backup::restore(&target.app, &serde_json::to_vec(&hostile).unwrap())
+                .await
+                .is_err(),
+            "A recomputed archive checksum cannot authorize unbounded password work."
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap(),
+            0
+        );
+        for (field, value) in [("role", "editor"), ("email", "Owner@Example.TEST")] {
+            let mut inaccessible: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            let mut payload: serde_json::Value =
+                serde_json::from_str(inaccessible["payload"].as_str().unwrap()).unwrap();
+            payload["tables"]["users"][0][field] = value.into();
+            let payload = payload.to_string();
+            inaccessible["payload"] = payload.clone().into();
+            inaccessible["sha256"] = auth::digest(payload.as_bytes()).into();
+            assert!(
+                backup::restore(&target.app, &serde_json::to_vec(&inaccessible).unwrap())
+                    .await
+                    .is_err(),
+                "Recovery must preserve a usable administrator login."
+            );
+        }
+        let mut shadowed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let mut payload: serde_json::Value =
+            serde_json::from_str(shadowed["payload"].as_str().unwrap()).unwrap();
+        payload["tables"]["posts"][0]["published_slug"] = "account".into();
+        let payload = payload.to_string();
+        shadowed["payload"] = payload.clone().into();
+        shadowed["sha256"] = auth::digest(payload.as_bytes()).into();
+        assert!(
+            backup::restore(&target.app, &serde_json::to_vec(&shadowed).unwrap())
+                .await
+                .is_err(),
+            "Restore must not bypass reserved public route validation."
         );
         backup::restore(&target.app, &bytes).await.unwrap();
         assert_eq!(
@@ -943,6 +1154,26 @@ fn configuration_and_composition_reject_unsafe_or_ambiguous_inputs() {
         ..Config::default()
     };
     assert!(!c.redacted().to_string().contains("secret"));
+    let canonical = Config {
+        base_url: "HTTPS://Example.TEST:443/".into(),
+        ..Config::default()
+    };
+    canonical.validate().unwrap();
+    assert_eq!(canonical.origin(), "https://example.test");
+    assert!(
+        canonical.secure_cookie(),
+        "Accepted HTTPS URL syntax cannot bypass Secure cookies or HSTS."
+    );
+    for protected in [
+        "/account",
+        "/audience/confirm/private",
+        "/registration/private",
+    ] {
+        assert!(
+            !wpalt::discovery::safe_path(protected),
+            "Proof/session routes are not public redirect rules."
+        );
+    }
     let mut c = Config {
         base_url: "http://public.example".into(),
         ..Config::default()
@@ -974,7 +1205,19 @@ fn configuration_and_composition_reject_unsafe_or_ambiguous_inputs() {
     p.blocks = r#"[{"kind":"executable","text":"code"}]"#.into();
     assert!(content::validate_input(&p, &s).is_err());
     assert!(!backup::safe_filename("../../image.png"));
-    assert!(!content::valid_slug("admin"));
+    for reserved in [
+        "admin",
+        "account",
+        "forms",
+        "audience",
+        "registration",
+        "themes",
+    ] {
+        assert!(
+            !content::valid_slug(reserved),
+            "A content route must not be shadowed by a system route: {reserved}"
+        );
+    }
 }
 
 // M2 cluster 1: one schema connects structured authoring, relationships, options and templates.
@@ -993,8 +1236,17 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
             )]),
         );
         schema::save_common(&site.app, common, 1).await.unwrap();
-        let model: schema::Model =
+        let mut model: schema::Model =
             serde_json::from_str(include_str!("fixtures/project-model.json")).unwrap();
+        model.fields.insert(
+            "inline-group".into(),
+            serde_json::from_value(json!({"kind":"group","fields":{"headline":{"kind":"string"}}}))
+                .unwrap(),
+        );
+        model.fields.insert(
+            "shared-object".into(),
+            serde_json::from_value(json!({"kind":"object","group":"hero"})).unwrap(),
+        );
         assert_eq!(
             upload(&site, "public.png", &png(), "public").await,
             StatusCode::SEE_OTHER
@@ -1030,7 +1282,7 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
         let public_identifier = uuid::Uuid::new_v4().to_string();
         let mut project = input("project-one", "publish");
         project.kind = "project".into();
-        project.fields=json!({"subtitle":public_identifier,"client":client.id,"steps":[{"label":"First useful step"},{"label":"Second useful step"}],"gallery":[public_media,private_media],"photo":public_media,"sections":[{"type":"hero","values":{"headline":"FLEXIBLE_HERO"}}],"shared":{"headline":"REUSED_GROUP"},"details":{"count":7}}).to_string();
+        project.fields=json!({"subtitle":public_identifier,"client":client.id,"steps":[{"label":"First useful step"},{"label":"Second useful step"}],"gallery":[public_media,private_media],"photo":public_media,"sections":[{"type":"hero","values":{"headline":"FLEXIBLE_HERO"}}],"shared":{"headline":"REUSED_GROUP"},"details":{"count":7},"inline-group":{"headline":"INLINE_GROUP"},"shared-object":{"headline":"SHARED_OBJECT"}}).to_string();
         project.taxonomies = json!({"sector":["Local businesses"]}).to_string();
         let record = content::save(&site.app, site.session(), None, project.clone())
             .await
@@ -1062,6 +1314,16 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
             "project".into(),
             serde_json::from_str(include_str!("fixtures/project-template.json")).unwrap(),
         );
+        for (id, path) in [
+            ("inline-group-output", "post.fields.inline-group.headline"),
+            ("shared-object-output", "post.fields.shared-object.headline"),
+            ("gallery-projection", "post.fields.gallery"),
+        ] {
+            package.templates.get_mut("project").unwrap().children.push(
+                serde_json::from_value(json!({"id":id,"kind":"text","text":{"bind":path}}))
+                    .unwrap(),
+            );
+        }
         package.templates.get_mut("home").unwrap().children.push(serde_json::from_value(json!({"id":"project-list","kind":"collection","source":"project","limit":30,"children":[{"id":"project-card","kind":"component","component":"card","arguments":{"title":{"bind":"item.fields.client.title"}}}]})).unwrap());
         theme::save(&site.app, "paper", package, 1, true)
             .await
@@ -1075,6 +1337,11 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
                 && public.contains("Second useful step")
         );
         assert!(!public.contains("PRIVATE_"));
+        assert!(public.contains("INLINE_GROUP") && public.contains("SHARED_OBJECT"));
+        assert!(
+            !public.contains(&private_media),
+            "Binding an entire gallery must not leak its private identifiers as JSON text."
+        );
         assert!(
             public.contains(&public_identifier),
             "Ordinary UUID-shaped strings are not mistaken for private relationship references"
@@ -2306,6 +2573,59 @@ async fn structured_upgrade_rolls_back_unsupported_source_and_retries_after_corr
                 .contains("quiet garden")
         );
         upgraded.db.pool.close().await;
+        site.close().await;
+    }
+}
+
+/// The administrative export must be complete or reject, with bounded buffering.
+#[tokio::test]
+async fn content_export_enforces_byte_budget_without_truncating_or_mutating_content() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        for n in 0..3 {
+            let mut post = input(&format!("large-export-{n}"), "publish");
+            post.body = "Readable large story. ".repeat(10000);
+            content::save(&site.app, site.session(), None, post)
+                .await
+                .unwrap();
+        }
+        let mut bounded = site.app.clone();
+        let mut config = (*bounded.config).clone();
+        config.max_backup_bytes = 1024 * 1024;
+        bounded.config = std::sync::Arc::new(config.clone());
+        assert_eq!(
+            get(&bounded, "/admin/export", Some(&site.token)).await.0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM posts")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap(),
+            3
+        );
+        config.max_backup_bytes = 8 * 1024 * 1024;
+        bounded.config = std::sync::Arc::new(config);
+        let (status, _, bytes) = request(
+            &bounded,
+            "GET",
+            "/admin/export",
+            Some(&site.token),
+            "",
+            Vec::new(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let exported: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(exported["format"], "wpalt-content-v2");
+        assert_eq!(exported["posts"].as_array().unwrap().len(), 3);
+        assert!(
+            exported["posts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|p| p["published_body"].as_str().unwrap().len() > 200000)
+        );
         site.close().await;
     }
 }

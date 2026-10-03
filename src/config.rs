@@ -161,10 +161,12 @@ impl Config {
         Ok(())
     }
     pub fn origin(&self) -> String {
-        self.base_url.trim_end_matches('/').into()
+        url::Url::parse(&self.base_url)
+            .map(|url| url.origin().ascii_serialization())
+            .unwrap_or_else(|_| self.base_url.trim_end_matches('/').into())
     }
     pub fn secure_cookie(&self) -> bool {
-        self.base_url.starts_with("https:")
+        url::Url::parse(&self.base_url).is_ok_and(|url| url.scheme() == "https")
     }
     pub fn redacted(&self) -> serde_json::Value {
         let mut value = serde_json::to_value(self).expect("configuration serializes");

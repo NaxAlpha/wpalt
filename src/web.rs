@@ -177,6 +177,8 @@ async fn security_and_trace(
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
         || route == "/login"
+        || route == "/account"
+        || route == "/logout"
         || (route.starts_with("/audience/") || route.starts_with("/registration/"))
         || route.starts_with("/api/forms/")
         || route.starts_with("/api/engagement/")
@@ -284,8 +286,13 @@ async fn health(State(app): State<App>) -> Result<Json<serde_json::Value>> {
     ))
 }
 async fn login_page(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
-    if auth::session(&app, &headers).await.is_ok() {
-        return Ok(Redirect::to("/admin").into_response());
+    if let Ok(session) = auth::session(&app, &headers).await {
+        return Ok(Redirect::to(if session.user.role == "subscriber" {
+            "/account"
+        } else {
+            "/admin"
+        })
+        .into_response());
     }
     Ok(Html(view::login(&app.db.settings().await?)).into_response())
 }
@@ -334,7 +341,10 @@ async fn logout(
 async fn dashboard(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
     let s = match admin_session(&app, &headers).await {
         Ok(s) => s,
-        Err(_) => return Ok(Redirect::to("/login").into_response()),
+        Err(error) if error.0 == StatusCode::UNAUTHORIZED => {
+            return Ok(Redirect::to("/login").into_response());
+        }
+        Err(error) => return Err(error),
     };
     let r=sqlx::query("SELECT (SELECT COUNT(*) FROM posts) AS content,(SELECT COUNT(*) FROM posts WHERE status='published') AS published,(SELECT COUNT(*) FROM media) AS media,(SELECT COUNT(*) FROM comments WHERE status='pending') AS pending").fetch_one(&app.db.pool).await?;
     Ok(html_page("Overview",&app.db.settings().await?,Some(&s),html!{
@@ -1171,17 +1181,41 @@ async fn media_file(
     if !backup::safe_filename(&name) {
         return Err(Error::not_found());
     }
-    let bytes = tokio::fs::read(app.config.data_dir.join("media").join(name)).await?;
     let mime: String = row.get("mime");
     if !["image/png", "image/jpeg", "image/webp", "image/gif"].contains(&mime.as_str()) {
         return Err(Error::invalid("Unsupported stored media type."));
     }
+    use tokio::io::AsyncReadExt;
+    let file = tokio::fs::File::open(app.config.data_dir.join("media").join(name)).await?;
+    let metadata = file.metadata().await?;
+    let length = metadata.len();
+    if !metadata.is_file() || length == 0 || length > 32 * 1024 * 1024 {
+        return Err(Error::invalid("Stored media exceeds its size limit."));
+    }
+    // Keep slow downloads from retaining a complete image after handler admission ends.
+    let stream =
+        futures_util::stream::try_unfold((file, length), |(mut file, remaining)| async move {
+            if remaining == 0 {
+                return Ok::<_, std::io::Error>(None);
+            }
+            let mut buffer = vec![0; remaining.min(8192) as usize];
+            let read = file.read(&mut buffer).await?;
+            if read == 0 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    "Stored media was truncated.",
+                ));
+            }
+            buffer.truncate(read);
+            Ok(Some((buffer, (file, remaining - read as u64))))
+        });
     Ok((
         [
-            ("content-type", mime.as_str()),
-            ("cache-control", "no-store"),
+            ("content-type", mime),
+            ("cache-control", "no-store".into()),
+            ("content-length", length.to_string()),
         ],
-        bytes,
+        Body::from_stream(stream),
     )
         .into_response())
 }
@@ -1448,24 +1482,41 @@ async fn download_backup(
 async fn export_content(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
     let s = admin_session(&app, &headers).await?;
     admin(&s)?;
-    let rows = sqlx::query("SELECT * FROM posts ORDER BY id LIMIT 10001")
-        .fetch_all(&app.db.pool)
-        .await?;
-    if rows.len() > 10000 {
-        return Err(Error::invalid(
-            "M1 content export is limited to 10,000 items; use full backup for this site.",
-        ));
+    use futures_util::TryStreamExt;
+    let mut rows = sqlx::query("SELECT * FROM posts ORDER BY id LIMIT 10001").fetch(&app.db.pool);
+    let mut bytes = br#"{"format":"wpalt-content-v2","posts":["#.to_vec();
+    let mut count = 0;
+    while let Some(row) = rows.try_next().await? {
+        count += 1;
+        if count > 10000 {
+            return Err(Error::invalid(
+                "Content export is limited to 10,000 items; use full backup.",
+            ));
+        }
+        let encoded = serde_json::to_vec(&Post::from_row(row))
+            .map_err(|_| Error::invalid("Content export serialization failed."))?;
+        if bytes.len().saturating_add(encoded.len()).saturating_add(3) > app.config.max_backup_bytes
+        {
+            return Err(Error::invalid(
+                "Content export exceeds max_backup_bytes; increase the configured budget before retrying.",
+            ));
+        }
+        if count > 1 {
+            bytes.push(b',');
+        }
+        bytes.extend(encoded);
     }
-    let posts: Vec<Post> = rows.into_iter().map(Post::from_row).collect();
+    bytes.extend(b"]}");
     Ok((
         [
+            ("content-type", "application/json"),
             (
                 "content-disposition",
                 "attachment; filename=wpalt-content.json",
             ),
             ("cache-control", "no-store"),
         ],
-        Json(serde_json::json!({"format":"wpalt-content-v2","posts":posts})),
+        bytes,
     )
         .into_response())
 }

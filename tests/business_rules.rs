@@ -511,6 +511,48 @@ async fn consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journ
             1,
             "Independent workers claim a job once."
         );
+        let spool_path = app
+            .config
+            .data_dir
+            .join("outbox")
+            .join(format!("{job}.eml"));
+        let stable = mail::download(&app, &job).await.unwrap();
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&spool_path)
+            .unwrap()
+            .set_len(stable.len() as u64 + 1)
+            .unwrap();
+        sqlx::query("UPDATE mail_jobs SET state='pending',next_at=0 WHERE id=$1")
+            .bind(&job)
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(mail::tick(&app).await.unwrap(), 1);
+        assert_eq!(
+            sqlx::query_scalar::<_, String>("SELECT state FROM mail_jobs WHERE id=$1")
+                .bind(&job)
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            "retry",
+            "A corrupted spool is an explicit recovery state, never accepted as delivered."
+        );
+        std::fs::write(&spool_path, &stable).unwrap();
+        sqlx::query("UPDATE mail_jobs SET next_at=0 WHERE id=$1")
+            .bind(&job)
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(mail::tick(&app).await.unwrap(), 1);
+        assert_eq!(
+            sqlx::query_scalar::<_, String>("SELECT state FROM mail_jobs WHERE id=$1")
+                .bind(&job)
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            "spooled"
+        );
         audience::decide(&app, token, false).await.unwrap();
         audience::decide(&app, token, false).await.unwrap();
         assert_eq!(
@@ -901,6 +943,44 @@ async fn attachments_follow_up_and_search_remain_private_and_survive_fresh_resto
             .await
             .is_err()
         );
+        // Hold the snapshot coordinator at its file-read boundary. Retention must
+        // wait, preserving the recovery point, then remove only the expired staging file.
+        let staged = attachments::upload(
+            State(app.clone()),
+            Path((form.clone(), "file".into())),
+            headers.clone(),
+            Bytes::from_static(b"expired staging only"),
+        )
+        .await
+        .unwrap()
+        .0;
+        let staged_id = staged["capability"]
+            .as_str()
+            .unwrap()
+            .split_once(':')
+            .unwrap()
+            .0;
+        let filename: String = sqlx::query_scalar(
+            "UPDATE form_attachments SET expires_at=0 WHERE id=$1 RETURNING filename",
+        )
+        .bind(staged_id)
+        .fetch_one(&app.db.pool)
+        .await
+        .unwrap();
+        let path = app.config.data_dir.join("attachments").join(filename);
+        let snapshot_guard = app.mutations.lock().await;
+        let cleanup = wpalt::business::quotas::cleanup(&app);
+        tokio::pin!(cleanup);
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(50), &mut cleanup)
+                .await
+                .is_err(),
+            "Retention must wait while a snapshot owns the file-read boundary."
+        );
+        assert!(path.exists());
+        drop(snapshot_guard);
+        cleanup.await.unwrap();
+        assert!(!path.exists());
         let input = json!({"name":"Ada Lovelace","file":uploaded["capability"]});
         let key = uuid::Uuid::new_v4().to_string();
         let entry = store::submit(&app, &form, 2, &key, &input).await.unwrap();
@@ -1360,6 +1440,28 @@ async fn local_offers_keep_variants_bound_frequency_and_allocate_last_reward_ato
         promotions::visit(&app, &visitors[1], visit("mobile"))
             .await
             .unwrap()
+            .unwrap();
+        // A visible promotion is not authority to allocate inventory when its wheel is off.
+        sqlx::query("UPDATE business_promotions SET wheel=0 WHERE id=$1")
+            .bind(&id)
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            promotions::claim(&app, &visitors[0], &id).await.is_err(),
+            "The disabled allocation capability must fail closed even with a valid impression."
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT remaining FROM promotion_rewards")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            1
+        );
+        sqlx::query("UPDATE business_promotions SET wheel=1 WHERE id=$1")
+            .bind(&id)
+            .execute(&app.db.pool)
+            .await
             .unwrap();
         let other = App::open((*app.config).clone()).await.unwrap();
         let (a, b) = tokio::join!(
@@ -1861,6 +1963,23 @@ async fn populated_business_paths_have_bounded_queries_and_reproducible_measurem
                 );
             }
         }
+        // Measure plans against the populated state actually used by the worker.
+        // An old cutoff would measure an empty ready queue despite 1,000 jobs.
+        let ready_cutoff = wpalt::now();
+        let ready_jobs: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM mail_jobs WHERE state IN ('pending','retry') AND next_at<=$1",
+        )
+        .bind(ready_cutoff)
+        .fetch_one(&app.db.pool)
+        .await
+        .unwrap();
+        assert_eq!(ready_jobs, 1000);
+        for table in ["form_entries", "engagement_events", "mail_jobs"] {
+            sqlx::query(&format!("ANALYZE {table}"))
+                .execute(&app.db.pool)
+                .await
+                .unwrap();
+        }
         let mut plans = serde_json::Map::new();
         for (name, sql) in [
             (
@@ -1887,7 +2006,11 @@ async fn populated_business_paths_have_bounded_queries_and_reproducible_measurem
                 query.bind(&id).fetch_all(&app.db.pool).await.unwrap()
             } else {
                 query
-                    .bind(wpalt::now() - 86400)
+                    .bind(if name == "mail" {
+                        ready_cutoff
+                    } else {
+                        wpalt::now() - 86400
+                    })
                     .fetch_all(&app.db.pool)
                     .await
                     .unwrap()
@@ -1921,7 +2044,7 @@ async fn populated_business_paths_have_bounded_queries_and_reproducible_measurem
             1000
         );
         times.sort_by(f64::total_cmp);
-        measurements.push(json!({"engine":if app.db.postgres{"postgres"}else{"sqlite"},"conditions":"Integration API, debug test binary, 1000 responses and fixed notification jobs, 2000 consented events; no timing assertions; not HTTP or production capacity","responses":1000,"events":2000,"submission_p50_ms":times[499],"submission_p95_ms":times[949],"local_spool_jobs_per_second":1000.0/spool_seconds,"plans":plans}));
+        measurements.push(json!({"engine":if app.db.postgres{"postgres"}else{"sqlite"},"conditions":"Integration API, debug test binary, 1000 responses and fixed notification jobs, 2000 consented events; no timing assertions; not HTTP or production capacity","responses":1000,"events":2000,"submission_p50_ms":times[499],"submission_p95_ms":times[949],"local_spool_jobs_per_second":1000.0/spool_seconds,"plans":plans,"plan_conditions":{"statistics":"ANALYZE after population","ready_mail_jobs":ready_jobs,"mail_cutoff":ready_cutoff}}));
         app.db.pool.close().await;
         if let Some(url) = engine {
             let pool = sqlx::PgPool::connect(url).await.unwrap();

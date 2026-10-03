@@ -511,8 +511,7 @@ fn field_kind(
         return Some(field.kind.clone());
     }
     match field.kind.as_str() {
-        "object" | "repeater" => field_kind(r, &field.fields, tail),
-        "group" => field_kind(r, r.common.groups.get(&field.group)?, tail),
+        "object" | "group" | "repeater" => field_kind(r, r.child_fields(field).ok()?, tail),
         "relationship" => {
             if tail.len() == 1 && ["title", "body", "url", "kind", "id"].contains(&tail[0]) {
                 Some("string".into())
@@ -567,14 +566,9 @@ fn nested_field_path(
     parts: &[&str],
 ) -> bool {
     fields.values().any(|f| match f.kind.as_str() {
-        "object" | "repeater" => {
-            field_path(r, &f.fields, parts, 0) || nested_field_path(r, &f.fields, parts)
-        }
-        "group" => r
-            .common
-            .groups
-            .get(&f.group)
-            .is_some_and(|fields| field_path(r, fields, parts, 0)),
+        "object" | "group" | "repeater" => r.child_fields(f).is_ok_and(|fields| {
+            field_path(r, fields, parts, 0) || nested_field_path(r, fields, parts)
+        }),
         _ => false,
     })
 }
@@ -597,12 +591,9 @@ fn field_path(
         return true;
     }
     match f.kind.as_str() {
-        "object" | "repeater" => field_path(r, &f.fields, tail, depth + 1),
-        "group" => r
-            .common
-            .groups
-            .get(&f.group)
-            .is_some_and(|fields| field_path(r, fields, tail, depth + 1)),
+        "object" | "group" | "repeater" => r
+            .child_fields(f)
+            .is_ok_and(|fields| field_path(r, fields, tail, depth + 1)),
         "relationship" => {
             if tail.len() == 1 && ["title", "body", "url", "kind", "id"].contains(&tail[0]) {
                 true
@@ -1357,7 +1348,28 @@ impl Context {
         if value.is_null() {
             v.get("fallback").cloned().unwrap_or(Value::Null)
         } else {
-            value.clone()
+            fn public_projection(ctx: &Context, value: &Value) -> Value {
+                match value {
+                    Value::String(id)
+                        if ctx.reference_ids.contains(id)
+                            && !ctx.relations.contains_key(id)
+                            && !ctx.media.contains_key(id) =>
+                    {
+                        Value::Null
+                    }
+                    Value::Array(values) => {
+                        Value::Array(values.iter().map(|v| public_projection(ctx, v)).collect())
+                    }
+                    Value::Object(values) => Value::Object(
+                        values
+                            .iter()
+                            .map(|(key, v)| (key.clone(), public_projection(ctx, v)))
+                            .collect(),
+                    ),
+                    _ => value.clone(),
+                }
+            }
+            public_projection(self, value)
         }
     }
 }

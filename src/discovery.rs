@@ -481,9 +481,12 @@ pub fn safe_path(path: &str) -> bool {
         && !path.starts_with("/assets")
         && !path.starts_with("/media")
         && !path.starts_with("/themes")
+        && !path.starts_with("/audience/")
+        && !path.starts_with("/registration/")
         && !matches!(
             path,
             "/login"
+                | "/account"
                 | "/logout"
                 | "/health"
                 | "/feed.xml"

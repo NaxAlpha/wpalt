@@ -437,7 +437,7 @@ async fn attachment_download(
     {
         return Err(Error::invalid("Attachment integrity check failed."));
     }
-    let data = tokio::fs::read(path).await?;
+    let data = crate::backup::read_bounded(&path, 2 * 1024 * 1024).await?;
     if data.len() as i64 != row.get::<i64, _>("size")
         || crate::auth::digest(&data) != row.get::<String, _>("sha256")
     {

@@ -230,7 +230,8 @@ async fn spool(app: &App, row: &sqlx::any::AnyRow, data: &[u8]) -> Result<()> {
     let dir = app.config.data_dir.join("outbox");
     tokio::fs::create_dir_all(&dir).await?;
     let path = dir.join(format!("{}.eml", row.get::<String, _>("id")));
-    if let Ok(existing) = tokio::fs::read(&path).await {
+    if tokio::fs::try_exists(&path).await? {
+        let existing = crate::backup::read_bounded(&path, data.len()).await?;
         if existing != data {
             return Err(Error::invalid(
                 "Outbox record differs from its durable message.",
@@ -259,9 +260,10 @@ async fn spool(app: &App, row: &sqlx::any::AnyRow, data: &[u8]) -> Result<()> {
             let _ = tokio::fs::remove_file(&temporary).await;
             return Err(error.into());
         }
-        if tokio::fs::read(&path).await? != data {
+        let existing = crate::backup::read_bounded(&path, data.len()).await;
+        if !matches!(existing.as_deref(), Ok(bytes) if bytes == data) {
             let _ = tokio::fs::remove_file(&temporary).await;
-            return Err(Error::invalid("Outbox collision."));
+            return Err(Error::invalid("Outbox collision or invalid stored size."));
         }
     }
     tokio::fs::remove_file(temporary).await?;
