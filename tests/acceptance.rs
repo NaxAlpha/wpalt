@@ -448,6 +448,45 @@ async fn permissions_csrf_sessions_and_origin_protect_every_write_surface() {
         )
         .await
         .unwrap();
+        auth::add_user(
+            &site.app,
+            "reader@example.test",
+            "Reader",
+            "subscriber",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (reader_token, _) = auth::login(&site.app, "reader@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let inventory: serde_json::Value =
+            serde_json::from_str(include_str!("../docs/evidence/adversarial-coverage.json"))
+                .unwrap();
+        for route in inventory["routes"].as_array().unwrap() {
+            let pattern = route["route"].as_str().unwrap();
+            if !pattern.starts_with("/admin") {
+                continue;
+            }
+            let mut path = pattern.to_owned();
+            while let Some(start) = path.find('{') {
+                let end = path[start..].find('}').unwrap() + start;
+                path.replace_range(start..=end, "00000000-0000-4000-8000-000000000001");
+            }
+            for token in [None, Some(reader_token.as_str())] {
+                let (status, _, _) = request(&site.app, "GET", &path, token, "", Vec::new()).await;
+                assert!(
+                    matches!(
+                        status,
+                        StatusCode::SEE_OTHER
+                            | StatusCode::UNAUTHORIZED
+                            | StatusCode::FORBIDDEN
+                            | StatusCode::METHOD_NOT_ALLOWED
+                    ),
+                    "Administrative route {pattern} must deny anonymous/subscriber reads before looking up data: {status}"
+                );
+            }
+        }
         let (etoken, editor) = auth::login(&site.app, "editor@example.test", PASSWORD)
             .await
             .unwrap();
@@ -822,6 +861,35 @@ async fn backup_restores_content_users_media_and_revisions_into_a_fresh_engine()
             upload(&source, "green.png", &png(), "private").await,
             StatusCode::SEE_OTHER
         );
+        let filename: String = sqlx::query_scalar("SELECT filename FROM media LIMIT 1")
+            .fetch_one(&source.app.db.pool)
+            .await
+            .unwrap();
+        let stored_path = source.app.config.data_dir.join("media").join(filename);
+        let original = std::fs::read(&stored_path).unwrap();
+        // Corrupted disk data must not turn a small upload into an unbounded response.
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&stored_path)
+            .unwrap()
+            .set_len(33 * 1024 * 1024)
+            .unwrap();
+        let media_id: String = sqlx::query_scalar("SELECT id FROM media LIMIT 1")
+            .fetch_one(&source.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            get(
+                &source.app,
+                &format!("/media/{media_id}"),
+                Some(&source.token)
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert!(backup::capture(&source.app).await.is_err());
+        std::fs::write(&stored_path, original).unwrap();
         let bytes = backup::capture(&source.app).await.unwrap();
         let other_engine = !pg && std::env::var("TEST_DATABASE_URL").is_ok();
         let target = Site::new(other_engine, false).await;
@@ -876,6 +944,19 @@ async fn backup_restores_content_users_media_and_revisions_into_a_fresh_engine()
                 .await
                 .unwrap(),
             0
+        );
+        let mut shadowed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let mut payload: serde_json::Value =
+            serde_json::from_str(shadowed["payload"].as_str().unwrap()).unwrap();
+        payload["tables"]["posts"][0]["published_slug"] = "account".into();
+        let payload = payload.to_string();
+        shadowed["payload"] = payload.clone().into();
+        shadowed["sha256"] = auth::digest(payload.as_bytes()).into();
+        assert!(
+            backup::restore(&target.app, &serde_json::to_vec(&shadowed).unwrap())
+                .await
+                .is_err(),
+            "Restore must not bypass reserved public route validation."
         );
         backup::restore(&target.app, &bytes).await.unwrap();
         assert_eq!(

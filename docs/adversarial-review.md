@@ -42,3 +42,15 @@ Guidance refreshed 2026-10-03: [OWASP session management](https://cheatsheetseri
 | A11 | Accepted uppercase HTTPS origins retained a noncanonical origin and failed to enable secure cookies. | Derive origin and HTTPS scheme from the parsed URL; configuration regression passes locally. |
 
 Round 1 local cumulative verification: `cargo test --locked` passes, including SMTP delivery/lost-receipt recovery on an authorized loopback listener. This is SQLite evidence; PostgreSQL evidence remains pending. Negative controls for A01–A04 deliberately restore the failing behavior and demonstrate that the corresponding probes fail. The full review is still in progress: browser, populated measurements, remaining feature coverage and final clean-artifact gates are required.
+
+## Round 2 — integrated browser and resource boundaries
+
+The release checkpoint passed the cumulative real-Chrome journey, including the linked form, engagement, workflow and authoring probes. Eleven core admin routes were additionally measured at 320/768/1440 widths (studio breakpoint edges also covered) under user text-spacing overrides. The stylesheet is a test-only same-origin fixture; production CSP remains enforced. The narrow content editor screenshot was visually inspected for readable controls, hierarchy and unclipped layout. This is representative visual evidence, not complete aesthetic certification.
+
+A05 restore follow-through: an archive with a recomputed checksum and reserved published slug must fail before recovery. A12: media responses and backup/private attachment reads previously trusted unbounded file reads or a separate metadata check; the read itself now has a finite byte cap, including the remaining backup budget. A corrupted 33 MiB file regression verifies rejection and subsequent successful recovery after repairing the file.
+
+The access journey now enumerates administrative route patterns and probes anonymous and subscriber GET requests. Data lookup must not substitute for authorization: only authentication/authorization denial or method rejection passes. Existing valid-write probes remain necessary; a malformed write does not establish permission enforcement.
+
+Promotion edits intentionally renew consent under the documented purpose/catalog/promotion policy; this behavior is retained. Multi-process publishing/authentication/file coordination remains the explicit M9 boundary, with current single-site process ownership enforced by the operator lock.
+
+Checkpoint performance measurement: native macOS arm64 release, 1,000 stories, composed twenty-card home, discovery endpoints, 200 requests per scenario, concurrency 1/10. Ten scenarios measured; client overhead and concurrent browser/test work are included. The measured executable SHA is recorded in the raw result; these numbers cannot be attributed to later source revisions without rerunning. Final representative performance and PostgreSQL evidence remain pending.

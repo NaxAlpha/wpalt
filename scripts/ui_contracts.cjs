@@ -323,6 +323,12 @@ module.exports = async function verifyUI(context, origin) {
         ),
       }),
     );
+    await page.route(origin + "/__ui_fixture/text-spacing.css", (route) =>
+      route.fulfill({
+        contentType: "text/css",
+        body: "body * { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important; } p { margin-bottom: 2em !important; }",
+      }),
+    );
     for (const width of contract.viewports) {
       await page.setViewportSize({ width, height: contract.height });
       await page.goto(origin + "/__ui_fixture");
@@ -593,6 +599,21 @@ module.exports = async function verifyUI(context, origin) {
           [],
           `${route}@${width}: ${m.failures.join("\n")}`,
         );
+        const spacingOverride = await page.addStyleTag({
+          url: origin + "/__ui_fixture/text-spacing.css",
+        });
+        const spaced = await geometry(page);
+        results.geometry.push({
+          surface: route,
+          state: "user-text-spacing",
+          ...spaced,
+        });
+        assert.deepEqual(
+          spaced.failures,
+          [],
+          `${route}@${width} with user text spacing: ${spaced.failures.join("\n")}`,
+        );
+        await spacingOverride.evaluate((el) => el.remove());
         await page.screenshot({
           path: path.join(
             output,

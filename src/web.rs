@@ -1173,7 +1173,11 @@ async fn media_file(
     if !backup::safe_filename(&name) {
         return Err(Error::not_found());
     }
-    let bytes = tokio::fs::read(app.config.data_dir.join("media").join(name)).await?;
+    let bytes = backup::read_bounded(
+        &app.config.data_dir.join("media").join(name),
+        32 * 1024 * 1024,
+    )
+    .await?;
     let mime: String = row.get("mime");
     if !["image/png", "image/jpeg", "image/webp", "image/gif"].contains(&mime.as_str()) {
         return Err(Error::invalid("Unsupported stored media type."));
