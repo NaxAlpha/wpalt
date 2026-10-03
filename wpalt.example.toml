@@ -67,4 +67,5 @@ client_secret = "" # Prefer WPALT_IDENTITY_CLIENT_SECRET from a secret manager.
 authorization_url = ""
 token_url = ""
 jwks_url = ""
+ca_cert_file = "" # Optional public PEM root certificate for an owner-controlled private PKI; never a private key.
 # Enabling requires an HTTPS base_url and explicit HTTPS provider endpoints.

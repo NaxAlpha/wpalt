@@ -259,7 +259,11 @@ pub fn validate(t: &Tables) -> Result<()> {
                 {
                     return Err(bad());
                 }
-            } else if text(r, "body").len() > 16000
+            } else if !c
+                .lessons
+                .iter()
+                .any(|l| l.id == text(r, "lesson_id") && l.title == text(r, "lesson_title"))
+                || text(r, "body").len() > 16000
                 || text(r, "feedback").len() > 4000
                 || !["submitted", "approved", "changes"].contains(&text(r, "state"))
                 || number(r, "version") < 1

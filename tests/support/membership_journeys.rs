@@ -204,7 +204,7 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
     for pg in engines() {
         let site = Site::new(pg, true).await;
         let (token, learner) = member(&site, "student@example.test").await;
-        let (_, outsider) = member(&site, "outsider@example.test").await;
+        let (outsider_token, outsider) = member(&site, "outsider@example.test").await;
         let a = publish(&site, "lesson-one", "FIRST_PRIVATE_LESSON").await;
         let b = publish(&site, "lesson-two", "SECOND_PRIVATE_LESSON").await;
         let policy = m::policy(&site.app, "Academy access", "academy", "")
@@ -276,6 +276,60 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
         assert_eq!(api.0, StatusCode::OK);
         assert!(!api.1.contains("correct"));
         assert!(!api.1.contains("Practice"), "locked lesson title leaked");
+        m::grant(
+            &site.app,
+            &outsider.user.id,
+            "academy",
+            wpalt::now() - 10,
+            0,
+            "local-test",
+        )
+        .await
+        .unwrap();
+        for _ in 0..3 {
+            assert!(
+                !m::assess(
+                    &site.app,
+                    &outsider,
+                    &id,
+                    &first.id,
+                    m::AttemptInput {
+                        version: v,
+                        key: &uuid::Uuid::new_v4().to_string(),
+                        answers: &[1],
+                        assignment: ""
+                    }
+                )
+                .await
+                .unwrap()
+                .passed
+            );
+        }
+        assert!(
+            m::assess(
+                &site.app,
+                &outsider,
+                &id,
+                &first.id,
+                m::AttemptInput {
+                    version: v,
+                    key: &uuid::Uuid::new_v4().to_string(),
+                    answers: &[0],
+                    assignment: ""
+                }
+            )
+            .await
+            .is_err()
+        );
+        let exhausted_page = get(
+            &site.app,
+            &format!("/members/courses/{id}/lessons/{}", first.id),
+            Some(&outsider_token),
+        )
+        .await;
+        assert_eq!(exhausted_page.0, StatusCode::OK);
+        assert!(exhausted_page.1.contains("Attempt limit reached"));
+        assert!(!exhausted_page.1.contains("Submit assessment"));
         let failed = m::assess(
             &site.app,
             &learner,
@@ -322,10 +376,11 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
         assert!(a.unwrap().completed);
         assert!(b.unwrap().completed);
         let attempts: i64 = sqlx::query_scalar(
-            "SELECT attempts FROM member_progress WHERE course_id=$1 AND lesson_id=$2",
+            "SELECT attempts FROM member_progress WHERE course_id=$1 AND lesson_id=$2 AND user_id=$3",
         )
         .bind(&id)
         .bind(&first.id)
+        .bind(&learner.user.id)
         .fetch_one(&site.app.db.pool)
         .await
         .unwrap();
@@ -961,6 +1016,7 @@ async fn identity_subject_binding_and_signed_claims_cannot_bypass_local_account_
             token_url: "https://127.0.0.1:1/token".into(),
             jwks_url: "https://127.0.0.1:1/keys".into(),
             client_secret: "private-test-secret".into(),
+            ca_cert_file: String::new(),
         };
         config.validate().unwrap();
         app.config = std::sync::Arc::new(config);
@@ -1128,7 +1184,7 @@ async fn populated_learning_projection_keeps_prerequisites_and_indexed_lookup_pa
     let mut evidence = vec![];
     for pg in engines() {
         let site = Site::new(pg, true).await;
-        let (_, learner) = member(&site, "volume-learner@example.test").await;
+        let (token, learner) = member(&site, "volume-learner@example.test").await;
         let policy = m::policy(&site.app, "Measured academy", "measured", "")
             .await
             .unwrap();
@@ -1193,6 +1249,133 @@ async fn populated_learning_projection_keeps_prerequisites_and_indexed_lookup_pa
             .await
             .unwrap()
         );
+        // More than one full catalog page, including a restricted course, must
+        // remain reachable without gaps, duplicates or post-pagination filtering.
+        let denied = m::policy(&site.app, "Restricted catalog", "not-assigned", "")
+            .await
+            .unwrap();
+        for index in 0..41 {
+            let post = publish(&site, &format!("catalog-{index}"), "Catalog lesson").await;
+            let c = Course {
+                title: if index == 40 {
+                    "PRIVATE_CATALOG_TITLE".into()
+                } else {
+                    format!("Catalog course {index}")
+                },
+                policy_id: if index == 40 {
+                    denied.clone()
+                } else {
+                    course.policy_id.clone()
+                },
+                sequential: true,
+                lessons: vec![lesson(post, "Catalog lesson")],
+            };
+            let cid = m::create_course(&site.app, &c).await.unwrap();
+            m::save_course(&site.app, &cid, 1, &c, true).await.unwrap();
+        }
+        for (base, session, expected) in [
+            ("/members", token.as_str(), 41),
+            ("/admin/courses", site.token.as_str(), 42),
+        ] {
+            let mut path = base.to_owned();
+            let mut found = HashSet::new();
+            let mut pages = 0;
+            loop {
+                let (status, html) = get(&site.app, &path, Some(session)).await;
+                assert_eq!(status, StatusCode::OK);
+                if base == "/members" {
+                    assert!(!html.contains("PRIVATE_CATALOG_TITLE"));
+                }
+                let prefix = format!("href=\"{base}/courses/");
+                let prefix = if base == "/admin/courses" {
+                    "href=\"/admin/courses/".to_owned()
+                } else {
+                    prefix
+                };
+                let links: Vec<_> = html
+                    .split(&prefix)
+                    .skip(1)
+                    .map(|tail| tail.split('"').next().unwrap().to_owned())
+                    .collect();
+                assert!(links.len() <= 40);
+                for id in links {
+                    assert!(found.insert(id), "Catalog cursor duplicated a course");
+                }
+                pages += 1;
+                let more = format!("href=\"{base}?before=");
+                if let Some((_, tail)) = html.split_once(&more) {
+                    path = format!("{base}?before={}", tail.split('"').next().unwrap());
+                    assert!(pages < 3, "Catalog cursor failed to make progress");
+                } else {
+                    break;
+                }
+            }
+            assert_eq!(pages, 2);
+            assert_eq!(found.len(), expected);
+        }
+        assert_eq!(
+            get(&site.app, "/members?before=invalid", Some(&token))
+                .await
+                .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        // A full pending queue must advance after grading, with historical lesson context.
+        let mut review_course = course.clone();
+        review_course.sequential = false;
+        for lesson in review_course.lessons.iter_mut().take(42) {
+            lesson.assignment = "Show your work".into();
+        }
+        let review_version = m::save_course(&site.app, &id, version, &review_course, true)
+            .await
+            .unwrap();
+        for lesson in review_course.lessons.iter().take(42) {
+            m::assess(
+                &site.app,
+                &learner,
+                &id,
+                &lesson.id,
+                m::AttemptInput {
+                    version: review_version,
+                    key: &uuid::Uuid::new_v4().to_string(),
+                    answers: &[],
+                    assignment: "Work awaiting human review",
+                },
+            )
+            .await
+            .unwrap();
+        }
+        let pending = sqlx::query("SELECT id,lesson_title FROM member_assignments WHERE state='submitted' ORDER BY created_at,id")
+            .fetch_all(&site.app.db.pool).await.unwrap();
+        assert_eq!(pending.len(), 42);
+        let (status, html) = get(&site.app, "/admin/members", Some(&site.token)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(html.matches("value=\"grade\"").count(), 40);
+        for (index, row) in pending.iter().enumerate() {
+            let assignment: String = row.get("id");
+            assert_eq!(html.contains(&assignment), index < 40);
+            if index < 40 {
+                assert!(html.contains(&row.get::<String, _>("lesson_title")));
+                let (status, _) = form(
+                    &site.app,
+                    "/admin/members",
+                    Some(&site.token),
+                    &[
+                        ("csrf", &site.session().csrf),
+                        ("operation", "grade"),
+                        ("id", &assignment),
+                        ("version", "1"),
+                        ("decision", "approve"),
+                    ],
+                )
+                .await;
+                assert_eq!(status, StatusCode::SEE_OTHER);
+            }
+        }
+        let (_, html) = get(&site.app, "/admin/members", Some(&site.token)).await;
+        assert_eq!(html.matches("value=\"grade\"").count(), 2);
+        for (index, row) in pending.iter().enumerate() {
+            assert_eq!(html.contains(&row.get::<String, _>("id")), index >= 40);
+        }
         sqlx::raw_sql("ANALYZE")
             .execute(&site.app.db.pool)
             .await
@@ -1233,7 +1416,7 @@ async fn populated_learning_projection_keeps_prerequisites_and_indexed_lookup_pa
             );
         }
         times.sort_by(f64::total_cmp);
-        evidence.push(serde_json::json!({"engine":if pg {"postgres"}else{"sqlite"},"conditions":"Debug integration API, maximum 100-lesson sequential course, 1,000 unrelated grants; no timing thresholds or production-capacity claim","p50_ms":times[14],"p95_ms":times[28],"plans":plans,"projection":"One progress batch; no per-lesson authorization query loop"}));
+        evidence.push(serde_json::json!({"engine":if pg {"postgres"}else{"sqlite"},"conditions":"Debug integration API, maximum 100-lesson sequential course, 1,000 unrelated grants; 42-course catalog pagination/filtering and 42-submission review queue advancement; no timing thresholds or production-capacity claim","p50_ms":times[14],"p95_ms":times[28],"plans":plans,"projection":"One progress batch; no per-lesson authorization query loop"}));
         site.close().await;
     }
     std::fs::create_dir_all("work").unwrap();
@@ -1242,4 +1425,156 @@ async fn populated_learning_projection_keeps_prerequisites_and_indexed_lookup_pa
         serde_json::to_vec_pretty(&evidence).unwrap(),
     )
     .unwrap();
+}
+
+#[tokio::test]
+async fn identity_https_code_exchange_validates_tls_pkce_claims_and_local_binding() {
+    use std::io::BufRead;
+    use wpalt::membership::identity::{Claims, Config};
+    struct Provider(std::process::Child);
+    impl Drop for Provider {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let (_, learner) = member(&site, "https-identity@example.test").await;
+        let directory = tempfile::tempdir().unwrap();
+        let spec = directory.path().join("provider.json");
+        let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+        let child = std::process::Command::new("python3")
+            .arg("-u")
+            .arg(fixtures.join("identity_provider.py"))
+            .arg(&spec)
+            .arg(fixtures.join("identity-fixture-server.pem"))
+            .arg(fixtures.join("identity-fixture-server.key"))
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let mut provider = Provider(child);
+        let mut port = String::new();
+        std::io::BufReader::new(provider.0.stdout.take().unwrap())
+            .read_line(&mut port)
+            .unwrap();
+        let port: u16 = port.trim().parse().expect("HTTPS adapter started");
+        let issuer = format!("https://127.0.0.1:{port}");
+        let mut app = site.app.clone();
+        let mut cfg = app.config.as_ref().clone();
+        cfg.base_url = "https://localhost".into();
+        cfg.identity = Config {
+            enabled: true,
+            issuer: issuer.clone(),
+            client_id: "test client:local".into(),
+            client_secret: "fixture+private:secret".into(),
+            authorization_url: format!("{issuer}/authorize"),
+            token_url: format!("{issuer}/token"),
+            jwks_url: format!("{issuer}/keys"),
+            ..Default::default()
+        };
+        cfg.validate().unwrap();
+        app.config = std::sync::Arc::new(cfg.clone());
+        sqlx::query(
+            "INSERT INTO member_identities(issuer,subject,user_id) VALUES($1,'fixture-subject',$2)",
+        )
+        .bind(&issuer)
+        .bind(&learner.user.id)
+        .execute(&app.db.pool)
+        .await
+        .unwrap();
+        let keys: serde_json::Value =
+            serde_json::from_str(include_str!("../fixtures/identity-test-jwks.json")).unwrap();
+        let signing = jsonwebtoken::EncodingKey::from_rsa_der(include_bytes!(
+            "../fixtures/identity-test-key.der"
+        ));
+        for trusted in [false, true] {
+            if trusted {
+                cfg.identity.ca_cert_file = fixtures
+                    .join("identity-fixture-ca.pem")
+                    .to_string_lossy()
+                    .into();
+                app.config = std::sync::Arc::new(cfg.clone());
+            }
+            let (_, headers, _) =
+                request(&app, "GET", "/members/identity/start", None, "", vec![]).await;
+            let location = url::Url::parse(headers["location"].to_str().unwrap()).unwrap();
+            let fields: std::collections::HashMap<_, _> =
+                location.query_pairs().into_owned().collect();
+            let claims = Claims {
+                iss: issuer.clone(),
+                sub: "fixture-subject".into(),
+                aud: serde_json::json!("test client:local"),
+                exp: wpalt::now() as u64 + 300,
+                iat: wpalt::now() as u64,
+                nonce: fields["nonce"].clone(),
+                at_hash: String::new(),
+                azp: String::new(),
+            };
+            let mut header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
+            header.kid = Some("fixture-key".into());
+            let token = jsonwebtoken::encode(&header, &claims, &signing).unwrap();
+            std::fs::write(&spec,serde_json::to_vec(&serde_json::json!({"keys":keys,"token":token,"client_id":"test client:local","secret":"fixture+private:secret","challenge":fields["code_challenge"],"callback":"https://localhost/members/identity/callback"})).unwrap()).unwrap();
+            let cookie = headers["set-cookie"]
+                .to_str()
+                .unwrap()
+                .split(';')
+                .next()
+                .unwrap();
+            let path = format!(
+                "/members/identity/callback?code=fixture-code&state={}",
+                fields["state"]
+            );
+            let req = Request::builder()
+                .uri(&path)
+                .header("cookie", cookie)
+                .body(Body::empty())
+                .unwrap();
+            let response = wpalt::web::router(app.clone()).oneshot(req).await.unwrap();
+            if !trusted {
+                assert_eq!(
+                    response.status(),
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "An untrusted local certificate must not bypass TLS validation"
+                );
+                continue;
+            }
+            assert_eq!(
+                response.status(),
+                StatusCode::SEE_OTHER,
+                "The real HTTPS token/JWKS exchange should issue the bound local session"
+            );
+            assert_eq!(response.headers()["location"], "/members");
+            let session_cookie = response
+                .headers()
+                .get_all("set-cookie")
+                .iter()
+                .filter_map(|h| h.to_str().ok())
+                .find(|h| h.starts_with("wpalt_session="))
+                .unwrap();
+            let session = session_cookie
+                .strip_prefix("wpalt_session=")
+                .unwrap()
+                .split(';')
+                .next()
+                .unwrap();
+            assert_eq!(get(&app, "/members", Some(session)).await.0, StatusCode::OK);
+            let replay = Request::builder()
+                .uri(&path)
+                .header("cookie", cookie)
+                .body(Body::empty())
+                .unwrap();
+            assert_eq!(
+                wpalt::web::router(app.clone())
+                    .oneshot(replay)
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::FORBIDDEN
+            );
+        }
+        drop(provider);
+        site.close().await;
+    }
 }

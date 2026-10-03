@@ -607,6 +607,7 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
             ("course_id", false),
             ("course_version", true),
             ("lesson_id", false),
+            ("lesson_title", false),
             ("user_id", false),
             ("body", false),
             ("state", false),

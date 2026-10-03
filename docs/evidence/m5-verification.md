@@ -1,17 +1,18 @@
 # M5 verification record
 
-Status: final-source verification in progress on [draft PR #10](https://github.com/NaxAlpha/wpalt/pull/10). This record does not assert milestone completion before current-source CI and clean-artifact verification. [Contract](../m5-contract.md), [operating scope](../membership-learning.md) and per-group [parity mapping](../feature-parity.json) define what is delivered and its limits.
+Status: defined scope verified locally; exact delivery CI/artifact status is tracked on [draft PR #10](https://github.com/NaxAlpha/wpalt/pull/10). This record does not assert milestone completion before current-source CI and clean-artifact verification. [Contract](../m5-contract.md), [operating scope](../membership-learning.md) and per-group [parity mapping](../feature-parity.json) define what is delivered and its limits.
 
 ## Readable journeys
 
-`tests/support/membership_journeys.rs` runs against real SQLite and, when required by CI, real PostgreSQL. Six connected journeys cover:
+`tests/support/membership_journeys.rs` runs against real SQLite and, when required by CI, real PostgreSQL. Seven connected journeys cover:
 
 - Policy composition and exact expiry/drip boundaries; two members; direct pages/media/API/search/feed/sitemap/comment exclusion, revocation and disabled-module fail-closed behavior.
 - Ordered quiz and assignment progress, concurrent replay, stale grading, draft/publication isolation, operator reset and certificate reissue, fresh recovery, malicious archive rejection before writes, removed-resource protection and deliberate release.
 - Delegated last-seat capacity, unauthorized intervention, single-use concurrent gift claims, escaped/moderated discussion, group removal and profile CSRF.
 - RSA-signed identity claims, issuer/audience/nonce/expiry/authorized-party/access-token binding, local subject binding and disabled accounts; browser-bound PKCE/state, wrong-browser rejection, provider outage and callback replay.
+- Actual HTTPS provider-adapter exchange with certificate verification, complex Basic credentials, PKCE challenge validation, signed JWT/JWKS, bound local session issuance and replay rejection. Disclosed loopback test certificates are never production credentials.
 - Database row budgets rolling back a partially attempted publication, upserts counting only new records, and rebuilt counters matching a fresh restored graph.
-- Maximum 100-lesson sequential learning projection with 1,000 unrelated grants; hidden locked titles, direct prerequisite denial, query plans and measured latency without fragile timing assertions.
+- Maximum 100-lesson sequential learning projection with 1,000 unrelated grants; hidden locked titles, direct prerequisite denial, query plans and measured latency without fragile timing assertions, plus permission-filtered cursor pagination across 42 courses without duplicates or inaccessible older courses, and an oldest-pending 42-assignment review queue that advances after grading with edition/lesson context.
 
 The cumulative Rust suite includes earlier content, composition, discovery, authoring, business and adversarial tests. Loopback SMTP tests need listener permission locally; the initial restricted run failed at socket bind with `PermissionDenied`, and the same SMTP test passed with loopback permission. This is recorded separately from application failures.
 
@@ -21,7 +22,7 @@ The cumulative Rust suite includes earlier content, composition, discovery, auth
 
 The first focused browser pass completed all three widths and text-spacing checks. Visual inspection of desktop member home, narrow quiz and course composition confirms the inherited calm, cardless design. The first cumulative CI checkpoint passed compilation, actual SQLite/PostgreSQL tests, audit and CLI, then exposed an upload-fixture selector ambiguous with existing M4 media; it was scoped to the upload form. The expanded browser run also caught the no-referrer gift page producing `Origin: null`; gift navigation now uses the established narrow same-origin Fetch Metadata exception, while retaining session/CSRF/token checks. Cross-site and forged-CSRF probes remain denied. The delivery gate requires a subsequent full current-source pass.
 
-`scripts/cli_acceptance.py` adds policy/grant/revoke/protect, course import/export/publication, private file permissions and preserved course definition after fresh restore to the existing configuration/lock/restart/scheduler/log-redaction journey. Optional provider credentials are never required by the local workflow. No actual third-party provider certification is claimed.
+`scripts/cli_acceptance.py` adds policy/grant/revoke/protect, course import/export/publication, private file permissions and preserved course definition after fresh restore to the existing configuration/lock/restart/scheduler/log-redaction journey. Optional provider credentials are never required by the local workflow. A real HTTPS loopback provider adapter exercises the successful exchange; no actual third-party provider certification is claimed.
 
 ## Performance and capacity evidence
 
@@ -39,6 +40,6 @@ Persisted membership record quotas use transactional database insert/delete trig
 
 ## Local release runtime observation
 
-The current macOS arm64 release executable was measured with a disposable 1,000-post SQLite blog and 100 requests per scenario. Executable: 15,929,040 bytes (15.2 MiB); RSS after load: 55,590,912 bytes (53.0 MiB); live site files including SQLite/WAL: 19,653,336 bytes (18.7 MiB), excluding logs/configuration. Full HTML home requests at concurrency 1 had p50 0.668 ms and p95 0.814 ms; concurrency 10 had p50 2.818 ms and p95 4.074 ms. These are localhost Python-client observations on macOS 26.6.2, eight logical CPUs, no response cache. They do not include browser rendering/assets or assert production capacity. `work/m5-runtime.json` records the exact measured binary hash and conditions; Linux artifact size is measured separately from the final clean build.
+The final review packet retains `m5-runtime.json` with executable hash, memory, disk and ten request scenarios from a disposable 1,000-post SQLite blog, 100 requests per scenario. Measurements are localhost Python-client observations on macOS arm64, eight logical CPUs, no response cache; they exclude browser rendering/assets and do not assert production capacity. Linux artifact size is measured separately from the final clean build.
 
 The full local cumulative browser pass produced 78 M5 geometry/text-spacing measurements and 39 accessibility scans across 13 screens, with zero geometry failures, reported script errors or external requests. Cumulative earlier-milestone browser journeys passed in the same disposable site. Later changes to tests/documentation must still pass final-source CI.

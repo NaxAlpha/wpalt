@@ -3,7 +3,7 @@ use super::*;
 use crate::{auth, view};
 use axum::{
     Router,
-    extract::{Form, Path, State},
+    extract::{Form, Path, Query, State},
     http::HeaderMap,
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
@@ -102,7 +102,7 @@ async fn admin(State(app): State<App>, h: HeaderMap) -> Result<Html<String>> {
     let media = sqlx::query("SELECT id,alt,filename FROM media ORDER BY created_at DESC LIMIT 100")
         .fetch_all(&app.db.pool)
         .await?;
-    let assignments=sqlx::query("SELECT a.id,a.version,a.body,a.state,u.name,c.title FROM member_assignments a JOIN users u ON u.id=a.user_id JOIN member_courses c ON c.id=a.course_id ORDER BY a.created_at DESC LIMIT 40").fetch_all(&app.db.pool).await?;
+    let assignments=sqlx::query("SELECT a.id,a.version,a.body,a.state,a.lesson_title,a.course_version,u.name,c.title FROM member_assignments a JOIN users u ON u.id=a.user_id JOIN member_courses c ON c.id=a.course_id WHERE a.state='submitted' ORDER BY a.created_at ASC,a.id ASC LIMIT 40").fetch_all(&app.db.pool).await?;
     let pending=sqlx::query("SELECT d.id,d.body,u.name,g.title FROM member_discussions d JOIN users u ON u.id=d.user_id JOIN member_groups g ON g.id=d.group_id WHERE d.state='pending' ORDER BY d.created_at LIMIT 40").fetch_all(&app.db.pool).await?;
     admin_page(&app,&s,"Members",html!{
  (view::heading("Community & learning","Members","Assign access, manage communities and review learning in one place."))
@@ -115,7 +115,7 @@ async fn admin(State(app): State<App>, h: HeaderMap) -> Result<Html<String>> {
  section class="panel" {h2 {"Policies"}@for p in &policies {form method="post" class="toolbar" {(view::csrf(&s))(hidden("operation","policy-toggle"))(hidden("id",&p.get::<String,_>("id")))(hidden("version",&p.get::<i64,_>("version").to_string()))strong {(p.get::<String,_>("title"))}span {(p.get::<String,_>("entitlement"))}button class="quiet" {(if p.get::<i64,_>("enabled")==1{"Suspend policy"}else{"Enable policy"})}}}}
  section class="panel" {h2 {"Create a group or organization"}form method="post" {(view::csrf(&s))(hidden("operation","group"))label {"Group title" input name="title" required maxlength="160";}label {"Seat manager" select name="user" {option value="" {"Site owner only"}@for u in &users {option value=(u.get::<String,_>("id")){(u.get::<String,_>("name"))}}}}label {"Seat limit (0 means ordinary group)" input type="number" name="seats" value="0" min="0" max="1000";}button {"Create group"}}@for g in &groups {p {a href=(format!("/members/groups/{}",g.get::<String,_>("id"))){(g.get::<String,_>("title"))}}}}
  section class="panel" {h2 {"Create a single-use gift"}form method="post" {(view::csrf(&s))(hidden("operation","gift"))label {"Entitlement key" input name="key" required maxlength="80";}label {"Claim before (UTC)" input type="datetime-local" name="expires" value=(utc_input(now()+86400)) required;}label {"Access duration (seconds)" input type="number" name="duration" min="1" max="31536000" value="2592000" required;}button {"Create gift link"}}}
- section class="panel" {h2 {"Assignments & gradebook"}p {a href="/admin/courses" {"Open a course to inspect member progress."}}@for a in assignments {article {h3 {(a.get::<String,_>("name")) " · " (a.get::<String,_>("title"))}p class="status" {(a.get::<String,_>("state"))}p {(a.get::<String,_>("body"))}form method="post" {(view::csrf(&s))(hidden("operation","grade"))(hidden("id",&a.get::<String,_>("id")))(hidden("version",&a.get::<i64,_>("version").to_string()))label {"Feedback" textarea name="feedback" maxlength="4000" {}}button name="decision" value="approve" {"Approve work"}button name="decision" value="changes" class="quiet" {"Request changes"}}}}}
+ section class="panel" {h2 {"Assignments & gradebook"}p {a href="/admin/courses" {"Open a course to inspect member progress."}}@for a in assignments {article {h3 {(a.get::<String,_>("name")) " · " (a.get::<String,_>("title"))}p class="muted" {"Edition " (a.get::<i64,_>("course_version")) " · " (a.get::<String,_>("lesson_title"))}p class="status" {(a.get::<String,_>("state"))}p {(a.get::<String,_>("body"))}form method="post" {(view::csrf(&s))(hidden("operation","grade"))(hidden("id",&a.get::<String,_>("id")))(hidden("version",&a.get::<i64,_>("version").to_string()))label {"Feedback" textarea name="feedback" maxlength="4000" {}}button name="decision" value="approve" {"Approve work"}button name="decision" value="changes" class="quiet" {"Request changes"}}}}}
  section class="panel" {h2 {"Discussion moderation"}@for d in pending {article {h3 {(d.get::<String,_>("title")) " · " (d.get::<String,_>("name"))}p {(d.get::<String,_>("body"))}form method="post" {(view::csrf(&s))(hidden("operation","moderate"))(hidden("id",&d.get::<String,_>("id")))button name="decision" value="approve" {"Approve"}button name="decision" value="reject" class="quiet" {"Reject"}}}}}
  }).await
 }
@@ -241,9 +241,61 @@ async fn admin_action(
     }
     Ok(Redirect::to("/admin/members").into_response())
 }
-async fn courses(State(app): State<App>, h: HeaderMap) -> Result<Html<String>> {
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct CatalogCursor {
+    before: String,
+}
+impl CatalogCursor {
+    fn values(&self) -> Result<(i64, String)> {
+        if self.before.is_empty() {
+            return Ok((i64::MAX, "ffffffff-ffff-ffff-ffff-ffffffffffff".into()));
+        }
+        let (time, id) = self
+            .before
+            .split_once(':')
+            .ok_or(Error::invalid("Invalid course cursor."))?;
+        uuid(id)?;
+        let time: i64 = time
+            .parse()
+            .map_err(|_| Error::invalid("Invalid course cursor."))?;
+        if time < 0 {
+            return Err(Error::invalid("Invalid course cursor."));
+        }
+        Ok((time, id.into()))
+    }
+}
+fn course_pager(path: &str, first: bool, next: Option<&String>) -> Markup {
+    if first && next.is_none() {
+        return html! {};
+    }
+    html! {nav aria-label="Course pages" class="toolbar" {
+        @if !first {a class="button secondary" href=(path) {"First course page"}}
+        @if let Some(cursor)=next {a class="button secondary" href=(format!("{path}?before={cursor}")) {"More courses"}}
+    }}
+}
+fn next_course_page(rows: &mut Vec<sqlx::any::AnyRow>) -> Option<String> {
+    if rows.len() <= 40 {
+        return None;
+    }
+    rows.pop();
+    rows.last().map(|r| {
+        format!(
+            "{}:{}",
+            r.get::<i64, _>("created_at"),
+            r.get::<String, _>("id")
+        )
+    })
+}
+async fn courses(
+    State(app): State<App>,
+    h: HeaderMap,
+    Query(cursor): Query<CatalogCursor>,
+) -> Result<Html<String>> {
     let s = owner(&app, &h).await?;
-    let rows=sqlx::query("SELECT id,title,published_version FROM member_courses ORDER BY created_at DESC,id DESC LIMIT 100").fetch_all(&app.db.pool).await?;
+    let (time, id) = cursor.values()?;
+    let mut rows=sqlx::query("SELECT id,title,published_version,created_at FROM member_courses WHERE (created_at,id)<($1,$2) ORDER BY created_at DESC,id DESC LIMIT 41").bind(time).bind(id).fetch_all(&app.db.pool).await?;
+    let next = next_course_page(&mut rows);
     let policies = sqlx::query("SELECT id,title FROM member_policies ORDER BY title LIMIT 100")
         .fetch_all(&app.db.pool)
         .await?;
@@ -252,7 +304,7 @@ async fn courses(State(app): State<App>, h: HeaderMap) -> Result<Html<String>> {
     )
     .fetch_all(&app.db.pool)
     .await?;
-    admin_page(&app,&s,"Courses",html!{(view::heading("Learning","Courses","Compose lessons from shared published content, then add assessments and publish."))p {a href="/admin/members" {"Memberships & review"}}section class="panel" {h2 {"Create a course"}form method="post" {(view::csrf(&s))label {"Course title" input name="title" maxlength="160" required;}label {"Access policy" select name="policy" required {@for p in policies {option value=(p.get::<String,_>("id")){(p.get::<String,_>("title"))}}}}label {"First lesson's content" select name="post" required {@for p in posts {option value=(p.get::<String,_>("id")){(p.get::<String,_>("title"))}}}}button {"Create course"}}}section class="panel" {h2 {"Your courses"}@for r in rows {p {a href=(format!("/admin/courses/{}",r.get::<String,_>("id"))){(r.get::<String,_>("title"))} " · " (if r.get::<i64,_>("published_version")>0{"Published"}else{"Draft"})}}}}).await
+    admin_page(&app,&s,"Courses",html!{(view::heading("Learning","Courses","Compose lessons from shared published content, then add assessments and publish."))p {a href="/admin/members" {"Memberships & review"}}section class="panel" {h2 {"Create a course"}form method="post" {(view::csrf(&s))label {"Course title" input name="title" maxlength="160" required;}label {"Access policy" select name="policy" required {@for p in policies {option value=(p.get::<String,_>("id")){(p.get::<String,_>("title"))}}}}label {"First lesson's content" select name="post" required {@for p in posts {option value=(p.get::<String,_>("id")){(p.get::<String,_>("title"))}}}}button {"Create course"}}}section class="panel" {h2 {"Your courses"}@for r in rows {p {a href=(format!("/admin/courses/{}",r.get::<String,_>("id"))){(r.get::<String,_>("title"))} " · " (if r.get::<i64,_>("published_version")>0{"Published"}else{"Draft"})}}(course_pager("/admin/courses",cursor.before.is_empty(),next.as_ref()))}}).await
 }
 #[derive(Deserialize)]
 struct NewCourse {
@@ -485,11 +537,17 @@ async fn edit_course(
     Ok(Redirect::to(&format!("/admin/courses/{id}")))
 }
 
-async fn dashboard(State(app): State<App>, h: HeaderMap) -> Result<Html<String>> {
+async fn dashboard(
+    State(app): State<App>,
+    h: HeaderMap,
+    Query(cursor): Query<CatalogCursor>,
+) -> Result<Html<String>> {
     let s = auth::session(&app, &h).await?;
-    let rows=sqlx::query("SELECT c.id,c.published_title AS title,c.published_version,(SELECT COUNT(*) FROM member_progress pr WHERE pr.course_id=c.id AND pr.course_version=c.published_version AND pr.user_id=$1 AND pr.completed_at>0) AS completed FROM member_courses c JOIN member_resources cr ON cr.kind='course' AND cr.resource_id=c.id JOIN member_policies p ON p.id=cr.policy_id JOIN users u ON u.id=$1 WHERE c.published_version>0 AND (u.role IN ('admin','editor') OR (u.role<>'disabled' AND p.enabled=1 AND (p.entitlement='' OR EXISTS(SELECT 1 FROM member_grants g WHERE g.user_id=$1 AND g.entitlement=p.entitlement AND g.revoked=0 AND g.starts_at<=$2 AND (g.expires_at=0 OR g.expires_at>$2))) AND (p.group_id='' OR EXISTS(SELECT 1 FROM member_group_users gu WHERE gu.group_id=p.group_id AND gu.user_id=$1)))) ORDER BY c.created_at DESC,c.id DESC LIMIT 40").bind(&s.user.id).bind(now()).fetch_all(&app.db.pool).await?;
+    let (time, id) = cursor.values()?;
+    let mut rows=sqlx::query("SELECT c.id,c.created_at,c.published_title AS title,c.published_version,(SELECT COUNT(*) FROM member_progress pr WHERE pr.course_id=c.id AND pr.course_version=c.published_version AND pr.user_id=$1 AND pr.completed_at>0) AS completed FROM member_courses c JOIN member_resources cr ON cr.kind='course' AND cr.resource_id=c.id JOIN member_policies p ON p.id=cr.policy_id JOIN users u ON u.id=$1 WHERE c.published_version>0 AND (c.created_at,c.id)<($3,$4) AND (u.role IN ('admin','editor') OR (u.role<>'disabled' AND p.enabled=1 AND (p.entitlement='' OR EXISTS(SELECT 1 FROM member_grants g WHERE g.user_id=$1 AND g.entitlement=p.entitlement AND g.revoked=0 AND g.starts_at<=$2 AND (g.expires_at=0 OR g.expires_at>$2))) AND (p.group_id='' OR EXISTS(SELECT 1 FROM member_group_users gu WHERE gu.group_id=p.group_id AND gu.user_id=$1)))) ORDER BY c.created_at DESC,c.id DESC LIMIT 41").bind(&s.user.id).bind(now()).bind(time).bind(id).fetch_all(&app.db.pool).await?;
+    let next = next_course_page(&mut rows);
     let groups=sqlx::query("SELECT g.id,g.title FROM member_groups g WHERE g.manager_id=$1 OR EXISTS(SELECT 1 FROM member_group_users gu WHERE gu.group_id=g.id AND gu.user_id=$1) ORDER BY g.title LIMIT 100").bind(&s.user.id).fetch_all(&app.db.pool).await?;
-    member_page(&app,"My learning",html!{(view::heading("Member area","My learning",&format!("Welcome, {}. Your access and progress are managed on this site.",s.user.name)))section class="panel" {h2 {"Your courses"}@if rows.is_empty(){p {"No courses are available with your current membership. Ask the site operator about access."}}@for c in rows {p {a href=(format!("/members/courses/{}",c.get::<String,_>("id"))){(c.get::<String,_>("title"))} " · " (c.get::<i64,_>("completed")) " lessons complete"}}}section class="panel" {h2 {"Your communities"}@for g in groups {p {a href=(format!("/members/groups/{}",g.get::<String,_>("id"))){(g.get::<String,_>("title"))}}}}}).await
+    member_page(&app,"My learning",html!{(view::heading("Member area","My learning",&format!("Welcome, {}. Your access and progress are managed on this site.",s.user.name)))section class="panel" {h2 {"Your courses"}@if rows.is_empty(){p {"No courses are available with your current membership. Ask the site operator about access."}}@for c in rows {p {a href=(format!("/members/courses/{}",c.get::<String,_>("id"))){(c.get::<String,_>("title"))} " · " (c.get::<i64,_>("completed")) " lessons complete"}}(course_pager("/members",cursor.before.is_empty(),next.as_ref()))}section class="panel" {h2 {"Your communities"}@for g in groups {p {a href=(format!("/members/groups/{}",g.get::<String,_>("id"))){(g.get::<String,_>("title"))}}}}}).await
 }
 async fn course_page(
     State(app): State<App>,
@@ -535,11 +593,16 @@ async fn lesson_page(
     .await?
     .ok_or_else(Error::not_found)?;
     let document = crate::document::Document::parse(&p.get::<String, _>("published_document"))?;
-    let completed = state.iter().any(|item| item.id == lesson && item.completed);
+    let progress = state
+        .iter()
+        .find(|item| item.id == lesson)
+        .ok_or_else(Error::not_found)?;
+    let completed = progress.completed;
+    let exhausted = progress.attempts >= l.max_attempts;
     let assignment=sqlx::query("SELECT state,feedback,body FROM member_assignments WHERE course_id=$1 AND course_version=$2 AND lesson_id=$3 AND user_id=$4").bind(&id).bind(v).bind(&lesson).bind(&s.user.id).fetch_optional(&app.db.pool).await?;
     member_page(&app,&l.title,html!{p {a href=(format!("/members/courses/{id}")){(&c.title)}}(view::heading("Lesson",&l.title,"Read the lesson, then record your learning."))section class="prose" {(maud::PreEscaped(document.html()))}@if !l.downloads.is_empty(){section class="panel" {h2 {"Lesson downloads"}@for download in &l.downloads{p {a href=(format!("/media/{download}")){"Open protected lesson download"}}}}}
- @if let Some(a)=&assignment {section class="panel" {h2 {"Assignment review"}p class="status" {(a.get::<String,_>("state"))}p {(a.get::<String,_>("feedback"))}}}
- section class="panel" {h2 {"Your assessment"}@if completed {p role="status" {"Lesson complete. Ask the operator to reset it before submitting replacement work."}}@else {form method="post" {(view::csrf(&s))(hidden("version",&v.to_string()))(hidden("key",&uuid::Uuid::new_v4().to_string()))
+ @if let Some(a)=&assignment {section class="panel" {h2 {"Assignment review"}p class="muted" {"Edition " (a.get::<i64,_>("course_version")) " · " (a.get::<String,_>("lesson_title"))}p class="status" {(a.get::<String,_>("state"))}p {(a.get::<String,_>("feedback"))}}}
+ section class="panel" {h2 {"Your assessment"}@if completed {p role="status" {"Lesson complete. Ask the operator to reset it before submitting replacement work."}}@else if exhausted {p role="status" {"Attempt limit reached. Ask the operator to review your work or reset your attempts."}}@else {form method="post" {(view::csrf(&s))(hidden("version",&v.to_string()))(hidden("key",&uuid::Uuid::new_v4().to_string()))
  @for (index,q) in l.questions.iter().enumerate(){fieldset {legend {(&q.prompt)}@for (choice,text) in q.choices.iter().enumerate(){label {input type="radio" name=(format!("answer_{index}")) value=(choice) required; (text)}}}}
  @if !l.assignment.is_empty(){label {(&l.assignment)textarea name="assignment" required maxlength="16000" {(assignment.as_ref().map(|a|a.get::<String,_>("body")).unwrap_or_default())}}}
  p class="muted" {"Up to " (l.max_attempts) " attempts. Required quiz score: " (l.pass_percent) "%. Assignments require operator approval."}button {(if l.questions.is_empty()&&l.assignment.is_empty(){"Mark lesson complete"}else{"Submit assessment"})}}}}

@@ -856,7 +856,7 @@
         "upstream guideline or version change",
         "relevant vulnerability or deprecation"
       ],
-      "status": "reviewed; delivery verification pending"
+      "status": "reviewed; exact delivery status tracked on PR #10"
     },
     {
       "feature_id": "M5-learning",
@@ -884,14 +884,15 @@
       "tests": [
         "courses_preserve_quiz_assignment_progress_under_retries_republication_and_fresh_recovery",
         "membership_budget_rolls_back_publication_and_counts_only_persisted_rows",
-        "scripts/membership_acceptance.cjs"
+        "scripts/membership_acceptance.cjs",
+        "populated_learning_projection_keeps_prerequisites_and_indexed_lookup_paths"
       ],
       "triggers": [
         "affected milestone/release",
         "upstream guideline or version change",
         "relevant vulnerability or deprecation"
       ],
-      "status": "reviewed; delivery verification pending"
+      "status": "reviewed; exact delivery status tracked on PR #10"
     },
     {
       "feature_id": "M5-identity",
@@ -900,7 +901,9 @@
       "basis": "external-and-internal",
       "sources": [
         "https://openid.net/specs/openid-connect-core-1_0-35.html",
-        "https://docs.rs/jsonwebtoken/9.3.1/jsonwebtoken/"
+        "https://docs.rs/jsonwebtoken/9.3.1/jsonwebtoken/",
+        "https://www.rfc-editor.org/rfc/rfc6749.html#section-2.3.1",
+        "https://www.rfc-editor.org/rfc/rfc9700.html"
       ],
       "applicable_versions": [
         "wpalt schema/archive 8",
@@ -913,17 +916,19 @@
       "maintenance_owner": "wpalt maintainers",
       "requirements": [
         "Validate signed identity claims and browser-bound one-use state/PKCE.",
-        "Exact issuer/subject binding only; fail closed without silently linking by email."
+        "Exact issuer/subject binding only; fail closed without silently linking by email.",
+        "TLS verification, current OAuth PKCE guidance and correctly encoded Basic client credentials; test the real HTTPS exchange."
       ],
       "tests": [
-        "identity_subject_binding_and_signed_claims_cannot_bypass_local_account_authority"
+        "identity_subject_binding_and_signed_claims_cannot_bypass_local_account_authority",
+        "identity_https_code_exchange_validates_tls_pkce_claims_and_local_binding"
       ],
       "triggers": [
         "affected milestone/release",
         "upstream guideline or version change",
         "relevant vulnerability or deprecation"
       ],
-      "status": "reviewed; delivery verification pending"
+      "status": "reviewed; exact delivery status tracked on PR #10"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

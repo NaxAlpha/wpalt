@@ -187,6 +187,18 @@ module.exports = async (owner, origin, output) => {
       page,
       form.getByRole("button", { name: "Save lesson draft", exact: true }),
     );
+    form = section(page, "Quiz questions · Foundations");
+    await form.getByText("Add a quiz question", { exact: true }).click();
+    await form
+      .getByLabel("Question prompt", { exact: true })
+      .fill("What belongs in debug logs?");
+    await form
+      .getByLabel("Answer choices, one per line", { exact: true })
+      .fill("Performance timings\nSecrets");
+    await submit(
+      page,
+      form.getByRole("button", { name: "Add question", exact: true }),
+    );
     form = section(page, "Add a lesson");
     await form.getByLabel("Lesson title", { exact: true }).fill("Project");
     await form
@@ -251,14 +263,22 @@ module.exports = async (owner, origin, output) => {
       .click();
     const firstLessonUrl = learner.url();
     await measure(learner, "quiz");
-    await learner.getByLabel("In a vendor account", { exact: true }).check();
+    for (const choice of ["In a vendor account", "Secrets"]) {
+      await learner.getByLabel(choice, { exact: true }).focus();
+      await learner.keyboard.press("Space");
+      assert(await learner.getByLabel(choice, { exact: true }).isChecked());
+    }
     await submit(
       learner,
       learner.getByRole("button", { name: "Submit assessment", exact: true }),
     );
     assert((await learner.innerText("body")).includes("Score: 0%"));
     await learner.goto(firstLessonUrl);
-    await learner.getByLabel("On this server", { exact: true }).check();
+    for (const choice of ["On this server", "Performance timings"]) {
+      await learner.getByLabel(choice, { exact: true }).focus();
+      await learner.keyboard.press("Space");
+      assert(await learner.getByLabel(choice, { exact: true }).isChecked());
+    }
     await submit(
       learner,
       learner.getByRole("button", { name: "Submit assessment", exact: true }),

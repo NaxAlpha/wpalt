@@ -27,6 +27,7 @@ pub struct Config {
     pub jwks_url: String,
     pub client_id: String,
     pub client_secret: String,
+    pub ca_cert_file: String,
 }
 impl Config {
     pub fn validate(&self) -> anyhow::Result<()> {
@@ -37,12 +38,20 @@ impl Config {
             !self.client_id.is_empty() && self.client_id.len() <= 256,
             "OIDC needs a bounded client ID"
         );
+        anyhow::ensure!(
+            self.client_secret.len() <= 4096 && self.ca_cert_file.len() <= 4096,
+            "OIDC secret and CA path must be bounded"
+        );
+        if !self.ca_cert_file.is_empty() {
+            ca_certificate(&self.ca_cert_file)?;
+        }
         for raw in [
             &self.issuer,
             &self.authorization_url,
             &self.token_url,
             &self.jwks_url,
         ] {
+            anyhow::ensure!(raw.len() <= 4096, "OIDC endpoint must be bounded");
             let u = url::Url::parse(raw)?;
             anyhow::ensure!(
                 u.scheme() == "https"
@@ -76,8 +85,30 @@ fn unavailable() -> Error {
         "Identity provider unavailable. Use local sign-in or retry later.",
     )
 }
-fn client() -> Result<reqwest::Client> {
-    reqwest::Client::builder()
+fn ca_certificate(path: &str) -> anyhow::Result<reqwest::Certificate> {
+    use std::io::Read;
+    let metadata = std::fs::metadata(path)?;
+    anyhow::ensure!(
+        metadata.is_file() && metadata.len() <= 32 * 1024,
+        "OIDC CA must be a regular PEM certificate file up to 32 KiB"
+    );
+    let file = std::fs::File::open(path)?;
+    anyhow::ensure!(
+        file.metadata()?.is_file(),
+        "OIDC CA must be a regular certificate file"
+    );
+    let mut pem = Vec::new();
+    file.take(32 * 1024 + 1).read_to_end(&mut pem)?;
+    anyhow::ensure!(pem.len() <= 32 * 1024, "OIDC CA exceeds 32 KiB");
+    Ok(reqwest::Certificate::from_pem(&pem)?)
+}
+fn client(config: &Config) -> Result<reqwest::Client> {
+    let mut builder = reqwest::Client::builder();
+    if !config.ca_cert_file.is_empty() {
+        builder = builder
+            .add_root_certificate(ca_certificate(&config.ca_cert_file).map_err(|_| unavailable())?);
+    }
+    builder
         .redirect(reqwest::redirect::Policy::none())
         .timeout(std::time::Duration::from_secs(5))
         .https_only(true)
@@ -229,8 +260,8 @@ async fn callback(
         .filter(|v| v.len() == 64 && v.bytes().all(|b| b.is_ascii_hexdigit()))
         .ok_or_else(Error::forbidden)?;
     let flow=sqlx::query("DELETE FROM identity_flows WHERE state_hash=$1 AND browser_hash=$2 AND expires_at>$3 RETURNING nonce,verifier").bind(auth::digest(i.state.as_bytes())).bind(auth::digest(browser.as_bytes())).bind(now()).fetch_optional(&app.db.pool).await?.ok_or_else(Error::forbidden)?;
-    let http = client()?;
     let cfg = &app.config.identity;
+    let http = client(cfg)?;
     let request = http.post(&cfg.token_url).form(&[
         ("grant_type", "authorization_code"),
         ("code", i.code.as_str()),
@@ -244,7 +275,15 @@ async fn callback(
     let request = if cfg.client_secret.is_empty() {
         request
     } else {
-        request.basic_auth(&cfg.client_id, Some(&cfg.client_secret))
+        // RFC 6749 client_secret_basic encodes each credential as a form value
+        // before composing the Basic header, including ':' and '+' characters.
+        let encode = |value: &str| {
+            url::form_urlencoded::Serializer::new(String::new())
+                .append_pair("", value)
+                .finish()[1..]
+                .to_owned()
+        };
+        request.basic_auth(encode(&cfg.client_id), Some(encode(&cfg.client_secret)))
     };
     let bytes = bounded(request.send().await.map_err(|_| unavailable())?).await?;
     let tokens: Tokens = serde_json::from_slice(&bytes).map_err(|_| unavailable())?;
