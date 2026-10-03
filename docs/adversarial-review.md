@@ -54,3 +54,23 @@ The access journey now enumerates administrative route patterns and probes anony
 Promotion edits intentionally renew consent under the documented purpose/catalog/promotion policy; this behavior is retained. Multi-process publishing/authentication/file coordination remains the explicit M9 boundary, with current single-site process ownership enforced by the operator lock.
 
 Checkpoint performance measurement: native macOS arm64 release, 1,000 stories, composed twenty-card home, discovery endpoints, 200 requests per scenario, concurrency 1/10. Ten scenarios measured; client overhead and concurrent browser/test work are included. The measured executable SHA is recorded in the raw result; these numbers cannot be attributed to later source revisions without rerunning. Final representative performance and PostgreSQL evidence remain pending.
+
+## Round 3 — stronger probes and negative controls
+
+A13: content export previously fetched up to 10,001 complete rich content rows before checking the count, without an aggregate byte budget. Export now consumes rows incrementally, preserves the existing JSON format and returns a complete result or a byte/count-limit error. The connected regression exercises rejection, unchanged source data and successful complete retry with a larger budget on each configured engine.
+
+The populated browser extension discovers actual owner detail links after form/audience/mail/engagement workflows. It passed 15 business screens at 320/768/1440, normal and user text spacing, with narrow-screen axe checks and screenshots. Together with the eleven core screens this covers both the component foundations and populated cross-feature administration. Private response, contact, campaign, delivery and promotion detail screens are included; no download or mutation is performed by the screen sweep.
+
+Three further negative controls remove restored-hash bounds, recursive private-reference projection and export byte limits in turn. Each corresponding behavioral assertion fails, and source is restored after each probe. Seven negative controls now distinguish meaningful regression protection from tests that merely repeat the implementation. Additional anonymous/subscriber inventory probes include `/api/admin` reads.
+
+Refreshed implementation guidance: [WHATWG URL origin rules](https://url.spec.whatwg.org/#concept-url-origin) and [version-pinned Argon2 parameter definitions](https://docs.rs/argon2/0.5.3/argon2/struct.Params.html). The generated password policy remains Argon2id v19 with library defaults; imported hashes must stay within the documented resource envelope (at most 64 MiB memory, ten passes, four lanes, 512 encoded bytes). These are defensive import ceilings, not recommendations to weaken new passwords.
+
+### Measurement correction and cumulative scope
+
+The queue-plan probe previously bound yesterday's cutoff, measuring an empty ready range despite 1,000 populated jobs. It now asserts 1,000 currently due jobs, refreshes planner statistics after fixture population, and records the actual cutoff/statistics conditions. This corrects verification quality without changing the delivery engine.
+
+The coverage ledger maps 49 implemented capability groups to their defined scopes and associated isolated/integrated journeys, alongside 101 route patterns and 21 shared boundaries. It records that cluster evidence is not exhaustive permutation coverage. Source review includes all route-owning modules and their role/CSRF guards, transactional recovery and migration stages, design/authoring state, database query shapes and privacy-safe diagnostics.
+
+SEO guidance refreshed against Google's [canonical guidance](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls), [sitemap overview](https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview) and [localized versions](https://developers.google.com/search/docs/specialty/international/localized-versions). Existing probes check absolute local canonical/metadata, publication-only sitemap/indexing and reciprocal published language variants. The declared minimal schema graph, exact redirects and local link checker remain their defined scopes; richer future SEO functionality is not claimed.
+
+Checkpoint `811af0d` passed the application job with real SQLite/PostgreSQL 17 and Linux Chromium, plus the compiler floor. Later export/UI/measurement changes require their own final-head gates. Full local Rust checks and negative controls remain distinct evidence from CI. No user-visible milestone scope changed.

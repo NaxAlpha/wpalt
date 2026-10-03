@@ -55,7 +55,7 @@ To recover, use a fresh database and data directory in a new configuration, then
 
 Do not run `init` first: restore requires an empty target. A snapshot can move between SQLite and PostgreSQL. Restored sessions are invalidated; use the original account credentials to sign in. The target runtime/database configuration is retained, not taken from the archive. Test recovery before relying on a backup.
 
-Backups include site settings, users, working/published content, revisions, taxonomies, media and comments; derived search indexes rebuild through insertion. They exclude sessions, rate-limit state, runtime secrets, binaries and external integrations. Content export in the admin panel is a separate credential-free content JSON file, not a complete recovery artifact.
+Backups include site settings, users, working/published content, revisions, taxonomies, media and comments; derived search indexes rebuild through insertion. They exclude sessions, rate-limit state, runtime secrets, binaries and external integrations. Content export in the admin panel is a separate credential-free content JSON file, not a complete recovery artifact. It returns a complete result or an error: at most 10,000 items and `max_backup_bytes` encoded bytes. A byte-budget rejection leaves content unchanged; increase the configured budget before retrying. Media reads have an absolute 32 MiB ceiling; private attachments have a 2 MiB ceiling. Backup reads also enforce the remaining configured budget while reading, rather than trusting a prior file-size check.
 
 ## Development upgrades
 

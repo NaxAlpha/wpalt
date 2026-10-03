@@ -566,6 +566,7 @@ async function freePort() {
   await require("./business_acceptance.cjs")(owner, origin, output);
   await require("./engagement_acceptance.cjs")(owner, origin, output);
   await require("./workflows_acceptance.cjs")(owner, origin, output);
+  await require("./adversarial_ui.cjs")(owner, origin, output);
   await require("./authoring_acceptance.cjs")(owner, origin, output, mediaUrl);
   assert.deepEqual(errors, [], "Browser JavaScript errors");
   assert.deepEqual(remote, [], "Unexpected external runtime requests");

@@ -465,7 +465,7 @@ async fn permissions_csrf_sessions_and_origin_protect_every_write_surface() {
                 .unwrap();
         for route in inventory["routes"].as_array().unwrap() {
             let pattern = route["route"].as_str().unwrap();
-            if !pattern.starts_with("/admin") {
+            if !pattern.starts_with("/admin") && !pattern.starts_with("/api/admin") {
                 continue;
             }
             let mut path = pattern.to_owned();
@@ -2478,6 +2478,59 @@ async fn structured_upgrade_rolls_back_unsupported_source_and_retries_after_corr
                 .contains("quiet garden")
         );
         upgraded.db.pool.close().await;
+        site.close().await;
+    }
+}
+
+/// The administrative export must be complete or reject, with bounded buffering.
+#[tokio::test]
+async fn content_export_enforces_byte_budget_without_truncating_or_mutating_content() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        for n in 0..3 {
+            let mut post = input(&format!("large-export-{n}"), "publish");
+            post.body = "Readable large story. ".repeat(10000);
+            content::save(&site.app, site.session(), None, post)
+                .await
+                .unwrap();
+        }
+        let mut bounded = site.app.clone();
+        let mut config = (*bounded.config).clone();
+        config.max_backup_bytes = 1024 * 1024;
+        bounded.config = std::sync::Arc::new(config.clone());
+        assert_eq!(
+            get(&bounded, "/admin/export", Some(&site.token)).await.0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM posts")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap(),
+            3
+        );
+        config.max_backup_bytes = 8 * 1024 * 1024;
+        bounded.config = std::sync::Arc::new(config);
+        let (status, _, bytes) = request(
+            &bounded,
+            "GET",
+            "/admin/export",
+            Some(&site.token),
+            "",
+            Vec::new(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let exported: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(exported["format"], "wpalt-content-v2");
+        assert_eq!(exported["posts"].as_array().unwrap().len(), 3);
+        assert!(
+            exported["posts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|p| p["published_body"].as_str().unwrap().len() > 200000)
+        );
         site.close().await;
     }
 }

@@ -275,20 +275,26 @@
     {
       "route": "/api/admin/media",
       "source": "src/web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/api/admin/content",
       "source": "src/web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/api/admin/content/{id}",
       "source": "src/web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/{slug}",
@@ -343,44 +349,58 @@
     {
       "route": "/api/admin/design",
       "source": "src/builder_web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/api/admin/design/{id}",
       "source": "src/builder_web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/api/admin/design/{id}/activate",
       "source": "src/builder_web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/api/admin/design/{id}/restore/{version}",
       "source": "src/builder_web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/api/admin/schema",
       "source": "src/builder_web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/api/admin/models/{id}",
       "source": "src/builder_web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/api/admin/options",
       "source": "src/builder_web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/admin/design/{id}/preview",
@@ -455,8 +475,10 @@
     {
       "route": "/api/admin/engagement/sessions/{hash}",
       "source": "src/business/engagement_web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/assets/engagement-review.js",
@@ -573,8 +595,10 @@
     {
       "route": "/api/admin/forms/catalog",
       "source": "src/business/web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/admin/forms",
@@ -627,8 +651,10 @@
     {
       "route": "/api/admin/forms/{id}",
       "source": "src/business/web.rs",
-      "review": "pending",
-      "evidence": []
+      "review": "anonymous/subscriber GET isolation verified locally; remaining role/write review pending",
+      "evidence": [
+        "tests/acceptance.rs::permissions_csrf_sessions_and_origin_protect_every_write_surface"
+      ]
     },
     {
       "route": "/api/forms/{id}/entries",
@@ -706,8 +732,11 @@
   "shared_boundaries": [
     {
       "name": "configuration/install/CLI",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "scripts/cli_acceptance.py",
+        "tests/acceptance.rs::configuration_and_composition_reject_unsafe_or_ambiguous_inputs"
+      ]
     },
     {
       "name": "authentication/revocation/rate limits",
@@ -726,8 +755,12 @@
     },
     {
       "name": "content/revisions/scheduling/taxonomies",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/acceptance.rs::author_preview_publish_autosave_and_restore_without_leaking_drafts",
+        "tests/acceptance.rs::concurrent_editors_never_silently_overwrite_each_other",
+        "tests/acceptance.rs::publication_schedule_survives_reopening_and_runs_only_once"
+      ]
     },
     {
       "name": "models/options/theme composition/publication",
@@ -739,53 +772,92 @@
     },
     {
       "name": "structured editor/recovery/undo/clipboard",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/document.rs::document_trust_boundary_rejects_unsafe_links_geometry_and_unbounded_work",
+        "tests/acceptance.rs::structured_authoring_preserves_live_isolation_conflicts_and_fresh_recovery",
+        "scripts/authoring_acceptance.cjs"
+      ]
     },
     {
       "name": "media/private files/processing",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/acceptance.rs::images_and_comments_obey_visibility_validation_and_moderation",
+        "tests/acceptance.rs::backup_restores_content_users_media_and_revisions_into_a_fresh_engine",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore"
+      ]
     },
     {
       "name": "comments/moderation",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/acceptance.rs::images_and_comments_obey_visibility_validation_and_moderation",
+        "scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "name": "languages/metadata/schema/sitemap/redirects/links",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal",
+        "tests/acceptance.rs::discovery_metadata_redirects_links_and_permissions_are_one_local_system",
+        "tests/acceptance.rs::discovery_volume_has_bounded_pages_and_indexed_language_search"
+      ]
     },
     {
       "name": "forms/conditions/calculations/steps/repeaters",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::surveys_scores_and_signature_acknowledgments_preserve_published_meaning",
+        "scripts/business_acceptance.cjs"
+      ]
     },
     {
       "name": "submissions/drafts/offline/files/entry management",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::partial_drafts_preserve_valid_work_without_bypassing_final_validation",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "name": "consent/contacts/segments/suppression/erasure",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/business_rules.rs::consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journey",
+        "tests/business_rules.rs::confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_cancels_it",
+        "scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "name": "campaigns/triggers/mail/leases/SMTP",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/business_rules.rs::consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journey",
+        "tests/business_rules.rs::smtp_acceptance_and_lost_receipts_have_distinct_recovery_states",
+        "tests/business_rules.rs::confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_cancels_it"
+      ]
     },
     {
       "name": "registration/contributions/approval",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "name": "engagement/privacy/geometry/reports",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/business_rules.rs::engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal",
+        "scripts/engagement_acceptance.cjs"
+      ]
     },
     {
       "name": "promotions/targeting/variants/stock",
@@ -797,8 +869,12 @@
     },
     {
       "name": "quotas/retention/module-disable",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "tests/business_rules.rs::site_wide_admission_is_atomic_replayable_and_preserves_unicode_bytes",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal"
+      ]
     },
     {
       "name": "backup/migrations/fresh cross-engine recovery",
@@ -828,8 +904,777 @@
     },
     {
       "name": "diagnostics/secrets/dependencies/build pipeline",
-      "review": "pending",
-      "evidence": []
+      "review": "source reviewed and local associated probes pass; final delivery CI pending",
+      "evidence": [
+        "scripts/cli_acceptance.py",
+        "scripts/audit_dependencies.py",
+        ".github/workflows/m1.yml"
+      ]
     }
-  ]
+  ],
+  "implemented_capabilities": [
+    {
+      "id": "F001",
+      "capability": "Custom types and taxonomies",
+      "defined_scope": {
+        "m2_coverage": "Installed custom models and model taxonomies; shared draft/live term joins, schema preflight and structured authoring. Taxonomy hierarchy/configurable taxonomy archives remain later refinements."
+      },
+      "cluster": "content",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "tests/acceptance.rs::composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_changes",
+        "tests/acceptance.rs::author_preview_publish_autosave_and_restore_without_leaking_drafts",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal"
+      ]
+    },
+    {
+      "id": "F002",
+      "capability": "Typed custom fields and relationships",
+      "defined_scope": {
+        "m2_coverage": "Shared/model primitive, media and relationship fields; required/type/target validation and batched published relationship resolution. Not every ACF/Pods field type is claimed."
+      },
+      "cluster": "content",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "tests/acceptance.rs::composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_changes",
+        "tests/acceptance.rs::author_preview_publish_autosave_and_restore_without_leaking_drafts",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal"
+      ]
+    },
+    {
+      "id": "F003",
+      "capability": "Repeaters, galleries and clone groups",
+      "defined_scope": {
+        "m2_coverage": "Bounded nested repeaters, image galleries and reusable field groups; group reuse shares definitions rather than copying records."
+      },
+      "cluster": "content",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "tests/acceptance.rs::composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_changes",
+        "tests/acceptance.rs::author_preview_publish_autosave_and_restore_without_leaking_drafts",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal"
+      ]
+    },
+    {
+      "id": "F004",
+      "capability": "Flexible content / reusable block schemas",
+      "defined_scope": {
+        "m2_coverage": "Flexible typed variant/group sections, nested values and reusable parameterized compositions. Arbitrary custom block JavaScript is outside the graph."
+      },
+      "cluster": "content",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "tests/acceptance.rs::composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_changes",
+        "tests/acceptance.rs::author_preview_publish_autosave_and_restore_without_leaking_drafts",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal"
+      ]
+    },
+    {
+      "id": "F005",
+      "capability": "Global options / settings pages",
+      "defined_scope": {
+        "m2_coverage": "Shared typed options with independent draft/live snapshots, authoring widgets and explicit publication."
+      },
+      "cluster": "content",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "tests/acceptance.rs::composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_changes",
+        "tests/acceptance.rs::author_preview_publish_autosave_and_restore_without_leaking_drafts",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal"
+      ]
+    },
+    {
+      "id": "F006",
+      "capability": "Content revisions and rollback",
+      "defined_scope": {
+        "m2_coverage": "Content revisions preserved; bounded theme revisions restore to a draft with optimistic concurrency. Schema changes need explicit data migrations."
+      },
+      "cluster": "content",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "tests/acceptance.rs::composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_changes",
+        "tests/acceptance.rs::author_preview_publish_autosave_and_restore_without_leaking_drafts",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal"
+      ]
+    },
+    {
+      "id": "F007",
+      "capability": "Drafts, preview and editorial approval",
+      "defined_scope": {
+        "m2_coverage": "Private content/theme previews and safe publication; editorial approval policy is later workflow work."
+      },
+      "cluster": "content",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "tests/acceptance.rs::composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_changes",
+        "tests/acceptance.rs::author_preview_publish_autosave_and_restore_without_leaking_drafts",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal"
+      ]
+    },
+    {
+      "id": "F008",
+      "capability": "Manual language variants and strings",
+      "defined_scope": {
+        "m3_coverage": "Independent language variants, labels/direction and per-language navigation. No automatic translation or admin localization."
+      },
+      "cluster": "content",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "tests/acceptance.rs::composition_rejects_unsafe_cycles_overwork_and_invalidating_schema_changes",
+        "tests/acceptance.rs::author_preview_publish_autosave_and_restore_without_leaking_drafts",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal"
+      ]
+    },
+    {
+      "id": "F013",
+      "capability": "Responsive blocks and layout primitives",
+      "defined_scope": {
+        "m2_coverage": "Responsive grid/row/stack, controlled spacing/width/colors, semantic heading levels and desktop/mobile studio previews; no arbitrary CSS execution."
+      },
+      "cluster": "design",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::theme_drafts_publish_restore_and_switch_without_content_loss",
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "scripts/browser_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F014",
+      "capability": "Theme-wide templates and dynamic field bindings",
+      "defined_scope": {
+        "m2_coverage": "Home/search/content/model templates, typed/dynamic bindings, model collections and repeater/relationship rendering through one server engine."
+      },
+      "cluster": "design",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::theme_drafts_publish_restore_and_switch_without_content_loss",
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "scripts/browser_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F015",
+      "capability": "Reusable patterns and design tokens",
+      "defined_scope": {
+        "m2_coverage": "Parameterized reusable components and six global color/font tokens; no remote pattern marketplace required."
+      },
+      "cluster": "design",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::theme_drafts_publish_restore_and_switch_without_content_loss",
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "scripts/browser_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F016",
+      "capability": "Header, footer and navigation builder",
+      "defined_scope": {
+        "m2_coverage": "Compose shared header/footer/navigation nodes; navigation items use local site settings. Mega-menu/hierarchical navigation is not claimed."
+      },
+      "cluster": "design",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::theme_drafts_publish_restore_and_switch_without_content_loss",
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "scripts/browser_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F017",
+      "capability": "Tabs, accordions, galleries and carousels",
+      "defined_scope": {
+        "m2_coverage": "Keyboard progressive tabs, native details accordion, gallery and horizontally scrollable scroll-snap carousel. No automatic carousel rotation or full WCAG certification."
+      },
+      "cluster": "design",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::theme_drafts_publish_restore_and_switch_without_content_loss",
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "scripts/browser_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F018",
+      "capability": "Conditional / protected presentation",
+      "defined_scope": {
+        "m2_coverage": "Bounded scalar/comparison/all/any/not predicates on public/typed contexts; conditional visibility does not grant membership authorization (M5)."
+      },
+      "cluster": "design",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::theme_drafts_publish_restore_and_switch_without_content_loss",
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "scripts/browser_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F019",
+      "capability": "Custom CSS and approved asset insertion",
+      "defined_scope": {
+        "m2_coverage": "Controlled responsive styles/tokens and permission-aware uploaded images; freeform CSS and executable asset insertion remain M8 extension work."
+      },
+      "cluster": "design",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::theme_drafts_publish_restore_and_switch_without_content_loss",
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "scripts/browser_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F020",
+      "capability": "Template import/export and cross-site reuse",
+      "defined_scope": {
+        "m2_coverage": "Portable declarative JSON import/export in studio and offline CLI; validates installed model/field/component dependencies, does not silently bundle a site database/media."
+      },
+      "cluster": "design",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::theme_drafts_publish_restore_and_switch_without_content_loss",
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "scripts/browser_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F021",
+      "capability": "Collaborative notes and assignments",
+      "defined_scope": {
+        "m4_coverage": "Versioned private response notes and active-editor assignments; not real-time shared editing."
+      },
+      "cluster": "design",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::theme_drafts_publish_restore_and_switch_without_content_loss",
+        "tests/acceptance.rs::typed_models_and_reusable_components_render_only_published_data",
+        "scripts/browser_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F025",
+      "capability": "SEO titles, metadata and social previews",
+      "defined_scope": {
+        "m3_coverage": "Per-content title/description and social metadata; no social image manager or SERP preview scoring."
+      },
+      "cluster": "seo",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::discovery_metadata_redirects_links_and_permissions_are_one_local_system",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal",
+        "tests/acceptance.rs::discovery_recovery_preserves_configuration_and_rejects_malicious_rules",
+        "tests/acceptance.rs::discovery_volume_has_bounded_pages_and_indexed_language_search"
+      ]
+    },
+    {
+      "id": "F026",
+      "capability": "Canonical, robots and indexing rules",
+      "defined_scope": {
+        "m3_coverage": "Local canonical, noindex, robots and reciprocal published hreflang; no arbitrary external canonical override."
+      },
+      "cluster": "seo",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::discovery_metadata_redirects_links_and_permissions_are_one_local_system",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal",
+        "tests/acceptance.rs::discovery_recovery_preserves_configuration_and_rejects_malicious_rules",
+        "tests/acceptance.rs::discovery_volume_has_bounded_pages_and_indexed_language_search"
+      ]
+    },
+    {
+      "id": "F027",
+      "capability": "XML, image, video and news sitemaps",
+      "defined_scope": {
+        "m3_coverage": "Bounded XML content sitemaps and index; image/video/news extensions deferred."
+      },
+      "cluster": "seo",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::discovery_metadata_redirects_links_and_permissions_are_one_local_system",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal",
+        "tests/acceptance.rs::discovery_recovery_preserves_configuration_and_rejects_malicious_rules",
+        "tests/acceptance.rs::discovery_volume_has_bounded_pages_and_indexed_language_search"
+      ]
+    },
+    {
+      "id": "F028",
+      "capability": "Schema graph and custom schema builder",
+      "defined_scope": {
+        "m3_coverage": "One minimal WebPage/Article graph with optional LocalBusiness node; arbitrary schema builder and rich-result enrichment deferred."
+      },
+      "cluster": "seo",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::discovery_metadata_redirects_links_and_permissions_are_one_local_system",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal",
+        "tests/acceptance.rs::discovery_recovery_preserves_configuration_and_rejects_malicious_rules",
+        "tests/acceptance.rs::discovery_volume_has_bounded_pages_and_indexed_language_search"
+      ]
+    },
+    {
+      "id": "F029",
+      "capability": "Local business / multiple location schema",
+      "defined_scope": {
+        "m3_coverage": "One visible business identity/address; multiple locations and richer business types deferred."
+      },
+      "cluster": "seo",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::discovery_metadata_redirects_links_and_permissions_are_one_local_system",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal",
+        "tests/acceptance.rs::discovery_recovery_preserves_configuration_and_rejects_malicious_rules",
+        "tests/acceptance.rs::discovery_volume_has_bounded_pages_and_indexed_language_search"
+      ]
+    },
+    {
+      "id": "F030",
+      "capability": "Redirects, regex rules and 404 reports",
+      "defined_scope": {
+        "m3_coverage": "Exact local 301/302 rules with loop/conflict/work limits; regex, automatic slug redirects and 404 reports deferred."
+      },
+      "cluster": "seo",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::discovery_metadata_redirects_links_and_permissions_are_one_local_system",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal",
+        "tests/acceptance.rs::discovery_recovery_preserves_configuration_and_rejects_malicious_rules",
+        "tests/acceptance.rs::discovery_volume_has_bounded_pages_and_indexed_language_search"
+      ]
+    },
+    {
+      "id": "F032",
+      "capability": "Internal broken-link checks",
+      "defined_scope": {
+        "m3_coverage": "Bounded published Markdown local link/public media checks, no external fetching; theme/raw HTML crawler extensions deferred."
+      },
+      "cluster": "seo",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/acceptance.rs::discovery_metadata_redirects_links_and_permissions_are_one_local_system",
+        "tests/acceptance.rs::multilingual_publication_keeps_drafts_private_and_variants_reciprocal",
+        "tests/acceptance.rs::discovery_recovery_preserves_configuration_and_rejects_malicious_rules",
+        "tests/acceptance.rs::discovery_volume_has_bounded_pages_and_indexed_language_search"
+      ]
+    },
+    {
+      "id": "F037",
+      "capability": "Form designer and reusable field schema",
+      "defined_scope": {
+        "m4_coverage": "Visual typed field/step designer, shared groups/repeaters, immutable publications and canonical content/theme form embedding."
+      },
+      "cluster": "forms",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/business_acceptance.cjs",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F038",
+      "capability": "Conditional fields / notification routing",
+      "defined_scope": {
+        "m4_coverage": "Earlier-field visibility and fixed-recipient canonical notification rules using presence/scalar equality; no arbitrary executable expressions."
+      },
+      "cluster": "forms",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/business_acceptance.cjs",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F039",
+      "capability": "Multi-step forms and repeatable inputs",
+      "defined_scope": {
+        "m4_coverage": "Eight ordered steps and bounded shared nested/repeated input grammar."
+      },
+      "cluster": "forms",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/business_acceptance.cjs",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F040",
+      "capability": "Entry storage, search, CSV export and permissions",
+      "defined_scope": {
+        "m4_coverage": "Private immutable responses, FTS5/GIN search, 40-row keysets, 500-row guarded CSV export and permission checks."
+      },
+      "cluster": "forms",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/business_acceptance.cjs",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F041",
+      "capability": "File uploads and protected attachments",
+      "defined_scope": {
+        "m4_coverage": "Scoped expiring upload capabilities; private UTF-8 text/PDF/image files, bounded decoding/re-encoding, authenticated integrity-checked downloads and backup; no malware scanner."
+      },
+      "cluster": "forms",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/business_acceptance.cjs",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F042",
+      "capability": "Calculations and pricing logic",
+      "defined_scope": {
+        "m4_coverage": "Server-authoritative finite sum/product/choice-score calculation; exact currency and payment pricing remain M6."
+      },
+      "cluster": "forms",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/business_acceptance.cjs",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F043",
+      "capability": "Signatures and signed-document records",
+      "defined_scope": {
+        "m4_coverage": "Typed-name signature and acknowledgment with frozen statement and accepted response; no cryptographic signature/identity certification or generated signed PDF."
+      },
+      "cluster": "forms",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/business_acceptance.cjs",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F044",
+      "capability": "Surveys, polls and scoring",
+      "defined_scope": {
+        "m4_coverage": "Choice questionnaires, scores and boolean acknowledgment inputs; responses/export support local evaluation, no specialized statistical survey designer."
+      },
+      "cluster": "forms",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/business_acceptance.cjs",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F045",
+      "capability": "Save/resume, partial entries and abandonment",
+      "defined_scope": {
+        "m4_coverage": "Seven-day revisioned partial server drafts and explicit device recovery; no covert abandonment tracking or automatic abandoned-response marketing."
+      },
+      "cluster": "forms",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/business_acceptance.cjs",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F046",
+      "capability": "Offline capture and later synchronization",
+      "defined_scope": {
+        "m4_coverage": "Already-loaded form editing offline and original-payload retry across reload; no uncached offline site navigation or general distributed synchronization."
+      },
+      "cluster": "forms",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/business_acceptance.cjs",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F047",
+      "capability": "User registration and post creation",
+      "defined_scope": {
+        "m4_coverage": "Mailbox proof, private password step, owner approval and subscriber-only accounts; literal visitor contributions become moderated drafts."
+      },
+      "cluster": "forms",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "tests/business_rules.rs::invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "tests/business_rules.rs::publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "tests/business_rules.rs::attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "tests/business_rules.rs::accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "scripts/business_acceptance.cjs",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F084",
+      "capability": "First-party pageviews, events and conversions",
+      "defined_scope": {
+        "m4_coverage": "Explicit-consent registered events, published public paths and server-confirmed response/offer conversions; GPC/DNT and withdrawal."
+      },
+      "cluster": "analytics",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal",
+        "tests/business_rules.rs::local_offers_keep_variants_bound_frequency_and_allocate_last_reward_atomically",
+        "scripts/engagement_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F085",
+      "capability": "Forms/store funnels and custom dimensions",
+      "defined_scope": {
+        "m4_coverage": "Declared enum dimensions and pageview-to-response-to-offer funnel; arbitrary funnel builder and store purchase events are not claimed; commerce is M6."
+      },
+      "cluster": "analytics",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal",
+        "tests/business_rules.rs::local_offers_keep_variants_bound_frequency_and_allocate_last_reward_atomically",
+        "scripts/engagement_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F086",
+      "capability": "Local dashboards and reports",
+      "defined_scope": {
+        "m4_coverage": "Bounded local event/path/category totals, funnel and recent geometry sessions; reports cover retained cookie sessions, not identity attribution."
+      },
+      "cluster": "analytics",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal",
+        "tests/business_rules.rs::local_offers_keep_variants_bound_frequency_and_allocate_last_reward_atomically",
+        "scripts/engagement_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F087",
+      "capability": "Heatmaps and masked session replay",
+      "defined_scope": {
+        "m4_coverage": "Bounded geometry-only wireframe playback and click heatmap; never DOM text/field values/screenshots; not full DOM replay."
+      },
+      "cluster": "analytics",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal",
+        "tests/business_rules.rs::local_offers_keep_variants_bound_frequency_and_allocate_last_reward_atomically",
+        "scripts/engagement_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F088",
+      "capability": "A/B experiments and variant allocation",
+      "defined_scope": {
+        "m4_coverage": "Stable consented-session A/B variants with retained impressions, sessions and claims; no statistical-significance guarantee."
+      },
+      "cluster": "analytics",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal",
+        "tests/business_rules.rs::local_offers_keep_variants_bound_frequency_and_allocate_last_reward_atomically",
+        "scripts/engagement_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F089",
+      "capability": "Exit-intent, device and referrer popups",
+      "defined_scope": {
+        "m4_coverage": "Accessible targeted native dialogs, keyboard dismissal, device/referrer categories and public paths; exit-intent triggering is not claimed."
+      },
+      "cluster": "analytics",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal",
+        "tests/business_rules.rs::local_offers_keep_variants_bound_frequency_and_allocate_last_reward_atomically",
+        "scripts/engagement_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F090",
+      "capability": "Scheduled/cookie/visitor-based targeting",
+      "defined_scope": {
+        "m4_coverage": "Start/end schedule, per-session impression cap, stable cookie allocation and renewed-purpose consent; not verified-person frequency."
+      },
+      "cluster": "analytics",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal",
+        "tests/business_rules.rs::local_offers_keep_variants_bound_frequency_and_allocate_last_reward_atomically",
+        "scripts/engagement_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F091",
+      "capability": "On-site coupon wheels / offer campaigns",
+      "defined_scope": {
+        "m4_coverage": "Weighted local bounded-stock reward allocation and duplicate-safe session receipt; cookie reset is not fraud prevention; purchase/redemption is M6."
+      },
+      "cluster": "analytics",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal",
+        "tests/business_rules.rs::local_offers_keep_variants_bound_frequency_and_allocate_last_reward_atomically",
+        "scripts/engagement_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F094",
+      "capability": "SMTP settings and connection routing",
+      "defined_scope": {
+        "m4_coverage": "Typed local file outbox and up to four owner-configured SMTP routes with TLS/explicit loopback transport and redacted credentials."
+      },
+      "cluster": "communications",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journey",
+        "tests/business_rules.rs::smtp_acceptance_and_lost_receipts_have_distinct_recovery_states",
+        "tests/business_rules.rs::confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_cancels_it",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F095",
+      "capability": "Mail logs, resend, failure alerts and fallback",
+      "defined_scope": {
+        "m4_coverage": "Durable states/attempt history, bounded retries/fallback, visible uncertain outcomes and deliberate duplicate-aware resend; no third-party outage alert service."
+      },
+      "cluster": "communications",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journey",
+        "tests/business_rules.rs::smtp_acceptance_and_lost_receipts_have_distinct_recovery_states",
+        "tests/business_rules.rs::confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_cancels_it",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F096",
+      "capability": "Transactional templates and notification rules",
+      "defined_scope": {
+        "m4_coverage": "Canonical shared templates, fixed-recipient conditional notifications, confirmations and private registration proof."
+      },
+      "cluster": "communications",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journey",
+        "tests/business_rules.rs::smtp_acceptance_and_lost_receipts_have_distinct_recovery_states",
+        "tests/business_rules.rs::confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_cancels_it",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F097",
+      "capability": "Mailing lists, consent records and segmentation",
+      "defined_scope": {
+        "m4_coverage": "Purpose/version-specific pending/confirmed/withdrawn membership, typed segments, suppression, bounded export and audience deletion guards."
+      },
+      "cluster": "communications",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journey",
+        "tests/business_rules.rs::smtp_acceptance_and_lost_receipts_have_distinct_recovery_states",
+        "tests/business_rules.rs::confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_cancels_it",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F098",
+      "capability": "Newsletter design, queue and automation",
+      "defined_scope": {
+        "m4_coverage": "Shared rich composition, manual/scheduled bounded expansion and deduplicated confirmation-triggered templates; not arbitrary visual automation graphs."
+      },
+      "cluster": "communications",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journey",
+        "tests/business_rules.rs::smtp_acceptance_and_lost_receipts_have_distinct_recovery_states",
+        "tests/business_rules.rs::confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_cancels_it",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    },
+    {
+      "id": "F099",
+      "capability": "Self-operated outbound mail server",
+      "defined_scope": {
+        "m4_coverage": "Owner-operated SMTP/MTA integration and disconnected .eml spool; no bundled internet-wide MTA/reputation infrastructure."
+      },
+      "cluster": "communications",
+      "review": "source boundaries inspected; associated local regression journeys pass; final CI/reconciliation pending",
+      "evidence": [
+        "tests/business_rules.rs::consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journey",
+        "tests/business_rules.rs::smtp_acceptance_and_lost_receipts_have_distinct_recovery_states",
+        "tests/business_rules.rs::confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_cancels_it",
+        "scripts/workflows_acceptance.cjs"
+      ]
+    }
+  ],
+  "coverage_limits": [
+    "Only defined implemented scopes are reviewed; future premium-plugin capabilities are not claimed.",
+    "A cluster journey is associated evidence, not proof of every possible input or combination.",
+    "Inventory-wide GET isolation does not replace valid-write authorization and role-specific probes.",
+    "Current deployment is one owning process per site data directory; M9 distributed coordination is outside current guarantees."
+  ],
+  "source_review_notes": {
+    "roles_and_writes": "Reviewed session/owner/editor helpers and CSRF call sites in every route-owning source. Origin enforcement is shared middleware. GET inventory probes cover anonymous/subscriber isolation; valid writing, role denial, revocation and capability actions are connected-journey evidence, not exhaustive payload permutation coverage.",
+    "recovery": "Reviewed allowlisted table/column parsing, pre-insert validation, transactional import and derived index rebuild. Archive checksums are corruption detection, not authenticity. Restored sessions are excluded; source and target configuration stay independent.",
+    "frontend": "Reviewed canonical editor and structured studio save/recovery, shared widgets and styles, public form message source/origin checks, local engagement rendering and frame masking. Actual Chrome journeys and 26 representative admin screens complement source inspection.",
+    "costs": "Reviewed finite parser/graph/worker/request limits, batched relationships, publication-only indexed listing/search, keyset admin/entry pages, DB-backed quotas and bounded background batches. Fixed promotion document amplification, file read bounds and content-export buffering. Limits and observations do not prove arbitrary data/configuration will fit any machine."
+  }
 }

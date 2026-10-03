@@ -1454,24 +1454,41 @@ async fn download_backup(
 async fn export_content(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
     let s = admin_session(&app, &headers).await?;
     admin(&s)?;
-    let rows = sqlx::query("SELECT * FROM posts ORDER BY id LIMIT 10001")
-        .fetch_all(&app.db.pool)
-        .await?;
-    if rows.len() > 10000 {
-        return Err(Error::invalid(
-            "M1 content export is limited to 10,000 items; use full backup for this site.",
-        ));
+    use futures_util::TryStreamExt;
+    let mut rows = sqlx::query("SELECT * FROM posts ORDER BY id LIMIT 10001").fetch(&app.db.pool);
+    let mut bytes = br#"{"format":"wpalt-content-v2","posts":["#.to_vec();
+    let mut count = 0;
+    while let Some(row) = rows.try_next().await? {
+        count += 1;
+        if count > 10000 {
+            return Err(Error::invalid(
+                "Content export is limited to 10,000 items; use full backup.",
+            ));
+        }
+        let encoded = serde_json::to_vec(&Post::from_row(row))
+            .map_err(|_| Error::invalid("Content export serialization failed."))?;
+        if bytes.len().saturating_add(encoded.len()).saturating_add(3) > app.config.max_backup_bytes
+        {
+            return Err(Error::invalid(
+                "Content export exceeds max_backup_bytes; increase the configured budget before retrying.",
+            ));
+        }
+        if count > 1 {
+            bytes.push(b',');
+        }
+        bytes.extend(encoded);
     }
-    let posts: Vec<Post> = rows.into_iter().map(Post::from_row).collect();
+    bytes.extend(b"]}");
     Ok((
         [
+            ("content-type", "application/json"),
             (
                 "content-disposition",
                 "attachment; filename=wpalt-content.json",
             ),
             ("cache-control", "no-store"),
         ],
-        Json(serde_json::json!({"format":"wpalt-content-v2","posts":posts})),
+        bytes,
     )
         .into_response())
 }
