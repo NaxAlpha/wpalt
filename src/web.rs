@@ -286,8 +286,13 @@ async fn health(State(app): State<App>) -> Result<Json<serde_json::Value>> {
     ))
 }
 async fn login_page(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
-    if auth::session(&app, &headers).await.is_ok() {
-        return Ok(Redirect::to("/admin").into_response());
+    if let Ok(session) = auth::session(&app, &headers).await {
+        return Ok(Redirect::to(if session.user.role == "subscriber" {
+            "/account"
+        } else {
+            "/admin"
+        })
+        .into_response());
     }
     Ok(Html(view::login(&app.db.settings().await?)).into_response())
 }
@@ -336,7 +341,10 @@ async fn logout(
 async fn dashboard(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
     let s = match admin_session(&app, &headers).await {
         Ok(s) => s,
-        Err(_) => return Ok(Redirect::to("/login").into_response()),
+        Err(error) if error.0 == StatusCode::UNAUTHORIZED => {
+            return Ok(Redirect::to("/login").into_response());
+        }
+        Err(error) => return Err(error),
     };
     let r=sqlx::query("SELECT (SELECT COUNT(*) FROM posts) AS content,(SELECT COUNT(*) FROM posts WHERE status='published') AS published,(SELECT COUNT(*) FROM media) AS media,(SELECT COUNT(*) FROM comments WHERE status='pending') AS pending").fetch_one(&app.db.pool).await?;
     Ok(html_page("Overview",&app.db.settings().await?,Some(&s),html!{

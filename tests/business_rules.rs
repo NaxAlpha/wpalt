@@ -511,6 +511,48 @@ async fn consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journ
             1,
             "Independent workers claim a job once."
         );
+        let spool_path = app
+            .config
+            .data_dir
+            .join("outbox")
+            .join(format!("{job}.eml"));
+        let stable = mail::download(&app, &job).await.unwrap();
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&spool_path)
+            .unwrap()
+            .set_len(stable.len() as u64 + 1)
+            .unwrap();
+        sqlx::query("UPDATE mail_jobs SET state='pending',next_at=0 WHERE id=$1")
+            .bind(&job)
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(mail::tick(&app).await.unwrap(), 1);
+        assert_eq!(
+            sqlx::query_scalar::<_, String>("SELECT state FROM mail_jobs WHERE id=$1")
+                .bind(&job)
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            "retry",
+            "A corrupted spool is an explicit recovery state, never accepted as delivered."
+        );
+        std::fs::write(&spool_path, &stable).unwrap();
+        sqlx::query("UPDATE mail_jobs SET next_at=0 WHERE id=$1")
+            .bind(&job)
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(mail::tick(&app).await.unwrap(), 1);
+        assert_eq!(
+            sqlx::query_scalar::<_, String>("SELECT state FROM mail_jobs WHERE id=$1")
+                .bind(&job)
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            "spooled"
+        );
         audience::decide(&app, token, false).await.unwrap();
         audience::decide(&app, token, false).await.unwrap();
         assert_eq!(

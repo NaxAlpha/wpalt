@@ -460,6 +460,30 @@ async fn permissions_csrf_sessions_and_origin_protect_every_write_surface() {
         let (reader_token, _) = auth::login(&site.app, "reader@example.test", PASSWORD)
             .await
             .unwrap();
+        let (status, headers, _) = request(
+            &site.app,
+            "GET",
+            "/login",
+            Some(&reader_token),
+            "",
+            Vec::new(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        assert_eq!(
+            headers["location"], "/account",
+            "A signed-in subscriber must not enter a login/admin redirect loop."
+        );
+        assert_eq!(
+            get(&site.app, "/admin", Some(&reader_token)).await.0,
+            StatusCode::FORBIDDEN
+        );
+        let account = get(&site.app, "/account", Some(&reader_token)).await.1;
+        assert!(account.contains("Your account"));
+        assert!(
+            !account.contains("href=\"/admin\""),
+            "Account navigation must stay inside the subscriber's permitted experience."
+        );
         let inventory: serde_json::Value =
             serde_json::from_str(include_str!("../docs/evidence/adversarial-coverage.json"))
                 .unwrap();
@@ -490,6 +514,17 @@ async fn permissions_csrf_sessions_and_origin_protect_every_write_surface() {
         let (etoken, editor) = auth::login(&site.app, "editor@example.test", PASSWORD)
             .await
             .unwrap();
+        let editor_page = get(&site.app, "/admin/posts", Some(&etoken)).await.1;
+        assert!(
+            !editor_page.contains("href=\"/admin/engagement\""),
+            "Navigation must not advertise owner-only reports to editors."
+        );
+        assert!(
+            get(&site.app, "/admin/posts", Some(&site.token))
+                .await
+                .1
+                .contains("href=\"/admin/engagement\"")
+        );
         let (mtoken, moderator) = auth::login(&site.app, "moderator@example.test", PASSWORD)
             .await
             .unwrap();
@@ -945,6 +980,21 @@ async fn backup_restores_content_users_media_and_revisions_into_a_fresh_engine()
                 .unwrap(),
             0
         );
+        for (field, value) in [("role", "editor"), ("email", "Owner@Example.TEST")] {
+            let mut inaccessible: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            let mut payload: serde_json::Value =
+                serde_json::from_str(inaccessible["payload"].as_str().unwrap()).unwrap();
+            payload["tables"]["users"][0][field] = value.into();
+            let payload = payload.to_string();
+            inaccessible["payload"] = payload.clone().into();
+            inaccessible["sha256"] = auth::digest(payload.as_bytes()).into();
+            assert!(
+                backup::restore(&target.app, &serde_json::to_vec(&inaccessible).unwrap())
+                    .await
+                    .is_err(),
+                "Recovery must preserve a usable administrator login."
+            );
+        }
         let mut shadowed: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         let mut payload: serde_json::Value =
             serde_json::from_str(shadowed["payload"].as_str().unwrap()).unwrap();

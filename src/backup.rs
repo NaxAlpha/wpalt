@@ -690,11 +690,25 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             row["name"].as_str().unwrap(),
             row["role"].as_str().unwrap(),
         )?;
+        let email = row["email"].as_str().unwrap();
+        if email != email.to_ascii_lowercase() {
+            return Err(Error::invalid(
+                "Backup account emails must use canonical lowercase addresses.",
+            ));
+        }
         if !crate::auth::supported_password_hash(row["password_hash"].as_str().unwrap()) {
             return Err(Error::invalid(
                 "Backup contains an unsupported or excessive-cost password hash.",
             ));
         }
+    }
+    if !snapshot.tables["users"]
+        .iter()
+        .any(|row| row["role"] == "admin")
+    {
+        return Err(Error::invalid(
+            "Backup must preserve at least one active administrator.",
+        ));
     }
     for row in &snapshot.tables["posts"] {
         for key in ["document", "published_document"] {

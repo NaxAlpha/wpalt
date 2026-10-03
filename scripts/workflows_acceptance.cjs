@@ -312,6 +312,13 @@ module.exports = async function (owner, origin, output) {
       403,
       "Approved subscribers still cannot read private form administration.",
     );
+    await visitor.goto(origin + "/login");
+    await visitor.waitForURL("**/account");
+    assert.equal(
+      (await context.request.get(origin + "/admin")).status(),
+      403,
+      "A signed-in subscriber must not enter a login/admin redirect loop.",
+    );
     // Insert the same published form through the real writing editor.
     await page.goto(origin + "/admin/posts/new");
     await page.getByLabel("Title", { exact: true }).fill("Participate locally");
