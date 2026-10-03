@@ -1,0 +1,24 @@
+# Automatic development releases and CI
+
+Every verified push to `main`, including each merged PR, creates a GitHub prerelease after all gates pass. No schedule or paid service is required. Tags are `nightly-YYYYMMDDHHMM-<12-character-commit>`, using the commit's UTC timestamp. The commit suffix prevents same-minute collisions and reruns use the same tag. The name is a development-build convention, not a once-per-night schedule. Failed checks publish nothing; older successful commits retain their own release even if another merge arrives. No deployment or database mutation is performed.
+
+The release contains the clean Linux x86_64/glibc archive and `SHA256SUMS`. Bundled `BUILD.json` identifies the exact source, locks, frontend/business assets, compiler and executable hash. `scripts/release_build.py` verifies these against the checked-out commit before extraction or publication, rejects unsafe/duplicate archive members, and restricts publication to main push execution. Publication uses a draft, uploads both assets, then publishes as a prerelease without changing GitHub's latest stable release. Interrupted draft uploads can be retried. An existing published release must match both assets and source; it is never overwritten. Mismatches fail for operator investigation. Run GitHub's “Re-run all jobs” on that commit after resolving a transient failure; do not force-move release tags.
+
+Only the release job has `contents: write`; PR verification uses read permissions. Actions are pinned by commit. Main push verification rechecks merged source rather than releasing a PR's synthetic merge artifact. The first live publish is verified after this delivery PR merges: PR execution deliberately skips publication. This is a pre-adoption development distribution, with no stable support or complete WordPress parity claim.
+
+## Preserve coverage while reducing elapsed time
+
+- `application`: real SQLite/PostgreSQL Rust journeys, release safety tests, fmt, warnings-denied Clippy, guidance freshness and all volume evidence.
+- `compiler-floor`: the existing Rust 1.85 source check.
+- `dependency-audit`: runs concurrently and caches only the pinned cargo-audit executable/tool installation by OS/architecture/compiler/tool version. The advisory database still fetches on every run; audit results are never cached.
+- `clean-build`: starts concurrently in empty Cargo/target directories, rebuilds locked frontend assets, checks committed output, compiles the release without restored build/dependency caches, and runs the complete CLI install/restart/recovery/configuration/security journey. npm's download cache does not alter the Rust clean-build guarantee.
+- `frontend`: consumes and independently verifies that exact clean archive, then runs frontend format/build reproducibility, npm audit and the entire browser suite, including prior milestones, three viewport sizes, text spacing, keyboard and accessibility evidence.
+- `release`: requires all five jobs to succeed and runs only on main pushes.
+
+This removes the second cached release compilation and duplicate invocation of the same CLI journey, while increasing browser confidence by testing the actual clean delivery executable. No Rust tests, database engines, browser surfaces, audits, security assertions or accessibility measurements are removed. No changed-file test skipping or timing-based retries are introduced. Independent jobs use separate runners; cold audit setup can run beside compilation. Parallelism trades additional concurrent runners against latency; measure total runner time as well as wall time.
+
+The old M5 PR run [37153441593](https://github.com/NaxAlpha/wpalt/actions/runs/37153441593) took approximately 13.5 minutes overall: application 620 seconds, then clean build 187 seconds. Major sequential application steps: Rust tests 165 seconds, installing cargo-audit 168 seconds, cached release compilation 119 seconds, browser installation 24 seconds and browser suite 65 seconds. The compiler-floor job ran independently for 60 seconds. These are observed CI timings, not a guaranteed future duration. The delivery PR records cold and warm measurements from actual runs; do not claim a six-minute target solely from this graph.
+
+## Guidance and update protocol
+
+Reviewed 2026-10-04; recheck by 2027-01-02 or when changing GitHub Actions/CLI, permissions, action versions, cargo-audit or artifact structure. Keep this review date and delivery evidence current. Primary references: [GitHub workflow job permissions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax), [GitHub CLI release creation](https://cli.github.com/manual/gh_release_create), [cargo-audit usage and advisory fetching](https://github.com/rustsec/rustsec/blob/main/cargo-audit/README.md). The existing feature-guidance protocol remains authoritative for application features.
