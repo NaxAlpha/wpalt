@@ -1163,7 +1163,7 @@ pub async fn context_with_discovery(
     // Select published columns only; stream under one request-wide memory budget.
     for (kind, limit) in sets {
         let mut query = QueryBuilder::<Any>::new(
-            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields FROM posts WHERE status='published' AND kind=",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND kind=",
         );
         query
             .push_bind(&kind)
@@ -1245,7 +1245,7 @@ pub async fn context_with_discovery(
         }
         seen.extend(ids.iter().cloned());
         let mut q = QueryBuilder::<Any>::new(
-            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields FROM posts WHERE status='published' AND id IN (",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND id IN (",
         );
         let mut list = q.separated(",");
         for id in &ids {
@@ -1290,7 +1290,7 @@ pub async fn context_with_discovery(
         let mut q = QueryBuilder::<Any>::new(if draft {
             "SELECT id,alt FROM media WHERE id IN ("
         } else {
-            "SELECT id,alt FROM media WHERE visibility='public' AND id IN ("
+            "SELECT id,alt FROM media WHERE visibility='public' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='media' AND mr.resource_id=media.id) AND id IN ("
         });
         let mut list = q.separated(",");
         for id in &media {

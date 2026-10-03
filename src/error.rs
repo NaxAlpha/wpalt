@@ -34,6 +34,11 @@ impl IntoResponse for Error {
 impl From<sqlx::Error> for Error {
     fn from(e: sqlx::Error) -> Self {
         if let sqlx::Error::Database(db) = &e {
+            if db.message() == "member_record_limit" {
+                return Self::invalid(
+                    "Membership record limit reached. Increase the configured budget or remove records before retrying.",
+                );
+            }
             if db.is_unique_violation() {
                 return Self(StatusCode::CONFLICT, "That identifier is already in use.");
             }

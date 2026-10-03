@@ -825,6 +825,105 @@
         "upstream guidance/security advisory"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M5-access",
+      "area": "Membership policy and local community",
+      "scope": "M5",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema/archive 8",
+        "OpenID Connect Core 1.0 errata set 2",
+        "jsonwebtoken 9.3.1"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Default deny; authoritative authorization on every entry point.",
+        "Compose entitlement, groups, drip and lesson prerequisites; prevent direct media/discovery bypass."
+      ],
+      "tests": [
+        "membership_policy_protects_every_delivery_surface_and_exact_time_boundaries",
+        "organizations_gifts_and_moderated_communities_do_not_expand_member_authority"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed; delivery verification pending"
+    },
+    {
+      "feature_id": "M5-learning",
+      "area": "Learning forms, progress and recovery",
+      "scope": "M5",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.w3.org/WAI/tutorials/forms/validation/",
+        "https://www.w3.org/WAI/tutorials/forms/notifications/"
+      ],
+      "applicable_versions": [
+        "wpalt schema/archive 8",
+        "OpenID Connect Core 1.0 errata set 2",
+        "jsonwebtoken 9.3.1"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Preserve deliberate published editions and optimistic updates.",
+        "Communicate quiz errors, grading and completion; verify reflow and usable controls.",
+        "Quota failures and replay must preserve one authoritative state."
+      ],
+      "tests": [
+        "courses_preserve_quiz_assignment_progress_under_retries_republication_and_fresh_recovery",
+        "membership_budget_rolls_back_publication_and_counts_only_persisted_rows",
+        "scripts/membership_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed; delivery verification pending"
+    },
+    {
+      "feature_id": "M5-identity",
+      "area": "Optional OpenID Connect sign-in",
+      "scope": "M5",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://openid.net/specs/openid-connect-core-1_0-35.html",
+        "https://docs.rs/jsonwebtoken/9.3.1/jsonwebtoken/"
+      ],
+      "applicable_versions": [
+        "wpalt schema/archive 8",
+        "OpenID Connect Core 1.0 errata set 2",
+        "jsonwebtoken 9.3.1"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Validate signed identity claims and browser-bound one-use state/PKCE.",
+        "Exact issuer/subject binding only; fail closed without silently linking by email."
+      ],
+      "tests": [
+        "identity_subject_binding_and_signed_claims_cannot_bypass_local_account_authority"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability or deprecation"
+      ],
+      "status": "reviewed; delivery verification pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

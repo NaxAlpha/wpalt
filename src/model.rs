@@ -68,6 +68,8 @@ pub struct Settings {
     #[serde(skip)]
     pub business_enabled: bool,
     #[serde(skip)]
+    pub membership_enabled: bool,
+    #[serde(skip)]
     pub engagement_available: bool,
     #[serde(skip)]
     pub analytics: Option<crate::business::engagement::PublicState>,
@@ -81,6 +83,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             business_enabled: true,
+            membership_enabled: true,
             engagement_available: true,
             analytics: None,
             title: "My wpalt site".into(),

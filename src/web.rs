@@ -30,6 +30,7 @@ pub fn router(app: App) -> Router {
         .merge(crate::builder_web::routes())
         .merge(business)
         .merge(crate::discovery::routes())
+        .merge(crate::membership::web::routes(&app))
         .route("/", get(home))
         .route("/search", get(home))
         .route("/health", get(health))
@@ -136,6 +137,8 @@ async fn security_and_trace(
         || route.starts_with("/api/admin")
         || route == "/login"
         || route == "/account"
+        || route.starts_with("/members")
+        || route.starts_with("/api/members")
         || (route.starts_with("/audience/") || route.starts_with("/registration/"))
         || route.starts_with("/api/forms/")
         || route.starts_with("/api/engagement/")
@@ -144,6 +147,13 @@ async fn security_and_trace(
             "x-robots-tag",
             HeaderValue::from_static("noindex, nofollow"),
         );
+    }
+    if route == "/{slug}"
+        || route == "/{locale}/{slug}"
+        || route.starts_with("/members")
+        || route.starts_with("/api/members")
+    {
+        h.insert("cache-control", HeaderValue::from_static("no-store"));
     }
     h.insert("x-request-id", HeaderValue::from_str(&id).unwrap());
     h.insert(
@@ -154,7 +164,11 @@ async fn security_and_trace(
         "referrer-policy",
         HeaderValue::from_static("strict-origin-when-cross-origin"),
     );
-    if route.starts_with("/audience/") || route.starts_with("/registration/") {
+    if route.starts_with("/audience/")
+        || route.starts_with("/registration/")
+        || route.starts_with("/members/gifts")
+        || route.starts_with("/members/identity")
+    {
         h.insert("referrer-policy", HeaderValue::from_static("no-referrer"));
     }
     h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"));
@@ -178,6 +192,8 @@ async fn security_and_trace(
         || route.starts_with("/api/admin")
         || route == "/login"
         || route == "/account"
+        || route.starts_with("/members")
+        || route.starts_with("/api/members")
         || route == "/logout"
         || (route.starts_with("/audience/") || route.starts_with("/registration/"))
         || route.starts_with("/api/forms/")
@@ -200,6 +216,7 @@ fn capability_navigation(route: &str, headers: &HeaderMap) -> bool {
         "/audience/confirm/{token}",
         "/audience/withdraw/{token}",
         "/registration/{token}",
+        "/members/gifts/{token}",
     ]
     .contains(&route)
         && headers.get("origin").is_some_and(|v| v == "null")
@@ -294,7 +311,11 @@ async fn login_page(State(app): State<App>, headers: HeaderMap) -> Result<Respon
         })
         .into_response());
     }
-    Ok(Html(view::login(&app.db.settings().await?)).into_response())
+    Ok(Html(view::login(
+        &app.db.settings().await?,
+        app.config.membership_enabled && app.config.identity.enabled,
+    ))
+    .into_response())
 }
 #[derive(Deserialize)]
 struct Login {
@@ -384,6 +405,7 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
     let mut sql = QueryBuilder::<Any>::new(
         "WITH candidates AS MATERIALIZED (SELECT id,published_at FROM posts WHERE status='published'",
     );
+    sql.push(crate::membership::PUBLIC_POST);
     sql.push(" AND published_locale=")
         .push_bind(locale)
         .push(if app.db.postgres {
@@ -542,7 +564,11 @@ async fn public_api(
         serde_json::json!({"items":items,"next_url":next.as_ref().map(|c|format!("/api/content{}",next_url(&query,c).trim_start_matches('/'))),"next":next}),
     ))
 }
-async fn public_post(State(app): State<App>, Path(slug): Path<String>) -> Result<Response> {
+async fn public_post(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+) -> Result<Response> {
     let (d, _) = crate::discovery::load(&app).await?;
     if d.languages.iter().any(|l| l.code == slug) {
         return Ok(Redirect::permanent(&d.path(&slug, "")).into_response());
@@ -558,10 +584,11 @@ async fn public_post(State(app): State<App>, Path(slug): Path<String>) -> Result
     if language != d.default_language {
         return Ok(Redirect::permanent(&d.path(&language, &slug)).into_response());
     }
-    render_post(app, language, slug, d).await
+    render_post(app, headers, language, slug, d).await
 }
 async fn localized_post(
     State(app): State<App>,
+    headers: HeaderMap,
     Path((locale, slug)): Path<(String, String)>,
 ) -> Result<Response> {
     let (d, _) = crate::discovery::load(&app).await?;
@@ -569,20 +596,36 @@ async fn localized_post(
     if locale == d.default_language {
         return Ok(Redirect::permanent(&d.path(&locale, &slug)).into_response());
     }
-    render_post(app, locale, slug, d).await
+    render_post(app, headers, locale, slug, d).await
 }
 async fn render_post(
     app: App,
+    headers: HeaderMap,
     locale: String,
     slug: String,
     discovery: crate::discovery::Definition,
 ) -> Result<Response> {
+    let access_id:String=sqlx::query_scalar("SELECT id FROM posts WHERE published_slug=$1 AND published_locale=$2 AND status='published'").bind(&slug).bind(&locale).fetch_optional(&app.db.pool).await?.ok_or_else(Error::not_found)?;
+    let viewer = crate::membership::viewer(&app, &headers).await?;
+    crate::membership::require(
+        &app,
+        "post",
+        &access_id,
+        viewer.as_ref().map(|s| s.user.id.as_str()),
+    )
+    .await?;
     let p = sqlx::query("SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' AS title,'' AS body,'{}' AS fields,'[]' AS blocks,'en' AS locale,'' AS translation_group,'{}' AS seo,'' AS document,published_slug,published_title,published_body,published_fields,published_blocks,published_locale,published_translation_group,published_seo,published_document FROM posts WHERE published_slug=$1 AND published_locale=$2 AND status='published'")
         .bind(&slug).bind(&locale)
         .fetch_optional(&app.db.pool)
         .await?
         .map(Post::from_row)
         .ok_or_else(Error::not_found)?;
+    let protected: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM member_resources WHERE kind='post' AND resource_id=$1",
+    )
+    .bind(&p.id)
+    .fetch_one(&app.db.pool)
+    .await?;
     let comments=sqlx::query("SELECT name,body FROM comments WHERE post_id=$1 AND status='approved' ORDER BY created_at LIMIT 100").bind(&p.id).fetch_all(&app.db.pool).await?;
     let terms=sqlx::query("SELECT t.kind,t.name,t.slug FROM terms t JOIN published_post_terms pt ON pt.term_id=t.id WHERE pt.post_id=$1 ORDER BY t.name").bind(&p.id).fetch_all(&app.db.pool).await?;
     let settings = app.db.settings().await?;
@@ -614,11 +657,11 @@ async fn render_post(
     let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))            section class="comments" {p class="muted" {@for t in terms {a href=(format!("{}?{}={}",discovery.path(&locale,""),t.get::<String,_>("kind"),t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
                     h2 {"Conversation"}
                     @for c in comments {article class="comment" {strong {(c.get::<String,_>("name"))}p {(c.get::<String,_>("body"))}}}
-                    form method="post" action=(format!("/{slug}/comments")) {label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}
-                        p class="muted" {"Comments are reviewed before publication."}button {"Submit for review"}}
+                    @if protected == 0 {form method="post" action=(format!("/{slug}/comments")) {label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}
+                        p class="muted" {"Comments are reviewed before publication."}button {"Submit for review"}}}
                 }
     };
-    Ok(Html(crate::theme::document(
+    let mut response = Html(crate::theme::document(
         &stored,
         &settings,
         &ctx,
@@ -627,7 +670,14 @@ async fn render_post(
         &p.kind,
         extra,
     )?)
-    .into_response())
+    .into_response();
+    if protected > 0 {
+        response.headers_mut().insert(
+            "x-robots-tag",
+            HeaderValue::from_static("noindex, nofollow"),
+        );
+    }
+    Ok(response)
 }
 async fn feed(State(app): State<App>) -> Result<Response> {
     let settings = app.db.settings().await?;
@@ -1169,11 +1219,25 @@ async fn media_file(
         return Err(Error::not_found());
     }
     let row = sqlx::query("SELECT filename,mime,visibility FROM media WHERE id=$1")
-        .bind(id)
+        .bind(&id)
         .fetch_optional(&app.db.pool)
         .await?
         .ok_or_else(Error::not_found)?;
-    if row.get::<String, _>("visibility") == "private" {
+    let viewer = crate::membership::viewer(&app, &headers).await?;
+    crate::membership::require(
+        &app,
+        "media",
+        &id,
+        viewer.as_ref().map(|s| s.user.id.as_str()),
+    )
+    .await?;
+    let gated: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM member_resources WHERE kind='media' AND resource_id=$1",
+    )
+    .bind(&id)
+    .fetch_one(&app.db.pool)
+    .await?;
+    if row.get::<String, _>("visibility") == "private" && gated == 0 {
         let s = admin_session(&app, &headers).await?;
         editor(&s)?;
     }
@@ -1251,6 +1315,7 @@ async fn comment(
             .fetch_optional(&mut *tx)
             .await?
             .ok_or_else(Error::not_found)?;
+    crate::membership::require(&app, "post", &id, None).await?;
     let last: Option<i64> =
         sqlx::query_scalar("SELECT last_at FROM comment_limits WHERE client_hash=$1")
             .bind(&key)
@@ -1362,6 +1427,7 @@ async fn save_settings(
     auth::csrf(&s, &input.csrf)?;
     let settings = Settings {
         business_enabled: app.config.business_enabled,
+        membership_enabled: app.config.membership_enabled,
         engagement_available: app.config.engagement.enabled,
         analytics: None,
         title: input.title,
@@ -1401,8 +1467,8 @@ async fn users(State(app): State<App>, headers: HeaderMap) -> Result<Html<String
                     button class="secondary" {"Update & revoke sessions"}
                 }
             }}}}}}
-            form class="panel" method="post" action="/admin/users" {(view::csrf(&s))h2 {"Add a collaborator"}div class="field-row" {label {"Name" input name="name" required maxlength="100";}label {"Email" input type="email" name="email" required maxlength="254";}}
-                div class="field-row" {label {"Role" select name="role" aria-label="Role" {option value="editor" {"Editor"}option value="moderator" {"Moderator"}option value="admin" {"Administrator"}}}label {"Initial password" input type="password" name="password" required minlength="12" maxlength="256" autocomplete="new-password";}}
+            form class="panel" method="post" action="/admin/users" {(view::csrf(&s))h2 {"Add an account"}div class="field-row" {label {"Name" input name="name" required maxlength="100";}label {"Email" input type="email" name="email" required maxlength="254";}}
+                div class="field-row" {label {"Role" select name="role" aria-label="Role" {option value="subscriber" {"Member"}option value="editor" {"Editor"}option value="moderator" {"Moderator"}option value="admin" {"Administrator"}}}label {"Initial password" input type="password" name="password" required minlength="12" maxlength="256" autocomplete="new-password";}}
                 button {"Create account"}
             }
         },
@@ -1544,7 +1610,7 @@ async fn update_user(
 
 async fn account(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
     let s = auth::session(&app, &headers).await?;
-    Ok(html_page("Your account",&app.db.settings().await?,None,html!{h1 {"Your account"}p {"Signed in as " (&s.user.name)}p {"Role: " (&s.user.role)}p {"This subscriber account does not grant access to site administration."}form method="post" action="/logout" {(view::csrf(&s))button {"Sign out"}}}).into_response())
+    Ok(html_page("Your account",&app.db.settings().await?,None,html!{h1 {"Your account"}p {"Signed in as " (&s.user.name)}p {"Role: " (&s.user.role)}p {"This subscriber account does not grant access to site administration."}@if app.config.membership_enabled {p {a href="/members" {"Open my learning and communities"}}}form method="post" action="/logout" {(view::csrf(&s))button {"Sign out"}}}).into_response())
 }
 
 async fn form_embed_js(State(app): State<App>) -> Result<Response> {
