@@ -216,6 +216,7 @@ fn capability_navigation(route: &str, headers: &HeaderMap) -> bool {
         "/audience/confirm/{token}",
         "/audience/withdraw/{token}",
         "/registration/{token}",
+        "/members/gifts/{token}",
     ]
     .contains(&route)
         && headers.get("origin").is_some_and(|v| v == "null")
@@ -619,6 +620,12 @@ async fn render_post(
         .await?
         .map(Post::from_row)
         .ok_or_else(Error::not_found)?;
+    let protected: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM member_resources WHERE kind='post' AND resource_id=$1",
+    )
+    .bind(&p.id)
+    .fetch_one(&app.db.pool)
+    .await?;
     let comments=sqlx::query("SELECT name,body FROM comments WHERE post_id=$1 AND status='approved' ORDER BY created_at LIMIT 100").bind(&p.id).fetch_all(&app.db.pool).await?;
     let terms=sqlx::query("SELECT t.kind,t.name,t.slug FROM terms t JOIN published_post_terms pt ON pt.term_id=t.id WHERE pt.post_id=$1 ORDER BY t.name").bind(&p.id).fetch_all(&app.db.pool).await?;
     let settings = app.db.settings().await?;
@@ -650,11 +657,11 @@ async fn render_post(
     let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))            section class="comments" {p class="muted" {@for t in terms {a href=(format!("{}?{}={}",discovery.path(&locale,""),t.get::<String,_>("kind"),t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
                     h2 {"Conversation"}
                     @for c in comments {article class="comment" {strong {(c.get::<String,_>("name"))}p {(c.get::<String,_>("body"))}}}
-                    form method="post" action=(format!("/{slug}/comments")) {label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}
-                        p class="muted" {"Comments are reviewed before publication."}button {"Submit for review"}}
+                    @if protected == 0 {form method="post" action=(format!("/{slug}/comments")) {label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}
+                        p class="muted" {"Comments are reviewed before publication."}button {"Submit for review"}}}
                 }
     };
-    Ok(Html(crate::theme::document(
+    let mut response = Html(crate::theme::document(
         &stored,
         &settings,
         &ctx,
@@ -663,7 +670,14 @@ async fn render_post(
         &p.kind,
         extra,
     )?)
-    .into_response())
+    .into_response();
+    if protected > 0 {
+        response.headers_mut().insert(
+            "x-robots-tag",
+            HeaderValue::from_static("noindex, nofollow"),
+        );
+    }
+    Ok(response)
 }
 async fn feed(State(app): State<App>) -> Result<Response> {
     let settings = app.db.settings().await?;

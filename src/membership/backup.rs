@@ -268,11 +268,18 @@ pub fn validate(t: &Tables) -> Result<()> {
             }
         }
     }
+    let mut active_certificates = HashSet::new();
     for r in &t["member_certificates"] {
         let c = versions
             .get(&(text(r, "course_id"), number(r, "course_version")))
             .ok_or_else(bad)?;
         if !users.contains(text(r, "user_id"))
+            || (number(r, "revoked") == 0
+                && !active_certificates.insert((
+                    text(r, "user_id"),
+                    text(r, "course_id"),
+                    number(r, "course_version"),
+                )))
             || !(0..=1).contains(&number(r, "revoked"))
             || (number(r, "revoked") == 0
                 && !c.lessons.iter().all(|l| {

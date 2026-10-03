@@ -88,6 +88,7 @@ async fn membership_policy_protects_every_delivery_surface_and_exact_time_bounda
         )
         .await;
         assert_eq!(s, StatusCode::OK);
+        assert!(h["x-robots-tag"].to_str().unwrap().contains("noindex"));
         assert_eq!(h["cache-control"], "no-store");
         assert!(String::from_utf8(b).unwrap().contains("M5_SECRET_BODY"));
         for path in [
@@ -414,8 +415,79 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
             .0,
             StatusCode::OK
         );
+        // Reset revokes the old proof permanently; reviewed replacement work
+        // receives a new certificate identity, not a revived old link.
+        m::reset_progress(&site.app, &id, v, &second.id, &learner.user.id)
+            .await
+            .unwrap();
+        assert_eq!(
+            get(
+                &site.app,
+                &format!("/members/certificates/{cert}"),
+                Some(&token)
+            )
+            .await
+            .0,
+            StatusCode::NOT_FOUND
+        );
+        assert!(m::certificate(&site.app, &learner, &id).await.is_err());
+        m::assess(
+            &site.app,
+            &learner,
+            &id,
+            &second.id,
+            m::AttemptInput {
+                version: v,
+                key: &uuid::Uuid::new_v4().to_string(),
+                answers: &[],
+                assignment: "Replacement work after an explicit reset",
+            },
+        )
+        .await
+        .unwrap();
+        let assignment_version: i64 =
+            sqlx::query_scalar("SELECT version FROM member_assignments WHERE id=$1")
+                .bind(&assignment)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        m::grade(
+            &site.app,
+            &assignment,
+            assignment_version,
+            true,
+            "Approved replacement",
+        )
+        .await
+        .unwrap();
+        let replacement = m::certificate(&site.app, &learner, &id).await.unwrap();
+        assert_ne!(replacement, cert);
+        assert_eq!(
+            get(
+                &site.app,
+                &format!("/members/certificates/{cert}"),
+                Some(&token)
+            )
+            .await
+            .0,
+            StatusCode::NOT_FOUND
+        );
+        let cert = replacement;
+        // Draft titles/policies must not leak or change authority before publication.
+        let mut draft = course.clone();
+        draft.title = "PRIVATE_FUTURE_TITLE".into();
+        draft.policy_id = m::policy(&site.app, "Future restriction", "future", "")
+            .await
+            .unwrap();
+        let draft_version = m::save_course(&site.app, &id, v, &draft, false)
+            .await
+            .unwrap();
+        let dashboard = get(&site.app, "/members", Some(&token)).await.1;
+        assert!(dashboard.contains("Local learning"));
+        assert!(!dashboard.contains("PRIVATE_FUTURE_TITLE"));
+        assert_eq!(m::live(&site.app, &id).await.unwrap().1, v);
         // Republishing is deliberate and cannot reuse progress for changed assessment meaning.
-        let next = m::save_course(&site.app, &id, v, &course, true)
+        let next = m::save_course(&site.app, &id, draft_version, &course, true)
             .await
             .unwrap();
         assert!(next > v);
@@ -484,6 +556,21 @@ async fn courses_preserve_quiz_assignment_progress_under_retries_republication_a
         assert_eq!(n, 0, "unsafe recovery partially wrote users");
         empty.close().await;
         fresh.close().await;
+        assert!(
+            m::release(&site.app, "post", &first.post_id).await.is_err(),
+            "Active lessons cannot be made public independently"
+        );
+        let mut shorter = course.clone();
+        shorter.lessons.remove(0);
+        m::save_course(&site.app, &id, next, &shorter, true)
+            .await
+            .unwrap();
+        assert_eq!(
+            get(&site.app, "/lesson-one", Some(&token)).await.0,
+            StatusCode::FORBIDDEN
+        );
+        m::release(&site.app, "post", &first.post_id).await.unwrap();
+        assert_eq!(get(&site.app, "/lesson-one", None).await.0, StatusCode::OK);
         site.close().await;
     }
 }
@@ -586,6 +673,42 @@ async fn organizations_gifts_and_moderated_communities_do_not_expand_member_auth
                 .await
                 .unwrap();
         assert_eq!(grants, 1);
+        // Browsers redact Origin on no-referrer gift pages. Only a same-origin
+        // document navigation may proceed, and it still needs session + CSRF.
+        let browser_gift = m::gift(&site.app, "browser-gift", wpalt::now() + 100, 60)
+            .await
+            .unwrap();
+        let browser_path = format!("/members/gifts/{browser_gift}");
+        for (fetch_site, csrf, expected) in [
+            ("cross-site", manager.csrf.as_str(), StatusCode::FORBIDDEN),
+            ("same-origin", "forged", StatusCode::FORBIDDEN),
+            ("same-origin", manager.csrf.as_str(), StatusCode::SEE_OTHER),
+        ] {
+            let body = serde_urlencoded::to_string([("csrf", csrf)]).unwrap();
+            let request = Request::builder()
+                .method("POST")
+                .uri(&browser_path)
+                .header("cookie", format!("wpalt_session={token}"))
+                .header("origin", "null")
+                .header("sec-fetch-site", fetch_site)
+                .header("sec-fetch-mode", "navigate")
+                .header("sec-fetch-dest", "document")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(body))
+                .unwrap();
+            assert_eq!(
+                wpalt::web::router(site.app.clone())
+                    .oneshot(request)
+                    .await
+                    .unwrap()
+                    .status(),
+                expected
+            );
+        }
+        assert_eq!(
+            get(&site.app, &browser_path, Some(&token)).await.0,
+            StatusCode::NOT_FOUND
+        );
         m::seat(&site.app, &manager, &group, "seat@example.test", true)
             .await
             .unwrap();
@@ -616,6 +739,72 @@ async fn organizations_gifts_and_moderated_communities_do_not_expand_member_auth
             .0,
             StatusCode::FORBIDDEN
         );
+        assert_eq!(
+            form(
+                &site.app,
+                "/members/profile",
+                Some(&token),
+                &[
+                    ("csrf", &manager.csrf),
+                    ("name", "Manager"),
+                    ("biography", "Private recovered biography")
+                ]
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        let referral =
+            m::referrals::create(&site.app, &manager.user.id, "Recovered local referral")
+                .await
+                .unwrap();
+        m::referrals::commission(&site.app, &referral, "one-local-obligation", 1200, "USD")
+            .await
+            .unwrap();
+        assert!(
+            m::referrals::commission(&site.app, &referral, "one-local-obligation", 9999, "USD")
+                .await
+                .is_err()
+        );
+        let archive = backup::capture(&site.app).await.unwrap();
+        let recovered = Site::new(pg, false).await;
+        backup::restore(&recovered.app, &archive).await.unwrap();
+        let (recovered_token, _) = auth::login(&recovered.app, "manager@example.test", PASSWORD)
+            .await
+            .unwrap();
+        assert!(
+            get(&recovered.app, "/members/profile", Some(&recovered_token))
+                .await
+                .1
+                .contains("Private recovered biography")
+        );
+        let discussion = get(
+            &recovered.app,
+            &format!("/members/groups/{group}"),
+            Some(&recovered_token),
+        )
+        .await
+        .1;
+        assert!(
+            discussion.contains("PENDING_TEAM_DISCUSSION") && !discussion.contains("<script>alert")
+        );
+        assert!(
+            m::claim_gift(&recovered.app, &manager, &browser_gift)
+                .await
+                .is_err(),
+            "Recovery must not resurrect a spent gift"
+        );
+        let amount: i64 = sqlx::query_scalar(
+            "SELECT amount_minor FROM member_commissions WHERE reference='one-local-obligation'",
+        )
+        .fetch_one(&recovered.app.db.pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            amount, 1200,
+            "Duplicate reference must not change the original obligation"
+        );
+        recovered.close().await;
         site.close().await;
     }
 }
@@ -714,6 +903,43 @@ async fn identity_subject_binding_and_signed_claims_cannot_bypass_local_account_
             get(&site.app, "/members", Some(&token)).await.0,
             StatusCode::UNAUTHORIZED
         );
+        let (_, active) = member(&site, "binding-revocation@example.test").await;
+        sqlx::query(
+            "INSERT INTO member_identities(issuer,subject,user_id) VALUES($1,'remove-me',$2)",
+        )
+        .bind(&cfg.issuer)
+        .bind(&active.user.id)
+        .execute(&site.app.db.pool)
+        .await
+        .unwrap();
+        let (active_token, _) = identity_session(&site.app, &cfg.issuer, "remove-me")
+            .await
+            .unwrap();
+        assert_eq!(
+            form(
+                &site.app,
+                "/admin/members",
+                Some(&site.token),
+                &[
+                    ("csrf", &site.session().csrf),
+                    ("operation", "identity-remove"),
+                    ("title", &cfg.issuer),
+                    ("key", "remove-me")
+                ]
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            get(&site.app, "/members", Some(&active_token)).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+        assert!(
+            identity_session(&site.app, &cfg.issuer, "remove-me")
+                .await
+                .is_err()
+        );
         let mut config = site.app.config.as_ref().clone();
         config.identity.client_secret = "fixture-secret-must-be-redacted".into();
         assert!(
@@ -721,6 +947,83 @@ async fn identity_subject_binding_and_signed_claims_cannot_bypass_local_account_
                 .redacted()
                 .to_string()
                 .contains("fixture-secret-must-be-redacted")
+        );
+        // A wrong browser cannot consume another browser's flow; the owning
+        // browser consumes it once even if the configured provider is unavailable.
+        let mut app = site.app.clone();
+        let mut config = app.config.as_ref().clone();
+        config.base_url = "https://localhost".into();
+        config.identity = Config {
+            enabled: true,
+            issuer: cfg.issuer.clone(),
+            client_id: cfg.client_id.clone(),
+            authorization_url: "https://identity.example.test/authorize".into(),
+            token_url: "https://127.0.0.1:1/token".into(),
+            jwks_url: "https://127.0.0.1:1/keys".into(),
+            client_secret: "private-test-secret".into(),
+        };
+        config.validate().unwrap();
+        app.config = std::sync::Arc::new(config);
+        let (_, headers, _) =
+            request(&app, "GET", "/members/identity/start", None, "", vec![]).await;
+        let location = url::Url::parse(headers["location"].to_str().unwrap()).unwrap();
+        let values: std::collections::HashMap<_, _> = location.query_pairs().into_owned().collect();
+        assert_eq!(values["code_challenge_method"], "S256");
+        assert!(!location.as_str().contains("private-test-secret"));
+        let cookie = headers["set-cookie"].to_str().unwrap();
+        assert!(
+            cookie.contains("Secure")
+                && cookie.contains("HttpOnly")
+                && cookie.contains("SameSite=Lax")
+        );
+        let cookie = cookie.split(';').next().unwrap();
+        let callback = format!(
+            "/members/identity/callback?state={}&code=fixture-code",
+            values["state"]
+        );
+        let wrong = Request::builder()
+            .uri(&callback)
+            .header("cookie", format!("wpalt_identity={}", "0".repeat(64)))
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            wpalt::web::router(app.clone())
+                .oneshot(wrong)
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM identity_flows")
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+        let own = Request::builder()
+            .uri(&callback)
+            .header("cookie", cookie)
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            wpalt::web::router(app.clone())
+                .oneshot(own)
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        let replay = Request::builder()
+            .uri(&callback)
+            .header("cookie", cookie)
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            wpalt::web::router(app.clone())
+                .oneshot(replay)
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
         );
         site.close().await;
     }
@@ -818,4 +1121,125 @@ async fn membership_budget_rolls_back_publication_and_counts_only_persisted_rows
         fresh.close().await;
         site.close().await;
     }
+}
+
+#[tokio::test]
+async fn populated_learning_projection_keeps_prerequisites_and_indexed_lookup_paths() {
+    let mut evidence = vec![];
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let (_, learner) = member(&site, "volume-learner@example.test").await;
+        let policy = m::policy(&site.app, "Measured academy", "measured", "")
+            .await
+            .unwrap();
+        m::grant(
+            &site.app,
+            &learner.user.id,
+            "measured",
+            wpalt::now() - 60,
+            0,
+            "local-test",
+        )
+        .await
+        .unwrap();
+        let mut lessons = vec![];
+        for index in 0..100 {
+            let post = publish(
+                &site,
+                &format!("measured-lesson-{index}"),
+                "Measured shared lesson content",
+            )
+            .await;
+            lessons.push(lesson(post, &format!("Lesson {}", index + 1)));
+        }
+        let course = Course {
+            title: "Measured academy".into(),
+            policy_id: policy,
+            sequential: true,
+            lessons,
+        };
+        let id = m::create_course(&site.app, &course).await.unwrap();
+        let version = m::save_course(&site.app, &id, 1, &course, true)
+            .await
+            .unwrap();
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        for index in 0..1000 {
+            sqlx::query("INSERT INTO member_grants(id,user_id,entitlement,starts_at,expires_at,origin,created_at) VALUES($1,$2,$3,1,2,'volume-fixture',1)")
+                .bind(uuid::Uuid::new_v4().to_string()).bind(&learner.user.id).bind(format!("unrelated-{index}"))
+                .execute(&mut *tx).await.unwrap();
+        }
+        tx.commit().await.unwrap();
+        let mut times = vec![];
+        for _ in 0..30 {
+            let start = std::time::Instant::now();
+            let (_, edition, states) = m::learner_state(&site.app, &learner, &id).await.unwrap();
+            times.push(start.elapsed().as_secs_f64() * 1000.0);
+            assert_eq!(edition, version);
+            assert_eq!(states.len(), 100);
+            assert_eq!(states.iter().filter(|s| s.unlocked).count(), 1);
+            assert!(
+                states.iter().skip(1).all(|s| s.title == "Locked lesson"),
+                "Locked titles stay private at maximum course size"
+            );
+        }
+        assert!(
+            !m::allowed(
+                &site.app,
+                "post",
+                &course.lessons[99].post_id,
+                Some(&learner.user.id),
+                wpalt::now()
+            )
+            .await
+            .unwrap()
+        );
+        sqlx::raw_sql("ANALYZE")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let prefix = if pg {
+            "EXPLAIN "
+        } else {
+            "EXPLAIN QUERY PLAN "
+        };
+        let user = &learner.user.id;
+        let queries = [
+            format!(
+                "SELECT policy_id FROM member_resources WHERE kind='course' AND resource_id='{id}'"
+            ),
+            format!(
+                "SELECT MIN(starts_at) FROM member_grants WHERE user_id='{user}' AND entitlement='measured' AND revoked=0 AND starts_at<=9999999999 AND (expires_at=0 OR expires_at>9999999999)"
+            ),
+            format!(
+                "SELECT lesson_id,completed_at FROM member_progress WHERE course_id='{id}' AND course_version={version} AND user_id='{user}'"
+            ),
+        ];
+        let mut plans = vec![];
+        for query in queries {
+            let rows = sqlx::query(&format!("{prefix}{query}"))
+                .fetch_all(&site.app.db.pool)
+                .await
+                .unwrap();
+            plans.push(
+                rows.iter()
+                    .map(|r| {
+                        if pg {
+                            r.get::<String, _>(0)
+                        } else {
+                            r.get::<String, _>("detail")
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            );
+        }
+        times.sort_by(f64::total_cmp);
+        evidence.push(serde_json::json!({"engine":if pg {"postgres"}else{"sqlite"},"conditions":"Debug integration API, maximum 100-lesson sequential course, 1,000 unrelated grants; no timing thresholds or production-capacity claim","p50_ms":times[14],"p95_ms":times[28],"plans":plans,"projection":"One progress batch; no per-lesson authorization query loop"}));
+        site.close().await;
+    }
+    std::fs::create_dir_all("work").unwrap();
+    std::fs::write(
+        "work/m5-volume.json",
+        serde_json::to_vec_pretty(&evidence).unwrap(),
+    )
+    .unwrap();
 }

@@ -87,11 +87,9 @@ module.exports = async (owner, origin, output) => {
   try {
     const password = crypto.randomBytes(20).toString("hex");
     await page.goto(origin + "/admin/users");
-    const account = page
-      .locator("form")
-      .filter({
-        has: page.getByRole("button", { name: "Create account", exact: true }),
-      });
+    const account = page.locator("form").filter({
+      has: page.getByRole("button", { name: "Create account", exact: true }),
+    });
     await account.getByLabel("Name", { exact: true }).fill("M5 Learner");
     await account
       .getByLabel("Email", { exact: true })
@@ -120,13 +118,14 @@ module.exports = async (owner, origin, output) => {
       );
     }
     await page.goto(origin + "/admin/media");
-    await page
+    const uploadForm = page.locator('form[enctype="multipart/form-data"]');
+    await uploadForm
       .getByLabel("Image", { exact: true })
       .setInputFiles(path.join(__dirname, "../tests/fixtures/green.png"));
-    await page
+    await uploadForm
       .getByLabel("Alternative text", { exact: true })
       .fill("M5 course worksheet");
-    await page
+    await uploadForm
       .getByLabel("Visibility", { exact: true })
       .selectOption("private");
     await submit(
@@ -299,12 +298,132 @@ module.exports = async (owner, origin, output) => {
       learner.getByRole("button", { name: /certificate/i }),
     );
     await measure(learner, "certificate");
+    await learner.goto(origin + "/members/profile");
+    await learner
+      .getByLabel("Biography", { exact: true })
+      .fill("An independent learner on a local site.");
+    await submit(
+      learner,
+      learner.getByRole("button", { name: "Save profile", exact: true }),
+    );
+    await measure(learner, "profile");
+    await page.goto(origin + "/admin/members");
+    form = section(page, "Create a group or organization");
+    await form
+      .getByLabel("Group title", { exact: true })
+      .fill("M5 learning team");
+    await form
+      .locator("select[name=user]")
+      .selectOption({ label: "M5 Learner" });
+    await form
+      .getByLabel("Seat limit (0 means ordinary group)", { exact: true })
+      .fill("2");
+    await submit(
+      page,
+      form.getByRole("button", { name: "Create group", exact: true }),
+    );
+    const groupPath = await page
+      .getByRole("link", { name: "M5 learning team", exact: true })
+      .getAttribute("href");
+    await learner.goto(origin + groupPath);
+    await learner
+      .getByLabel("Existing member email", { exact: true })
+      .fill("m5-learner@example.test");
+    await submit(
+      learner,
+      learner.getByRole("button", { name: "Add seat", exact: true }),
+    );
+    await learner
+      .getByLabel("Message", { exact: true })
+      .fill("Our local learning discussion awaits moderation.");
+    await submit(
+      learner,
+      learner.getByRole("button", { name: "Submit for review", exact: true }),
+    );
+    await measure(learner, "community");
+    await page.goto(origin + "/admin/members");
+    const discussion = section(page, "Discussion moderation")
+      .locator("article")
+      .filter({ hasText: "Our local learning discussion" });
+    await submit(
+      page,
+      discussion.getByRole("button", { name: "Approve", exact: true }),
+    );
+    await learner.goto(origin + groupPath);
+    await learner.getByText("approved", { exact: true }).waitFor();
+    await page.goto(origin + "/admin/members");
+    form = section(page, "Create a single-use gift");
+    await form.getByLabel("Entitlement key", { exact: true }).fill("m5-gift");
+    await submit(
+      page,
+      form.getByRole("button", { name: "Create gift link", exact: true }),
+    );
+    const giftPath = await page
+      .locator('a[href^="/members/gifts/"]')
+      .getAttribute("href");
+    await learner.goto(origin + giftPath);
+    await measure(learner, "gift");
+    await submit(
+      learner,
+      learner.getByRole("button", { name: "Claim gift", exact: true }),
+    );
+    assert.equal(
+      learner.url(),
+      origin + "/members",
+      "Gift claim should complete with a member-dashboard redirect",
+    );
+    assert.equal(
+      (
+        await context.request.get(origin + giftPath, { maxRedirects: 0 })
+      ).status(),
+      404,
+    );
+    await page.goto(origin + "/admin/members/referrals");
+    form = section(page, "Create a referral");
+    await form.getByLabel("Title", { exact: true }).fill("M5 local referral");
+    await form
+      .locator("select[name=user]")
+      .selectOption({ label: "M5 Learner" });
+    await submit(
+      page,
+      form.getByRole("button", { name: "Create referral link", exact: true }),
+    );
+    const referralPath = await page
+      .getByRole("link", { name: "M5 local referral", exact: true })
+      .getAttribute("href");
+    assert.equal(
+      (await context.request.get(origin + referralPath)).status(),
+      200,
+    );
+    await page.reload();
+    form = section(page, "Record a commission");
+    await form
+      .locator("select[name=id]")
+      .selectOption({ label: "M5 local referral" });
+    await form
+      .getByLabel("Unique reference", { exact: true })
+      .fill("M5-manual-obligation");
+    await form
+      .getByLabel("Amount in minor units", { exact: true })
+      .fill("1200");
+    await form.getByLabel("Currency code", { exact: true }).fill("USD");
+    await submit(
+      page,
+      form.getByRole("button", { name: "Record commission", exact: true }),
+    );
+    await measure(page, "referrals");
+    await page.goto(origin + "/admin/members/identity");
+    await measure(page, "identity-disabled");
+    report.journey.push(
+      "Private profile, delegated group seats, moderated community, one-use gift, local referral visits and manual commission administration.",
+    );
     await page.goto(courseUrl);
     await measure(page, "gradebook");
     await page.goto(origin + "/admin/members");
     const grant = section(page, "Assign a membership")
       .locator("div.toolbar")
-      .filter({ hasText: "M5 Learner" });
+      .filter({ hasText: "M5 Learner" })
+      .filter({ hasText: "m5-academy" });
     await submit(
       page,
       grant.getByRole("button", { name: "Revoke", exact: true }),

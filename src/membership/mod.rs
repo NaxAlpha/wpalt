@@ -32,7 +32,8 @@ CREATE INDEX IF NOT EXISTS member_progress_user ON member_progress(user_id,cours
 CREATE TABLE IF NOT EXISTS member_attempts(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),course_id TEXT NOT NULL REFERENCES member_courses(id),course_version BIGINT NOT NULL,lesson_id TEXT NOT NULL,request_key TEXT NOT NULL,score BIGINT NOT NULL,passed BIGINT NOT NULL,created_at BIGINT NOT NULL,UNIQUE(user_id,course_id,course_version,lesson_id,request_key));
 CREATE TABLE IF NOT EXISTS member_assignments(id TEXT PRIMARY KEY,course_id TEXT NOT NULL REFERENCES member_courses(id),course_version BIGINT NOT NULL,lesson_id TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id),body TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('submitted','approved','changes')),feedback TEXT NOT NULL DEFAULT '',version BIGINT NOT NULL DEFAULT 1,created_at BIGINT NOT NULL,UNIQUE(course_id,course_version,lesson_id,user_id));
 CREATE INDEX IF NOT EXISTS member_assignment_review ON member_assignments(state,created_at,id);
-CREATE TABLE IF NOT EXISTS member_certificates(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),course_id TEXT NOT NULL REFERENCES member_courses(id),course_version BIGINT NOT NULL,issued_at BIGINT NOT NULL,revoked BIGINT NOT NULL DEFAULT 0,UNIQUE(user_id,course_id,course_version));
+CREATE TABLE IF NOT EXISTS member_certificates(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),course_id TEXT NOT NULL REFERENCES member_courses(id),course_version BIGINT NOT NULL,issued_at BIGINT NOT NULL,revoked BIGINT NOT NULL DEFAULT 0);
+CREATE UNIQUE INDEX IF NOT EXISTS member_certificate_current ON member_certificates(user_id,course_id,course_version) WHERE revoked=0;
 CREATE TABLE IF NOT EXISTS member_discussions(id TEXT PRIMARY KEY,group_id TEXT NOT NULL REFERENCES member_groups(id),user_id TEXT NOT NULL REFERENCES users(id),body TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('pending','approved','rejected')),created_at BIGINT NOT NULL);
 CREATE INDEX IF NOT EXISTS member_discussion_group ON member_discussions(group_id,state,created_at,id);
 CREATE TABLE IF NOT EXISTS member_gifts(id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,entitlement TEXT NOT NULL,expires_at BIGINT NOT NULL,duration_seconds BIGINT NOT NULL,claimed_by TEXT NOT NULL DEFAULT '',created_at BIGINT NOT NULL);
@@ -575,7 +576,7 @@ pub async fn certificate(app: &App, s: &Session, course: &str) -> Result<String>
         ));
     }
     let id = uuid::Uuid::new_v4().to_string();
-    sqlx::query("INSERT INTO member_certificates(id,user_id,course_id,course_version,issued_at) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,course_id,course_version) DO NOTHING").bind(id).bind(&s.user.id).bind(course).bind(v).bind(now()).execute(&app.db.pool).await?;
+    sqlx::query("INSERT INTO member_certificates(id,user_id,course_id,course_version,issued_at) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,course_id,course_version) WHERE revoked=0 DO NOTHING").bind(id).bind(&s.user.id).bind(course).bind(v).bind(now()).execute(&app.db.pool).await?;
     sqlx::query_scalar("SELECT id FROM member_certificates WHERE user_id=$1 AND course_id=$2 AND course_version=$3 AND revoked=0").bind(&s.user.id).bind(course).bind(v).fetch_optional(&app.db.pool).await?.ok_or_else(Error::forbidden)
 }
 
@@ -749,13 +750,15 @@ pub async fn learner_state(
         .fetch_one(&app.db.pool)
         .await?;
     let staff = matches!(role.as_str(), "admin" | "editor");
+    let progress: std::collections::HashMap<String, _> = progress
+        .into_iter()
+        .map(|row| (row.get::<String, _>("lesson_id"), row))
+        .collect();
     let mut prior = true;
     let time = now();
     let mut out = Vec::new();
     for l in &c.lessons {
-        let p = progress
-            .iter()
-            .find(|p| p.get::<String, _>("lesson_id") == l.id);
+        let p = progress.get(&l.id);
         let completed = p.is_some_and(|p| p.get::<i64, _>("completed_at") > 0);
         let unlocked = staff
             || ((!c.sequential || prior)
@@ -795,5 +798,47 @@ pub async fn reset_progress(
     sqlx::query("UPDATE member_certificates SET revoked=1 WHERE course_id=$1 AND course_version=$2 AND user_id=$3").bind(course).bind(version).bind(user).execute(&mut *tx).await?;
     tx.commit().await?;
     tracing::info!(event="learning_progress_reset",course_id=%course,course_version=version);
+    Ok(())
+}
+
+/// Explicit owner release never unprotects a resource still owned by a live lesson.
+pub async fn release(app: &App, kind: &str, id: &str) -> Result<()> {
+    if !matches!(kind, "post" | "media") {
+        return Err(Error::invalid("Select content or media."));
+    }
+    uuid(id)?;
+    let _guard = app.mutations.lock().await;
+    let row =
+        sqlx::query("SELECT course_id FROM member_resources WHERE kind=$1 AND resource_id=$2")
+            .bind(kind)
+            .bind(id)
+            .fetch_optional(&app.db.pool)
+            .await?
+            .ok_or_else(Error::not_found)?;
+    let course: String = row.get("course_id");
+    if !course.is_empty() {
+        let (course, _) = live(app, &course).await?;
+        if course.lessons.iter().any(|lesson| {
+            if kind == "post" {
+                lesson.post_id == id
+            } else {
+                lesson.downloads.iter().any(|media| media == id)
+            }
+        }) {
+            return Err(Error::invalid(
+                "Remove this resource from the published course before releasing its access rule.",
+            ));
+        }
+    }
+    sqlx::query("DELETE FROM member_resources WHERE kind=$1 AND resource_id=$2")
+        .bind(kind)
+        .bind(id)
+        .execute(&app.db.pool)
+        .await?;
+    tracing::info!(
+        event = "membership_resource_released",
+        resource_kind = kind,
+        resource_id = id
+    );
     Ok(())
 }

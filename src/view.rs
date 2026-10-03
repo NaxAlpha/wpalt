@@ -49,7 +49,7 @@ fn layout_inner(
             }}
         }
         main id="main" class=(if admin || member{"workspace"}else{"site-main"}) {(body)}
-        @if !admin {footer class="site-footer" {span {(settings.description)} a href="/login" {"Manage site"}}}
+        @if !admin {footer class="site-footer" {span {(settings.description)} a href=(if member {"/account"}else{"/login"}) {(if member {"Account"}else{"Manage site"})}}}
     }} }.into_string()
 }
 pub fn heading(kicker: &str, title: &str, description: &str) -> Markup {
@@ -90,7 +90,7 @@ pub fn login(settings: &Settings, identity: bool) -> String {
         "Sign in",
         settings,
         None,
-        html! {section class="login-card panel" {p class="eyebrow" {"Owner-controlled publishing"}h1 {"Welcome back."}p {"Sign in to manage your website."}
+        html! {section class="login-card panel" {p class="eyebrow" {"Owner-controlled publishing"}h1 {"Welcome back."}p {"Sign in to your account."}
             form method="post" action="/login" {label {"Email" input type="email" name="email" autocomplete="username" required;}
                 label {"Password" input type="password" name="password" autocomplete="current-password" required maxlength="256";}
                 button {"Sign in"}}

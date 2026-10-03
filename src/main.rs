@@ -129,6 +129,12 @@ enum MemberCommand {
         #[arg(long, default_value_t = 0)]
         delay: i64,
     },
+    Release {
+        #[arg(long)]
+        kind: String,
+        #[arg(long)]
+        resource: String,
+    },
     CourseImport {
         input: PathBuf,
         #[arg(long)]
@@ -207,6 +213,10 @@ async fn member_command(app: &App, command: MemberCommand) -> wpalt::error::Resu
         } => {
             m::protect(app, &kind, &resource, &policy, opens, delay).await?;
             println!("Resource protected.");
+        }
+        MemberCommand::Release { kind, resource } => {
+            m::release(app, &kind, &resource).await?;
+            println!("Access rule released.");
         }
         MemberCommand::CourseImport { input, id, publish } => {
             let bytes = backup::read_bounded(&input, 256 * 1024).await?;
