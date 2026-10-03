@@ -230,3 +230,57 @@ pub async fn from_m3(db: &Db) -> anyhow::Result<()> {
     tx.commit().await?;
     Ok(())
 }
+
+/// One-time M4 account-role upgrade. Startup runs before accepting requests.
+pub async fn from_m4(db: &Db) -> anyhow::Result<()> {
+    let mut connection = db.pool.acquire().await?;
+    if db.postgres {
+        let present:Option<String>=sqlx::query_scalar("SELECT CAST(table_name AS TEXT) AS table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='users'").fetch_optional(&mut *connection).await?;
+        if present.is_some() {
+            let mut tx = connection.begin().await?;
+            sqlx::raw_sql("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check; ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN ('admin','editor','moderator','subscriber','disabled'));").execute(&mut *tx).await?;
+            tx.commit().await?;
+        }
+    } else {
+        let sql: Option<String> =
+            sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")
+                .fetch_optional(&mut *connection)
+                .await?;
+        if sql.is_some_and(|s| !s.contains("'subscriber'")) {
+            sqlx::query("PRAGMA foreign_keys=OFF")
+                .execute(&mut *connection)
+                .await?;
+            let result=async {let mut tx=connection.begin().await?;sqlx::raw_sql("CREATE TABLE users_m4(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,name TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('admin','editor','moderator','subscriber','disabled')),password_hash TEXT NOT NULL,created_at BIGINT NOT NULL); INSERT INTO users_m4 SELECT * FROM users; DROP TABLE users; ALTER TABLE users_m4 RENAME TO users;").execute(&mut *tx).await?;tx.commit().await?;Ok::<(),anyhow::Error>(())}.await;
+            sqlx::query("PRAGMA foreign_keys=ON")
+                .execute(&mut *connection)
+                .await?;
+            result?;
+            let violations = sqlx::query("PRAGMA foreign_key_check")
+                .fetch_all(&mut *connection)
+                .await?;
+            anyhow::ensure!(
+                violations.is_empty(),
+                "M4 role migration encountered inconsistent foreign keys"
+            );
+        }
+    }
+    let columns = if db.postgres {
+        sqlx::query("SELECT CAST(column_name AS TEXT) AS name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='business_campaigns'").fetch_all(&mut *connection).await?
+    } else {
+        sqlx::query("PRAGMA table_info(business_campaigns)")
+            .fetch_all(&mut *connection)
+            .await?
+    };
+    if !columns.is_empty()
+        && !columns
+            .iter()
+            .any(|r| r.get::<String, _>("name") == "trigger_kind")
+    {
+        sqlx::query(
+            "ALTER TABLE business_campaigns ADD COLUMN trigger_kind TEXT NOT NULL DEFAULT ''",
+        )
+        .execute(&mut *connection)
+        .await?;
+    }
+    Ok(())
+}

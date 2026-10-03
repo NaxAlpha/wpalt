@@ -1,0 +1,23 @@
+[
+  {
+    "conditions": "Integration API, debug test binary, 1000 responses and fixed notification jobs, 2000 consented events; no timing assertions; not HTTP or production capacity",
+    "engine": "sqlite",
+    "events": 2000,
+    "local_spool_jobs_per_second": 96.38747998902419,
+    "plans": {
+      "entries": [
+        "SEARCH form_entries USING COVERING INDEX form_entries_recent (form_id=?)"
+      ],
+      "events": [
+        "SEARCH engagement_events USING COVERING INDEX engagement_event_report (created_at>?)",
+        "USE TEMP B-TREE FOR GROUP BY"
+      ],
+      "mail": [
+        "SEARCH mail_jobs USING INDEX mail_ready (next_at<?)"
+      ]
+    },
+    "responses": 1000,
+    "submission_p50_ms": 2.249417,
+    "submission_p95_ms": 4.627667000000001
+  }
+]

@@ -536,6 +536,20 @@ async fn preflight(app: &App, registry: &Registry) -> Result<()> {
         }
     }
     drop(rows);
+    let mut forms = sqlx::query("SELECT draft FROM business_forms ORDER BY id").fetch(&app.db.pool);
+    while let Some(row) = forms.try_next().await? {
+        count += 1;
+        if count > 10000 {
+            return Err(Error::invalid(
+                "Large schema changes require an explicit offline migration.",
+            ));
+        }
+        let form: crate::business::forms::FormDefinition =
+            serde_json::from_str(&row.get::<String, _>("draft"))
+                .map_err(|_| Error::invalid("Existing form definitions require repair."))?;
+        form.validate(&registry.common)?;
+    }
+    drop(forms);
     let design = sqlx::query("SELECT draft_options,live_options FROM site_design WHERE id=1")
         .fetch_one(&app.db.pool)
         .await?;

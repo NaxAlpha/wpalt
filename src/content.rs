@@ -148,6 +148,27 @@ pub async fn save(
     } else {
         crate::document::Document::parse(&input.document)?
     };
+    let form_ids = doc.form_ids();
+    if !form_ids.is_empty() {
+        if !app.config.business_enabled || form_ids.len() > 128 {
+            return Err(Error::invalid(
+                "Enable forms and use at most 128 published form references.",
+            ));
+        }
+        let mut query = sqlx::QueryBuilder::<sqlx::Any>::new(
+            "SELECT id FROM business_forms WHERE published_version>0 AND id IN (",
+        );
+        let mut list = query.separated(",");
+        for id in &form_ids {
+            list.push_bind(id);
+        }
+        list.push_unseparated(")");
+        if app.db.fetch_builder(&mut query).await?.len() != form_ids.len() {
+            return Err(Error::invalid(
+                "Publish each embedded form before saving the content.",
+            ));
+        }
+    }
     input.document = doc.encode();
     // Imported source stays in the revision; canonical editing derives the search/export projection.
     if structured {

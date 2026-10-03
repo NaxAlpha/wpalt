@@ -6,3 +6,17 @@
 .theme-carousel{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x mandatory}.theme-carousel img{flex:0 0 90%;object-fit:contain;scroll-snap-align:start}.theme-node [role=tablist]{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.theme-node [aria-selected=true]{outline:3px solid currentColor;outline-offset:3px}
 
 .document-table{overflow-x:auto;max-width:100%}.document-table table{border-collapse:collapse;width:100%;table-layout:fixed}.document-table td,.document-table th{border:1px solid currentColor;padding:.5rem;overflow-wrap:anywhere}.prose pre{white-space:pre-wrap;overflow-wrap:anywhere}.prose img{max-width:100%;height:auto}
+
+#public-form{max-width:720px;margin:24px 0}#public-form .ui-field{margin:20px 0}#public-form .ui-field label{margin:0 0 8px}#public-form input:not([type=checkbox]),#public-form button{min-height:44px;border-radius:6px}#public-form label:has(>input[type=checkbox]){display:flex;align-items:center;gap:12px;min-height:44px}#public-form input[type=checkbox]{width:20px;height:20px;flex:none}#public-form :is(input,button):focus-visible{outline:3px solid var(--accent);outline-offset:3px}#public-form .notice{overflow-wrap:anywhere}#public-form :is(input,fieldset){min-width:0}#public-form fieldset{border:0;border-top:1px solid var(--line);padding:20px 0}
+.entry-text{white-space:pre-wrap;overflow-wrap:anywhere}.workspace dt{overflow-wrap:anywhere}.workspace dd{min-width:0}
+
+.privacy-controls{padding-block:1.5rem;border-top:1px solid var(--line,#ddd);margin-top:2rem}.privacy-controls h2{font-size:1.125rem}.engagement-wireframe{display:block;width:100%;max-width:800px;height:auto;max-height:700px;object-fit:contain;border:1px solid var(--ui-line,#d5d8d1)}#engagement-playback input[type=range]{min-height:44px;width:100%;max-width:800px}
+
+#local-offer { width: min(42rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow:auto; border:1px solid var(--line); padding:clamp(1rem,4vw,2rem); color:var(--ink); background:var(--panel); }
+#local-offer::backdrop { background:rgb(20 24 28 / 35%); }
+#local-offer button { min-height:44px; margin:6px 6px 6px 0; }
+
+.form-embed iframe{width:100%;height:640px;border:0;display:block}.form-embed{margin-block:2rem}
+
+.embedded-form{padding:16px;background:var(--bg)}.embedded-form main{max-width:720px;margin-inline:auto}.embedded-form h1{font-size:1.5rem}.embedded-form #public-form{margin:16px 0}
+#engagement-controls label{display:flex;align-items:flex-start;gap:10px}#engagement-controls input[type=checkbox]{width:auto;flex:0 0 auto;margin:6px 0 0}

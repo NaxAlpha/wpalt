@@ -1,8 +1,10 @@
 # wpalt
 
-An owner-controlled Rust CMS with a bundled admin panel and public website. M3/M3.5 add multilingual discovery and integrated structured authoring to the composable publishing system on SQLite or PostgreSQL, with no vendor account or external runtime services.
+An owner-controlled Rust CMS with a bundled admin panel and public website. The composable publishing system includes multilingual discovery, integrated structured authoring and M4 business/audience workflows on SQLite or PostgreSQL, with no mandatory vendor account or external runtime services.
 
 Create posts and pages, keep drafts separate from live content, autosave, preview, restore revisions and schedule publication. Manage images, typed fields, basic compositions, navigation, Paper/Ink themes, moderated comments and local search. Export content, download a consistent manual backup and recover into a fresh database, including across database engines.
+
+Design and embed typed forms; protect responses/files; manage purpose-specific confirmed audiences; compose conditional, scheduled and confirmation-triggered messages with a local outbox or configured SMTP; approve subscriber accounts and moderate contributions. Measure explicitly consented events, bounded geometry-only interactions and local A/B offers. See [business operation and limits](docs/business.md) and [M4 delivery evidence](docs/evidence/m4-verification.md).
 
 ![M1 administration panel](docs/evidence/screenshots/admin-desktop.png)
 

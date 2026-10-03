@@ -251,3 +251,21 @@ The user approved M3.5 between M3 and M4, with its own delivery PR. The document
 ### M3 merged; integrated authoring implementation — 2026-10-02
 
 M3 PR #6 merged as `eb189c21d92af51f0f48577739df31a102f0d678`; actual-main run 36951433688 and its downloaded clean build were verified. M3.5 is implemented and locally verified in [delivery PR #7](https://github.com/NaxAlpha/wpalt/pull/7); its required current-head CI and downloaded clean-artifact verification determine delivery acceptance: see [authoring operations](authoring.md), [editor decision](decisions/0005-structured-editor.md) and [evidence](evidence/m3-5-verification.md). M4 remains planned. No future parity scope was removed.
+
+### M3.5 merged; M4 active — 2026-10-02
+
+The user authorized merging PR #7 and continuing with M4. M3.5 merged as `df8208f64c65853ec1cdabdef6a13ca1186805b1`; all three actual-main jobs in run 37000435046 passed and its downloaded clean artifact was verified separately from PR verification. M4 is active under [its contract](m4-contract.md) and [architecture decision](decisions/0006-business-audience.md). M5–M9 remain planned; existing parity requirements are retained.
+
+
+### M4 first implementation step — 2026-10-02
+
+The shared form grammar and versioned persistence are implemented as groundwork, not a usable completed milestone. Hidden inputs are discarded, calculations recomputed, drafts remain typed, published reusable groups are frozen, submission keys deduplicate across pools, stale publication is rejected, and current-format backup/restore includes immutable entries. Local rule/storage/recovery tests and the existing SQLite publishing suite pass. Real PostgreSQL evidence, the form designer/public UI, remaining form workflows, audience/communications/engagement, integrated verification and delivery remain pending. No capability is marked complete from this step.
+
+
+### M4 first usable form slice — 2026-10-02
+
+[Draft milestone PR #8](https://github.com/NaxAlpha/wpalt/pull/8) tracks the full M4 delivery. Initial backend commit `7349159` passed real PostgreSQL CI and the independent clean build (run 37003012725); newer changes need their own CI. The first user-facing slice adds basic visual form design/public collection and protected response viewing, shared controls, measured narrow/desktop layouts, frozen publication groups, capacity-race protection and a module-disable configuration. Local SQLite acceptance and the full native-browser/UI regression suite pass. See [operations](business.md) and [step evidence](evidence/m4-step-1.md). M4 remains in progress; required advanced form, audience, communication, engagement and integrated delivery work remains.
+
+### M4 integrated implementation — 2026-10-03
+
+PR #8 now connects forms, private recovery/files/follow-up, consented audiences, shared communications, moderated contributions/accounts and bounded engagement/experiments/offers. The full agreed contract remains the delivery gate. See [M4 verification](evidence/m4-verification.md), [business operation and limits](business.md) and the per-group defined coverage in the parity matrix. Defined scope is locally verified; PR #8 is marked ready only after current-source PostgreSQL/browser CI and clean-artifact verification. Its delivery record supplies the exact run/hashes; review/merge remains separate. M5–M9 and M6 commerce/redemption dependencies remain unchanged.

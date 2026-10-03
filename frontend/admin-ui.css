@@ -779,3 +779,12 @@ img.ProseMirror-separator {
   max-height: calc(100vh - 32px);
   overflow-y: auto;
 }
+
+.admin #forms-studio .field-row {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(96px, 0.7fr);
+}
+@media (--ui-mobile) {
+  .admin #forms-studio .field-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

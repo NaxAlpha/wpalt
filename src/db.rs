@@ -6,6 +6,9 @@ use std::str::FromStr;
 pub struct Db {
     pub pool: AnyPool,
     pub postgres: bool,
+    pub business_enabled: bool,
+    pub engagement_available: bool,
+    pub respect_dnt: bool,
 }
 impl Db {
     pub async fn open(config: &Config) -> anyhow::Result<Self> {
@@ -46,7 +49,13 @@ impl Db {
             })
             .connect_with(options)
             .await?;
-        Ok(Self { pool, postgres })
+        Ok(Self {
+            pool,
+            postgres,
+            business_enabled: config.business_enabled,
+            engagement_available: config.business_enabled && config.engagement.enabled,
+            respect_dnt: config.engagement.respect_dnt,
+        })
     }
     pub async fn migrate(&self) -> anyhow::Result<()> {
         sqlx::query("CREATE TABLE IF NOT EXISTS schema_version(id BIGINT PRIMARY KEY CHECK(id=1),version BIGINT NOT NULL)").execute(&self.pool).await?;
@@ -58,18 +67,75 @@ impl Db {
             crate::migrations::from_m1(self).await?;
         } else {
             anyhow::ensure!(
-                version.is_none() || version == Some(2) || version == Some(3) || version == Some(4),
+                version.is_none()
+                    || version == Some(2)
+                    || version == Some(3)
+                    || version == Some(4)
+                    || version == Some(5)
+                    || version == Some(6)
+                    || version == Some(7),
                 "unsupported schema version; use the documented migration/reset path"
             );
         }
         if version == Some(1) || version == Some(2) {
             crate::migrations::from_m2(self).await?;
         }
-        if version.is_some() && version != Some(4) {
+        if matches!(version, Some(1..=3)) {
             crate::migrations::from_m3(self).await?;
+        }
+        if version.is_some_and(|v| v < 7) {
+            crate::migrations::from_m4(self).await?;
         }
         let mut tx = self.pool.begin().await?;
         sqlx::raw_sql(SCHEMA).execute(&mut *tx).await?;
+        sqlx::raw_sql(crate::business::store::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::audience::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::campaigns::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::drafts::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::attachments::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::entries::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::entries::SEARCH_SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::engagement::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::engagement::DIMENSION_SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::promotions::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::registration::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::workflows::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::mail::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::business::quotas::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        crate::business::quotas::initialize(&mut tx, self.postgres)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?;
+        sqlx::query("UPDATE schema_version SET version=7 WHERE id=1")
+            .execute(&mut *tx)
+            .await?;
         if self.postgres {
             sqlx::query("CREATE INDEX IF NOT EXISTS public_search ON posts USING GIN(to_tsvector('simple',published_title || ' ' || published_body)) WHERE status='published'").execute(&mut *tx).await?;
         } else {
@@ -79,6 +145,7 @@ impl Db {
         }
         sqlx::query("INSERT INTO discovery_settings(id,definition,version) VALUES(1,$1,1) ON CONFLICT(id) DO NOTHING").bind(serde_json::to_string(&crate::discovery::Definition::default())?).execute(&mut *tx).await?;
         tx.commit().await?;
+        crate::business::entries::prepare_search(self).await?;
         Ok(())
     }
     /// Run bounded planner/index maintenance after an offline bulk operation.
@@ -122,11 +189,23 @@ impl Db {
     }
     pub async fn settings(&self) -> Result<Settings> {
         let r = sqlx::query(
-            "SELECT title,description,theme,navigation,field_schema FROM settings WHERE id=1",
+            "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording AS analytics_recording,e.purpose AS analytics_purpose,e.version AS analytics_policy FROM settings s JOIN engagement_settings e ON e.id=1 WHERE s.id=1",
         )
         .fetch_one(&self.pool)
         .await?;
         Ok(Settings {
+            business_enabled: self.business_enabled,
+            engagement_available: self.engagement_available,
+            analytics: if self.engagement_available && r.get::<i64, _>("analytics_enabled") == 1 {
+                Some(crate::business::engagement::PublicState {
+                    purpose: r.get("analytics_purpose"),
+                    policy: r.get("analytics_policy"),
+                    recording: r.get::<i64, _>("analytics_recording") == 1,
+                    respect_dnt: self.respect_dnt,
+                })
+            } else {
+                None
+            },
             title: r.get("title"),
             description: r.get("description"),
             theme: r.get("theme"),
@@ -140,7 +219,7 @@ pub const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS schema_version(id BIGINT PRIMARY KEY CHECK(id=1), version BIGINT NOT NULL);
 INSERT INTO schema_version(id,version) VALUES(1,4) ON CONFLICT(id) DO NOTHING;
 CREATE TABLE IF NOT EXISTS settings(id BIGINT PRIMARY KEY CHECK(id=1),title TEXT NOT NULL,description TEXT NOT NULL,theme TEXT NOT NULL,navigation TEXT NOT NULL,field_schema TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,name TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('admin','editor','moderator','disabled')),password_hash TEXT NOT NULL,created_at BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,name TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('admin','editor','moderator','subscriber','disabled')),password_hash TEXT NOT NULL,created_at BIGINT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,csrf TEXT NOT NULL,expires_at BIGINT NOT NULL);
 CREATE INDEX IF NOT EXISTS user_sessions ON sessions(user_id,expires_at);
 CREATE INDEX IF NOT EXISTS session_expiry ON sessions(expires_at);

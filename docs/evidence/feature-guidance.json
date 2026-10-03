@@ -617,6 +617,214 @@
         "input regression, vulnerability or document grammar change"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-FORM-RULES",
+      "area": "Server-authoritative form validation",
+      "scope": "M4 step 1 groundwork",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 5; shared field grammar; bounded condition/calculation operations"
+      ],
+      "last_checked": "2026-10-02",
+      "next_review": "2026-12-31",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Apply type/allowlist and semantic validation on the server before storage/actions.",
+        "Reject unknown inputs; discard hidden inputs and recompute derived values; partial recovery cannot bypass final required validation.",
+        "Validation is not a replacement for SQL parameterization, authorization, request-forgery protection or output escaping.",
+        "Field/step/rule limits and earlier-field dependencies are internal product contracts, not OWASP-mandated limits."
+      ],
+      "tests": [
+        "hidden_values_and_forged_totals_cannot_enter_the_authoritative_submission",
+        "partial_drafts_preserve_valid_work_without_bypassing_final_validation",
+        "invalid_dependencies_and_shared_repeater_limits_fail_before_actions",
+        "publication_retries_and_fresh_restore_preserve_one_authoritative_entry"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guidance change",
+        "form grammar or worker/action change"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-MAIL-CONSENT",
+      "area": "Purpose-specific audience consent and durable mail",
+      "scope": "M4",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.rs/lettre/0.11.23/lettre/",
+        "https://www.postgresql.org/docs/17/sql-select.html",
+        "https://www.rfc-editor.org/rfc/rfc8058.html"
+      ],
+      "applicable_versions": [
+        "lettre 0.11.23",
+        "PostgreSQL 17",
+        "wpalt schema/backup 7"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Random hashed purpose/version-bound confirmation capabilities; GET must not change consent. Campaign eligibility requires confirmed current policy and is checked again before transport.",
+        "Atomic bounded queue claims across database connections; uncertain SMTP receipt loss is visible and never blindly resent. Owner SMTP credentials are redacted.",
+        "Ordinary withdrawal landing pages use deliberate same-origin POST. Do not claim RFC8058 one-click compliance or publish its header without an operator signing/transport implementation."
+      ],
+      "tests": [
+        "consent_confirmation_withdrawal_and_mail_recovery_are_one_durable_journey",
+        "smtp_acceptance_and_lost_receipts_have_distinct_recovery_states"
+      ],
+      "triggers": [
+        "affected release",
+        "mail transport/security advisory",
+        "consent or lease semantics change"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-PRIVATE-RESPONSE",
+      "area": "Private attachments and indexed response management",
+      "scope": "M4",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html",
+        "https://www.sqlite.org/fts5.html",
+        "https://www.postgresql.org/docs/17/textsearch-indexes.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema/backup 7",
+        "SQLite FTS5",
+        "PostgreSQL 17 GIN"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Public upload admission is restricted to a published upload field, with form/version/field-scoped hashed single-entry capabilities, bounded requests and file-storage quota. Private files use generated paths outside public media, owner-only download, restrictive permissions and integrity checks.",
+        "Re-encode accepted images with allocation/dimension limits. PDF signature checking is not malware scanning; downloaded documents can still be unsafe in their native applications.",
+        "Bounded keyset entry pagination, parameterized FTS5/GIN search, versioned notes/assignment and bounded CSV exports. Backups include protected files and rebuild derived search."
+      ],
+      "tests": [
+        "attachments_follow_up_and_search_remain_private_and_survive_fresh_restore",
+        "publication_retries_and_fresh_restore_preserve_one_authoritative_entry"
+      ],
+      "triggers": [
+        "affected release",
+        "image/parser advisory",
+        "file-type or retention policy change",
+        "query/index or permission change"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-ENGAGEMENT",
+      "area": "Consented local analytics, bounded categories and masked playback",
+      "scope": "M4",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://globalprivacycontrol.org/",
+        "https://www.w3.org/TR/WCAG22/"
+      ],
+      "applicable_versions": [
+        "wpalt schema/backup 7",
+        "PostgreSQL 17",
+        "WCAG 2.2"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Capture is opt-in and purpose/version-bound; recording additionally requires explicit consent. Honor Sec-GPC independently on the server and configured DNT. GPC is used conservatively to disable local collection; this is a product rule, not a general legal-compliance claim.",
+        "Geometry-only recording accepts bounded coordinates/categories and rejects text, field values, links and extra properties. Withdrawal cascades visitor-linked events and receipts. Hard module disable removes assets/routes and skips jobs."
+      ],
+      "tests": [
+        "engagement_requires_current_consent_masks_geometry_and_erases_on_withdrawal",
+        "scripts/engagement_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected release",
+        "privacy, permission, retention or parser change",
+        "upstream guidance/security advisory"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-OFFERS",
+      "area": "Accessible targeting, stable experiments and local reward allocation",
+      "scope": "M4",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.w3.org/TR/WCAG22/",
+        "https://www.postgresql.org/docs/17/sql-select.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema/backup 7",
+        "PostgreSQL 17",
+        "WCAG 2.2"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Owner-composed canonical messages use native modal keyboard/focus behavior and measured mobile targets. No forced motion or remote frontend dependencies.",
+        "Server targeting requires current consent, declared device/referrer categories, public paths, schedule and persisted frequency. DB transactions serialize last-stock allocation and retry recovers the same receipt. Cookie sessions are not verified people; commerce/redemption belongs to M6."
+      ],
+      "tests": [
+        "local_offers_keep_variants_bound_frequency_and_allocate_last_reward_atomically",
+        "scripts/engagement_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected release",
+        "privacy, permission, retention or parser change",
+        "upstream guidance/security advisory"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M4-MODERATED-ACTIONS",
+      "area": "Frozen notifications, contributions and approved account requests",
+      "scope": "M4",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema/backup 7",
+        "PostgreSQL 17",
+        "Argon2 0.5"
+      ],
+      "last_checked": "2026-10-03",
+      "next_review": "2027-01-01",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Accepted entries and fixed-recipient conditional notifications, pending registration proof and private contribution drafts commit atomically; retries cannot repeat actions. Partial drafts never trigger actions.",
+        "Registration uses expiring hashed ownership proof, deliberate password submission with bounded Argon2 workers, then explicit owner approval. Public input cannot choose a role; subscriber has no editorial/moderation/admin permissions.",
+        "Database admission counters bound record and UTF-8 body storage. Configured retention releases expired staged data and completed mail; uncertain deliveries remain available for deliberate recovery.",
+        "No-referrer random-capability native POSTs accept Origin:null only with exact same-origin navigation metadata; other routes keep Origin/CSRF checks; fail closed on missing/same-site/cross-site metadata."
+      ],
+      "tests": [
+        "accepted_response_routes_once_creates_only_a_draft_and_requires_verified_approved_account",
+        "publication_retries_and_fresh_restore_preserve_one_authoritative_entry",
+        "confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_cancels_it"
+      ],
+      "triggers": [
+        "affected release",
+        "privacy, permission, retention or parser change",
+        "upstream guidance/security advisory"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

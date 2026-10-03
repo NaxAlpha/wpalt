@@ -22,13 +22,21 @@ export function Button({
     </button>
   );
 }
-export function Field({ label, description, error, children, ...input }) {
+export function Field({
+  label,
+  description,
+  error,
+  children,
+  multiline = false,
+  ...input
+}) {
   const id = useId();
   const hint = error || description;
+  const Control = multiline ? "textarea" : "input";
   return (
     <div class="ui-field">
       <label for={id}>{label}</label>
-      <input
+      <Control
         {...input}
         id={id}
         aria-invalid={error ? "true" : undefined}
@@ -40,6 +48,28 @@ export function Field({ label, description, error, children, ...input }) {
         </small>
       )}
       {children}
+    </div>
+  );
+}
+export function SelectField({ label, description, error, children, ...props }) {
+  const id = useId();
+  const hint = error || description;
+  return (
+    <div class="ui-field">
+      <label for={id}>{label}</label>
+      <select
+        {...props}
+        id={id}
+        aria-invalid={error ? "true" : undefined}
+        aria-describedby={hint ? id + "-hint" : undefined}
+      >
+        {children}
+      </select>
+      {hint && (
+        <small id={id + "-hint"} class={error ? "ui-field-error" : "help"}>
+          {hint}
+        </small>
+      )}
     </div>
   );
 }

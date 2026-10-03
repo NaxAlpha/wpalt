@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md; partial plugin groups are not blanket parity claims.",
-  "milestone": "M3",
+  "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity.",
+  "milestone": "M4 defined scope implemented and locally verified; current-source CI and review recorded on PR #8",
   "capabilities": [
     {
       "id": "F001",
@@ -329,10 +329,20 @@
       "capability": "Collaborative notes and assignments",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "sequencing_reason": "Collaborative assignments belong to the later workflow platform; requirement retained."
+      "sequencing_reason": "Collaborative assignments belong to the later workflow platform; requirement retained.",
+      "m4_coverage": "Versioned private response notes and active-editor assignments; not real-time shared editing.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F022",
@@ -548,9 +558,19 @@
       "capability": "Form designer and reusable field schema",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Visual typed field/step designer, shared groups/repeaters, immutable publications and canonical content/theme form embedding.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F038",
@@ -558,9 +578,19 @@
       "capability": "Conditional fields / notification routing",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Earlier-field visibility and fixed-recipient canonical notification rules using presence/scalar equality; no arbitrary executable expressions.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F039",
@@ -568,9 +598,19 @@
       "capability": "Multi-step forms and repeatable inputs",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Eight ordered steps and bounded shared nested/repeated input grammar.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F040",
@@ -578,9 +618,19 @@
       "capability": "Entry storage, search, CSV export and permissions",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Private immutable responses, FTS5/GIN search, 40-row keysets, 500-row guarded CSV export and permission checks.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F041",
@@ -588,9 +638,19 @@
       "capability": "File uploads and protected attachments",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Scoped expiring upload capabilities; private UTF-8 text/PDF/image files, bounded decoding/re-encoding, authenticated integrity-checked downloads and backup; no malware scanner.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F042",
@@ -598,9 +658,19 @@
       "capability": "Calculations and pricing logic",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Server-authoritative finite sum/product/choice-score calculation; exact currency and payment pricing remain M6.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F043",
@@ -608,9 +678,19 @@
       "capability": "Signatures and signed-document records",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Typed-name signature and acknowledgment with frozen statement and accepted response; no cryptographic signature/identity certification or generated signed PDF.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F044",
@@ -618,9 +698,19 @@
       "capability": "Surveys, polls and scoring",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Choice questionnaires, scores and boolean acknowledgment inputs; responses/export support local evaluation, no specialized statistical survey designer.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F045",
@@ -628,9 +718,19 @@
       "capability": "Save/resume, partial entries and abandonment",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Seven-day revisioned partial server drafts and explicit device recovery; no covert abandonment tracking or automatic abandoned-response marketing.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F046",
@@ -638,9 +738,19 @@
       "capability": "Offline capture and later synchronization",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Already-loaded form editing offline and original-payload retry across reload; no uncached offline site navigation or general distributed synchronization.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F047",
@@ -648,9 +758,19 @@
       "capability": "User registration and post creation",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Mailbox proof, private password step, owner approval and subscriber-only accounts; literal visitor contributions become moderated drafts.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F048",
@@ -1018,9 +1138,19 @@
       "capability": "First-party pageviews, events and conversions",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Explicit-consent registered events, published public paths and server-confirmed response/offer conversions; GPC/DNT and withdrawal.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F085",
@@ -1028,9 +1158,19 @@
       "capability": "Forms/store funnels and custom dimensions",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Declared enum dimensions and pageview-to-response-to-offer funnel; arbitrary funnel builder and store purchase events are not claimed; commerce is M6.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F086",
@@ -1038,9 +1178,19 @@
       "capability": "Local dashboards and reports",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Bounded local event/path/category totals, funnel and recent geometry sessions; reports cover retained cookie sessions, not identity attribution.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F087",
@@ -1048,9 +1198,19 @@
       "capability": "Heatmaps and masked session replay",
       "deployment": "W",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Bounded geometry-only wireframe playback and click heatmap; never DOM text/field values/screenshots; not full DOM replay.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F088",
@@ -1058,9 +1218,19 @@
       "capability": "A/B experiments and variant allocation",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Stable consented-session A/B variants with retained impressions, sessions and claims; no statistical-significance guarantee.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F089",
@@ -1068,9 +1238,19 @@
       "capability": "Exit-intent, device and referrer popups",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Accessible targeted native dialogs, keyboard dismissal, device/referrer categories and public paths; exit-intent triggering is not claimed.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F090",
@@ -1078,9 +1258,19 @@
       "capability": "Scheduled/cookie/visitor-based targeting",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Start/end schedule, per-session impression cap, stable cookie allocation and renewed-purpose consent; not verified-person frequency.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F091",
@@ -1088,9 +1278,19 @@
       "capability": "On-site coupon wheels / offer campaigns",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Weighted local bounded-stock reward allocation and duplicate-safe session receipt; cookie reset is not fraud prevention; purchase/redemption is M6.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F092",
@@ -1118,9 +1318,19 @@
       "capability": "SMTP settings and connection routing",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Typed local file outbox and up to four owner-configured SMTP routes with TLS/explicit loopback transport and redacted credentials.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F095",
@@ -1128,9 +1338,19 @@
       "capability": "Mail logs, resend, failure alerts and fallback",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Durable states/attempt history, bounded retries/fallback, visible uncertain outcomes and deliberate duplicate-aware resend; no third-party outage alert service.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F096",
@@ -1138,9 +1358,19 @@
       "capability": "Transactional templates and notification rules",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Canonical shared templates, fixed-recipient conditional notifications, confirmations and private registration proof.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F097",
@@ -1148,9 +1378,19 @@
       "capability": "Mailing lists, consent records and segmentation",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Purpose/version-specific pending/confirmed/withdrawn membership, typed segments, suppression, bounded export and audience deletion guards.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F098",
@@ -1158,9 +1398,19 @@
       "capability": "Newsletter design, queue and automation",
       "deployment": "L",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Shared rich composition, manual/scheduled bounded expansion and deduplicated confirmation-triggered templates; not arbitrary visual automation graphs.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F099",
@@ -1168,9 +1418,19 @@
       "capability": "Self-operated outbound mail server",
       "deployment": "W",
       "milestone": "M4",
-      "status": "planned",
+      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m4_coverage": "Owner-operated SMTP/MTA integration and disconnected .eml spool; no bundled internet-wide MTA/reputation infrastructure.",
+      "evidence": [
+        "m4-contract.md",
+        "business.md",
+        "evidence/m4-verification.md",
+        "../tests/business_rules.rs",
+        "../scripts/business_acceptance.cjs",
+        "../scripts/engagement_acceptance.cjs",
+        "../scripts/workflows_acceptance.cjs"
+      ]
     },
     {
       "id": "F100",

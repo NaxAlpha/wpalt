@@ -84,6 +84,62 @@ impl Document {
     pub fn html(&self) -> String {
         render(&self.root)
     }
+    /// Draft inspection must not create live response collectors.
+    pub fn preview_html(&self) -> String {
+        fn project(n: &mut Node) {
+            if n.kind == "form" {
+                *n = node(
+                    "paragraph",
+                    vec![text("Published form (inactive in draft preview)", &[])],
+                );
+            } else {
+                for child in &mut n.content {
+                    project(child);
+                }
+            }
+        }
+        let mut root = self.root.clone();
+        project(&mut root);
+        render(&root)
+    }
+    pub fn form_ids(&self) -> std::collections::BTreeSet<String> {
+        fn visit(n: &Node, ids: &mut std::collections::BTreeSet<String>) {
+            if n.kind == "form" {
+                ids.insert(n.attrs["id"].as_str().unwrap_or("").to_owned());
+            }
+            for child in &n.content {
+                visit(child, ids);
+            }
+        }
+        let mut ids = std::collections::BTreeSet::new();
+        visit(&self.root, &mut ids);
+        ids
+    }
+    pub fn mail_html(&self, base_url: &str) -> String {
+        fn project(n: &mut Node, base: &str) {
+            if n.kind == "form" {
+                let href = format!(
+                    "{}/forms/{}",
+                    base.trim_end_matches('/'),
+                    n.attrs["id"].as_str().unwrap_or("")
+                );
+                let title = n.attrs["title"].as_str().unwrap_or("Form").to_owned();
+                let mut t = text(&title, &[]);
+                t.marks.push(Mark {
+                    kind: "link".into(),
+                    attrs: json!({"href":href}),
+                });
+                *n = node("paragraph", vec![t]);
+            } else {
+                for child in &mut n.content {
+                    project(child, base);
+                }
+            }
+        }
+        let mut root = self.root.clone();
+        project(&mut root, base_url);
+        render(&root)
+    }
     pub fn markdown(&self) -> String {
         projection(&self.root)
     }
@@ -102,6 +158,7 @@ fn block(k: &str) -> bool {
         "callout",
         "table",
         "horizontal_rule",
+        "form",
     ]
     .contains(&k)
 }
@@ -113,6 +170,7 @@ fn validate(n: &Node, depth: usize, count: &mut usize, bytes: &mut usize) -> Res
     }
     let allowed: &[&str] = match n.kind.as_str() {
         "heading" => &["level"],
+        "form" => &["id", "title"],
         "ordered_list" => &["order"],
         "code_block" => &["params"],
         "image" => &["src", "alt", "title"],
@@ -139,6 +197,16 @@ fn validate(n: &Node, depth: usize, count: &mut usize, bytes: &mut usize) -> Res
         && n.attrs
             .get("params")
             .is_some_and(|v| !v.is_null() && v.as_str().is_none_or(|s| s.len() > 100))
+    {
+        return Err(invalid());
+    }
+    if n.kind == "form"
+        && (n.attrs["id"]
+            .as_str()
+            .is_none_or(|id| uuid::Uuid::parse_str(id).is_err())
+            || n.attrs["title"]
+                .as_str()
+                .is_none_or(|title| title.is_empty() || title.len() > 160))
     {
         return Err(invalid());
     }
@@ -200,7 +268,7 @@ fn validate(n: &Node, depth: usize, count: &mut usize, bytes: &mut usize) -> Res
             !children.is_empty() && children.iter().all(|c| block(&c.kind) && c.kind != "table")
         }
         "text" => children.is_empty() && n.text.as_ref().is_some_and(|t| !t.is_empty()),
-        "image" | "hard_break" | "horizontal_rule" => children.is_empty(),
+        "form" | "image" | "hard_break" | "horizontal_rule" => children.is_empty(),
         _ => false,
     };
     if !valid
@@ -245,6 +313,7 @@ fn render(n: &Node) -> String {
     let inner = n.content.iter().map(render).collect::<String>();
     let inner = PreEscaped(inner);
     match n.kind.as_str(){
+        "form"=>form_embed(n.attrs["id"].as_str().unwrap_or(""),n.attrs["title"].as_str().unwrap_or("Form")),
         "text"=>{let mut v=html!{(n.text.as_deref().unwrap_or(""))}.into_string();for m in n.marks.iter().rev(){let x=PreEscaped(v);v=match m.kind.as_str(){"strong"=>html!{strong{(x)}},"em"=>html!{em{(x)}},"strike"=>html!{s{(x)}},"code"=>html!{code{(x)}},"link"=>html!{a href=(m.attrs["href"].as_str().unwrap_or("")) rel="noopener noreferrer"{(x)}},_=>html!{(x)}}.into_string();}v},
         "paragraph"=>html!{p{(inner)}}.into_string(),
         "heading"=>{let level=n.attrs["level"].as_u64().unwrap_or(2); format!("<h{level}>{}</h{level}>",inner.0)},
@@ -270,6 +339,11 @@ fn projection(n: &Node) -> String {
             }
             v
         }
+        "form" => format!(
+            "[{}](/forms/{})\n\n",
+            n.attrs["title"].as_str().unwrap_or("Form"),
+            n.attrs["id"].as_str().unwrap_or("")
+        ),
         "paragraph" => format!("{inner}\n\n"),
         "heading" => format!(
             "{} {inner}\n\n",
@@ -532,4 +606,9 @@ fn normalize(n: &mut Node) {
             n.content.insert(0, node("paragraph", vec![]));
         }
     }
+}
+
+/// A typed, same-origin form block. No arbitrary embed URLs or executable markup.
+pub fn form_embed(id: &str, title: &str) -> String {
+    html!{section class="form-embed"{iframe src=(format!("/forms/{id}?embedded=true")) title=(title) loading="lazy" sandbox="allow-scripts allow-forms allow-same-origin" {}p{a href=(format!("/forms/{id}")){"Open " (title) " in a full page"}}}script defer src="/assets/form-embed.js"{}}.into_string()
 }

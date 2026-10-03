@@ -1,0 +1,17 @@
+# Integrated business and audience workflows
+
+Accepted implementation decisions, 2026-10-03. See [contract](../m4-contract.md), [operation and limits](../business.md) and [delivery evidence](../evidence/m4-verification.md).
+
+Keep forms, immutable publications, responses, private files, consent, audiences, canonical messages, campaigns, durable jobs and bounded events in owner-controlled SQLite/PostgreSQL storage. Reuse shared field grammar and canonical documents; render same-origin published forms through one navigation with value-free resize messages. Draft inspection never opens a live collector. Public definitions omit private workflow actions.
+
+Use parameterized queries, per-form publication/admission locks and stable payload-bound UUIDs. Actions and entry admission commit together. Persistent conditional record/byte counters apply across independent server pools; startup initializes missing counters once, without rescanning histories on ordinary requests. A consistent lock order and engine race tests protect concurrent admission/deletion/delivery. Use FTS5/GIN search, useful partial/compound indexes, bounded keysets and measured plans. Global counter rows favor correctness and controlled backpressure over unlimited write concurrency; a future deployment change requires measurement, not an unverified sharding claim.
+
+Registration requires mailbox proof, a private password step and administrative approval; subscriber accounts cannot acquire editorial permissions. Visitor contributions create escaped draft text only. Owner-configured conditional messages use fixed destinations. Confirmation-triggered templates share consent/segments with scheduled expansion. Contacts are not verified people, and clearing cookies is not fraud prevention.
+
+Use database leases and explicit ambiguous-delivery states. SMTP cannot atomically commit with the database. Local deterministic files support disconnected evaluation; selected SMTP routes can point at an owner MTA. Expired leases or lost receipts become uncertain and require deliberate duplicate-aware recovery. Do not promise internet inbox delivery, reputation or RFC8058 compliance.
+
+Collection starts off and requires explicit visitor consent with separate recording consent. Store declared categorical events and geometry-only frames, never arbitrary DOM text, field values, links or credentials. Global Privacy Control and configured DNT deny capture; purpose changes renew consent. Withdrawal erases visitor-linked history while issued inventory remains consumed. Reports have documented cookie/time/sample limits. Native dialogs supply accessible targeting and locally weighted stock allocation; M6 supplies commerce/redemption.
+
+Schema/backup 7 includes private files, capabilities, counters and masked engagement. Restore checks typed meaning and integrity, recovers leases conservatively and reconstructs local spools. A one-time user constraint rebuild introduces subscriber roles and preserves meaningful prior publishing data. Old archives restore through their matching binary before database upgrade. No parallel legacy runtime is retained; disposable intermediate development fixtures may reset.
+
+Guidance records cover OWASP validation/uploads/authentication, current database and transport APIs, WCAG 2.2, GPC and SMTP semantics. They are reviewed through the shared maintenance protocol. Defined local coverage is recorded per catalog group; proprietary identity/reputation services and later commerce are not recreated or silently claimed.

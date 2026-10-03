@@ -166,6 +166,318 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
             ("created_at", true),
         ],
     ),
+    (
+        "business_forms",
+        &[
+            ("id", false),
+            ("owner_id", false),
+            ("draft", false),
+            ("live", false),
+            ("version", true),
+            ("published_version", true),
+            ("updated_at", true),
+            ("entry_count", true),
+        ],
+    ),
+    (
+        "form_publications",
+        &[
+            ("form_id", false),
+            ("version", true),
+            ("definition", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "form_entries",
+        &[
+            ("id", false),
+            ("form_id", false),
+            ("request_key", false),
+            ("request_hash", false),
+            ("form_version", true),
+            ("values_json", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "audience_contacts",
+        &[
+            ("id", false),
+            ("email", false),
+            ("name", false),
+            ("attributes", false),
+            ("version", true),
+            ("suppressed", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "audience_lists",
+        &[
+            ("id", false),
+            ("title", false),
+            ("purpose", false),
+            ("policy", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "audience_memberships",
+        &[
+            ("contact_id", false),
+            ("list_id", false),
+            ("state", false),
+            ("policy", false),
+            ("nonce_hash", false),
+            ("withdraw_hash", false),
+            ("expires_at", true),
+            ("confirmed_at", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "audience_consent_events",
+        &[
+            ("id", false),
+            ("contact_id", false),
+            ("list_id", false),
+            ("action", false),
+            ("policy", false),
+            ("purpose", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "mail_jobs",
+        &[
+            ("id", false),
+            ("dedupe", false),
+            ("contact_id", false),
+            ("list_id", false),
+            ("kind", false),
+            ("recipient", false),
+            ("sender", false),
+            ("subject", false),
+            ("html", false),
+            ("plain", false),
+            ("message_id", false),
+            ("state", false),
+            ("attempts", true),
+            ("next_at", true),
+            ("lease_owner", false),
+            ("lease_until", true),
+            ("last_code", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "mail_attempts",
+        &[
+            ("id", false),
+            ("job_id", false),
+            ("outcome", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "business_campaigns",
+        &[
+            ("id", false),
+            ("title", false),
+            ("subject", false),
+            ("document", false),
+            ("segment", false),
+            ("trigger_kind", false),
+            ("list_id", false),
+            ("state", false),
+            ("version", true),
+            ("send_at", true),
+            ("cutoff", true),
+            ("cursor", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "audience_withdrawal_tokens",
+        &[
+            ("hash", false),
+            ("contact_id", false),
+            ("list_id", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "form_drafts",
+        &[
+            ("form_id", false),
+            ("token_hash", false),
+            ("form_version", true),
+            ("revision", true),
+            ("values_json", false),
+            ("expires_at", true),
+        ],
+    ),
+    (
+        "form_upload_usage",
+        &[("form_id", false), ("bytes", true), ("files", true)],
+    ),
+    (
+        "form_attachments",
+        &[
+            ("id", false),
+            ("form_id", false),
+            ("field_name", false),
+            ("form_version", true),
+            ("token_hash", false),
+            ("filename", false),
+            ("original_name", false),
+            ("mime", false),
+            ("size", true),
+            ("sha256", false),
+            ("entry_id", false),
+            ("expires_at", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "form_entry_workflows",
+        &[
+            ("entry_id", false),
+            ("notes", false),
+            ("assignee", false),
+            ("version", true),
+            ("updated_at", true),
+        ],
+    ),
+    (
+        "form_entry_search",
+        &[("entry_id", false), ("search_text", false)],
+    ),
+    ("business_secrets", &[("id", false), ("value", false)]),
+    (
+        "audience_suppressions",
+        &[("hash", false), ("suppressed", true), ("created_at", true)],
+    ),
+    (
+        "registration_requests",
+        &[
+            ("id", false),
+            ("entry_id", false),
+            ("email", false),
+            ("name", false),
+            ("token_hash", false),
+            ("password_hash", false),
+            ("state", false),
+            ("expires_at", true),
+            ("version", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "form_contributions",
+        &[("entry_id", false), ("post_id", false)],
+    ),
+    (
+        "business_usage",
+        &[("kind", false), ("items", true), ("bytes", true)],
+    ),
+    (
+        "engagement_settings",
+        &[
+            ("id", true),
+            ("enabled", true),
+            ("recording", true),
+            ("purpose", false),
+            ("version", true),
+        ],
+    ),
+    (
+        "engagement_sessions",
+        &[
+            ("hash", false),
+            ("policy", true),
+            ("purpose", false),
+            ("recording", true),
+            ("events", true),
+            ("frames", true),
+            ("expires_at", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "engagement_event_names",
+        &[("name", false), ("label", false)],
+    ),
+    (
+        "engagement_events",
+        &[
+            ("id", false),
+            ("session_hash", false),
+            ("path", false),
+            ("name", false),
+            ("dimensions", false),
+            ("frame", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "engagement_usage",
+        &[("id", true), ("events", true), ("sessions", true)],
+    ),
+    (
+        "business_promotions",
+        &[
+            ("id", false),
+            ("title", false),
+            ("document_a", false),
+            ("document_b", false),
+            ("experiment", true),
+            ("wheel", true),
+            ("target", false),
+            ("active", true),
+            ("version", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "promotion_rewards",
+        &[
+            ("id", false),
+            ("promotion_id", false),
+            ("label", false),
+            ("weight", true),
+            ("remaining", true),
+            ("issued", true),
+        ],
+    ),
+    (
+        "promotion_impressions",
+        &[
+            ("promotion_id", false),
+            ("session_hash", false),
+            ("variant", false),
+            ("path", false),
+            ("count", true),
+            ("last_at", true),
+        ],
+    ),
+    (
+        "promotion_claims",
+        &[
+            ("id", false),
+            ("promotion_id", false),
+            ("session_hash", false),
+            ("reward_id", false),
+            ("label", false),
+            ("code", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "engagement_dimension_values",
+        &[("name", false), ("value", false)],
+    ),
 ];
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -174,6 +486,7 @@ struct Snapshot {
     created_at: i64,
     tables: BTreeMap<String, Vec<BTreeMap<String, Value>>>,
     files: Vec<MediaFile>,
+    private_files: Vec<MediaFile>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -263,8 +576,37 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
         });
     }
     tx.commit().await?;
+    let mut private_files = Vec::new();
+    for row in &tables["form_attachments"] {
+        let filename = row["filename"].as_str().unwrap();
+        if !crate::business::attachments::safe_filename(filename) {
+            return Err(Error::invalid("Unsafe private attachment path."));
+        }
+        let path = app.config.data_dir.join("attachments").join(filename);
+        if tokio::fs::metadata(&path).await?.len() > 2 * 1024 * 1024 {
+            return Err(Error::invalid(
+                "Private attachment exceeds its maximum file size.",
+            ));
+        }
+        let data = tokio::fs::read(path).await?;
+        budget += data.len() * 5;
+        if budget > app.config.max_backup_bytes
+            || data.len() as i64 != row["size"].as_i64().unwrap()
+            || digest(&data) != row["sha256"].as_str().unwrap()
+        {
+            return Err(Error::invalid(
+                "Private attachment integrity or backup budget failed.",
+            ));
+        }
+        private_files.push(MediaFile {
+            filename: filename.into(),
+            sha256: digest(&data),
+            data,
+        });
+    }
     let snapshot = Snapshot {
-        schema: 4,
+        private_files,
+        schema: 7,
         created_at: crate::now(),
         tables,
         files,
@@ -272,7 +614,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v4".into(),
+        format: "wpalt-backup-v7".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -289,14 +631,14 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v4"
+    if envelope.format != "wpalt-backup-v7"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 4
+    if snapshot.schema != 7
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -443,6 +785,9 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             .ok_or(Error::invalid("Invalid backup settings."))
     };
     crate::content::validate_settings(&crate::model::Settings {
+        business_enabled: app.config.business_enabled,
+        engagement_available: app.config.engagement.enabled,
+        analytics: None,
         title: setting_string("title")?,
         description: setting_string("description")?,
         theme: setting_string("theme")?,
@@ -485,6 +830,35 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             return Err(Error::invalid("Backup media failed validation."));
         }
     }
+    let expected_private: BTreeMap<_, _> = snapshot.tables["form_attachments"]
+        .iter()
+        .map(|row| {
+            (
+                row["filename"].as_str().unwrap(),
+                (
+                    row["sha256"].as_str().unwrap(),
+                    row["size"].as_i64().unwrap(),
+                ),
+            )
+        })
+        .collect();
+    if expected_private.len() != snapshot.tables["form_attachments"].len()
+        || expected_private.len() != snapshot.private_files.len()
+    {
+        return Err(Error::invalid("Private attachment backup is incomplete."));
+    }
+    let mut seen = HashSet::new();
+    for file in &snapshot.private_files {
+        if !crate::business::attachments::safe_filename(&file.filename)
+            || !seen.insert(&file.filename)
+            || file.data.len() > 2 * 1024 * 1024
+            || digest(&file.data) != file.sha256
+            || expected_private.get(file.filename.as_str())
+                != Some(&(file.sha256.as_str(), file.data.len() as i64))
+        {
+            return Err(Error::invalid("Invalid private attachment backup."));
+        }
+    }
     let registry = crate::schema::Registry {
         common: serde_json::from_str(&setting_string("field_schema")?)
             .map_err(|_| Error::invalid("Invalid backup field definitions."))?,
@@ -505,6 +879,62 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             .collect::<Result<_>>()?,
     };
     registry.validate()?;
+    for row in &snapshot.tables["business_forms"] {
+        let draft: crate::business::forms::FormDefinition =
+            serde_json::from_str(row["draft"].as_str().unwrap())
+                .map_err(|_| Error::invalid("Invalid backup form."))?;
+        draft.validate(&registry.common)?;
+        if row["published_version"].as_i64().unwrap() > 0 {
+            let live: crate::business::store::PublishedForm =
+                serde_json::from_str(row["live"].as_str().unwrap())
+                    .map_err(|_| Error::invalid("Invalid backup published form."))?;
+            live.form.validate(&live.common())?;
+        }
+    }
+    let mut publications = BTreeMap::new();
+    for row in &snapshot.tables["form_publications"] {
+        let published: crate::business::store::PublishedForm =
+            serde_json::from_str(row["definition"].as_str().unwrap())
+                .map_err(|_| Error::invalid("Invalid backup publication."))?;
+        published.form.validate(&published.common())?;
+        let identity = (
+            row["form_id"].as_str().unwrap(),
+            row["version"].as_i64().unwrap(),
+        );
+        if publications.insert(identity, published).is_some() {
+            return Err(Error::invalid("Duplicate form publication."));
+        }
+    }
+    for row in &snapshot.tables["business_forms"] {
+        let version = row["published_version"].as_i64().unwrap();
+        if version > 0 {
+            let live = publications
+                .get(&(row["id"].as_str().unwrap(), version))
+                .ok_or(Error::invalid("Backup form lacks its live publication."))?;
+            let snapshot: Value = serde_json::from_str(row["live"].as_str().unwrap())
+                .map_err(|_| Error::invalid("Invalid live form snapshot."))?;
+            if serde_json::to_value(live)
+                .map_err(|_| Error::invalid("Invalid live form snapshot."))?
+                != snapshot
+            {
+                return Err(Error::invalid("Backup live form and publication disagree."));
+            }
+        }
+    }
+    for row in &snapshot.tables["form_entries"] {
+        let identity = (
+            row["form_id"].as_str().unwrap(),
+            row["form_version"].as_i64().unwrap(),
+        );
+        let live = publications
+            .get(&identity)
+            .ok_or(Error::invalid("Backup entry lacks its publication."))?;
+        let values: Value = serde_json::from_str(row["values_json"].as_str().unwrap())
+            .map_err(|_| Error::invalid("Invalid backup entry values."))?;
+        if live.form.evaluate(&live.common(), &values, false)? != values {
+            return Err(Error::invalid("Backup entry has non-authoritative values."));
+        }
+    }
     let mut relationships = BTreeMap::new();
     let mut references = Vec::new();
     for row in &snapshot.tables["posts"] {
@@ -535,6 +965,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             )?;
         }
     }
+    crate::business::backup_validation::validate(&snapshot.tables)?;
     let post_kinds: BTreeMap<_, _> = snapshot.tables["posts"]
         .iter()
         .map(|row| (row["id"].as_str().unwrap(), row["kind"].as_str().unwrap()))
@@ -609,6 +1040,22 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             .bind(serde_json::to_string(&crate::discovery::Definition::default()).unwrap())
             .fetch_one(&mut *tx)
             .await?
+        } else if *name == "business_usage" {
+            sqlx::query_scalar("SELECT COUNT(*) FROM business_usage WHERE items<>0 OR bytes<>0")
+                .fetch_one(&mut *tx)
+                .await?
+        } else if *name == "engagement_settings" {
+            sqlx::query_scalar("SELECT COUNT(*) FROM engagement_settings WHERE enabled<>0 OR recording<>0 OR version<>1 OR purpose<>'Understand and improve this site using local interaction data.'").fetch_one(&mut *tx).await?
+        } else if *name == "engagement_dimension_values" {
+            sqlx::query_scalar("SELECT COUNT(*) FROM engagement_dimension_values WHERE NOT ((name='device' AND value IN ('mobile','desktop')) OR (name='referrer' AND value IN ('direct','same_site','external')))").fetch_one(&mut *tx).await?
+        } else if *name == "engagement_usage" {
+            sqlx::query_scalar(
+                "SELECT COUNT(*) FROM engagement_usage WHERE events<>0 OR sessions<>0",
+            )
+            .fetch_one(&mut *tx)
+            .await?
+        } else if *name == "engagement_event_names" {
+            sqlx::query_scalar("SELECT COUNT(*) FROM engagement_event_names WHERE NOT ((name='pageview' AND label='Page view') OR (name='form_submit' AND label='Accepted form response') OR (name='offer_claim' AND label='Offer claimed') OR (name='interaction' AND label='Masked interaction'))").fetch_one(&mut *tx).await?
         } else {
             sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {name}"))
                 .fetch_one(&mut *tx)
@@ -623,6 +1070,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     sqlx::query("DELETE FROM discovery_settings")
         .execute(&mut *tx)
         .await?;
+    sqlx::raw_sql("DELETE FROM business_usage; DELETE FROM engagement_settings; DELETE FROM engagement_usage; DELETE FROM engagement_event_names; DELETE FROM engagement_dimension_values;").execute(&mut *tx).await?;
     for (name, columns) in TABLES {
         for row in &snapshot.tables[*name] {
             let mut q = QueryBuilder::<Any>::new(format!(
@@ -651,6 +1099,13 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             sqlx::query_with(&sql, args).execute(&mut *tx).await?;
         }
     }
+    // Restored leases cannot belong to a live worker. SMTP acceptance may have
+    // happened before capture; keep it uncertain. Local spools are reproducible.
+    sqlx::query("UPDATE mail_jobs SET state='uncertain',lease_owner='',lease_until=0,last_code='restored_lease' WHERE state='leased'").execute(&mut *tx).await?;
+    sqlx::query("UPDATE mail_jobs SET state='pending',next_at=$1 WHERE state='spooled'")
+        .bind(crate::now())
+        .execute(&mut *tx)
+        .await?;
     // Files precede commit: interruption cannot commit a site whose files are missing.
     // A failed fresh restore may leave orphan files; a retry overwrites only validated UUID paths.
     for file in snapshot.files {
@@ -659,6 +1114,15 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             file.data,
         )
         .await?;
+    }
+    for file in snapshot.private_files {
+        let path = app.config.data_dir.join("attachments").join(file.filename);
+        tokio::fs::write(&path, file.data).await?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            tokio::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).await?;
+        }
     }
     tx.commit().await?;
     tracing::info!(event = "backup_restored");

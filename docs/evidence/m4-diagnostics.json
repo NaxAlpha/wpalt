@@ -1,0 +1,138 @@
+{
+  "conditions": "macOS native release; 1000 stories + About; debug SQL enabled; 50 warm admin reads; latency includes Python localhost client, excludes browser render; no timing assertions.",
+  "idle_initialized_rss_bytes": 35094528,
+  "routes": [
+    {
+      "route": "/",
+      "p50_ms": 1.373,
+      "p95_ms": 2.498,
+      "sql_queries_per_request": [
+        7,
+        9,
+        11
+      ]
+    },
+    {
+      "route": "/journal-1",
+      "p50_ms": 0.953,
+      "p95_ms": 1.842,
+      "sql_queries_per_request": [
+        9
+      ]
+    },
+    {
+      "route": "/search?q=publishing",
+      "p50_ms": 2.186,
+      "p95_ms": 3.464,
+      "sql_queries_per_request": [
+        7
+      ]
+    },
+    {
+      "route": "/admin/posts",
+      "p50_ms": 0.587,
+      "p95_ms": 0.754,
+      "sql_queries_per_request": [
+        3
+      ]
+    },
+    {
+      "route": "/admin/posts/{id}",
+      "p50_ms": 0.481,
+      "p95_ms": 0.582,
+      "sql_queries_per_request": [
+        6
+      ]
+    },
+    {
+      "route": "/admin/builder",
+      "p50_ms": 0.347,
+      "p95_ms": 0.429,
+      "sql_queries_per_request": [
+        2
+      ]
+    },
+    {
+      "route": "/api/admin/design",
+      "p50_ms": 1.189,
+      "p95_ms": 1.524,
+      "sql_queries_per_request": [
+        11
+      ]
+    },
+    {
+      "route": "/admin/forms",
+      "p50_ms": 0.398,
+      "p95_ms": 0.916,
+      "sql_queries_per_request": [
+        3
+      ]
+    },
+    {
+      "route": "/admin/audience",
+      "p50_ms": 0.433,
+      "p95_ms": 0.527,
+      "sql_queries_per_request": [
+        4
+      ]
+    },
+    {
+      "route": "/admin/campaigns",
+      "p50_ms": 0.441,
+      "p95_ms": 0.617,
+      "sql_queries_per_request": [
+        4
+      ]
+    },
+    {
+      "route": "/admin/mail",
+      "p50_ms": 0.424,
+      "p95_ms": 0.505,
+      "sql_queries_per_request": [
+        3
+      ]
+    },
+    {
+      "route": "/admin/engagement",
+      "p50_ms": 0.602,
+      "p95_ms": 0.803,
+      "sql_queries_per_request": [
+        7
+      ]
+    },
+    {
+      "route": "/admin/promotions",
+      "p50_ms": 0.418,
+      "p95_ms": 0.51,
+      "sql_queries_per_request": [
+        3
+      ]
+    },
+    {
+      "route": "/admin/registrations",
+      "p50_ms": 0.48,
+      "p95_ms": 0.624,
+      "sql_queries_per_request": [
+        3
+      ]
+    },
+    {
+      "route": "/forms/{form_id}",
+      "p50_ms": 0.365,
+      "p95_ms": 0.587,
+      "sql_queries_per_request": [
+        2
+      ]
+    },
+    {
+      "route": "/api/forms/{form_id}/entries",
+      "p50_ms": 0.586,
+      "p95_ms": 1.235,
+      "sql_queries_per_request": [
+        6
+      ]
+    }
+  ],
+  "binary_sha256": "fef710e726a582c93fc3642f2b150b3b82f06cad14409b7fcadb49357f555887",
+  "rss_after_authoring_reads_bytes": 43220992
+}

@@ -93,6 +93,22 @@ const nodes = {
     parseDOM: [{ tag: "pre", preserveWhitespace: "full" }],
     toDOM: () => ["pre", ["code", 0]],
   },
+  form: {
+    group: "block",
+    atom: true,
+    draggable: true,
+    attrs: { id: { default: "" }, title: { default: "Form" } },
+    toDOM: (n) => [
+      "section",
+      { class: "form-embed" },
+      ["p", `Form: ${n.attrs.title}`],
+      [
+        "a",
+        { href: `/forms/${n.attrs.id}`, target: "_blank", rel: "noopener" },
+        "Preview published form",
+      ],
+    ],
+  },
   horizontal_rule: {
     group: "block",
     parseDOM: [{ tag: "hr" }],
@@ -169,10 +185,13 @@ const schema = new Schema({
   ),
   marks: base.spec.marks,
 });
-const form = document.querySelector("[data-editor]");
-const host = document.querySelector("[data-writing-canvas]");
-if (form && host) initialize();
-function initialize() {
+for (const [index, form] of Array.from(
+  document.querySelectorAll("[data-editor]"),
+).entries()) {
+  const host = form.querySelector("[data-writing-canvas]");
+  if (host) initialize(form, host, index);
+}
+function initialize(form, host, index) {
   const hidden = form.elements.document,
     fallback = form.elements.body;
   // Do not replace text entered while the enhancement bundle was still loading.
@@ -191,7 +210,7 @@ function initialize() {
   host.before(ui);
   const hint = document.createElement("p");
   hint.className = "muted writing-hint";
-  hint.id = "writing-help";
+  hint.id = index === 0 ? "writing-help" : `writing-help-${index}`;
   hint.textContent =
     "Write naturally. Type / in an empty paragraph to choose a block. Use ⌘/Ctrl B or I to format.";
   host.before(hint);
@@ -209,7 +228,7 @@ function initialize() {
   const dialog = document.createElement("dialog");
   dialog.className = "writing-dialog";
   form.after(dialog);
-  const recoveryKey = `wpalt:authoring:${form.dataset.owner}:${form.getAttribute("action")}`;
+  const recoveryKey = `wpalt:authoring:${form.dataset.owner}:${form.getAttribute("action") || location.pathname}:${form.elements.variant?.value || "main"}`;
   const recoveryVersion = Number(form.elements.version.value);
   let writeTimer,
     slash = false,
@@ -336,7 +355,7 @@ function initialize() {
       role: "textbox",
       "aria-label": "Content",
       "aria-multiline": "true",
-      "aria-describedby": "writing-help",
+      "aria-describedby": hint.id,
       spellcheck: "true",
       lang: form.elements.locale.value,
       dir: "auto",
@@ -575,6 +594,7 @@ function initialize() {
     ["Callout", "callout"],
     ["Code", "code_block"],
     ["Image", "image"],
+    ["Published form", "form"],
     ["Table", "table"],
     ["Divider", "horizontal_rule"],
   ])
@@ -588,6 +608,7 @@ function initialize() {
         slash = false;
         closeMenu();
         if (kind === "image") return imageDialog();
+        if (kind === "form") return formDialog();
         if (kind === "table") return insertTable();
         if (["paragraph", "heading", "code_block"].includes(kind))
           run(setBlockType(schema.nodes[kind], attrs));
@@ -781,6 +802,57 @@ function initialize() {
         },
         f,
       );
+    });
+  }
+  function formDialog() {
+    openDialog("Insert published form", (f) => {
+      const label = document.createElement("label");
+      label.textContent = "Published form";
+      const select = document.createElement("select");
+      select.required = true;
+      label.append(select);
+      f.append(label);
+      const status = document.createElement("p");
+      status.setAttribute("role", "status");
+      status.textContent = "Loading published forms…";
+      f.append(status);
+      fetch("/api/admin/forms/catalog", { credentials: "same-origin" })
+        .then((r) => {
+          if (!r.ok) throw Error();
+          return r.json();
+        })
+        .then((data) => {
+          for (const item of data.forms) {
+            const option = document.createElement("option");
+            option.value = item.id;
+            option.textContent = item.title;
+            select.append(option);
+          }
+          status.textContent = data.forms.length
+            ? "Only published forms are listed."
+            : "Publish a form in Forms first.";
+        })
+        .catch(() => {
+          status.textContent = "Forms could not be loaded.";
+        });
+      const submit = document.createElement("button");
+      submit.type = "submit";
+      submit.textContent = "Insert form";
+      f.append(submit);
+      f.onsubmit = (e) => {
+        e.preventDefault();
+        if (!select.value) return;
+        view.dispatch(
+          view.state.tr.replaceSelectionWith(
+            schema.nodes.form.create({
+              id: select.value,
+              title: select.selectedOptions[0].textContent,
+            }),
+          ),
+        );
+        dialog.close();
+        view.focus();
+      };
     });
   }
   function imageDialog() {
@@ -1008,7 +1080,7 @@ function initialize() {
           form.elements.locale.dispatchEvent(
             new Event("change", { bubbles: true }),
           );
-          form.elements.kind.dispatchEvent(
+          form.elements.kind?.dispatchEvent(
             new Event("change", { bubbles: true }),
           );
           form.dispatchEvent(new Event("input", { bubbles: true }));

@@ -95,3 +95,16 @@ await build({
   banner: { js: "/*!\n" + editorLicenses.join("\n") + "*/" },
   legalComments: "eof",
 });
+
+await build({
+  banner: { js: "/*! Preact 11.0.0\n" + license + "*/" },
+  entryPoints: ["forms.jsx"],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  jsxFactory: "h",
+  jsxFragment: "Fragment",
+  target: ["es2020"],
+  outfile: "../assets/generated/forms.js",
+  legalComments: "eof",
+});
