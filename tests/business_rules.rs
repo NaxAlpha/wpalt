@@ -1156,6 +1156,36 @@ async fn engagement_requires_current_consent_masks_geometry_and_erases_on_withdr
         let archive = backup::capture(&app).await.unwrap();
         let (config, restored_schema) = database_config(&data, "engagement_restored", engine).await;
         let restored = App::open(config).await.unwrap();
+        let mut envelope: serde_json::Value = serde_json::from_slice(&archive).unwrap();
+        let mut payload: serde_json::Value =
+            serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        let recorded = payload["tables"]["engagement_events"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|r| !r["frame"].as_str().unwrap().is_empty())
+            .unwrap();
+        let mut frame: serde_json::Value =
+            serde_json::from_str(recorded["frame"].as_str().unwrap()).unwrap();
+        frame["text"] = json!("PRIVATE_TEXT_MUST_NOT_IMPORT");
+        recorded["frame"] = json!(frame.to_string());
+        let encoded = payload.to_string();
+        envelope["sha256"] = json!(auth::digest(encoded.as_bytes()));
+        envelope["payload"] = json!(encoded);
+        assert!(
+            backup::restore(&restored, &serde_json::to_vec(&envelope).unwrap())
+                .await
+                .is_err(),
+            "A recomputed checksum cannot turn text-bearing capture into a valid private backup."
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM engagement_events")
+                .fetch_one(&restored.db.pool)
+                .await
+                .unwrap(),
+            0,
+            "Semantic rejection occurs before importing private rows."
+        );
         backup::restore(&restored, &archive).await.unwrap();
         assert_eq!(
             sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM engagement_events")

@@ -336,6 +336,20 @@ module.exports = async function (owner, origin, output) {
     await visitor.goto(origin + "/participate-locally");
     const embedded = visitor.frameLocator(".form-embed iframe");
     await embedded.getByLabel("Your full name", { exact: true }).waitFor();
+    const layout = await visitor.evaluate(() => ({
+      width: innerWidth,
+      scroll: document.documentElement.scrollWidth,
+      overflow: [...document.querySelectorAll("body *")]
+        .filter((e) => e.getBoundingClientRect().right > innerWidth + 1)
+        .slice(0, 10)
+        .map((e) => ({
+          tag: e.tagName,
+          class: e.className,
+          width: e.getBoundingClientRect().width,
+        })),
+    }));
+    report.measurements.push({ surface: "embedded-public-form", ...layout });
+    assert.ok(layout.scroll <= layout.width + 1, JSON.stringify(layout));
     assert.equal(
       await embedded.locator(".site-header").count(),
       0,

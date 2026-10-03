@@ -41,4 +41,15 @@ Coverage is defined individually in the 132-group parity matrix. Limits include 
 
 ## Delivery checks
 
-Current-head PostgreSQL/browser CI, release measurements and downloaded clean-artifact source/hash verification are being completed. Do not infer readiness from this section until the final record identifies the passing run and verified archive.
+The delivery record on PR #8 identifies the passing current-source application (including PostgreSQL 17 and Linux browser), Rust 1.85 compiler-floor and independent clean-build run, plus the downloaded archive/source/executable/asset hashes. The PR remains draft until those checks and artifact verification pass. The exact run/hash attestation is also saved in the local M4 review packet; it is separate from the measured macOS executable. Merge requires the user’s subsequent decision.
+
+Local final verification: 19 publishing acceptance clusters, 14 business rule/integration clusters, two document trust clusters, warnings-denied Clippy, reproducible frontend assets, guidance checks and the native Chrome suite pass. The browser found and guarded same-page recovery, private action projection, no-referrer proof navigation, independent A/B editors and narrow public privacy-checkbox overflow. The embedding measurement records 320 px viewport and 320 px document width.
+
+
+### Recorded local observations
+
+Final macOS release executable: **14,069,920 bytes (13.42 MiB)**, SHA256 `fef710e726a582c93fc3642f2b150b3b82f06cad14409b7fcadb49357f555887`. The 1,000-story composed-blog scenario used **52.16 MiB RSS** after load and **18.44 MiB site files**, excluding config/logs and the executable. Resident memory is an observation affected by workload and OS residency, not a guaranteed footprint.
+
+The debug-log release HTTP run recorded a two-query public form read and a six-query simple authoritative submission; p95 was **1.235 ms** including Python localhost overhead. The separate populated debug integration run measured response p95 **4.628 ms** and **96.4 fsync-spooled jobs/s**. This workload contains 1,000 notification-bearing responses and 2,000 events; it is not the simple HTTP submission workload. Event grouping uses a temporary aggregation structure while its time range reads the covering event index. Admission and ready-queue queries use their compound/partial indexes.
+
+Machine-readable local records: [release HTTP/footprint](m4-footprint.json), [request-correlated diagnostics](m4-diagnostics.json), [business volume/plans](m4-volume-local.json). PostgreSQL volume/plans are retained in the passing run’s `m4-volume-evidence` artifact. No WordPress performance comparison is asserted by these measurements.
