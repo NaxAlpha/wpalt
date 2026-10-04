@@ -676,6 +676,271 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
         "member_identities",
         &[("issuer", false), ("subject", false), ("user_id", false)],
     ),
+    (
+        "shop_settings",
+        &[
+            ("id", true),
+            ("currency", false),
+            ("tax_bps", true),
+            ("shipping_minor", true),
+            ("tax_shipping", true),
+            ("version", true),
+        ],
+    ),
+    (
+        "shop_products",
+        &[
+            ("id", false),
+            ("slug", false),
+            ("title", false),
+            ("description", false),
+            ("kind", false),
+            ("entitlement", false),
+            ("access_seconds", true),
+            ("download_id", false),
+            ("published", true),
+            ("version", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "shop_variants",
+        &[
+            ("id", false),
+            ("product_id", false),
+            ("title", false),
+            ("sku", false),
+            ("price_minor", true),
+            ("member_price_minor", true),
+            ("member_key", false),
+            ("stock_total", true),
+            ("held", true),
+            ("sold", true),
+            ("billing_interval", false),
+            ("active", true),
+            ("version", true),
+        ],
+    ),
+    (
+        "shop_discounts",
+        &[
+            ("code", false),
+            ("title", false),
+            ("bps", true),
+            ("starts_at", true),
+            ("expires_at", true),
+            ("max_uses", true),
+            ("held", true),
+            ("used", true),
+            ("member_key", false),
+            ("product_id", false),
+            ("reward_id", false),
+            ("active", true),
+            ("version", true),
+        ],
+    ),
+    (
+        "shop_carts",
+        &[("user_id", false), ("version", true), ("updated_at", true)],
+    ),
+    (
+        "shop_cart_lines",
+        &[
+            ("user_id", false),
+            ("variant_id", false),
+            ("slot_id", false),
+            ("quantity", true),
+        ],
+    ),
+    (
+        "shop_resources",
+        &[
+            ("id", false),
+            ("title", false),
+            ("staff_id", false),
+            ("active", true),
+            ("version", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "shop_slots",
+        &[
+            ("id", false),
+            ("resource_id", false),
+            ("variant_id", false),
+            ("starts_at", true),
+            ("ends_at", true),
+            ("capacity", true),
+            ("held", true),
+            ("booked", true),
+            ("active", true),
+            ("version", true),
+        ],
+    ),
+    (
+        "shop_subscriptions",
+        &[
+            ("id", false),
+            ("user_id", false),
+            ("variant_id", false),
+            ("entitlement", false),
+            ("price_minor", true),
+            ("billing_interval", false),
+            ("period_start", true),
+            ("period_end", true),
+            ("state", false),
+            ("provider", false),
+            ("provider_ref", false),
+            ("provider_cancel_pending", true),
+            ("provider_cancel_at", true),
+            ("grant_id", false),
+            ("next_variant", false),
+            ("next_price_minor", true),
+            ("version", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "shop_orders",
+        &[
+            ("id", false),
+            ("user_id", false),
+            ("request_key", false),
+            ("request_digest", false),
+            ("cart_version", true),
+            ("customer_name", false),
+            ("customer_email", false),
+            ("shipping_address", false),
+            ("currency", false),
+            ("subtotal_minor", true),
+            ("discount_minor", true),
+            ("discount_bps", true),
+            ("discount_base_minor", true),
+            ("tax_minor", true),
+            ("shipping_minor", true),
+            ("total_minor", true),
+            ("tax_bps", true),
+            ("tax_shipping", true),
+            ("discount_code", false),
+            ("reward_claim", false),
+            ("referral_id", false),
+            ("commission_bps", true),
+            ("provider", false),
+            ("provider_ref", false),
+            ("payment_ref", false),
+            ("payment_state", false),
+            ("fulfillment", false),
+            ("paid_minor", true),
+            ("refunded_minor", true),
+            ("expires_at", true),
+            ("subscription_id", false),
+            ("period_start", true),
+            ("period_end", true),
+            ("target_price_minor", true),
+            ("purpose", false),
+            ("version", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "shop_order_lines",
+        &[
+            ("id", false),
+            ("order_id", false),
+            ("variant_id", false),
+            ("product_id", false),
+            ("title", false),
+            ("sku", false),
+            ("kind", false),
+            ("quantity", true),
+            ("unit_minor", true),
+            ("line_minor", true),
+            ("slot_id", false),
+            ("entitlement", false),
+            ("access_seconds", true),
+            ("allocation", false),
+            ("grant_id", false),
+            ("billing_interval", false),
+        ],
+    ),
+    (
+        "shop_payments",
+        &[
+            ("id", false),
+            ("order_id", false),
+            ("provider", false),
+            ("reference", false),
+            ("amount_minor", true),
+            ("currency", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "shop_refunds",
+        &[
+            ("id", false),
+            ("order_id", false),
+            ("request_key", false),
+            ("amount_minor", true),
+            ("reason", false),
+            ("restock", true),
+            ("state", false),
+            ("provider_ref", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "shop_notifications",
+        &[
+            ("id", false),
+            ("order_id", false),
+            ("kind", false),
+            ("slot_id", false),
+            ("due_at", true),
+            ("state", false),
+            ("message_id", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "shop_provider_events",
+        &[
+            ("id", false),
+            ("digest", false),
+            ("body", false),
+            ("state", false),
+            ("attempts", true),
+            ("next_at", true),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "shop_reward_redemptions",
+        &[("claim_id", false), ("order_id", false), ("state", false)],
+    ),
+    (
+        "shop_payouts",
+        &[
+            ("id", false),
+            ("user_id", false),
+            ("amount_minor", true),
+            ("currency", false),
+            ("reference", false),
+            ("created_at", true),
+        ],
+    ),
+    (
+        "shop_history",
+        &[
+            ("id", false),
+            ("order_id", false),
+            ("actor", false),
+            ("action", false),
+            ("amount_minor", true),
+            ("created_at", true),
+        ],
+    ),
 ];
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -810,7 +1075,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     }
     let snapshot = Snapshot {
         private_files,
-        schema: 8,
+        schema: 9,
         created_at: crate::now(),
         tables,
         files,
@@ -818,7 +1083,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v7".into(),
+        format: "wpalt-backup-v8".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -835,14 +1100,14 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v7"
+    if envelope.format != "wpalt-backup-v8"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 8
+    if snapshot.schema != 9
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -1022,6 +1287,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     crate::content::validate_settings(&crate::model::Settings {
         business_enabled: app.config.business_enabled,
         membership_enabled: app.config.membership_enabled,
+        commerce_enabled: app.config.commerce.enabled,
         engagement_available: app.config.engagement.enabled,
         analytics: None,
         title: setting_string("title")?,
@@ -1203,6 +1469,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     }
     crate::business::backup_validation::validate(&snapshot.tables)?;
     crate::membership::backup::validate(&snapshot.tables)?;
+    crate::commerce::backup::validate(&snapshot.tables, &app.config.commerce)?;
     let post_kinds: BTreeMap<_, _> = snapshot.tables["posts"]
         .iter()
         .map(|row| (row["id"].as_str().unwrap(), row["kind"].as_str().unwrap()))
@@ -1277,6 +1544,8 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             .bind(serde_json::to_string(&crate::discovery::Definition::default()).unwrap())
             .fetch_one(&mut *tx)
             .await?
+        } else if *name == "shop_settings" {
+            sqlx::query_scalar("SELECT COUNT(*) FROM shop_settings WHERE tax_bps<>0 OR shipping_minor<>0 OR tax_shipping<>0 OR version<>1").fetch_one(&mut *tx).await?
         } else if *name == "business_usage" {
             sqlx::query_scalar("SELECT COUNT(*) FROM business_usage WHERE items<>0 OR bytes<>0")
                 .fetch_one(&mut *tx)
@@ -1307,7 +1576,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     sqlx::query("DELETE FROM discovery_settings")
         .execute(&mut *tx)
         .await?;
-    sqlx::raw_sql("DELETE FROM business_usage; DELETE FROM engagement_settings; DELETE FROM engagement_usage; DELETE FROM engagement_event_names; DELETE FROM engagement_dimension_values;").execute(&mut *tx).await?;
+    sqlx::raw_sql("DELETE FROM shop_settings; DELETE FROM business_usage; DELETE FROM engagement_settings; DELETE FROM engagement_usage; DELETE FROM engagement_event_names; DELETE FROM engagement_dimension_values;").execute(&mut *tx).await?;
     for (name, columns) in TABLES {
         for row in &snapshot.tables[*name] {
             let mut q = QueryBuilder::<Any>::new(format!(

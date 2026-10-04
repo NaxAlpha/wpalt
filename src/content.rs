@@ -31,6 +31,8 @@ pub fn valid_slug(slug: &str) -> bool {
             "registration",
             "themes",
             "members",
+            "shop",
+            "commerce",
             "r",
         ]
         .contains(&slug)

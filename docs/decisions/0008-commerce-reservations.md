@@ -1,0 +1,13 @@
+# ADR 0008 — Integrated local financial and reservation authority
+
+2026-10-04. Implementation decision within the agreed M6 scope; verification remains a release gate.
+
+Use the existing SQLite/PostgreSQL Any database, accounts, mutation guard, member grants, contacts and durable mail outbox. A separate commerce schema preserves clear financial records without a separate service, frontend framework or compulsory cloud account. One owning process remains the supported topology; coordinated independent workers/nodes are M9.
+
+Keep prices in checked integer minor units and the store currency immutable. Snapshot the accepted quote, rule basis, contact terms and order lines before reserving conditional stock/slot counters. Database constraints/triggers and idempotency keys reinforce the owning-process guard. Counts, limits and allocation counters are derived and verified at recovery. Preserve a financial transition ledger rather than mutate earlier agreed terms. Refunds authorize a bounded outstanding amount; uncertain external effects remain pending and retry with a stable provider key.
+
+Use explicit UTC resource slots with capacity instead of deriving bookable time from untrusted customer input. Prevent overlapping resource/staff allocations, including occupied inactive slots. Payments settle holds and grants together; late paid money after released holds becomes a recorded refund obligation rather than renewed capacity/access. Full refunds revoke only their own purchase grants, preserving unrelated paid/owner access.
+
+Offline collection records actual payments. Local subscription periods/renewal/dunning/cancellation/proration are useful without provider credentials. Calendar month/year billing uses UTC calendar arithmetic. Upgrades with the same access/interval require settlement; downgrades retain an accepted next-period price. Hosted Stripe is an optional network boundary, pinned to the verified current API and raw HMAC webhook protocol. Browser redirects/webhook object fields are not authority: retrieve authenticated canonical objects and require exact mappings/amounts. Deterministic HTTPS fixtures prove adapter behavior; they do not claim provider sandbox certification or universal payment/tax compatibility.
+
+Schema 8 upgrades to 9. Schema-9 backups replace the archive format with v8 and include the entire commerce graph. Restore old M5 archives with the matching runtime before upgrading/re-exporting. No pre-adoption compatibility parser or obsolete preview migration is introduced. Recoverable financial facts and private data require secure independent backups; scheduled/encrypted destinations remain M7.

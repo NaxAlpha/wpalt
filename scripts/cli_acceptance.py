@@ -114,9 +114,28 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     exported_course=root/'course-export.json';run(config,'member','course-export',course_id,str(exported_course))
     assert json.loads(exported_course.read_text())==course
     assert exported_course.stat().st_mode & 0o077==0,'Course exports must be private'
+    # Native commerce automation survives the same full-site recovery boundary.
+    run(config,'shop','seed-demo')
+    report=json.loads(run(config,'shop','report').stdout)
+    assert report['products']==4 and report['awaiting_payment']==0
+    product_input={'slug':'cli-notebook','title':'CLI notebook','description':'Local merchant import','kind':'physical','entitlement':'','access_seconds':0,'download_id':'','published':True}
+    product_file=root/'product.json';product_file.write_text(json.dumps(product_input))
+    product_id=run(config,'shop','product-import',str(product_file)).stdout.strip();uuid.UUID(product_id)
+    variant={'title':'Standard','sku':'CLI-NOTEBOOK','price_minor':1200,'member_price_minor':-1,'member_key':'','stock_total':5,'billing_interval':'','active':True}
+    variant_file=root/'variant.json';variant_file.write_text(json.dumps(variant))
+    variant_id=run(config,'shop','variant-import',product_id,str(variant_file)).stdout.strip();uuid.UUID(variant_id)
+    variant['price_minor']=-1;variant_file.write_text(json.dumps(variant))
+    run(config,'shop','variant-import',product_id,str(variant_file),'--id',variant_id,'--version','1',ok=False)
+    run(config,'shop','maintenance')
+    assert json.loads(run(config,'shop','report').stdout)['awaiting_payment']==0,'Maintenance cannot invent offline orders or payments'
     snapshot=root/'snapshot.json';run(config,'backup',str(snapshot));assert snapshot.exists()
     if os.name=='posix':assert snapshot.stat().st_mode & 0o077==0,'Backup permissions expose private data'
     run(target,'restore',str(snapshot));run(target,'restore',str(snapshot),ok=False)
+    recovered_report=json.loads(run(target,'shop','report').stdout)
+    assert recovered_report['products']==5 and recovered_report['awaiting_payment']==0
+    with sqlite3.connect(root/'recovered.db') as database:
+        assert database.execute('SELECT price_minor,stock_total FROM shop_variants WHERE id=?',(variant_id,)).fetchone()==(1200,5)
+        assert database.execute('SELECT COUNT(*) FROM shop_slots').fetchone()[0]==1
     restored_course=root/'restored-course.json';run(target,'member','course-export',course_id,str(restored_course))
     assert json.loads(restored_course.read_text())==course
     with log.open('a') as log_file:
@@ -129,4 +148,4 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     logs=log.read_text();assert secret not in logs;assert csrf not in logs
     for cookie in jar:assert cookie.value not in logs
     assert 'request_completed' in logs and 'elapsed_us' in logs and 'login_succeeded' in logs
-    print('PASS: configuration precedence, initialization, process lock, real login, persisted scheduler/restart, RSS XML, portable theme import/export/publication, private backup, fresh restore and redacted debug logs.')
+    print('PASS: configuration precedence, initialization, process lock, real login, persisted scheduler/restart, RSS XML, portable theme import/export/publication, commerce imports/demo/maintenance, private backup, fresh graph restore and redacted debug logs.')

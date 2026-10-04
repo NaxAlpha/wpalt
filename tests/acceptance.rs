@@ -2637,3 +2637,6 @@ async fn content_export_enforces_byte_budget_without_truncating_or_mutating_cont
 
 #[path = "support/membership_journeys.rs"]
 mod membership_journeys;
+
+#[path = "support/commerce_journeys.rs"]
+mod commerce_journeys;

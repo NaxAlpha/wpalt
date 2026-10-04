@@ -101,6 +101,10 @@ async function freePort() {
     page.getByRole("button", { name: "Sign in", exact: true }),
   );
   await page.waitForURL(origin + "/admin");
+  if (process.env.WPALT_COMMERCE_ONLY) {
+    await require("./commerce_acceptance.cjs")(owner, origin, output);
+    return;
+  }
   if (process.env.WPALT_MEMBERSHIP_ONLY) {
     await require("./membership_acceptance.cjs")(owner, origin, output);
     return;
@@ -573,6 +577,7 @@ async function freePort() {
   await require("./adversarial_ui.cjs")(owner, origin, output);
   await require("./authoring_acceptance.cjs")(owner, origin, output, mediaUrl);
   await require("./membership_acceptance.cjs")(owner, origin, output);
+  await require("./commerce_acceptance.cjs")(owner, origin, output);
   assert.deepEqual(errors, [], "Browser JavaScript errors");
   assert.deepEqual(remote, [], "Unexpected external runtime requests");
   fs.writeFileSync(
@@ -642,7 +647,10 @@ async function freePort() {
       server.kill("SIGTERM");
       await new Promise((resolve) => {
         const deadline = setTimeout(() => server.kill("SIGKILL"), 10000);
-        server.once("exit", () => { clearTimeout(deadline); resolve(); });
+        server.once("exit", () => {
+          clearTimeout(deadline);
+          resolve();
+        });
       });
     }
     if (logFd !== undefined) fs.closeSync(logFd);

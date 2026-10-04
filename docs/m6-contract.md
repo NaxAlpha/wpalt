@@ -1,0 +1,28 @@
+# M6 — Integrated commerce and reservations
+
+Active implementation, 2026-10-04, after the user authorized merging delivery PR #11 and proceeding with M6. No completion claim until exact-source SQLite/PostgreSQL, cumulative browser/CLI and clean-delivery gates pass.
+
+## End-user system and functional sequence
+
+A merchant runs a store and appointment/group-booking service through shared users, content, media, contacts, memberships and local operations. Shoppers browse published products, choose variants, build a bounded cart, inspect authoritative prices/discount/tax/shipping, place an order and receive paid access or fulfillable purchases. Customers see their own orders, invoices, reservations and subscription state; merchants inspect and reconcile payments, fulfill, cancel and refund with retained records.
+
+First make each connected workflow correct, verify it, then optimize its queries/security/UX and the integrated whole. Preserve M1–M5 journeys. No M7–M9 work or compatibility shims for unpublished M6 previews.
+
+1. Catalog: physical/digital/membership/booking products, variants, integer minor-unit prices, stock, reusable discounts and configured member prices. Digital files remain private under shared membership policy; HTML visibility never grants access.
+2. Orders: persistent signed-in carts (at most 20 lines, bounded quantities), snapshotted prices and contact/shipping information, authoritative totals, expiring stock/slot holds, immutable order lines, idempotent checkout and operator fulfillment. Offline payment receipts are explicitly recorded payments rather than simulated card settlement. Printable financial records are local records, not jurisdiction-certified invoices.
+3. Payments/access: optional hosted Stripe Checkout, raw-body signed webhooks, provider idempotency and exact currency/amount/order reconciliation; duplicate, delayed and failed callbacks cannot double-charge, oversell or grant premature access. No card details enter wpalt. Confirmed purchases grant locally bounded entitlements and refunds revoke only the grants belonging to that purchase. Test adapters are explicitly test-only and cannot pose as real settlement.
+4. Subscriptions: durable billing periods, renewal invoices, paid/failed/dunning/cancel state, integer proration for defined plan changes and access tied to settled periods. Local/offline collection and optional configured provider collection have separate truthful states. Do not invent successful recurring collections from a scheduler tick.
+5. Reservations: merchant-created staff/resource calendars, explicit UTC slots and capacity, linked product pricing, pending/confirmed/cancelled reservations, durable local confirmations/reminders, cancellation and associated refund flow. Atomic last-slot and overlapping-resource allocation; no unaudited client-selected times/capacity.
+6. Integration: current contacts/accounts and protected downloads, referral commissions from actual settled orders and promotion reward redemption, communications through the durable local outbox, restart/fresh recovery of the whole financial/reservation graph.
+
+## Defined operating rules and external boundaries
+
+One owning process per data directory, backed by real SQLite or PostgreSQL; cross-process coordination remains M9. Database constraints/conditional updates/transactions protect integrity in addition to the shared mutation guard. Money uses checked integers, never floating point. A store has one configured currency (initial supported USD/EUR/GBP/JPY), merchant-set tax basis points and flat shipping rules. Tax applies to the declared discounted subtotal and shipping policy; records retain those rules. Current tax datasets, jurisdictional filings, carrier labels/rates and external calendar synchronization remain explicitly optional/external F070/F071 boundaries, not fabricated local services.
+
+Customer checkout uses existing verified/approved accounts; guest checkout is not promised. Staff/provider endpoints recheck authority. Cart prices are never authority; server recalculates at checkout. Bounded cursor lists and batched financial projections must not silently hide older actionable orders. Provider configuration is optional; local workflows remain useful without it. Provider sandbox evidence is recorded separately from deterministic adapter tests; missing credentials never justify a false verification claim.
+
+## Verification output
+
+Readable connected journeys cover two customers with different access/pricing; physical/digital/membership purchases; rounding/tax/shipping/discounts; stale cart/price changes; simultaneous last-unit and last-slot checkouts; abandoned-hold release; payment failure and repeated/out-of-order callbacks; partial/full refunds without excess or duplicate reversal; renewal/dunning/cancellation/proration; overlapping resource slots, customer/owner reservations and confirmations/reminders; protected data/API/media, role/CSRF/module-disabled boundaries; malicious archive rejection before writes and fresh restart/recovery. Real browser journeys verify merchant and customer native flows at 320/768/1440, keyboard/text-spacing/a11y with representative screenshot review. Populated catalog/order/booking projections retain plans/latency/footprint observations without brittle timing thresholds.
+
+Deliver PR, schema-8-to-9 migration/reset notes, guide, feature-parity/guidance mappings, review packet and independently verified clean artifact. M6 does not claim universal tax/payment-provider compatibility, formal PCI/security certification or complete WooCommerce ecosystem parity.
