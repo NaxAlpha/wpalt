@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M6 defined scope verified locally; final-source delivery gates and exact clean artifact on PR #12",
+  "milestone": "M7 active; PR #13 remains a draft until all contract families and integrated evidence are complete.",
   "capabilities": [
     {
       "id": "F001",
@@ -1188,9 +1188,16 @@
       "capability": "Page caching, invalidation and preload",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Bounded anonymous publication/listing/sitemap cache, current-mutation invalidation, owner purge and preload of up to 20 recent unprotected pages without network fetches.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F073",
@@ -1198,9 +1205,14 @@
       "capability": "Browser-cache headers and compression settings",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0\u20133600 seconds, default revalidation. Private/publication browser responses no-store.",
+      "evidence": [
+        "resilient-operations.md",
+        "../tests/acceptance.rs"
+      ]
     },
     {
       "id": "F074",
@@ -1208,9 +1220,16 @@
       "capability": "Object-cache integration",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Bounded public serialized content projection cache; external shared object-cache integration remains M9.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F075",
@@ -1238,9 +1257,16 @@
       "capability": "Resize, compress and WebP/AVIF derivatives",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Native bounded WebP derivatives with original authorization; AVIF remains outstanding.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F078",
@@ -1638,9 +1664,16 @@
       "capability": "TOTP/passkeys and local login protections",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Local TOTP, one-use recovery codes and user-verified passkeys; replay/current-session/current-credential safeguards.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F104",
@@ -1658,9 +1691,16 @@
       "capability": "Local request rule engine and rate limits",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Real peer/path deny rules, bounded counters and global admission limits; no implicit forwarded trust.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F106",
@@ -1668,9 +1708,16 @@
       "capability": "File-integrity / known-pattern malware scans",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Paginated inventory/hash scans and explicit executable-pattern review warnings; current external signature intelligence excluded.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F107",
@@ -1678,9 +1725,16 @@
       "capability": "Audit logs and privileged action history",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Bounded privileged HTTP intent/outcome history, including account-security writes; shared CLI/job audit remains outstanding.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F108",
@@ -1698,9 +1752,16 @@
       "capability": "Cookie banner and consent/script enforcement",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Existing M4 local consent enforcement and GPC/DNT; arbitrary third-party script manager remains outstanding.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F110",
@@ -1708,9 +1769,16 @@
       "capability": "Consent records and data-request workflows",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Existing M4 consent/audience erase workflow; broader user-data request workflow remains outstanding.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F111",
@@ -1718,9 +1786,16 @@
       "capability": "Cookie scan on own pages",
       "deployment": "W",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Optional locked Playwright same-origin sample scan, consent states and value-free cookie/storage/script metadata; finite scope.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F112",
@@ -1758,9 +1833,16 @@
       "capability": "Consistent files + database snapshot",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Consistent current-schema logical database/file graph across SQLite/PostgreSQL.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F116",
@@ -1768,9 +1850,16 @@
       "capability": "Schedules, retention and pre-update backups",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Scheduled copies, per-destination retention and durable copy status; pre-upgrade workflow remains outstanding.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F117",
@@ -1778,9 +1867,16 @@
       "capability": "Encrypted backup packages and recovery keys",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Authenticated encrypted packages and separately held keys; tamper/wrong-key/fresh-recovery checks.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F118",
@@ -1788,9 +1884,16 @@
       "capability": "Incremental/deduplicated backup worker",
       "deployment": "W",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Native encrypted content-addressed chunks with independently complete manifests and verified preview/hash pruning.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F119",
@@ -1798,9 +1901,16 @@
       "capability": "Selective restore, clone and URL-aware migration",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Validated private file extraction and offline M6 archive conversion; URL-aware clone and selective graph workflows remain outstanding.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F120",
@@ -1808,9 +1918,16 @@
       "capability": "Portable restore utility independent of CMS",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Standalone same-binary archive inspect/extract without database/site installation; full restore remains empty-target.",
+      "evidence": [
+        "m7-contract.md",
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F121",

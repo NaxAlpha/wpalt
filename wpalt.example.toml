@@ -100,6 +100,10 @@ retain = 14
 
 # Bounded anonymous listing/sitemap cache. Cookie/authenticated/private routes bypass.
 [cache]
+# Compression negotiation is applied to both fresh and cached responses.
+gzip = true
+# Mutable preview asset URLs: zero revalidates on every use; maximum 3600.
+asset_cache_seconds = 0
 enabled = false
 max_bytes = 8388608
 max_entries = 128

@@ -298,7 +298,7 @@ module.exports = async function (owner, origin, output) {
     );
     await visitor.goto(origin + "/login");
     await visitor
-      .locator("input[name=email]")
+      .getByLabel("Email", { exact: true })
       .fill("applicant-browser@example.test");
     await visitor
       .locator("input[name=password]")

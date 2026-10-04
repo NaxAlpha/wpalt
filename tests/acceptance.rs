@@ -2646,7 +2646,7 @@ async fn encrypted_recovery_survives_original_loss_and_reports_failed_independen
     use wpalt::operations::{encryption, recovery};
     for pg in engines() {
         let mut original = Site::new(pg, true).await;
-        content::save(
+        let story = content::save(
             &original.app,
             original.session(),
             None,
@@ -2657,6 +2657,48 @@ async fn encrypted_recovery_survives_original_loss_and_reports_failed_independen
         assert_eq!(
             upload(&original, "green.png", &png(), "private").await,
             StatusCode::SEE_OTHER
+        );
+        let (_, buyer) =
+            commerce_journeys::shopper(&original, "recovery-learner@example.test").await;
+        let (_, variant) = commerce_journeys::product(&original, "membership", 1200, -1, "").await;
+        let checkout = commerce_journeys::cart(&original, &buyer, &variant, "", 1).await;
+        let order = wpalt::commerce::orders::checkout(&original.app, &buyer, &checkout)
+            .await
+            .unwrap();
+        commerce_journeys::pay(&original, &order, "independent-recovery-payment").await;
+        let policy = wpalt::membership::policy(&original.app, "Recovered academy", "academy", "")
+            .await
+            .unwrap();
+        let lesson = membership_journeys::lesson(story.id, "Recovered lesson");
+        let course = wpalt::membership::Course {
+            title: "Independent recovery academy".into(),
+            policy_id: policy,
+            sequential: true,
+            lessons: vec![lesson.clone()],
+        };
+        let course_id = wpalt::membership::create_course(&original.app, &course)
+            .await
+            .unwrap();
+        let edition = wpalt::membership::save_course(&original.app, &course_id, 1, &course, true)
+            .await
+            .unwrap();
+        let attempt_key = uuid::Uuid::new_v4().to_string();
+        assert!(
+            wpalt::membership::assess(
+                &original.app,
+                &buyer,
+                &course_id,
+                &lesson.id,
+                wpalt::membership::AttemptInput {
+                    version: edition,
+                    key: &attempt_key,
+                    answers: &[],
+                    assignment: ""
+                }
+            )
+            .await
+            .unwrap()
+            .completed
         );
         let independent = tempfile::tempdir().unwrap();
         let key_store = tempfile::tempdir().unwrap();
@@ -2720,6 +2762,34 @@ async fn encrypted_recovery_survives_original_loss_and_reports_failed_independen
             .await
             .unwrap();
         assert_eq!(owner.user.role, "admin");
+        let (_, buyer) = auth::login(&fresh.app, "recovery-learner@example.test", PASSWORD)
+            .await
+            .unwrap();
+        assert!(
+            wpalt::membership::learner_state(&fresh.app, &buyer, &course_id)
+                .await
+                .unwrap()
+                .2[0]
+                .completed
+        );
+        let payment: String =
+            sqlx::query_scalar("SELECT payment_state FROM shop_orders WHERE id=$1")
+                .bind(&order)
+                .fetch_one(&fresh.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(payment, "paid");
+        let receipts: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM shop_payments WHERE order_id=$1")
+                .bind(&order)
+                .fetch_one(&fresh.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            receipts, 1,
+            "restoring learning/access must not replay a payment"
+        );
+
         assert_eq!(
             sqlx::query_scalar::<_, i64>(
                 "SELECT COUNT(*) FROM posts WHERE published_slug='encrypted-story'"
@@ -2822,6 +2892,63 @@ async fn anonymous_cache_never_reuses_sessions_and_invalidates_published_access_
             .await
             .unwrap();
         assert!(!cookie.headers().contains_key("x-wpalt-cache"));
+        let preload = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/operations/cache/preload")
+                    .header("origin", site.app.config.origin())
+                    .header("cookie", format!("wpalt_session={}", site.token))
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(format!("csrf={}", site.session().csrf)))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(preload.status(), StatusCode::SEE_OTHER);
+        let gzip = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/cached-public-story")
+                    .header("accept-encoding", "gzip")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(gzip.headers()["x-wpalt-cache"], "hit");
+        assert_eq!(gzip.headers()["content-encoding"], "gzip");
+        let encoded = axum::body::to_bytes(gzip.into_body(), 1_000_000)
+            .await
+            .unwrap();
+        use std::io::Read;
+        let mut decoded = String::new();
+        flate2::read::GzDecoder::new(encoded.as_ref())
+            .read_to_string(&mut decoded)
+            .unwrap();
+        assert!(decoded.contains("cached-public-story"));
+        let identity = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/cached-public-story")
+                    .header("accept-encoding", "gzip;q=0")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(identity.headers()["x-wpalt-cache"], "hit");
+        assert!(!identity.headers().contains_key("content-encoding"));
+        assert_eq!(
+            axum::body::to_bytes(identity.into_body(), 1_000_000)
+                .await
+                .unwrap()
+                .as_ref(),
+            decoded.as_bytes()
+        );
         let policy = wpalt::membership::policy(&site.app, "Private stories", "paid-reader", "")
             .await
             .unwrap();
@@ -3380,4 +3507,62 @@ async fn recovery_cleanup_requires_current_preview_and_preserves_every_retained_
         before,
         "corrupt retained point stops deletion"
     );
+}
+
+#[tokio::test]
+async fn paginated_integrity_reaches_late_damage_and_labels_patterns_without_deleting_files() {
+    use wpalt::operations::integrity;
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let bytes = png();
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        let mut last = String::new();
+        for i in 1..=1001u128 {
+            let id = uuid::Uuid::from_u128(i).to_string();
+            let filename = format!("{id}.png");
+            std::fs::write(
+                site.app.config.data_dir.join("media").join(&filename),
+                &bytes,
+            )
+            .unwrap();
+            sqlx::query("INSERT INTO media(id,filename,original_name,mime,alt,visibility,size,sha256,created_at) VALUES($1,$2,'fixture.png','image/png','','private',$3,$4,0)").bind(&id).bind(&filename).bind(bytes.len() as i64).bind(auth::digest(&bytes)).execute(&mut *tx).await.unwrap();
+            last = filename;
+        }
+        tx.commit().await.unwrap();
+        let path = site.app.config.data_dir.join("media").join(last);
+        std::fs::write(&path, b"<?php late-damaged-file").unwrap();
+        let first = integrity::scan(&site.app).await.unwrap();
+        assert_eq!(first.checked, 1000);
+        assert!(first.limited && first.failed.is_empty());
+        assert_eq!(first.next_attachment, "done");
+        let next = integrity::scan_page(&site.app, &first.next_image, &first.next_attachment)
+            .await
+            .unwrap();
+        assert_eq!(next.checked, 1);
+        assert!(!next.limited);
+        assert_eq!(next.failed.len(), 1);
+        // Size mismatch is already conclusive; no unnecessary file read/pattern work.
+        assert!(next.pattern_warnings.is_empty());
+        let bytes = b"<?php embedded payload for explicit owner review";
+        std::fs::write(&path, bytes).unwrap();
+        sqlx::query("UPDATE media SET size=$1,sha256=$2 WHERE filename=$3")
+            .bind(bytes.len() as i64)
+            .bind(auth::digest(bytes))
+            .bind(path.file_name().unwrap().to_str().unwrap())
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let warning = integrity::scan_page(&site.app, &first.next_image, "done")
+            .await
+            .unwrap();
+        assert!(warning.failed.is_empty());
+        assert_eq!(warning.pattern_warnings.len(), 1);
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        assert!(
+            integrity::scan_page(&site.app, "../unsafe", "")
+                .await
+                .is_err()
+        );
+        site.close().await;
+    }
 }

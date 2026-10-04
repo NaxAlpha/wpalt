@@ -56,7 +56,12 @@ enum Command {
     /// Inspect durable recovery copy and interruption status.
     RecoveryStatus,
     /// Scan stored media/private attachment inventory without changing files.
-    IntegrityScan,
+    IntegrityScan {
+        #[arg(long, default_value = "")]
+        after_image: String,
+        #[arg(long, default_value = "")]
+        after_attachment: String,
+    },
     /// Validate a full recovery graph without restoring it.
     RecoveryInspect {
         input: PathBuf,
@@ -81,7 +86,10 @@ enum Command {
         execute: Option<String>,
     },
     /// Emergency local host-owner recovery. Server must be stopped.
-    AuthReset { email: String },
+    AuthReset {
+        #[arg(long)]
+        email: String,
+    },
     /// Restore a snapshot into an EMPTY database/data directory, with the server stopped.
     Restore {
         input: PathBuf,
@@ -725,13 +733,17 @@ async fn main() -> anyhow::Result<()> {
                 "Local authenticators and sessions cleared. Password sign-in remains required."
             );
         }
-        Command::IntegrityScan => {
-            let report = wpalt::operations::integrity::scan(&app)
-                .await
-                .map_err(|e| anyhow::anyhow!(e.1))?;
+        Command::IntegrityScan {
+            after_image,
+            after_attachment,
+        } => {
+            let report =
+                wpalt::operations::integrity::scan_page(&app, &after_image, &after_attachment)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e.1))?;
             println!("{}", serde_json::to_string_pretty(&report)?);
             anyhow::ensure!(
-                report.failed.is_empty() && !report.limited,
+                report.failed.is_empty() && report.pattern_warnings.is_empty() && !report.limited,
                 "integrity scan found failures or reached its bounded workload; inspect the report"
             );
         }

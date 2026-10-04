@@ -16,6 +16,8 @@ use std::{
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub enabled: bool,
+    pub gzip: bool,
+    pub asset_cache_seconds: u64,
     pub max_bytes: usize,
     pub max_entries: usize,
     pub ttl_seconds: u64,
@@ -24,6 +26,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             enabled: false,
+            gzip: true,
+            asset_cache_seconds: 0,
             max_bytes: 8 * 1024 * 1024,
             max_entries: 128,
             ttl_seconds: 60,
@@ -32,6 +36,10 @@ impl Default for Config {
 }
 impl Config {
     pub fn validate(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.asset_cache_seconds <= 3600,
+            "unversioned asset cache must be 0..3600 seconds; use zero for immediate upgrade visibility"
+        );
         anyhow::ensure!(
             (64 * 1024..=256 * 1024 * 1024).contains(&self.max_bytes),
             "cache max_bytes must be 64 KiB..256 MiB"
@@ -52,6 +60,7 @@ struct Entry {
     headers: HeaderMap,
     at: Instant,
     generation: u64,
+    cost: usize,
 }
 #[derive(Default)]
 pub struct Cache {
@@ -65,7 +74,7 @@ impl Cache {
             || entry.at.elapsed() >= Duration::from_secs(config.ttl_seconds)
         {
             let old = self.entries.remove(path).unwrap();
-            self.bytes -= old.bytes.len();
+            self.bytes -= old.cost;
             return None;
         }
         let mut response = Response::new(Body::from(entry.bytes.clone()));
@@ -83,17 +92,25 @@ impl Cache {
         mut headers: HeaderMap,
         config: &Config,
     ) {
-        if bytes.len() > config.max_bytes {
+        let cost = bytes
+            .len()
+            .saturating_add(path.len())
+            .saturating_add(
+                headers
+                    .iter()
+                    .map(|(name, value)| name.as_str().len() + value.len() + 32)
+                    .sum::<usize>(),
+            )
+            .saturating_add(std::mem::size_of::<Entry>());
+        if cost > config.max_bytes {
             return;
         }
         headers.remove("x-request-id");
         headers.remove("content-length");
         if let Some(old) = self.entries.remove(&path) {
-            self.bytes -= old.bytes.len();
+            self.bytes -= old.cost;
         }
-        while self.bytes + bytes.len() > config.max_bytes
-            || self.entries.len() >= config.max_entries
-        {
+        while self.bytes + cost > config.max_bytes || self.entries.len() >= config.max_entries {
             let Some(key) = self
                 .entries
                 .iter()
@@ -103,9 +120,9 @@ impl Cache {
                 break;
             };
             let old = self.entries.remove(&key).unwrap();
-            self.bytes -= old.bytes.len();
+            self.bytes -= old.cost;
         }
-        self.bytes += bytes.len();
+        self.bytes += cost;
         self.entries.insert(
             path,
             Entry {
@@ -113,6 +130,7 @@ impl Cache {
                 headers,
                 at: Instant::now(),
                 generation,
+                cost,
             },
         );
     }

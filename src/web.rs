@@ -21,6 +21,7 @@ use std::{io::Cursor, net::SocketAddr};
 pub fn router(app: App) -> Router {
     let limit = app.config.max_upload_bytes + 64 * 1024;
     let timeout = app.config.request_timeout_seconds;
+    let gzip = app.config.cache.gzip;
     let business = if app.config.business_enabled {
         crate::business::web::routes(&app)
     } else {
@@ -89,6 +90,7 @@ pub fn router(app: App) -> Router {
         .route("/admin/recovery/run", post(run_recovery))
         .route("/admin/operations/integrity", post(integrity_scan))
         .route("/admin/operations/cache/purge", post(cache_purge))
+        .route("/admin/operations/cache/preload", post(cache_preload))
         .route("/admin/operations/audit", get(audit_history))
         .route("/admin/export", get(export_content))
         .route("/api/content", get(public_api))
@@ -102,7 +104,6 @@ pub fn router(app: App) -> Router {
         .route("/{slug}/comments", post(comment))
         .fallback(|| async { Error::not_found() })
         .layer(DefaultBodyLimit::max(limit))
-        .layer(tower_http::compression::CompressionLayer::new().gzip(true))
         .layer(tower_http::timeout::TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             std::time::Duration::from_secs(timeout),
@@ -111,6 +112,7 @@ pub fn router(app: App) -> Router {
             app.clone(),
             security_and_trace,
         ))
+        .layer(tower_http::compression::CompressionLayer::new().gzip(gzip))
         .with_state(app)
 }
 async fn security_and_trace(
@@ -221,12 +223,7 @@ async fn security_and_trace(
             let generation = app
                 .cache_generation
                 .load(std::sync::atomic::Ordering::SeqCst);
-            let encoding = request
-                .headers()
-                .get("accept-encoding")
-                .and_then(|h| h.to_str().ok())
-                .unwrap_or("");
-            let key = format!("{}|encoding={}", request.uri(), encoding);
+            let key = request.uri().to_string();
             let cached = app
                 .page_cache
                 .lock()
@@ -305,6 +302,14 @@ async fn security_and_trace(
         }
     }
     let h = response.headers_mut();
+    if route.starts_with("/assets/") {
+        let policy = if app.config.cache.asset_cache_seconds == 0 {
+            "no-cache".to_owned()
+        } else {
+            format!("public, max-age={}", app.config.cache.asset_cache_seconds)
+        };
+        h.insert("cache-control", HeaderValue::from_str(&policy).unwrap());
+    }
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
         || route == "/login"
@@ -1727,23 +1732,109 @@ async fn add_user(
     })?;
     Ok(Redirect::to("/admin/users"))
 }
-async fn audit_history(
-    State(app): State<App>,
-    headers: HeaderMap,
-) -> Result<Json<Vec<crate::operations::audit::Event>>> {
-    let session = admin_session(&app, &headers).await?;
-    admin(&session)?;
-    Ok(Json(crate::operations::audit::read(&app).await?))
+fn wants_html(headers: &HeaderMap) -> bool {
+    headers
+        .get("accept")
+        .and_then(|h| h.to_str().ok())
+        .is_some_and(|h| h.contains("text/html"))
+}
+async fn audit_history(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    let events = crate::operations::audit::read(&app).await?;
+    if !wants_html(&headers) {
+        return Ok(Json(events).into_response());
+    }
+    Ok(html_page("Action history",&app.db.settings().await?,Some(&s),html!{
+        (view::heading("Operations","Action history","Recent privileged actions. An intent without an outcome may have been interrupted."))
+        p {a href="/admin/operations" {"Return to Operations"}}
+        div class="table-wrap" {table {thead {tr {th {"Time"}th {"Action"}th {"Phase"}th {"Status"}th {"Actor"}}}tbody {@for event in events {tr {td {(event.at)}td {(event.route)}td {(event.phase)}td {(event.status)}td {(event.actor)}}}}}}
+        p class="muted" {"Private rotating journal, bounded to two 1 MiB files. This history is operational evidence, not a tamper-proof ledger."}
+    }).into_response())
+}
+#[derive(Deserialize)]
+struct IntegrityInput {
+    csrf: String,
+    #[serde(default)]
+    after_image: String,
+    #[serde(default)]
+    after_attachment: String,
 }
 async fn integrity_scan(
     State(app): State<App>,
     headers: HeaderMap,
+    Form(input): Form<IntegrityInput>,
+) -> Result<Response> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    auth::csrf(&s, &input.csrf)?;
+    let report =
+        crate::operations::integrity::scan_page(&app, &input.after_image, &input.after_attachment)
+            .await?;
+    if !wants_html(&headers) {
+        return Ok(Json(report).into_response());
+    }
+    Ok(html_page("Stored-file inspection",&app.db.settings().await?,Some(&s),html!{
+        (view::heading("Operations","Stored-file inspection","Validate recorded checksums and flag embedded executable patterns for owner review."))
+        p {"Checked " (report.checked) " files · " (report.failed.len()) " integrity findings · " (report.pattern_warnings.len()) " pattern warnings"}
+        @if report.limited {p class="notice" {"The bounded scan has more files to inspect."}form method="post" action="/admin/operations/integrity" {(view::csrf(&s))input type="hidden" name="after_image" value=(report.next_image);input type="hidden" name="after_attachment" value=(report.next_attachment);button {"Continue inspection"}}}
+        @for finding in report.failed.iter().chain(report.pattern_warnings.iter()) {section class="panel" {h2 {(finding.kind) " · " (finding.id)}p {(finding.reason)}}}
+        p {"Patterns can be false positives and are not current malware intelligence. No files were modified."}
+        p {a href="/admin/operations" {"Return to Operations"}}
+    }).into_response())
+}
+async fn cache_preload(
+    State(app): State<App>,
+    headers: HeaderMap,
     Form(input): Form<Csrf>,
-) -> Result<Json<crate::operations::integrity::Report>> {
-    let session = admin_session(&app, &headers).await?;
-    admin(&session)?;
-    auth::csrf(&session, &input.csrf)?;
-    Ok(Json(crate::operations::integrity::scan(&app).await?))
+) -> Result<Redirect> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    auth::csrf(&s, &input.csrf)?;
+    if !app.config.cache.enabled {
+        return Err(Error::invalid("Enable public caching before preloading."));
+    }
+    let _permit = app
+        .media_work
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| Error::invalid("Maintenance workers are busy."))?;
+    // Explicit bounded owner action: anonymous/public rows only, no network fetch,
+    // no authentication variants and no persistent cache after process restart.
+    let rows=sqlx::query("SELECT published_slug,published_locale FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources r WHERE r.kind='post' AND r.resource_id=posts.id) ORDER BY published_at DESC,id DESC LIMIT 20").fetch_all(&app.db.pool).await?;
+    for row in rows {
+        let _read = app.mutations.lock().await;
+        let (discovery, _) = crate::discovery::load(&app).await?;
+        let generation = app
+            .cache_generation
+            .load(std::sync::atomic::Ordering::SeqCst);
+        let locale: String = row.get("published_locale");
+        let slug: String = row.get("published_slug");
+        let key = discovery.path(&locale, &slug);
+        let response = render_post(
+            app.clone(),
+            HeaderMap::new(),
+            locale,
+            slug,
+            discovery.clone(),
+        )
+        .await?;
+        if response.status() != StatusCode::OK || response.headers().contains_key("cache-control") {
+            continue;
+        }
+        let (parts, body) = response.into_parts();
+        let bytes = axum::body::to_bytes(body, app.config.cache.max_bytes)
+            .await
+            .map_err(|_| Error::invalid("Preload response exceeds cache budget."))?;
+        app.page_cache.lock().await.insert(
+            key,
+            generation,
+            bytes,
+            parts.headers,
+            &app.config.cache,
+        );
+    }
+    Ok(Redirect::to("/admin/operations"))
 }
 async fn cache_purge(
     State(app): State<App>,
@@ -1779,7 +1870,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
         Some(&s),
         html! {
             (view::heading("Operations","Operations","Manual snapshots, portable content and useful diagnostics without cloud dependencies."))
-            div class="split" {section class="panel" {h2 {"Back up & move"}p class="muted" {"Download a consistent database-and-media snapshot. It includes password hashes and private content; keep it secure. M1 snapshots are not encrypted."}
+            div class="split" {section class="panel" {h2 {"Back up & move"}p class="muted" {"Download a consistent database-and-media snapshot. It includes password hashes and private content; keep it secure. This download is unencrypted."}
                 form method="post" action="/admin/backup" {(view::csrf(&s))button {"Download full backup"}}
                 p class="muted" {"Restore with the CLI into an empty database/data directory while the server is stopped. Keep an independent copy to recover from losing this host."}
                 a href="/admin/export" {"Export portable content JSON →"}
@@ -1797,7 +1888,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
                 }
                 p class="muted" {"Keep the recovery key separately. Verify an independent copy by restoring into a fresh instance. A pending attempt after restart may have been interrupted; inspect destination packages before retrying."}
             }
-            section class="panel" {h2 {"Public response cache"}p {(if app.config.cache.enabled {"Enabled"}else{"Disabled"}) " · " (cache.0) " entries · " (cache.1) " bytes retained"}p {"Anonymous publications, listings, content projections and sitemaps only. Cookies, credentials and protected resources bypass shared storage. Browser page caching remains disabled so access changes take effect."}form method="post" action="/admin/operations/cache/purge" {(view::csrf(&s))button class="secondary" {"Purge public cache"}}}
+            section class="panel" {h2 {"Public response cache"}p {(if app.config.cache.enabled {"Enabled"}else{"Disabled"}) " · " (cache.0) " entries · " (cache.1) " bytes retained"}p {"Anonymous publications, listings, content projections and sitemaps only. Cookies, credentials and protected resources bypass shared storage. Browser page caching remains disabled so access changes take effect."}form method="post" action="/admin/operations/cache/purge" {(view::csrf(&s))button class="secondary" {"Purge public cache"}} form method="post" action="/admin/operations/cache/preload" {(view::csrf(&s))button class="secondary" disabled[!app.config.cache.enabled] {"Preload recent public pages"}}}
             section class="panel" {h2 {"Stored-file integrity"}p {a href="/admin/operations/audit" {"Inspect privileged action history"}}
                 p {"Check database-recorded image and private attachment checksums without changing files. A bounded scan reports incomplete work; it does not certify malware-free content."}
                 form method="post" action="/admin/operations/integrity" {(view::csrf(&s))button class="secondary" {"Inspect stored-file integrity"}}
@@ -2015,8 +2106,17 @@ async fn auth_js() -> impl IntoResponse {
         include_str!("../assets/generated/auth.js"),
     )
 }
-fn security_page(title: &str, settings: &Settings, body: Markup) -> Html<String> {
-    Html(view::member_layout(title, settings, body))
+fn security_page(
+    title: &str,
+    settings: &Settings,
+    session: &Session,
+    body: Markup,
+) -> Html<String> {
+    if session.user.role == "subscriber" {
+        Html(view::member_layout(title, settings, body))
+    } else {
+        html_page(title, settings, Some(session), body)
+    }
 }
 async fn factor_page(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {
     let session = auth::session(&app, &headers).await?;
@@ -2034,6 +2134,7 @@ async fn factor_page(State(app): State<App>, headers: HeaderMap) -> Result<Html<
     Ok(security_page(
         "Account security",
         &app.db.settings().await?,
+        &session,
         html! {
             (view::heading("Account","Account security","Protect local sign-in with an authenticator you control."))
             @if enabled.is_some_and(|s|!s.is_empty()) {
@@ -2072,6 +2173,7 @@ async fn factor_begin(
     Ok(security_page(
         "Confirm authenticator",
         &app.db.settings().await?,
+        &s,
         html! {
             h1 {"Confirm authenticator"}p {"Add this setup URI to your authenticator. Keep it private; it expires in ten minutes."}
             pre class="inline-code" {(uri)}
@@ -2090,6 +2192,7 @@ async fn factor_confirm(
     Ok(security_page(
         "Recovery codes",
         &app.db.settings().await?,
+        &s,
         html! {
             h1 {"Save recovery codes"}p {"Authenticator enabled. Each code works once. Keep these codes offline; they are shown only now."}
             pre class="inline-code" {(codes.join("\n"))}p {a href="/account/security" {"Return to account security"}}
@@ -2108,7 +2211,7 @@ async fn factor_disable(
 }
 async fn account(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
     let s = auth::session(&app, &headers).await?;
-    Ok(html_page("Your account",&app.db.settings().await?,None,html!{h1 {"Your account"}p {"Signed in as " (&s.user.name)}p {"Role: " (&s.user.role)}p {a href="/account/security" {"Account security"}}p {"This subscriber account does not grant access to site administration."}@if app.config.membership_enabled {p {a href="/members" {"Open my learning and communities"}}}form method="post" action="/logout" {(view::csrf(&s))button {"Sign out"}}}).into_response())
+    Ok(html_page("Your account",&app.db.settings().await?,None,html!{h1 {"Your account"}p {"Signed in as " (&s.user.name)}p {"Role: " (&s.user.role)}p {a href="/account/security" {"Account security"}}@if s.user.role=="subscriber" {p {"This subscriber account does not grant access to site administration."}} @else {p {a href="/admin" {"Open site administration"}}}@if app.config.membership_enabled {p {a href="/members" {"Open my learning and communities"}}}form method="post" action="/logout" {(view::csrf(&s))button {"Sign out"}}}).into_response())
 }
 
 async fn form_embed_js(State(app): State<App>) -> Result<Response> {

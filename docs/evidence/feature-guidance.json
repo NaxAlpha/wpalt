@@ -1203,6 +1203,39 @@
         "relevant vulnerability"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-owner-page-inspection",
+      "area": "Local inventory and cookie inspection",
+      "scope": "Paginated owner inventory and finite same-origin browser sample",
+      "basis": "internal-with-upstream",
+      "sources": [
+        "https://playwright.dev/docs/api/class-browsercontext",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie"
+      ],
+      "applicable_versions": [
+        "Playwright 1.62.1",
+        "wpalt schema 10"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Bound inventory rows/bytes and expose keyset continuation; no mutation/quarantine on checksum or executable-pattern warnings.",
+        "Cookie scanner samples explicit owner pages, blocks foreign requests and excludes cookie/storage values; observed consent states are not legal certification."
+      ],
+      "tests": [
+        "paginated_integrity_reaches_late_damage_and_labels_patterns_without_deleting_files",
+        "scripts/operations_acceptance.cjs",
+        "scripts/cookie_scan.cjs"
+      ],
+      "triggers": [
+        "affected release",
+        "upstream version changes",
+        "relevant vulnerability"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

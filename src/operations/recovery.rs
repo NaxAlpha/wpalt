@@ -171,7 +171,13 @@ pub async fn run(app: &App) -> Result<Status> {
     publish(&state_path, &serde_json::to_vec(&state).unwrap(), true)
         .map_err(|_| Error::invalid("Cannot persist recovery status; check site storage."))?;
     let plaintext = backup::capture(app).await?;
-    let encoded = encryption::seal(&key, &plaintext)?;
+    let encoded = if config.incremental {
+        None
+    } else {
+        Some(std::sync::Arc::<[u8]>::from(encryption::seal(
+            &key, &plaintext,
+        )?))
+    };
     for copy in &mut state.copies {
         let result: Result<()> = async {
             let metadata = tokio::fs::symlink_metadata(&copy.destination).await?;
@@ -190,9 +196,9 @@ pub async fn run(app: &App) -> Result<Status> {
             let path = destination.join(&state.package);
             let bytes = if config.incremental {
                 let manifest = super::incremental::write(&destination, &key, &plaintext).await?;
-                encryption::seal(&key, &manifest)?
+                std::sync::Arc::<[u8]>::from(encryption::seal(&key, &manifest)?)
             } else {
-                encoded.clone()
+                encoded.as_ref().unwrap().clone()
             };
             let output = path.clone();
             tokio::task::spawn_blocking(move || publish(&output, &bytes, false))

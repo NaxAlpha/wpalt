@@ -130,6 +130,17 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     assert json.loads(run(config,'shop','report').stdout)['awaiting_payment']==0,'Maintenance cannot invent offline orders or payments'
     snapshot=root/'snapshot.json';run(config,'backup',str(snapshot));assert snapshot.exists()
     if os.name=='posix':assert snapshot.stat().st_mode & 0o077==0,'Backup permissions expose private data'
+    # Portable validation must not connect to PostgreSQL or create local site state.
+    portable=root/'portable.toml'
+    portable.write_text(f'database_url = "postgres://invalid:invalid@127.0.0.1:1/unreachable"\ndata_dir = "{root/"never-created"}"\n')
+    inspected=json.loads(run(portable,'recovery-inspect',str(snapshot)).stdout)
+    assert inspected['schema']==10
+    assert not (root/'never-created').exists(),'Portable inspection must not create a site'
+    key=root/'recovery.key';run(config,'recovery-key',str(key))
+    encrypted=root/'encrypted.wpbackup';run(config,'backup',str(encrypted),'--key-file',str(key))
+    assert json.loads(run(portable,'recovery-inspect',str(encrypted),'--key-file',str(key)).stdout)['schema']==10
+    wrong_key=root/'wrong.key';run(config,'recovery-key',str(wrong_key))
+    run(portable,'recovery-inspect',str(encrypted),'--key-file',str(wrong_key),ok=False)
     run(target,'restore',str(snapshot));run(target,'restore',str(snapshot),ok=False)
     recovered_report=json.loads(run(target,'shop','report').stdout)
     assert recovered_report['products']==5 and recovered_report['awaiting_payment']==0

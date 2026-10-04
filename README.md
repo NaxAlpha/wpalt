@@ -12,7 +12,7 @@ Manage locally assigned memberships, protected content/downloads, ordered course
 
 ## Run
 
-Rust 1.85 or newer is the declared build floor, verified by CI. Node/npm are frontend development tools; the resulting server requires no Cargo, Node or PHP at runtime.
+Rust 1.88 or newer is the declared build floor, verified by CI. Node/npm are frontend development tools; the resulting server requires no Cargo, Node or PHP at runtime.
 
 ```sh
 npm ci --prefix frontend --ignore-scripts
