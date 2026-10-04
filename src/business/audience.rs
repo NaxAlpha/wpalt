@@ -317,7 +317,7 @@ pub async fn update_contact(
     Ok(())
 }
 pub async fn delete_contact(app: &App, id: &str) -> Result<()> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let mut tx = app.db.pool.begin().await?;
     super::quotas::release(&mut tx, "contacts", 0, 0).await?;
     super::quotas::release(&mut tx, "mail", 0, 0).await?;

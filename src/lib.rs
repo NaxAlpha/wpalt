@@ -11,6 +11,7 @@ pub mod error;
 pub mod membership;
 pub mod migrations;
 pub mod model;
+pub mod operations;
 pub mod schema;
 pub mod theme;
 pub mod view;
@@ -24,6 +25,9 @@ pub struct App {
     pub config: Arc<config::Config>,
     pub db: db::Db,
     pub mutations: Arc<Mutex<()>>,
+    pub cache_generation: Arc<std::sync::atomic::AtomicU64>,
+    pub page_cache: Arc<Mutex<operations::cache::Cache>>,
+    pub recovery_work: Arc<Mutex<()>>,
     pub password_work: Arc<Semaphore>,
     pub media_work: Arc<Semaphore>,
     pub request_work: Arc<Semaphore>,
@@ -33,6 +37,15 @@ pub struct App {
 }
 
 impl App {
+    pub async fn mutation(&self) -> operations::cache::Mutation<'_> {
+        let guard = self.mutations.lock().await;
+        self.cache_generation
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        operations::cache::Mutation {
+            _guard: guard,
+            generation: &self.cache_generation,
+        }
+    }
     pub async fn open(config: config::Config) -> anyhow::Result<Self> {
         config.validate()?;
         config.prepare_directories()?;
@@ -48,6 +61,9 @@ impl App {
             config: Arc::new(config),
             db,
             mutations: Arc::new(Mutex::new(())),
+            recovery_work: Arc::new(Mutex::new(())),
+            cache_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            page_cache: Arc::new(Mutex::new(operations::cache::Cache::default())),
             password_work: Arc::new(Semaphore::new(workers)),
             media_work: Arc::new(Semaphore::new(workers)),
             request_work: Arc::new(Semaphore::new(requests)),

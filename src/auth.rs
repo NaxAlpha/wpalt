@@ -73,7 +73,7 @@ pub async fn initialize(app: &App, email: &str, name: &str, password: &str) -> a
     );
     let password = password.to_string();
     let hash = tokio::task::spawn_blocking(move || hash_password(&password)).await??;
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let mut tx = app.db.pool.begin().await?;
     let s = Settings::default();
     sqlx::query("INSERT INTO settings(id,title,description,theme,navigation,field_schema) VALUES(1,$1,$2,$3,$4,$5)").bind(s.title).bind(s.description).bind(s.theme).bind(s.navigation).bind(s.field_schema).execute(&mut *tx).await?;
@@ -96,7 +96,7 @@ pub async fn add_user(
     );
     let password = password.to_string();
     let hash = tokio::task::spawn_blocking(move || hash_password(&password)).await??;
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     sqlx::query(
         "INSERT INTO users(id,email,name,role,password_hash,created_at) VALUES($1,$2,$3,$4,$5,$6)",
     )
@@ -215,7 +215,7 @@ pub async fn login(app: &App, email: &str, password: &str) -> Result<(String, Se
 /// Password work runs outside the mutation coordinator. Recheck the verified
 /// credential at the session commit boundary so concurrent revocation wins.
 async fn persist_session(app: &App, session: &Session, verified_hash: &str) -> Result<()> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     sqlx::query("DELETE FROM sessions WHERE expires_at<$1")
         .bind(now())
         .execute(&app.db.pool)
@@ -319,7 +319,7 @@ pub async fn update_user(
         .map_err(|_| Error::invalid("Password worker failed."))?
         .map_err(|_| Error::invalid("Password hash failed."))?
     };
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let mut tx = app.db.pool.begin().await?;
     let current: String = sqlx::query_scalar("SELECT role FROM users WHERE id=$1")
         .bind(id)

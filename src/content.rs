@@ -156,7 +156,7 @@ pub async fn save(
     if !session.can_edit() {
         return Err(Error::forbidden());
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let settings = app.db.settings().await?;
     validate_input(&input, &settings)?;
     let structured = !input.document.is_empty() && !input.import_markdown;
@@ -389,7 +389,7 @@ async fn copy_terms(tx: &mut sqlx::Transaction<'_, sqlx::Any>, id: &str) -> Resu
     Ok(())
 }
 pub async fn publish_due(app: &App) -> Result<usize> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let mut tx = app.db.pool.begin().await?;
     let rows=sqlx::query("SELECT * FROM posts WHERE status='scheduled' AND publish_at<=$1 ORDER BY publish_at LIMIT 50").bind(now()).fetch_all(&mut *tx).await?;
     let mut n = 0;

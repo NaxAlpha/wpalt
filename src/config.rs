@@ -13,6 +13,8 @@ pub struct Config {
     pub listen: SocketAddr,
     pub base_url: String,
     pub debug: bool,
+    pub cache: crate::operations::cache::Config,
+    pub recovery: crate::operations::recovery::Config,
     pub business_enabled: bool,
     pub membership_enabled: bool,
     pub membership_max_records: i64,
@@ -39,6 +41,8 @@ impl Default for Config {
             listen: "127.0.0.1:3000".parse().unwrap(),
             base_url: "http://127.0.0.1:3000".into(),
             debug: false,
+            cache: Default::default(),
+            recovery: Default::default(),
             business_enabled: true,
             membership_enabled: true,
             membership_max_records: 1_000_000,
@@ -110,6 +114,8 @@ impl Config {
         Ok(c)
     }
     pub fn validate(&self) -> anyhow::Result<()> {
+        self.cache.validate()?;
+        self.recovery.validate()?;
         self.commerce.validate()?;
         ensure!(
             !self.commerce.stripe.enabled || self.base_url.starts_with("https://"),

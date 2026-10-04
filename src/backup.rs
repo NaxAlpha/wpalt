@@ -976,7 +976,7 @@ pub fn safe_filename(name: &str) -> bool {
         && !name.contains('\\')
 }
 pub async fn capture(app: &App) -> Result<Vec<u8>> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let mut tx = app.db.pool.begin().await?;
     if app.db.postgres {
         sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
@@ -1534,7 +1534,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     for row in &snapshot.tables["theme_revisions"] {
         crate::theme::Package::parse_historical(row["package"].as_str().unwrap(), &registry)?;
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let mut tx = app.db.pool.begin().await?;
     for (name, _) in TABLES {
         let count: i64 = if *name == "discovery_settings" {

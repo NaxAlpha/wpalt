@@ -70,7 +70,7 @@ pub async fn save_product(
     p: &ProductInput,
 ) -> Result<String> {
     product_valid(p)?;
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     owner(app, s).await?;
     let id = id
         .map(str::to_owned)
@@ -170,7 +170,7 @@ pub async fn save_variant(
     {
         return Err(Error::invalid("Check stock or billing interval."));
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     owner(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     let kind: String = sqlx::query_scalar("SELECT kind FROM shop_products WHERE id=$1")
@@ -252,7 +252,7 @@ pub async fn discount(app: &App, s: &Session, d: &DiscountInput, version: i64) -
             "Check coupon code, dates, percentage and use limit.",
         ));
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     owner(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     for (id, table) in [
@@ -284,7 +284,7 @@ pub async fn set_rules(
 ) -> Result<()> {
     money(shipping_minor)?;
     basis(0, tax_bps)?;
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     owner(app, s).await?;
     if sqlx::query("UPDATE shop_settings SET tax_bps=$1,shipping_minor=$2,tax_shipping=$3,version=version+1 WHERE id=1 AND version=$4").bind(tax_bps).bind(shipping_minor).bind(i64::from(tax_shipping)).bind(version).execute(&app.db.pool).await?.rows_affected()!=1{return Err(Error::conflict())}
     Ok(())

@@ -62,3 +62,5 @@ M1–M8 are pre-adoption development. M2 provides typed models, parameterized re
 The integrated writing milestone and its structured-document API/migration are documented in [authoring](docs/authoring.md). This remains a pre-adoption milestone build; full WordPress/plugin parity is the roadmap goal, not the current capability claim.
 
 Development distribution and pipeline: [automatic releases and CI](docs/automatic-releases.md).
+
+M7 is in development: [completion contract](docs/m7-contract.md) and [initial resilience controls](docs/resilient-operations.md). Earlier capabilities remain supported; the full M7 delivery is not yet verified.

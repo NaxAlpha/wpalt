@@ -2640,3 +2640,208 @@ mod membership_journeys;
 
 #[path = "support/commerce_journeys.rs"]
 mod commerce_journeys;
+
+#[tokio::test]
+async fn encrypted_recovery_survives_original_loss_and_reports_failed_independent_copies() {
+    use wpalt::operations::{encryption, recovery};
+    for pg in engines() {
+        let mut original = Site::new(pg, true).await;
+        content::save(
+            &original.app,
+            original.session(),
+            None,
+            input("encrypted-story", "publish"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            upload(&original, "green.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let independent = tempfile::tempdir().unwrap();
+        let key_store = tempfile::tempdir().unwrap();
+        let key = encryption::generate_key();
+        let key_path = key_store.path().join("recovery.key");
+        backup::write_private(&key_path, hex::encode(key).as_bytes()).unwrap();
+        let mut config = (*original.app.config).clone();
+        config.recovery = recovery::Config {
+            enabled: true,
+            key_file: key_path,
+            destinations: vec![independent.path().to_owned()],
+            interval_seconds: 60,
+            retain: 1,
+        };
+        original.app.config = std::sync::Arc::new(config);
+        let first = recovery::run(&original.app).await.unwrap();
+        assert_eq!(first.copies[0].state, "verified");
+        let second = recovery::run(&original.app).await.unwrap();
+        assert_ne!(first.package, second.package);
+        assert!(
+            !independent.path().join(first.package).exists(),
+            "retention follows a verified replacement"
+        );
+        let package = std::fs::read(independent.path().join(&second.package)).unwrap();
+        assert!(
+            !package
+                .windows(PASSWORD.len())
+                .any(|w| w == PASSWORD.as_bytes())
+        );
+        assert!(
+            encryption::open(&encryption::generate_key(), &package, 256 * 1024 * 1024).is_err()
+        );
+        let mut tampered = package.clone();
+        *tampered.last_mut().unwrap() ^= 1;
+        assert!(encryption::open(&key, &tampered, 256 * 1024 * 1024).is_err());
+        assert!(encryption::open(&key, &package[..package.len() - 1], 256 * 1024 * 1024).is_err());
+        assert!(encryption::open(&key, &package, 1).is_err());
+        // A missing mount must not be recreated on the origin disk and reported
+        // as an independent successful copy.
+        let mut config = (*original.app.config).clone();
+        let missing = independent.path().join("missing-mount");
+        config.recovery.destinations.push(missing.clone());
+        original.app.config = std::sync::Arc::new(config);
+        let partial = recovery::run(&original.app).await.unwrap();
+        assert_eq!(partial.copies[0].state, "verified");
+        assert_eq!(partial.copies[1].state, "failed");
+        assert!(!missing.exists());
+        assert_eq!(
+            recovery::status(&original.app).await.unwrap().copies[1].state,
+            "failed"
+        );
+        // The original site/database becomes unavailable. Recovery uses only the
+        // independently stored package and separately held key.
+        original.close().await;
+        let fresh = Site::new(pg, false).await;
+        let plaintext =
+            encryption::open(&key, &package, fresh.app.config.max_backup_bytes).unwrap();
+        backup::restore(&fresh.app, &plaintext).await.unwrap();
+        let (_, owner) = auth::login(&fresh.app, "owner@example.test", PASSWORD)
+            .await
+            .unwrap();
+        assert_eq!(owner.user.role, "admin");
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM posts WHERE published_slug='encrypted-story'"
+            )
+            .fetch_one(&fresh.app.db.pool)
+            .await
+            .unwrap(),
+            1
+        );
+        let filename: String =
+            sqlx::query_scalar("SELECT filename FROM media WHERE visibility='private'")
+                .fetch_one(&fresh.app.db.pool)
+                .await
+                .unwrap();
+        assert!(
+            fresh
+                .app
+                .config
+                .data_dir
+                .join("media")
+                .join(filename)
+                .is_file()
+        );
+
+        assert!(
+            backup::restore(&fresh.app, &plaintext).await.is_err(),
+            "never overwrite an existing site"
+        );
+        fresh.close().await;
+    }
+}
+
+#[tokio::test]
+async fn anonymous_cache_never_reuses_sessions_and_invalidates_published_access_changes() {
+    for pg in engines() {
+        let mut site = Site::new(pg, true).await;
+        let mut config = (*site.app.config).clone();
+        config.cache.enabled = true;
+        site.app.config = std::sync::Arc::new(config);
+        let published = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("cached-public-story", "publish"),
+        )
+        .await
+        .unwrap();
+        let router = wpalt::web::router(site.app.clone());
+        let request = || {
+            Request::builder()
+                .uri("/sitemap.xml")
+                .body(Body::empty())
+                .unwrap()
+        };
+        let first = router.clone().oneshot(request()).await.unwrap();
+        assert_eq!(first.headers()["x-wpalt-cache"], "miss");
+        assert!(
+            String::from_utf8(
+                axum::body::to_bytes(first.into_body(), 1_000_000)
+                    .await
+                    .unwrap()
+                    .to_vec()
+            )
+            .unwrap()
+            .contains("cached-public-story")
+        );
+        let second = router.clone().oneshot(request()).await.unwrap();
+        assert_eq!(second.headers()["x-wpalt-cache"], "hit");
+        let cookie = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/sitemap.xml")
+                    .header("cookie", format!("wpalt_session={}", site.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert!(!cookie.headers().contains_key("x-wpalt-cache"));
+        let policy = wpalt::membership::policy(&site.app, "Private stories", "paid-reader", "")
+            .await
+            .unwrap();
+        wpalt::membership::protect(&site.app, "post", &published.id, &policy, 0, 0)
+            .await
+            .unwrap();
+        let protected = router.clone().oneshot(request()).await.unwrap();
+        assert_eq!(protected.headers()["x-wpalt-cache"], "miss");
+        assert!(
+            !String::from_utf8(
+                axum::body::to_bytes(protected.into_body(), 1_000_000)
+                    .await
+                    .unwrap()
+                    .to_vec()
+            )
+            .unwrap()
+            .contains("cached-public-story")
+        );
+        let private = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/cached-public-story")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert!(!private.headers().contains_key("x-wpalt-cache"));
+        wpalt::membership::release(&site.app, "post", &published.id)
+            .await
+            .unwrap();
+        let reopened = router.oneshot(request()).await.unwrap();
+        assert!(
+            String::from_utf8(
+                axum::body::to_bytes(reopened.into_body(), 1_000_000)
+                    .await
+                    .unwrap()
+                    .to_vec()
+            )
+            .unwrap()
+            .contains("cached-public-story")
+        );
+        site.close().await;
+    }
+}

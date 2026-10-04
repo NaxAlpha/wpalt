@@ -6,7 +6,7 @@ use crate::{
 };
 use axum::{
     Extension, Json, Router,
-    body::Body,
+    body::{Body, HttpBody},
     extract::{ConnectInfo, DefaultBodyLimit, Form, MatchedPath, Multipart, Path, Query, State},
     http::{HeaderMap, HeaderValue, Request, StatusCode},
     middleware::{self, Next},
@@ -63,6 +63,7 @@ pub fn router(app: App) -> Router {
         .route("/admin/users/{id}", post(update_user))
         .route("/admin/operations", get(operations))
         .route("/admin/backup", post(download_backup))
+        .route("/admin/recovery/run", post(run_recovery))
         .route("/admin/export", get(export_content))
         .route("/api/content", get(public_api))
         .route("/api/admin/media", get(media_picker))
@@ -117,7 +118,68 @@ async fn security_and_trace(
         Error::forbidden().into_response()
     } else {
         use tracing::Instrument;
-        next.run(request).instrument(span).await
+        // Narrow allowlist: only anonymous discovery/listing output. Private
+        // content, forms, carts, previews and account routes are never stored.
+        let candidate = app.config.cache.enabled
+            && method == axum::http::Method::GET
+            && !request.headers().contains_key("cookie")
+            && !request.headers().contains_key("authorization")
+            && !request.headers().contains_key("range")
+            && matches!(
+                route.as_str(),
+                "/" | "/search"
+                    | "/sitemap.xml"
+                    | "/sitemap-index.xml"
+                    | "/{locale}/"
+                    | "/{locale}/search"
+            )
+            && request.uri().to_string().len() <= 2048;
+        if candidate {
+            // This is a read lock: do not increment the mutation generation.
+            let _read_guard = app.mutations.lock().await;
+            let generation = app
+                .cache_generation
+                .load(std::sync::atomic::Ordering::SeqCst);
+            let key = request.uri().to_string();
+            let cached = app
+                .page_cache
+                .lock()
+                .await
+                .get(&key, generation, &app.config.cache);
+            if let Some(response) = cached {
+                response
+            } else {
+                let response = next.run(request).instrument(span).await;
+                let cacheable = response
+                    .body()
+                    .size_hint()
+                    .upper()
+                    .is_some_and(|n| n <= app.config.cache.max_bytes as u64)
+                    && response.status() == StatusCode::OK
+                    && !response.headers().contains_key("set-cookie")
+                    && response
+                        .headers()
+                        .get("cache-control")
+                        .and_then(|h| h.to_str().ok())
+                        .is_none_or(|h| !h.contains("no-store") && !h.contains("private"));
+                if cacheable {
+                    let (parts, body) = response.into_parts();
+                    match axum::body::to_bytes(body, app.config.cache.max_bytes).await {
+                        Ok(bytes) => {
+                            app.page_cache.lock().await.insert(key, generation, bytes.clone(), parts.headers.clone(), &app.config.cache);
+                            let mut response = Response::from_parts(parts, Body::from(bytes));
+                            response.headers_mut().insert("x-wpalt-cache", HeaderValue::from_static("miss"));
+                            response
+                        }
+                        Err(_) => Error(StatusCode::SERVICE_UNAVAILABLE, "Public response exceeds the cache budget; disable caching or increase max_bytes.").into_response(),
+                    }
+                } else {
+                    response
+                }
+            }
+        } else {
+            next.run(request).instrument(span).await
+        }
     };
     if response.status() == StatusCode::NOT_FOUND
         && (method == axum::http::Method::GET || method == axum::http::Method::HEAD)
@@ -355,7 +417,7 @@ async fn logout(
 ) -> Result<Response> {
     let s = admin_session(&app, &headers).await?;
     auth::csrf(&s, &input.csrf)?;
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     sqlx::query("DELETE FROM sessions WHERE token_hash=$1")
         .bind(s.hash)
         .execute(&app.db.pool)
@@ -1178,7 +1240,7 @@ async fn upload(
     let id = uuid::Uuid::new_v4().to_string();
     let filename = format!("{id}.{ext}");
     let hash = auth::digest(&bytes);
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let path = app.config.data_dir.join("media").join(&filename);
     tokio::fs::write(&path, &bytes).await?;
     let result=sqlx::query("INSERT INTO media(id,filename,original_name,mime,alt,visibility,size,sha256,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)").bind(id).bind(filename).bind(name).bind(mime).bind(alt).bind(visibility).bind(bytes.len() as i64).bind(hash).bind(now()).execute(&app.db.pool).await;
@@ -1206,7 +1268,7 @@ async fn update_media(
     if input.alt.len() > 500 || !["public", "private"].contains(&input.visibility.as_str()) {
         return Err(Error::invalid("Invalid media details."));
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let result = sqlx::query("UPDATE media SET alt=$1,visibility=$2 WHERE id=$3")
         .bind(input.alt)
         .bind(input.visibility)
@@ -1315,7 +1377,7 @@ async fn comment(
         .map(|c| c.0.0.ip().to_string())
         .unwrap_or_else(|| "local-test".into());
     let key = auth::digest(client.as_bytes());
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let mut tx = app.db.pool.begin().await?;
     let id: String =
         sqlx::query_scalar("SELECT id FROM posts WHERE published_slug=$1 AND status='published'")
@@ -1384,7 +1446,7 @@ async fn moderate(
     if !["approved", "rejected", "pending"].contains(&input.status.as_str()) {
         return Err(Error::invalid("Invalid moderation decision."));
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let result = sqlx::query("UPDATE comments SET status=$1 WHERE id=$2")
         .bind(input.status)
         .bind(id)
@@ -1447,7 +1509,7 @@ async fn save_settings(
     };
     content::validate_settings(&settings)?;
     crate::theme::load(&app, &settings.theme, false).await?;
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     sqlx::query("UPDATE settings SET title=$1,description=$2,theme=$3,navigation=$4 WHERE id=1")
         .bind(settings.title)
         .bind(settings.description)
@@ -1514,9 +1576,21 @@ async fn add_user(
     })?;
     Ok(Redirect::to("/admin/users"))
 }
+async fn run_recovery(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<Csrf>,
+) -> Result<Redirect> {
+    let session = admin_session(&app, &headers).await?;
+    admin(&session)?;
+    auth::csrf(&session, &input.csrf)?;
+    crate::operations::recovery::run(&app).await?;
+    Ok(Redirect::to("/admin/operations"))
+}
 async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {
     let s = admin_session(&app, &headers).await?;
     admin(&s)?;
+    let recovery = crate::operations::recovery::status(&app).await?;
     Ok(html_page(
         "Operations",
         &app.db.settings().await?,
@@ -1528,6 +1602,19 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
                 p class="muted" {"Restore with the CLI into an empty database/data directory while the server is stopped. Keep an independent copy to recover from losing this host."}
                 a href="/admin/export" {"Export portable content JSON →"}
             }section class="panel" {h2 {"Runtime"}p {"Database: " strong {(if app.db.postgres{"PostgreSQL"}else{"SQLite · WAL"})}}p {"Version: " (env!("CARGO_PKG_VERSION"))}p {"Scheduler: " (app.config.scheduler_seconds) " seconds"}p {"Debug: " (app.config.debug)}p {a href="/health" {"Readiness endpoint →"}}}}
+            section class="panel" {
+                h2 {"Managed recovery"}
+                @if app.config.recovery.enabled {
+                    p {"Encrypted copies every " (app.config.recovery.interval_seconds) " seconds. Retain " (app.config.recovery.retain) " packages per destination."}
+                    p {"Last attempt: " (recovery.last_attempt) ". Last complete set: " (recovery.last_complete) "."}
+                    @if !recovery.package.is_empty() {p class="muted" {(recovery.package)}}
+                    @for copy in &recovery.copies {p {(copy.destination.display()) " · " strong {(copy.state)}}}
+                    form method="post" action="/admin/recovery/run" {(view::csrf(&s))button {"Create encrypted recovery copies"}}
+                } @else {
+                    p {"Configure a private recovery key, existing destinations, interval and retention in [recovery] to enable scheduled encrypted copies."}
+                }
+                p class="muted" {"Keep the recovery key separately. Verify an independent copy by restoring into a fresh instance. A pending attempt after restart may have been interrupted; inspect destination packages before retrying."}
+            }
             details class="panel" {summary {"Effective configuration · secrets redacted"}pre class="inline-code" {(serde_json::to_string_pretty(&app.config.redacted()).unwrap())}}
         },
     ))

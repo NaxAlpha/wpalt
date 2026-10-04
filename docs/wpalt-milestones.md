@@ -290,3 +290,7 @@ User authorized merging delivery PR #11 and proceeding with M6. PR #11 merged to
 ### M6 local integration and delivery review — 2026-10-04
 
 [Delivery PR #12](https://github.com/NaxAlpha/wpalt/pull/12) integrates the local store, real-payment reconciliation, shared paid access, billing, UTC resource reservations, service outbox and recovery. Twelve connected M6 journeys supplement the cumulative suite; [verification](evidence/m6-verification.md) and [operating limits](commerce-reservations.md) define tested coverage rather than broad plugin parity. Final-source CI and independently checked clean archive determine ready status. Human merge remains separate; M7 has not started.
+
+## M7 implementation checkpoint — 2026-10-04
+
+M6 PR #12 is merged; M7 is active under [its completion contract](m7-contract.md). Initial recovery/cache slices are described in [the operations guide](resilient-operations.md). Scheduled authenticated encrypted copies, retention, failure/interruption status, fresh-engine recovery and bounded anonymous listing/sitemap caching are implemented and pass current SQLite behavioral checks. The full 27-family M7 requirement inventory is still active; no completion or broad family-parity claim is made. PostgreSQL, browser/UI, performance and whole-milestone delivery evidence must be recorded before readiness. Draft delivery PR will track continuing work; no merge is authorized yet.

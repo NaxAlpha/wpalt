@@ -1069,6 +1069,68 @@
         "security guidance update"
       ],
       "status": "defined-scope verified locally; final-source CI and artifact gates on PR #12"
+    },
+    {
+      "feature_id": "M7-recovery",
+      "area": "Authenticated independent recovery",
+      "scope": "M7 initial slices",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.rs/ring/0.17.14/ring/aead/index.html",
+        "https://www.sqlite.org/backup.html",
+        "https://www.postgresql.org/docs/current/backup.html"
+      ],
+      "applicable_versions": [
+        "ring 0.17.14",
+        "wpalt schema 9, encrypted envelope 1, single owning process"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Use random recovery keys and fresh nonces; authenticate version metadata and ciphertext before restoration.",
+        "Logical database/media snapshots are not native WAL PITR; verify independent copies and restore into fresh targets."
+      ],
+      "tests": [
+        "encrypted_recovery_survives_original_loss_and_reports_failed_independent_copies"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-cache",
+      "area": "Anonymous bounded response cache",
+      "scope": "M7 initial slices",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control"
+      ],
+      "applicable_versions": [
+        "ring 0.17.14",
+        "wpalt schema 9, encrypted envelope 1, single owning process"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Exclude personalized/private/cookie-bearing output; invalidate on publication and access mutation.",
+        "Bound total bytes, entries and TTL; fresh request IDs and outer security headers per response."
+      ],
+      "tests": [
+        "anonymous_cache_never_reuses_sessions_and_invalidates_published_access_changes"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

@@ -37,7 +37,7 @@ CREATE INDEX IF NOT EXISTS form_entries_recent ON form_entries(form_id,created_a
 "#;
 
 pub async fn create(app: &App, owner: &str, definition: &FormDefinition) -> Result<String> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     definition.validate(&Registry::load(app).await?.common)?;
     let id = uuid::Uuid::new_v4().to_string();
     let raw = serde_json::to_string(definition)
@@ -56,7 +56,7 @@ pub async fn save(
     definition: &FormDefinition,
     publish: bool,
 ) -> Result<()> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let common = Registry::load(app).await?.common;
     definition.validate(&common)?;
     let raw = serde_json::to_string(definition)

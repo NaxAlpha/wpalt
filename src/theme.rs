@@ -917,7 +917,7 @@ pub async fn save(
     version: i64,
     publish: bool,
 ) -> Result<i64> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     if !crate::schema::identifier(id) {
         return Err(Error::invalid("Invalid theme identifier."));
     }
@@ -965,7 +965,7 @@ pub async fn save(
     Ok(version + 1)
 }
 pub async fn activate(app: &App, id: &str) -> Result<()> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let stored = load(app, id, false).await?;
     if stored.published_version < 1 {
         return Err(Error::invalid("Publish the theme before activating it."));

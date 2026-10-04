@@ -69,7 +69,7 @@ pub async fn set_cart(
     if !slot.is_empty() {
         crate::membership::uuid(slot)?
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     customer(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     let kind:Option<String>=sqlx::query_scalar("SELECT p.kind FROM shop_variants v JOIN shop_products p ON p.id=v.product_id WHERE v.id=$1 AND ($2=0 OR (v.active=1 AND p.published=1))").bind(variant).bind(quantity).fetch_optional(&mut *tx).await?;
@@ -315,7 +315,7 @@ pub async fn checkout(app: &App, s: &Session, input: &Checkout) -> Result<String
     if !input.referral_id.is_empty() {
         crate::membership::uuid(&input.referral_id)?
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     customer(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     let digest = crate::auth::digest(
@@ -563,7 +563,7 @@ pub(crate) async fn expire_tx(tx: &mut Tx<'_>, at: i64) -> Result<usize> {
     Ok(count)
 }
 pub async fn expire(app: &App) -> Result<usize> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let mut tx = app.db.pool.begin().await?;
     let count = expire_tx(&mut tx, now()).await?;
     tx.commit().await?;
@@ -634,7 +634,7 @@ async fn confirm_payment_as(app: &App, p: &Payment, actor: Option<(&Session, i64
     if p.paid_at <= 0 || p.paid_at > now() + 60 || p.subscription_ref.len() > 200 {
         return Err(Error::invalid("Invalid payment record."));
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     if let Some((s, _)) = actor {
         owner(app, s).await?;
     }
@@ -857,7 +857,7 @@ async fn payment_tx(
     Ok(())
 }
 pub async fn cancel(app: &App, s: &Session, id: &str, version: i64) -> Result<()> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     customer(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     let order = sqlx::query("SELECT * FROM shop_orders WHERE id=$1")
@@ -894,7 +894,7 @@ pub async fn cancel(app: &App, s: &Session, id: &str, version: i64) -> Result<()
     Ok(())
 }
 pub async fn fulfill(app: &App, s: &Session, id: &str, version: i64) -> Result<()> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     owner(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     if sqlx::query("UPDATE shop_orders SET fulfillment='fulfilled',version=version+1 WHERE id=$1 AND version=$2 AND payment_state IN ('paid','partially_refunded') AND fulfillment='unfulfilled'").bind(id).bind(version).execute(&mut *tx).await?.rows_affected()!=1{return Err(Error::conflict())}
@@ -922,7 +922,7 @@ pub async fn refund_request(
     if input.amount_minor == 0 {
         return Err(Error::invalid("Refund amount must be positive."));
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     owner(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     if let Some(old)=sqlx::query("SELECT id,amount_minor,restock,reason FROM shop_refunds WHERE order_id=$1 AND request_key=$2").bind(order).bind(&input.request_key).fetch_optional(&mut *tx).await?{if old.get::<i64,_>("amount_minor")!=input.amount_minor||old.get::<i64,_>("restock")!=i64::from(input.restock)||old.get::<String,_>("reason")!=input.reason{return Err(Error::conflict())}return Ok(old.get("id"))}
@@ -984,7 +984,7 @@ async fn confirm_refund_as(
     staff: Option<&Session>,
 ) -> Result<()> {
     text(reference, 200)?;
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     if let Some(s) = staff {
         owner(app, s).await?;
     }
@@ -1094,7 +1094,7 @@ pub async fn record_payout(
     if amount == 0 || currency != app.config.commerce.currency {
         return Err(Error::invalid("Check payout amount and store currency."));
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     owner(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     if let Some(old) =
