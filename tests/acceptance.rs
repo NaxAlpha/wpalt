@@ -3996,3 +3996,63 @@ async fn cleanup_preserves_references_and_rejects_stale_or_unsafe_plans() {
         site.close().await;
     }
 }
+
+/// Reachable CSS includes reused components/responsive rules without shipping
+/// unrelated templates; public and draft routes preserve publication boundaries.
+#[tokio::test]
+async fn theme_styles_are_template_scoped_and_preserve_reachable_components() {
+    use wpalt::theme;
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let mut stored = theme::load(&site.app, "paper", true).await.unwrap();
+        let component: theme::Node=serde_json::from_value(serde_json::json!({"id":"critical_component","kind":"text","text":"Included","style":{"color":"#123456","mobile_columns":1}})).unwrap();
+        stored.package.components.insert(
+            "critical".into(),
+            theme::Component {
+                parameters: Default::default(),
+                root: component,
+            },
+        );
+        stored
+            .package
+            .templates
+            .get_mut("home")
+            .unwrap()
+            .children
+            .push(
+            serde_json::from_value(
+                serde_json::json!({"id":"critical_use","kind":"component","component":"critical"}),
+            )
+            .unwrap(),
+        );
+        stored.package.templates.get_mut("search").unwrap().children.push(serde_json::from_value(serde_json::json!({"id":"unrelated_search","kind":"text","text":"Search only","style":{"color":"#654321"}})).unwrap());
+        let full = stored.package.css();
+        let scoped = stored.package.css_for("home").unwrap();
+        assert!(
+            scoped.contains(".n-critical_component{")
+                && scoped.contains("@media(max-width:700px){.n-critical_component")
+        );
+        assert!(!scoped.contains(".n-unrelated_search{"));
+        assert!(scoped.len() < full.len());
+        theme::save(&site.app, "paper", stored.package, stored.version, true)
+            .await
+            .unwrap();
+        let (_, html) = get(&site.app, "/", None).await;
+        assert!(html.contains("style.css?template=home"));
+        assert!(html.contains("rel=\"preload\"") && html.contains("as=\"style\""));
+        let (status, css) = get(&site.app, "/themes/paper/2/style.css?template=home", None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(css.contains(".n-critical_component{") && !css.contains(".n-unrelated_search{"));
+        assert_eq!(
+            get(
+                &site.app,
+                "/themes/paper/2/style.css?template=unknown",
+                None
+            )
+            .await
+            .0,
+            StatusCode::NOT_FOUND
+        );
+        site.close().await;
+    }
+}

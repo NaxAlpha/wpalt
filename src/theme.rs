@@ -438,6 +438,18 @@ impl Package {
         Ok(original)
     }
     pub fn css(&self) -> String {
+        self.css_scope(None)
+    }
+    /// A deterministic render-reachable stylesheet. Preserve conditional branches
+    /// and responsive rules; discard unrelated templates/components, not guessed
+    /// browser states. The stylesheet is served locally under strict CSP.
+    pub fn css_for(&self, template: &str) -> Result<String> {
+        if !self.templates.contains_key(template) {
+            return Err(Error::not_found());
+        }
+        Ok(self.css_scope(Some(template)))
+    }
+    fn css_scope(&self, template: Option<&str>) -> String {
         let font = match self.tokens["font"].as_str() {
             "serif" => "Georgia,serif",
             "mono" => "ui-monospace,monospace",
@@ -490,13 +502,35 @@ impl Package {
                 add(c, out)
             }
         }
-        for n in self
-            .templates
-            .values()
-            .chain([&self.header, &self.footer])
-            .chain(self.components.values().map(|c| &c.root))
-        {
-            add(n, &mut out)
+        fn reachable<'a>(
+            p: &'a Package,
+            n: &'a Node,
+            seen: &mut BTreeSet<String>,
+            roots: &mut Vec<&'a Node>,
+        ) {
+            if n.kind == "component" && seen.insert(n.component.clone()) {
+                let root = &p.components[&n.component].root;
+                roots.push(root);
+                reachable(p, root, seen, roots);
+            }
+            for child in &n.children {
+                reachable(p, child, seen, roots);
+            }
+        }
+        let mut roots = vec![&self.header, &self.footer];
+        if let Some(template) = template {
+            roots.push(&self.templates[template]);
+            let mut seen = BTreeSet::new();
+            let initial = roots.clone();
+            for root in initial {
+                reachable(self, root, &mut seen, &mut roots);
+            }
+        } else {
+            roots.extend(self.templates.values());
+            roots.extend(self.components.values().map(|c| &c.root));
+        }
+        for n in roots {
+            add(n, &mut out);
         }
         out
     }
@@ -1116,6 +1150,8 @@ pub async fn context_with_discovery(
         queries: 2,
         reference_ids: BTreeSet::new(),
     };
+    ctx.root["_asset_scope"] = app.config.assets.scoped_theme_css.into();
+    ctx.root["_asset_preload"] = app.config.assets.preload_theme_css.into();
     ctx.root["language"] = locale.into();
     ctx.root["direction"] = language_config.direction.clone().into();
     if !language_config.navigation.is_empty() {
@@ -1605,6 +1641,32 @@ pub fn document(
             stored.id, stored.published_version
         )
     };
+    let style = if ctx.root["_asset_scope"].as_bool().unwrap_or(true) {
+        let selected = if p.templates.contains_key(template) {
+            template
+        } else {
+            "content"
+        };
+        format!(
+            "{style}{}template={selected}",
+            if draft { "&" } else { "?" }
+        )
+    } else {
+        style
+    };
+    let preload = ctx.root["_asset_preload"].as_bool().unwrap_or(true);
+    let priority_image = post
+        .and_then(|post| {
+            crate::document::Document::parse(if draft {
+                &post.document
+            } else {
+                &post.published_document
+            })
+            .ok()
+        })
+        .and_then(|doc| doc.priority_image())
+        .filter(|src| body.0.contains(&format!("src=\"{src}\"")));
+
     tracing::debug!(event="theme_render",theme_id=%stored.id,nodes=budget,resolution_queries=ctx.queries,preview=draft);
     fn has_tabs(p: &Package, n: &Node) -> bool {
         n.kind == "tabs"
@@ -1614,7 +1676,7 @@ pub fn document(
     let scripts = [&p.header, &p.footer, root]
         .into_iter()
         .any(|n| has_tabs(p, n));
-    let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" class="theme-shell"{(body)(extra)}(footer)(crate::business::engagement::markup(settings,draft))(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
+    let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";@if let Some(src)=priority_image{link rel="preload" href=(src) as="image";}@if preload{link rel="preload" href=(&style) as="style";}link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" class="theme-shell"{(body)(extra)}(footer)(crate::business::engagement::markup(settings,draft))(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
     if output.len() > 2 * 1024 * 1024 {
         return Err(Error::invalid("Rendered document exceeds 2 MiB."));
     }

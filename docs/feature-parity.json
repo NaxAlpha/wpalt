@@ -1237,9 +1237,16 @@
       "capability": "Asset minification and loading controls",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Locked build-time minification and conditional feature bundles; configured template-scoped style/preload controls. No unsafe async CSS flash or arbitrary scripts.",
+      "evidence": [
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../tests/document.rs",
+        "../scripts/authoring_acceptance.cjs"
+      ]
     },
     {
       "id": "F076",
@@ -1247,9 +1254,16 @@
       "capability": "Lazy loading, dimensions and preload hints",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "New editor images record intrinsic dimensions; bounded lazy/eager choices survive publication and recovery; a single explicit local lead image is preloaded. Legacy/imported images without metadata and composition-only images retain lazy originals.",
+      "evidence": [
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../tests/document.rs",
+        "../scripts/authoring_acceptance.cjs"
+      ]
     },
     {
       "id": "F077",
@@ -1284,9 +1298,16 @@
       "capability": "Unused/critical CSS generation",
       "deployment": "W",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Native deterministic template-reachable stylesheet generation strips unrelated templates/components, preserves conditional/responsive rules and strict external-only style CSP. No heuristic above-fold pruning of arbitrary CSS.",
+      "evidence": [
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../tests/document.rs",
+        "../scripts/authoring_acceptance.cjs"
+      ]
     },
     {
       "id": "F080",

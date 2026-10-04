@@ -81,6 +81,22 @@ impl Document {
     pub fn encode(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
+    /// At most one explicit local priority image. Never preload imported external URLs.
+    pub fn priority_image(&self) -> Option<String> {
+        fn visit(n: &Node) -> Option<String> {
+            if n.kind == "image" && n.attrs["loading"].as_str() == Some("eager") {
+                let src = n.attrs["src"].as_str()?;
+                if src
+                    .strip_prefix("/media/")
+                    .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok())
+                {
+                    return Some(src.into());
+                }
+            }
+            n.content.iter().find_map(visit)
+        }
+        visit(&self.root)
+    }
     pub fn html(&self) -> String {
         render(&self.root)
     }
@@ -173,7 +189,7 @@ fn validate(n: &Node, depth: usize, count: &mut usize, bytes: &mut usize) -> Res
         "form" => &["id", "title"],
         "ordered_list" => &["order"],
         "code_block" => &["params"],
-        "image" => &["src", "alt", "title"],
+        "image" => &["src", "alt", "title", "width", "height", "loading"],
         "table_cell" | "table_header" => &["colspan", "rowspan", "colwidth"],
         _ => &[],
     };
@@ -214,6 +230,17 @@ fn validate(n: &Node, depth: usize, count: &mut usize, bytes: &mut usize) -> Res
         let src = n.attrs["src"].as_str().ok_or_else(invalid)?;
         // Existing HTTP(S) images may be imported, but are never fetched by this server.
         if !crate::content::safe_nav_url(src) || src.len() > 2000 {
+            return Err(invalid());
+        }
+        let width = n.attrs.get("width").filter(|v| !v.is_null());
+        let height = n.attrs.get("height").filter(|v| !v.is_null());
+        if width.is_some() != height.is_some()
+            || width.is_some_and(|v| !matches!(v.as_u64(), Some(1..=4096)))
+            || height.is_some_and(|v| !matches!(v.as_u64(), Some(1..=4096)))
+            || n.attrs
+                .get("loading")
+                .is_some_and(|v| !v.is_null() && !matches!(v.as_str(), Some("lazy" | "eager")))
+        {
             return Err(invalid());
         }
         for k in ["alt", "title"] {
@@ -309,18 +336,50 @@ fn validate(n: &Node, depth: usize, count: &mut usize, bytes: &mut usize) -> Res
     }
     Ok(())
 }
+fn render_image(n: &Node) -> String {
+    let eager = n.attrs["loading"].as_str() == Some("eager");
+    html! {img src=(n.attrs["src"].as_str().unwrap_or("")) alt=(n.attrs["alt"].as_str().unwrap_or(""))
+        width=[n.attrs["width"].as_u64()] height=[n.attrs["height"].as_u64()]
+        loading=(if eager {"eager"} else {"lazy"}) fetchpriority=(if eager {"high"} else {"auto"}) decoding="async";}.into_string()
+}
 fn render(n: &Node) -> String {
     let inner = n.content.iter().map(render).collect::<String>();
     let inner = PreEscaped(inner);
-    match n.kind.as_str(){
-        "form"=>form_embed(n.attrs["id"].as_str().unwrap_or(""),n.attrs["title"].as_str().unwrap_or("Form")),
-        "text"=>{let mut v=html!{(n.text.as_deref().unwrap_or(""))}.into_string();for m in n.marks.iter().rev(){let x=PreEscaped(v);v=match m.kind.as_str(){"strong"=>html!{strong{(x)}},"em"=>html!{em{(x)}},"strike"=>html!{s{(x)}},"code"=>html!{code{(x)}},"link"=>html!{a href=(m.attrs["href"].as_str().unwrap_or("")) rel="noopener noreferrer"{(x)}},_=>html!{(x)}}.into_string();}v},
-        "paragraph"=>html!{p{(inner)}}.into_string(),
-        "heading"=>{let level=n.attrs["level"].as_u64().unwrap_or(2); format!("<h{level}>{}</h{level}>",inner.0)},
-        "blockquote"=>html!{blockquote{(inner)}}.into_string(),"callout"=>html!{aside class="callout"{(inner)}}.into_string(),
-        "bullet_list"=>html!{ul{(inner)}}.into_string(),"ordered_list"=>html!{ol start=(n.attrs["order"].as_u64().unwrap_or(1)){(inner)}}.into_string(),"list_item"=>html!{li{(inner)}}.into_string(),
-        "code_block"=>html!{pre{code{(inner)}}}.into_string(),"image"=>html!{img src=(n.attrs["src"].as_str().unwrap_or("")) alt=(n.attrs["alt"].as_str().unwrap_or("")) loading="lazy";}.into_string(),
-        "table"=>html!{div class="document-table"{table{tbody{(inner)}}}}.into_string(),"table_row"=>html!{tr{(inner)}}.into_string(),"table_cell"=>html!{td{(inner)}}.into_string(),"table_header"=>html!{th scope="col"{(inner)}}.into_string(),"hard_break"=>"<br>".into(),"horizontal_rule"=>"<hr>".into(),_=>inner.0}
+    match n.kind.as_str() {
+        "form" => form_embed(
+            n.attrs["id"].as_str().unwrap_or(""),
+            n.attrs["title"].as_str().unwrap_or("Form"),
+        ),
+        "text" => {
+            let mut v = html! {(n.text.as_deref().unwrap_or(""))}.into_string();
+            for m in n.marks.iter().rev() {
+                let x = PreEscaped(v);
+                v=match m.kind.as_str(){"strong"=>html!{strong{(x)}},"em"=>html!{em{(x)}},"strike"=>html!{s{(x)}},"code"=>html!{code{(x)}},"link"=>html!{a href=(m.attrs["href"].as_str().unwrap_or("")) rel="noopener noreferrer"{(x)}},_=>html!{(x)}}.into_string();
+            }
+            v
+        }
+        "paragraph" => html! {p{(inner)}}.into_string(),
+        "heading" => {
+            let level = n.attrs["level"].as_u64().unwrap_or(2);
+            format!("<h{level}>{}</h{level}>", inner.0)
+        }
+        "blockquote" => html! {blockquote{(inner)}}.into_string(),
+        "callout" => html! {aside class="callout"{(inner)}}.into_string(),
+        "bullet_list" => html! {ul{(inner)}}.into_string(),
+        "ordered_list" => {
+            html! {ol start=(n.attrs["order"].as_u64().unwrap_or(1)){(inner)}}.into_string()
+        }
+        "list_item" => html! {li{(inner)}}.into_string(),
+        "code_block" => html! {pre{code{(inner)}}}.into_string(),
+        "image" => render_image(n),
+        "table" => html! {div class="document-table"{table{tbody{(inner)}}}}.into_string(),
+        "table_row" => html! {tr{(inner)}}.into_string(),
+        "table_cell" => html! {td{(inner)}}.into_string(),
+        "table_header" => html! {th scope="col"{(inner)}}.into_string(),
+        "hard_break" => "<br>".into(),
+        "horizontal_rule" => "<hr>".into(),
+        _ => inner.0,
+    }
 }
 fn projection(n: &Node) -> String {
     let inner = n.content.iter().map(projection).collect::<String>();

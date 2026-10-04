@@ -1370,6 +1370,39 @@
         "release or relevant security guidance"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-ASSET-LOADING",
+      "area": "Scoped theme CSS, intrinsic dimensions and loading hints",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/rel/preload",
+        "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/img"
+      ],
+      "applicable_versions": [
+        "HTML preload/as=style and image",
+        "img width/height/loading/fetchpriority",
+        "wpalt authoring document 1 optional image metadata"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Match preload resource URL/destination with the actual consumer; preload only one selected local lead image, never imported external resources. Bound authoring dimensions and preserve explicit loading policy. Prune render-unreachable theme trees without guessing responsive/conditional visibility. Retain external-only style CSP."
+      ],
+      "tests": [
+        "theme_styles_are_template_scoped_and_preserve_reachable_components",
+        "image_dimensions_and_priority_are_bounded_and_external_preloads_are_excluded",
+        "authoring browser publication journey"
+      ],
+      "triggers": [
+        "browser loading/CSP change",
+        "theme or document schema changes",
+        "asset pipeline or affected release"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."
