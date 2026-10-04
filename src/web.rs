@@ -85,6 +85,10 @@ pub fn router(app: App) -> Router {
         .route("/admin/media/{id}", post(update_media))
         .route("/media/{id}", get(media_file))
         .route("/media/{id}/resize/{width}", get(media_derivative))
+        .route(
+            "/media/{id}/resize/{width}/{format}",
+            get(media_derivative_format),
+        )
         .route("/admin/comments", get(comments))
         .route("/admin/comments/{id}", post(moderate))
         .route("/admin/settings", get(settings_page).post(save_settings))
@@ -1285,7 +1289,7 @@ async fn media_list(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
         html! {
             (view::heading("Assets","Media library","Upload images, describe them and choose who can access them. SVG and executable uploads are not accepted."))
             section class="panel" {form method="post" action="/admin/media" enctype="multipart/form-data" {(view::csrf(&s))div class="field-row" {label {"Image" input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/gif" required;}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" {"Public"}option value="private" {"Editors only"}}}}label {"Alternative text" input name="alt" maxlength="500";}button {"Upload image"}}}
-            div class="cards" {@for r in rows {@let id=r.get::<String,_>("id");section class="panel media-card" {img src=(format!("/media/{id}")) alt=(r.get::<String,_>("alt")) loading="lazy";h3 {(r.get::<String,_>("original_name"))}p class="muted" {(r.get::<i64,_>("size")/1024) " KiB"}code {(format!("![description](/media/{id})"))}
+            div class="cards" {@for r in rows {@let id=r.get::<String,_>("id");section class="panel media-card" {img src=(format!("/media/{id}")) alt=(r.get::<String,_>("alt")) loading="lazy";h3 {(r.get::<String,_>("original_name"))}p class="muted" {(r.get::<i64,_>("size")/1024) " KiB"}code {(format!("![description](/media/{id})"))}details {summary {"Optimized image sizes"}p class="muted" {"Original access controls apply to every size. GIF animations retain their original file."}p {a href=(format!("/media/{id}/resize/320")) {"320px WebP"} " · " a href=(format!("/media/{id}/resize/640")) {"640px WebP"} " · " a href=(format!("/media/{id}/resize/1280/avif")) {"1280px AVIF"}}}
                 form method="post" action=(format!("/admin/media/{id}")) {(view::csrf(&s))label {"Alternative text" input name="alt" value=(r.get::<String,_>("alt")) maxlength="500";}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" selected[r.get::<String,_>("visibility")=="public"] {"Public"}option value="private" selected[r.get::<String,_>("visibility")=="private"] {"Editors only"}}}button class="secondary" {"Save details"}}
             }}}
         },
@@ -1430,8 +1434,44 @@ async fn media_derivative(
     headers: HeaderMap,
     Path((id, width)): Path<(String, u32)>,
 ) -> Result<Response> {
-    if ![320, 640, 1280, 1920].contains(&width) {
-        return Err(Error::invalid("Unsupported image width."));
+    media_derivative_format(State(app), headers, Path((id, width, "webp".into()))).await
+}
+async fn media_derivative_format(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path((id, width, format)): Path<(String, u32, String)>,
+) -> Result<Response> {
+    if ![320, 640, 1280, 1920].contains(&width) || !["webp", "avif"].contains(&format.as_str()) {
+        return Err(Error::invalid("Unsupported image derivative."));
+    }
+    if format == "avif" && width > 1280 {
+        return Err(Error::invalid("AVIF supports widths 320,640 and1280."));
+    }
+    let read_permit = app.media_reads.clone().try_acquire_owned().map_err(|_| {
+        Error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Image reads are busy. Try again shortly.",
+        )
+    })?;
+    // Same policy and current role checks as original delivery, including private
+    // editor-only images and paid entitlement revocation. Never expose a filesystem path.
+    let original = media_file(State(app.clone()), headers, Path(id)).await?;
+    let bytes = axum::body::to_bytes(original.into_body(), 32 * 1024 * 1024)
+        .await
+        .map_err(|_| Error::invalid("Cannot read bounded source image."))?;
+    let key_format = format.clone();
+    let (bytes, key) = tokio::task::spawn_blocking(move || {
+        let _permit = read_permit;
+        let key = format!("image:{}:{width}:{key_format}", auth::digest(&bytes));
+        (bytes, key)
+    })
+    .await
+    .map_err(|_| Error::invalid("Image read worker interrupted."))?;
+    let storage = app.config.media.storage();
+    if storage.enabled
+        && let Some(response) = app.media_cache.lock().await.get(&key, 0, &storage)
+    {
+        return Ok(response);
     }
     let permit = app.media_work.clone().try_acquire_owned().map_err(|_| {
         Error(
@@ -1439,26 +1479,34 @@ async fn media_derivative(
             "Image processing is busy. Try again shortly.",
         )
     })?;
-    // Same policy and current role checks as original delivery, including private
-    // editor-only images and paid entitlement revocation. Never expose a filesystem path.
-    let original = media_file(State(app), headers, Path(id)).await?;
-    let bytes = axum::body::to_bytes(original.into_body(), 32 * 1024 * 1024)
-        .await
-        .map_err(|_| Error::invalid("Cannot read bounded source image."))?;
+    let encoding = format.clone();
     let output = tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        crate::operations::media::derivative(&bytes, width)
+        crate::operations::media::derivative_format(&bytes, width, &encoding)
     })
     .await
     .map_err(|_| Error::invalid("Image worker interrupted."))??;
-    Ok((
-        [
-            ("content-type", "image/webp"),
-            ("cache-control", "no-store"),
-        ],
-        output,
-    )
-        .into_response())
+    let mut output_headers = HeaderMap::new();
+    output_headers.insert(
+        "content-type",
+        HeaderValue::from_static(if format == "avif" {
+            "image/avif"
+        } else {
+            "image/webp"
+        }),
+    );
+    output_headers.insert("cache-control", HeaderValue::from_static("no-store"));
+    let output = axum::body::Bytes::from(output);
+    if storage.enabled {
+        app.media_cache.lock().await.insert(
+            key,
+            0,
+            output.clone(),
+            output_headers.clone(),
+            &storage,
+        );
+    }
+    Ok((output_headers, output).into_response())
 }
 async fn media_file(
     State(app): State<App>,

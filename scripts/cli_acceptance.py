@@ -163,6 +163,25 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
             with urllib.request.urlopen(origin+'/scheduled-restart') as r:assert b'DURABLE_SCHEDULE' in r.read()
             with urllib.request.urlopen(origin+'/journal-1') as r:assert r.status==200
         finally:stop(process)
+    journal=(root/'source'/'privileged-audit.jsonl').read_text()
+    assert secret not in journal and csrf not in journal and str(root) not in journal
+    events=[json.loads(line) for line in journal.splitlines()]
+    cli_events=[event for event in events if event['actor']=='host-owner']
+    assert any(event['route']=='cli:upgrade-prepare' and event['phase']=='outcome' and event['status']==200 for event in cli_events)
+    assert any(event['route']=='cli:upgrade-prepare' and event['phase']=='outcome' and event['status']==500 for event in cli_events)
+    for event in cli_events:
+        if event['phase']=='outcome':
+            assert any(intent['request_id']==event['request_id'] and intent['phase']=='intent' for intent in cli_events)
+    # A full/unsafe audit path prevents a privileged CLI mutation before dispatch.
+    journal_path=root/'source'/'privileged-audit.jsonl'
+    saved_journal=root/'saved-audit.jsonl';journal_path.rename(saved_journal);journal_path.mkdir()
+    with sqlite3.connect(root/'source.db') as database:
+        before=database.execute('SELECT tax_bps,shipping_minor FROM shop_settings').fetchone()
+    denied=run(config,'shop','rules','--tax-bps','500','--shipping-minor','99',ok=False)
+    assert 'Cannot persist audit history' in denied.stderr
+    with sqlite3.connect(root/'source.db') as database:
+        assert database.execute('SELECT tax_bps,shipping_minor FROM shop_settings').fetchone()==before
+    journal_path.rmdir();saved_journal.rename(journal_path)
     logs=log.read_text();assert secret not in logs;assert csrf not in logs
     for cookie in jar:assert cookie.value not in logs
     assert 'request_completed' in logs and 'elapsed_us' in logs and 'login_succeeded' in logs

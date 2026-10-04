@@ -677,7 +677,65 @@ async fn main() -> anyhow::Result<()> {
         .init();
     let _lock = lock(&config)?;
     let app = App::open(config).await?;
-    match cli.command {
+    // Journal command classes without collecting argv, paths or secrets.
+    let route = match &cli.command {
+        Command::Init { .. } => Some("cli:init"),
+        Command::Backup { .. } => Some("cli:backup"),
+        Command::RecoveryRun => Some("cli:recovery-run"),
+        Command::UpgradePrepare { .. } => Some("cli:upgrade-prepare"),
+        Command::RecoveryPrune { .. } => Some("cli:recovery-prune"),
+        Command::AuthReset { .. } => Some("cli:auth-reset"),
+        Command::Restore { .. } => Some("cli:restore"),
+        Command::UserAdd { .. } => Some("cli:user-add"),
+        Command::Theme { .. } => Some("cli:theme"),
+        Command::Member { .. } => Some("cli:member"),
+        Command::Shop { .. } => Some("cli:shop"),
+        Command::SeedDemo { .. } => Some("cli:seed-demo"),
+        _ => None,
+    };
+    let audit_id = uuid::Uuid::new_v4().to_string();
+    let audit_app = app.clone();
+    if let Some(route) = route {
+        wpalt::operations::audit::append(
+            &app,
+            wpalt::operations::audit::Event {
+                at: wpalt::now(),
+                request_id: audit_id.clone(),
+                actor: "host-owner".into(),
+                route: route.into(),
+                phase: "intent".into(),
+                status: 0,
+            },
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!(e.1))?;
+    }
+    let outcome = execute(app, cli.command).await;
+    if let Some(route) = route
+        && wpalt::operations::audit::append(
+            &audit_app,
+            wpalt::operations::audit::Event {
+                at: wpalt::now(),
+                request_id: audit_id,
+                actor: "host-owner".into(),
+                route: route.into(),
+                phase: "outcome".into(),
+                status: if outcome.is_ok() { 200 } else { 500 },
+            },
+        )
+        .await
+        .is_err()
+    {
+        // A command may already have committed money or data. Missing audit
+        // persistence must not instruct operators to repeat the mutation.
+        tracing::error!(event = "cli_audit_outcome_failed", route);
+        eprintln!("Warning: outcome audit could not be persisted; inspect state before retrying.");
+    }
+    outcome
+}
+
+async fn execute(app: App, command: Command) -> anyhow::Result<()> {
+    match command {
         Command::Init {
             admin_email,
             admin_name,
@@ -943,6 +1001,7 @@ async fn main() -> anyhow::Result<()> {
     }
     Ok(())
 }
+
 async fn shutdown() {
     #[cfg(unix)]
     {

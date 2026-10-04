@@ -29,6 +29,18 @@ module.exports = async (owner, origin, output, password) => {
   };
 
   try {
+    await page.goto(origin+"/admin/media");
+    await page.getByLabel("Image",{exact:true}).setInputFiles(path.join(__dirname,"../tests/fixtures/green.png"));
+    await page.locator('form[action="/admin/media"]').getByLabel("Visibility",{exact:true}).selectOption("private");
+    await page.locator('form[action="/admin/media"]').getByLabel("Alternative text",{exact:true}).fill("Native AVIF fixture");
+    await Promise.all([page.waitForNavigation(),page.getByRole("button",{name:"Upload image",exact:true}).click()]);
+    const source=await page.locator(".media-card").first().locator("img").getAttribute("src");
+    const avif=await page.evaluate(async source=>{ const image=new Image();image.src=source+"/resize/320/avif";await image.decode();return {width:image.naturalWidth,height:image.naturalHeight}; },source);
+    assert(avif.width>0 && avif.height>0,"browser decodes native AVIF");
+    const anonymous=await owner.browser().newContext();
+    assert.equal((await anonymous.request.get(origin+source+"/resize/320/avif")).status(),401,"cached derivative requires current authority");
+    await anonymous.close();
+    report.journey.push("Native AVIF decodes in browser and retains private source authority");
     await page.goto(origin+"/admin/operations");
     await measure("operations");
     await Promise.all([page.waitForNavigation(),page.getByRole("button",{name:"Inspect stored-file integrity",exact:true}).click()]);

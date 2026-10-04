@@ -2715,6 +2715,20 @@ async fn encrypted_recovery_survives_original_loss_and_reports_failed_independen
             retain: 1,
         };
         original.app.config = std::sync::Arc::new(config);
+        let history_id = uuid::Uuid::new_v4().to_string();
+        wpalt::operations::audit::append(
+            &original.app,
+            wpalt::operations::audit::Event {
+                at: wpalt::now(),
+                request_id: history_id.clone(),
+                actor: "host-owner".into(),
+                route: "cli:recovery-check".into(),
+                phase: "outcome".into(),
+                status: 200,
+            },
+        )
+        .await
+        .unwrap();
         let first = recovery::run(&original.app).await.unwrap();
         assert_eq!(first.copies[0].state, "verified");
         let second = recovery::run(&original.app).await.unwrap();
@@ -2771,6 +2785,14 @@ async fn encrypted_recovery_survives_original_loss_and_reports_failed_independen
                 .unwrap()
                 .2[0]
                 .completed
+        );
+        assert!(
+            wpalt::operations::audit::read(&fresh.app)
+                .await
+                .unwrap()
+                .iter()
+                .any(|event| event.request_id == history_id),
+            "original loss must not discard recent operational evidence"
         );
         let payment: String =
             sqlx::query_scalar("SELECT payment_state FROM shop_orders WHERE id=$1")
@@ -3132,6 +3154,43 @@ async fn native_image_derivatives_preserve_private_authority_and_validate_proces
             image::guess_format(&bytes).unwrap(),
             image::ImageFormat::WebP
         );
+        assert_eq!(site.app.media_cache.lock().await.statistics().0, 1);
+        // Saturating encoders must not prevent reuse, but cached bytes never bypass authority.
+        let permits = site
+            .app
+            .media_work
+            .clone()
+            .acquire_many_owned(site.app.media_work.available_permits() as u32)
+            .await
+            .unwrap();
+        let reused = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(&path)
+                    .header("cookie", format!("wpalt_session={}", site.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(reused.status(), StatusCode::OK);
+        assert_eq!(
+            axum::body::to_bytes(reused.into_body(), 1_000_000)
+                .await
+                .unwrap(),
+            bytes
+        );
+        let denied = router
+            .clone()
+            .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert!(
+            !denied.status().is_success(),
+            "a populated derivative cache cannot grant access"
+        );
+        drop(permits);
         let decoded = image::load_from_memory(&bytes).unwrap();
         let source = image::load_from_memory(&png()).unwrap();
         assert_eq!(
@@ -3139,8 +3198,74 @@ async fn native_image_derivatives_preserve_private_authority_and_validate_proces
             source.width(),
             "small images are never enlarged"
         );
+        let avif = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("{path}/avif"))
+                    .header("cookie", format!("wpalt_session={}", site.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(avif.status(), StatusCode::OK);
+        assert_eq!(avif.headers()["content-type"], "image/avif");
+        let avif_bytes = axum::body::to_bytes(avif.into_body(), 1_000_000)
+            .await
+            .unwrap();
+        assert_eq!(
+            image::guess_format(&avif_bytes).unwrap(),
+            image::ImageFormat::Avif
+        );
+        assert_eq!(
+            site.app.media_cache.lock().await.statistics().0,
+            2,
+            "formats cannot collide"
+        );
+        assert!(wpalt::operations::media::derivative_format(&png(), 320, "jpeg").is_err());
         assert!(wpalt::operations::media::derivative(&png(), 999).is_err());
         assert!(wpalt::operations::media::derivative(b"not an image", 320).is_err());
+        let mut chunks = Vec::new();
+        fn chunk(output: &mut Vec<u8>, tag: &[u8; 4], data: &[u8]) {
+            output.extend_from_slice(tag);
+            output.extend_from_slice(&(data.len() as u32).to_le_bytes());
+            output.extend_from_slice(data);
+            if data.len() % 2 == 1 {
+                output.push(0);
+            }
+        }
+        let mut extended = vec![2, 0, 0, 0];
+        extended.extend_from_slice(&(source.width() - 1).to_le_bytes()[..3]);
+        extended.extend_from_slice(&(source.height() - 1).to_le_bytes()[..3]);
+        chunk(&mut chunks, b"VP8X", &extended);
+        chunk(&mut chunks, b"ANIM", &[0; 6]);
+        for _ in 0..2 {
+            let mut frame = vec![0; 6];
+            frame.extend_from_slice(&(source.width() - 1).to_le_bytes()[..3]);
+            frame.extend_from_slice(&(source.height() - 1).to_le_bytes()[..3]);
+            frame.extend_from_slice(&[244, 1, 0, 0]);
+            frame.extend_from_slice(&bytes[12..]);
+            chunk(&mut chunks, b"ANMF", &frame);
+        }
+        let mut animated_webp = b"RIFF".to_vec();
+        animated_webp.extend_from_slice(&(chunks.len() as u32 + 4).to_le_bytes());
+        animated_webp.extend_from_slice(b"WEBP");
+        animated_webp.extend_from_slice(&chunks);
+        assert!(
+            image::codecs::webp::WebPDecoder::new(Cursor::new(&animated_webp))
+                .unwrap()
+                .has_animation()
+        );
+        for animated in [
+            include_bytes!("fixtures/animated.png").as_slice(),
+            animated_webp.as_slice(),
+        ] {
+            assert!(
+                wpalt::operations::media::derivative_format(animated, 320, "avif").is_err(),
+                "animation must not silently become a still image"
+            );
+        }
         site.close().await;
     }
 }
@@ -3208,6 +3333,33 @@ async fn privileged_audit_records_attempt_and_outcome_without_passwords_or_capab
         .await
         .unwrap();
     assert_ne!(denied.status(), StatusCode::OK);
+    // Rotation must not make the previous file invisible to owner inspection.
+    for n in 0..530 {
+        wpalt::operations::audit::append(
+            &site.app,
+            wpalt::operations::audit::Event {
+                at: wpalt::now(),
+                request_id: format!("rotation-{n}"),
+                actor: "host-owner".into(),
+                route: format!("test:{}", "x".repeat(2000)),
+                phase: "outcome".into(),
+                status: 200,
+            },
+        )
+        .await
+        .unwrap();
+    }
+    assert!(
+        site.app
+            .config
+            .data_dir
+            .join("privileged-audit.previous.jsonl")
+            .exists()
+    );
+    let rotated = wpalt::operations::audit::read(&site.app).await.unwrap();
+    assert_eq!(rotated.len(), 200);
+    assert_eq!(rotated.first().unwrap().request_id, "rotation-529");
+    assert_eq!(rotated.last().unwrap().request_id, "rotation-330");
     // If intent cannot be persisted, no privileged handler is dispatched.
     let journal = site.app.config.data_dir.join("privileged-audit.jsonl");
     std::fs::remove_file(&journal).unwrap();
@@ -3389,6 +3541,7 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let mut payload: serde_json::Value =
             serde_json::from_str(old["payload"].as_str().unwrap()).unwrap();
         payload["schema"] = serde_json::json!(9);
+        payload.as_object_mut().unwrap().remove("audit_history");
         payload["tables"]
             .as_object_mut()
             .unwrap()

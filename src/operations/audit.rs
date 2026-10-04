@@ -10,6 +10,7 @@ use std::io::Write;
 
 const LIMIT: u64 = 1024 * 1024;
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Event {
     pub at: i64,
     pub request_id: String,
@@ -22,7 +23,7 @@ pub async fn append(app: &App, event: Event) -> Result<()> {
     let _guard = app.audit_work.lock().await;
     let directory = app.config.data_dir.clone();
     let bytes = serde_json::to_vec(&event).map_err(|_| Error::invalid("Invalid audit event."))?;
-    if bytes.len() > 4096 {
+    if !valid(&event) || bytes.len() > 4096 {
         return Err(Error::invalid("Audit event exceeds its budget."));
     }
     tokio::task::spawn_blocking(move || -> std::io::Result<()> {
@@ -59,20 +60,45 @@ pub async fn append(app: &App, event: Event) -> Result<()> {
 }
 pub async fn read(app: &App) -> Result<Vec<Event>> {
     let _guard = app.audit_work.lock().await;
-    let path = app.config.data_dir.join("privileged-audit.jsonl");
-    if !path.exists() {
-        return Ok(vec![]);
-    }
-    let bytes = backup::read_bounded(&path, LIMIT as usize).await?;
-    let text =
-        std::str::from_utf8(&bytes).map_err(|_| Error::invalid("Audit history is damaged."))?;
     let mut records = Vec::new();
-    for line in text.lines().rev().take(200) {
-        records.push(serde_json::from_str(line).map_err(|_| {
-            Error::invalid(
-                "Audit history contains an interrupted record; inspect the private file.",
-            )
-        })?);
+    for name in ["privileged-audit.jsonl", "privileged-audit.previous.jsonl"] {
+        let path = app.config.data_dir.join(name);
+        match tokio::fs::symlink_metadata(&path).await {
+            Ok(metadata) if metadata.is_file() => {}
+            Ok(_) => return Err(Error::invalid("Unsafe audit history path.")),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.into()),
+        }
+        let bytes = backup::read_bounded(&path, LIMIT as usize).await?;
+        let text =
+            std::str::from_utf8(&bytes).map_err(|_| Error::invalid("Audit history is damaged."))?;
+        for line in text.lines().rev() {
+            let event: Event = serde_json::from_str(line).map_err(|_| {
+                Error::invalid(
+                    "Audit history contains an interrupted record; inspect the private file.",
+                )
+            })?;
+            if !valid(&event) {
+                return Err(Error::invalid("Audit history contains an invalid record."));
+            }
+            records.push(event);
+        }
     }
+    records.sort_by_key(|event: &Event| std::cmp::Reverse(event.at));
+    let mut seen = std::collections::HashSet::new();
+    records
+        .retain(|event| seen.insert((event.request_id.clone(), event.phase.clone(), event.status)));
+    records.truncate(200);
     Ok(records)
+}
+pub fn valid(event: &Event) -> bool {
+    event.at >= 0
+        && !event.request_id.is_empty()
+        && !event.route.is_empty()
+        && event.request_id.len() <= 128
+        && event.actor.len() <= 256
+        && event.route.len() <= 3072
+        && ["intent", "response", "outcome"].contains(&event.phase.as_str())
+        && event.status <= 599
+        && serde_json::to_vec(event).is_ok_and(|bytes| bytes.len() <= 4096)
 }

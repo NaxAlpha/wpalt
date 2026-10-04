@@ -970,6 +970,7 @@ struct Snapshot {
     tables: BTreeMap<String, Vec<BTreeMap<String, Value>>>,
     files: Vec<MediaFile>,
     private_files: Vec<MediaFile>,
+    audit_history: Vec<crate::operations::audit::Event>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1093,7 +1094,9 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
             data,
         });
     }
+    let audit_history = crate::operations::audit::read(app).await?;
     let snapshot = Snapshot {
+        audit_history,
         private_files,
         schema: 10,
         created_at: crate::now(),
@@ -1103,7 +1106,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v9".into(),
+        format: "wpalt-backup-v10".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -1120,7 +1123,7 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v9"
+    if envelope.format != "wpalt-backup-v10"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
@@ -1134,6 +1137,14 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
             .any(|(name, _)| !snapshot.tables.contains_key(*name))
     {
         return Err(Error::invalid("Unsupported backup schema or table set."));
+    }
+    if snapshot.audit_history.len() > 200
+        || snapshot
+            .audit_history
+            .iter()
+            .any(|event| !crate::operations::audit::valid(event))
+    {
+        return Err(Error::invalid("Invalid archived audit history."));
     }
     // Validate every row before any writes; no archive SQL or paths are executed.
     for (name, columns) in TABLES {
@@ -1716,6 +1727,11 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             tokio::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).await?;
         }
     }
+    // Preserve recent source history without overwriting the fresh host's own
+    // restore intent. Imported records remain operational evidence, not a ledger.
+    for event in snapshot.audit_history.into_iter().rev() {
+        crate::operations::audit::append(app, event).await?;
+    }
     tx.commit().await?;
     tracing::info!(event = "backup_restored");
     Ok(())
@@ -1780,8 +1796,27 @@ pub fn migrate_m6(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<
     {
         return Err(Error::invalid("Invalid M6 archive format/checksum."));
     }
-    let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
+    // A dedicated one-off converter parses byte vectors directly, avoiding a
+    // Value tree with an allocation per archived byte. Ordinary restore has no legacy parser.
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct M6 {
+        schema: i64,
+        created_at: i64,
+        tables: BTreeMap<String, Vec<BTreeMap<String, Value>>>,
+        files: Vec<MediaFile>,
+        private_files: Vec<MediaFile>,
+    }
+    let old: M6 = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid M6 archive graph."))?;
+    let mut snapshot = Snapshot {
+        schema: old.schema,
+        created_at: old.created_at,
+        tables: old.tables,
+        files: old.files,
+        private_files: old.private_files,
+        audit_history: vec![],
+    };
     if snapshot.schema != 9
         || snapshot.tables.contains_key("user_factors")
         || snapshot.tables.contains_key("user_passkeys")
@@ -1796,7 +1831,7 @@ pub fn migrate_m6(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Archive migration failed."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v9".into(),
+        format: "wpalt-backup-v10".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })

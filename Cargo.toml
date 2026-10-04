@@ -39,7 +39,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 jsonwebtoken = { version = "9.3", default-features = false }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "avif"] }
 
 [dev-dependencies]
 flate2 = "1"
