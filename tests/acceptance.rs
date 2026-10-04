@@ -3899,3 +3899,100 @@ async fn native_wal_archive_is_idempotent_bound_to_cluster_and_preserves_output_
             && wal::valid_name("000000010000000000000001.00000028.backup")
     );
 }
+
+/// Cleanup must preserve draft/history references, reject stale plans and leave
+/// unexpected filesystem objects untouched. Exercise both real database engines.
+#[tokio::test]
+async fn cleanup_preserves_references_and_rejects_stale_or_unsafe_plans() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let retained = uuid::Uuid::new_v4().to_string();
+        let unused = uuid::Uuid::new_v4().to_string();
+        let orphan = uuid::Uuid::new_v4().to_string();
+        let disposable = uuid::Uuid::new_v4().to_string();
+        for id in [&retained, &unused, &disposable] {
+            let filename = format!("{id}.png");
+            tokio::fs::write(
+                site.app.config.data_dir.join("media").join(&filename),
+                b"synthetic",
+            )
+            .await
+            .unwrap();
+            sqlx::query("INSERT INTO media(id,filename,original_name,mime,alt,visibility,size,sha256,created_at) VALUES($1,$2,'fixture.png','image/png','','private',9,$3,0)").bind(id).bind(filename).bind(auth::digest(b"synthetic")).execute(&site.app.db.pool).await.unwrap();
+        }
+        let orphan_path = site
+            .app
+            .config
+            .data_dir
+            .join("media")
+            .join(format!("{orphan}.png"));
+        tokio::fs::write(&orphan_path, b"orphan").await.unwrap();
+        let mut post = input("cleanup-draft", "save");
+        // Imported percent-encoded media URLs also retain the original.
+        post.body = format!("![draft](/media/{})", retained.replace('-', "%2D"));
+        content::save(&site.app, site.session(), None, post)
+            .await
+            .unwrap();
+        let plan = wpalt::operations::cleanup::preview(&site.app)
+            .await
+            .unwrap();
+        assert_eq!(plan.retained, 1);
+        assert_eq!(plan.candidates.len(), 3);
+        assert!(
+            plan.candidates
+                .iter()
+                .any(|c| c.id == orphan && !c.registered)
+        );
+        // A concurrent editorial save adds a reference after the preview.
+        let mut second = input("cleanup-new-reference", "save");
+        second.body = format!("![new](/media/{unused})");
+        content::save(&site.app, site.session(), None, second)
+            .await
+            .unwrap();
+        assert_eq!(
+            wpalt::operations::cleanup::execute(&site.app, &plan.hash, plan.cutoff)
+                .await
+                .unwrap_err()
+                .0,
+            StatusCode::CONFLICT
+        );
+        assert!(orphan_path.exists());
+        let next = wpalt::operations::cleanup::preview(&site.app)
+            .await
+            .unwrap();
+        assert_eq!(next.retained, 2);
+        let result = wpalt::operations::cleanup::execute(&site.app, &next.hash, next.cutoff)
+            .await
+            .unwrap();
+        assert_eq!(result.removed_files, 2);
+        assert!(result.pending_files.is_empty());
+        assert!(!orphan_path.exists());
+        assert!(
+            site.app
+                .config
+                .data_dir
+                .join("media")
+                .join(format!("{retained}.png"))
+                .exists()
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM media")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 2);
+        let unexpected = site
+            .app
+            .config
+            .data_dir
+            .join("media")
+            .join("owner-notes.txt");
+        tokio::fs::write(&unexpected, b"must retain").await.unwrap();
+        assert!(
+            wpalt::operations::cleanup::preview(&site.app)
+                .await
+                .is_err()
+        );
+        assert_eq!(tokio::fs::read(unexpected).await.unwrap(), b"must retain");
+        site.close().await;
+    }
+}

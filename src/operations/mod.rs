@@ -1,6 +1,7 @@
 //! Owner-operated recovery and maintenance. No network service is required.
 pub mod audit;
 pub mod cache;
+pub mod cleanup;
 pub mod encryption;
 pub mod factor;
 pub mod incremental;

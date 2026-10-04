@@ -1338,6 +1338,38 @@
         "affected release"
       ],
       "status": "implementation-reviewed; real-engine-test-pending"
+    },
+    {
+      "feature_id": "M7-CLEANUP",
+      "area": "Reference-aware media and expired-session cleanup",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.sqlite.org/lang_transaction.html",
+        "https://www.postgresql.org/docs/17/sql-delete.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 10",
+        "SQLite transactional DELETE",
+        "PostgreSQL 17 transactional DELETE"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Bound scans and preserve draft/live/historical module references. Recheck candidate set under the owning process mutation lock. Commit library removal before unlink so interruption leaves retryable unserved orphans. Unknown files and symlinks fail closed."
+      ],
+      "tests": [
+        "cleanup_preserves_references_and_rejects_stale_or_unsafe_plans",
+        "operations browser cleanup preview/result at 320/768/1440"
+      ],
+      "triggers": [
+        "new persisted module or reference format",
+        "schema/storage/engine change",
+        "release or relevant security guidance"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

@@ -72,6 +72,13 @@ enum Command {
         #[arg(long, default_value = "")]
         after_attachment: String,
     },
+    /// Preview unused media and expired sessions; deletion requires the exact recent plan.
+    Cleanup {
+        #[arg(long)]
+        execute: Option<String>,
+        #[arg(long)]
+        cutoff: Option<i64>,
+    },
     /// Validate a full recovery graph without restoring it.
     RecoveryInspect {
         input: PathBuf,
@@ -702,6 +709,9 @@ async fn main() -> anyhow::Result<()> {
         Command::RecoveryRun => Some("cli:recovery-run"),
         Command::UpgradePrepare { .. } => Some("cli:upgrade-prepare"),
         Command::RecoveryPrune { .. } => Some("cli:recovery-prune"),
+        Command::Cleanup {
+            execute: Some(_), ..
+        } => Some("cli:cleanup"),
         Command::AuthReset { .. } => Some("cli:auth-reset"),
         Command::Restore { .. } => Some("cli:restore"),
         Command::UserAdd { .. } => Some("cli:user-add"),
@@ -822,6 +832,22 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             println!(
                 "Local authenticators and sessions cleared. Password sign-in remains required."
             );
+        }
+        Command::Cleanup { execute, cutoff } => {
+            if let Some(hash) = execute {
+                let cutoff = cutoff
+                    .ok_or_else(|| anyhow::anyhow!("--execute requires the preview --cutoff"))?;
+                let result = wpalt::operations::cleanup::execute(&app, &hash, cutoff)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e.1))?;
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                anyhow::ensure!(cutoff.is_none(), "--cutoff is only used with --execute");
+                let plan = wpalt::operations::cleanup::preview(&app)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e.1))?;
+                println!("{}", serde_json::to_string_pretty(&plan)?);
+            }
         }
         Command::IntegrityScan {
             after_image,

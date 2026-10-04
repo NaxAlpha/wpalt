@@ -34,7 +34,7 @@ module.exports = async (owner, origin, output, password) => {
     await page.locator('form[action="/admin/media"]').getByLabel("Visibility",{exact:true}).selectOption("private");
     await page.locator('form[action="/admin/media"]').getByLabel("Alternative text",{exact:true}).fill("Native AVIF fixture");
     await Promise.all([page.waitForNavigation(),page.getByRole("button",{name:"Upload image",exact:true}).click()]);
-    const source=await page.locator(".media-card").first().locator("img").getAttribute("src");
+    const source=await page.locator(".media-card").filter({has:page.locator('input[name="alt"][value="Native AVIF fixture"]')}).locator("img").getAttribute("src");
     const avif=await page.evaluate(async source=>{ const image=new Image();image.src=source+"/resize/320/avif";await image.decode();return {width:image.naturalWidth,height:image.naturalHeight}; },source);
     assert(avif.width>0 && avif.height>0,"browser decodes native AVIF");
     const anonymous=await owner.browser().newContext();
@@ -46,6 +46,15 @@ module.exports = async (owner, origin, output, password) => {
     await Promise.all([page.waitForNavigation(),page.getByRole("button",{name:"Inspect stored-file integrity",exact:true}).click()]);
     await page.getByRole("heading",{name:"Stored-file inspection",exact:true}).waitFor();
     await measure("integrity");
+    await page.goto(origin+"/admin/operations");
+    await Promise.all([page.waitForNavigation(),page.getByRole("button",{name:"Preview unused media cleanup",exact:true}).click()]);
+    await page.getByRole("heading",{name:"Cleanup preview",exact:true}).waitFor();
+    await measure("cleanup-preview");
+    await Promise.all([page.waitForNavigation(),page.getByRole("button",{name:"Permanently remove listed files and expired sessions",exact:true}).click()]);
+    await page.getByRole("heading",{name:"Cleanup result",exact:true}).waitFor();
+    await measure("cleanup-result");
+    assert.equal((await owner.request.get(origin+source)).status(),404,"unreferenced source is no longer served");
+    report.journey.push("Owner inspects reference-aware cleanup and removes unused media");
     await page.goto(origin+"/admin/operations/audit");
     await measure("audit");
     await page.goto(origin + "/account/security");

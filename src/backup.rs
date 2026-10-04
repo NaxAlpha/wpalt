@@ -27,7 +27,7 @@ pub async fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>> {
 }
 
 // Types and table names are an allowlist, never supplied by an archive.
-const TABLES: &[(&str, &[(&str, bool)])] = &[
+pub(crate) const TABLES: &[(&str, &[(&str, bool)])] = &[
     (
         "user_passkeys",
         &[

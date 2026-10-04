@@ -1294,9 +1294,15 @@
       "capability": "Unused-image and database cleanup",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Owner preview/execute and CLI: conservative current/draft/historical cross-module UUID references, stale candidate rejection, bounded inventory, expired session removal, interruption-safe metadata-first unlink with retryable orphan preview. External links cannot be detected; no automatic historical/financial data deletion or online database compaction.",
+      "evidence": [
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/operations_acceptance.cjs"
+      ]
     },
     {
       "id": "F081",

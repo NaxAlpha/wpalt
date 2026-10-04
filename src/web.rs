@@ -98,6 +98,8 @@ pub fn router(app: App) -> Router {
         .route("/admin/backup", post(download_backup))
         .route("/admin/recovery/run", post(run_recovery))
         .route("/admin/operations/integrity", post(integrity_scan))
+        .route("/admin/operations/cleanup", post(cleanup_preview))
+        .route("/admin/operations/cleanup/execute", post(cleanup_execute))
         .route("/admin/operations/cache/purge", post(cache_purge))
         .route("/admin/operations/cache/preload", post(cache_preload))
         .route("/admin/operations/audit", get(audit_history))
@@ -1849,6 +1851,67 @@ struct IntegrityInput {
     #[serde(default)]
     after_attachment: String,
 }
+#[derive(Deserialize)]
+struct CleanupInput {
+    csrf: String,
+    #[serde(default)]
+    hash: String,
+    #[serde(default)]
+    cutoff: i64,
+}
+async fn cleanup_preview(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<CleanupInput>,
+) -> Result<Response> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    auth::csrf(&s, &input.csrf)?;
+    let plan = crate::operations::cleanup::preview(&app).await?;
+    if !wants_html(&headers) {
+        return Ok(Json(plan).into_response());
+    }
+    Ok(html_page(
+        "Cleanup preview",
+        &app.db.settings().await?,
+        Some(&s),
+        html! {
+            (view::heading("Operations","Cleanup preview","Inspect unused media before permanent removal. Drafts, publications, revisions and module records retain referenced images."))
+            p { (plan.retained) " referenced files retained · " (plan.candidates.len()) " unused files · " (plan.expired_sessions) " expired sessions" }
+            p class="notice" {"Download a verified recovery copy first. Files linked only from external websites or unpublished files on your computer cannot be detected. This preview expires after ten minutes; any changed candidate set requires a new preview."}
+            ul {@for item in &plan.candidates {li {code {(item.filename)} " · " (item.bytes) " bytes · " (if item.registered {"library image"} else {"unregistered file / interrupted deletion"})}}}
+            form method="post" action="/admin/operations/cleanup/execute" {
+                (view::csrf(&s)) input type="hidden" name="hash" value=(plan.hash); input type="hidden" name="cutoff" value=(plan.cutoff);
+                button class="danger" {"Permanently remove listed files and expired sessions"}
+            }
+            p {a href="/admin/operations" {"Return to Operations"}}
+        },
+    ).into_response())
+}
+async fn cleanup_execute(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<CleanupInput>,
+) -> Result<Response> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    auth::csrf(&s, &input.csrf)?;
+    let result = crate::operations::cleanup::execute(&app, &input.hash, input.cutoff).await?;
+    if !wants_html(&headers) {
+        return Ok(Json(result).into_response());
+    }
+    Ok(html_page(
+        "Cleanup result",
+        &app.db.settings().await?,
+        Some(&s),
+        html! {
+            (view::heading("Operations","Cleanup result","Review completed removal and retryable storage failures."))
+            p {(result.removed_files) " files removed · " (result.removed_bytes) " bytes · " (result.removed_sessions) " expired sessions removed"}
+            @if !result.pending_files.is_empty() {p class="notice" {"Some files could not be unlinked. Their library entries have been removed; inspect storage permissions and preview again to retry."}ul {@for name in result.pending_files {li {code {(name)}}}}}
+            p {a href="/admin/operations" {"Return to Operations"}}
+        },
+    ).into_response())
+}
 async fn integrity_scan(
     State(app): State<App>,
     headers: HeaderMap,
@@ -1981,7 +2044,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
             section class="panel" {h2 {"Local submission guard"}p {(if app.config.spam.enabled {"Enabled"} else {"Disabled"}) " for public comments and forms."}p class="muted" {"When enabled, submissions need a short same-origin computation. Honeypots, link limits, moderation and existing rate limits work together. This does not identify humans or use shared reputation. Configure [spam] to adjust the policy."}}
             section class="panel" {h2 {"Stored-file integrity"}p {a href="/admin/operations/audit" {"Inspect privileged action history"}}
                 p {"Check database-recorded image and private attachment checksums without changing files. A bounded scan reports incomplete work; it does not certify malware-free content."}
-                form method="post" action="/admin/operations/integrity" {(view::csrf(&s))button class="secondary" {"Inspect stored-file integrity"}}
+                form method="post" action="/admin/operations/integrity" {(view::csrf(&s))button class="secondary" {"Inspect stored-file integrity"}} form method="post" action="/admin/operations/cleanup" {(view::csrf(&s))button class="secondary" {"Preview unused media cleanup"}}
             }
             details class="panel" {summary {"Effective configuration · secrets redacted"}pre class="inline-code" {(serde_json::to_string_pretty(&app.config.redacted()).unwrap())}}
         },
