@@ -161,13 +161,12 @@ async fn admin(
     let s = merchant(&app, &h).await?;
     cursor(&q)?;
     let settings = settings(&app).await?;
-    let products =
-        sqlx::query("SELECT * FROM shop_products WHERE ($1='' OR id>$1) ORDER BY id LIMIT 41")
-            .bind(if q.view == "all" { "" } else { &q.after })
-            .fetch_all(&app.db.pool)
-            .await?;
+    let products = sqlx::query("SELECT * FROM shop_products WHERE id>$1 ORDER BY id LIMIT 41")
+        .bind(if q.view == "all" { "" } else { &q.after })
+        .fetch_all(&app.db.pool)
+        .await?;
     let orders = if q.view == "all" {
-        sqlx::query("SELECT id,customer_name,payment_state,fulfillment,total_minor,currency,created_at FROM shop_orders WHERE ($1='' OR id>$1) ORDER BY id LIMIT 41").bind(&q.after).fetch_all(&app.db.pool).await?
+        sqlx::query("SELECT id,customer_name,payment_state,fulfillment,total_minor,currency,created_at FROM shop_orders WHERE id>$1 ORDER BY id LIMIT 41").bind(&q.after).fetch_all(&app.db.pool).await?
     } else {
         sqlx::query("SELECT id,customer_name,payment_state,fulfillment,total_minor,currency,created_at FROM shop_orders WHERE payment_state IN ('awaiting','needs_refund') OR fulfillment IN ('unfulfilled','cancel_requested') AND payment_state IN ('paid','partially_refunded') ORDER BY created_at,id LIMIT 41").fetch_all(&app.db.pool).await?
     };
@@ -175,7 +174,7 @@ async fn admin(
         .fetch_all(&app.db.pool)
         .await?;
     let variants=sqlx::query("SELECT v.id,p.title,v.title AS variant FROM shop_variants v JOIN shop_products p ON p.id=v.product_id WHERE p.kind='booking' AND p.published=1 AND v.active=1 ORDER BY v.id LIMIT 100").fetch_all(&app.db.pool).await?;
-    let slots=sqlx::query("SELECT s.*,r.title FROM shop_slots s JOIN shop_resources r ON r.id=s.resource_id WHERE s.ends_at>$1 AND (s.starts_at>$2 OR (s.starts_at=$2 AND s.id>$3)) ORDER BY s.starts_at,s.id LIMIT 41").bind(crate::now()).bind(q.calendar_start).bind(&q.calendar_after).fetch_all(&app.db.pool).await?;
+    let slots=sqlx::query("SELECT s.*,r.title FROM shop_slots s JOIN shop_resources r ON r.id=s.resource_id WHERE s.ends_at>$1 AND (s.starts_at,s.id)>($2,$3) ORDER BY s.starts_at,s.id LIMIT 41").bind(crate::now()).bind(q.calendar_start).bind(&q.calendar_after).fetch_all(&app.db.pool).await?;
     let discounts = sqlx::query("SELECT * FROM shop_discounts ORDER BY code LIMIT 100")
         .fetch_all(&app.db.pool)
         .await?;
@@ -373,7 +372,7 @@ async fn product_action(
 }
 async fn catalog(State(app): State<App>, Query(q): Query<Paging>) -> Result<Html<String>> {
     cursor(&q)?;
-    let products=sqlx::query("SELECT p.id,p.title,p.description,p.kind,(SELECT MIN(v.price_minor) FROM shop_variants v WHERE v.product_id=p.id AND v.active=1) AS price FROM shop_products p WHERE p.published=1 AND ($1='' OR p.id>$1) AND EXISTS(SELECT 1 FROM shop_variants v WHERE v.product_id=p.id AND v.active=1) ORDER BY p.id LIMIT 41").bind(&q.after).fetch_all(&app.db.pool).await?;
+    let products=sqlx::query("SELECT p.id,p.title,p.description,p.kind,(SELECT MIN(v.price_minor) FROM shop_variants v WHERE v.product_id=p.id AND v.active=1) AS price FROM shop_products p WHERE p.published=1 AND p.id>$1 AND EXISTS(SELECT 1 FROM shop_variants v WHERE v.product_id=p.id AND v.active=1) ORDER BY p.id LIMIT 41").bind(&q.after).fetch_all(&app.db.pool).await?;
     page(&app,None,"Store",html!{(view::heading("Your local store","Store","Thoughtfully selected products and reservations."))ul class="content-list"{@for p in products.iter().take(40){li{h2{a href=(format!("/shop/products/{}",p.get::<String,_>("id"))){(p.get::<String,_>("title"))}}p{(p.get::<String,_>("description"))}p{(p.get::<String,_>("kind"))"· from "(amount(p.get("price"),&app.config.commerce.currency))}}}@if products.len()>40{a href=(format!("/shop?after={}",products[39].get::<String,_>("id"))){"Next products"}}}}).await
 }
 async fn product(
@@ -401,7 +400,7 @@ async fn product(
     } else {
         0
     };
-    let slots=sqlx::query("SELECT s.*,r.title FROM shop_slots s JOIN shop_resources r ON r.id=s.resource_id JOIN shop_variants v ON v.id=s.variant_id WHERE v.product_id=$1 AND s.active=1 AND r.active=1 AND (r.staff_id='' OR EXISTS(SELECT 1 FROM users staff WHERE staff.id=r.staff_id AND staff.role IN ('admin','editor'))) AND s.starts_at>$2 AND s.capacity>s.held+s.booked AND (s.starts_at>$3 OR (s.starts_at=$3 AND s.id>$4)) ORDER BY s.starts_at,s.id LIMIT 41").bind(&id).bind(crate::now()).bind(q.calendar_start).bind(&q.calendar_after).fetch_all(&app.db.pool).await?;
+    let slots=sqlx::query("SELECT s.*,r.title FROM shop_slots s JOIN shop_resources r ON r.id=s.resource_id JOIN shop_variants v ON v.id=s.variant_id WHERE v.product_id=$1 AND s.active=1 AND r.active=1 AND (r.staff_id='' OR EXISTS(SELECT 1 FROM users staff WHERE staff.id=r.staff_id AND staff.role IN ('admin','editor'))) AND s.starts_at>$2 AND s.capacity>s.held+s.booked AND (s.starts_at,s.id)>($3,$4) ORDER BY s.starts_at,s.id LIMIT 41").bind(&id).bind(crate::now()).bind(q.calendar_start).bind(&q.calendar_after).fetch_all(&app.db.pool).await?;
     page(&app,None,&p.get::<String,_>("title"),html!{(view::heading("Store",&p.get::<String,_>("title"),&p.get::<String,_>("description")))a href="/shop"{"← Catalog"}@for v in &variants{section{h2{(v.get::<String,_>("title"))}p{(amount(v.get("price_minor"),&app.config.commerce.currency))@if !v.get::<String,_>("billing_interval").is_empty(){"/ "(v.get::<String,_>("billing_interval"))} @if v.get::<i64,_>("stock_total")>=0{"· "(v.get::<i64,_>("stock_total")-v.get::<i64,_>("held")-v.get::<i64,_>("sold"))"available"}}@if let Some(s)=&s{form method="post" action="/shop/cart"{(view::csrf(s))(hidden("variant_id",&v.get::<String,_>("id")))(hidden("version",&version.to_string()))@if p.get::<String,_>("kind")=="booking"{label{"Reservation time · UTC" select aria-label="Reservation time · UTC" name="slot_id" required{@for slot in slots.iter().take(40).filter(|slot|slot.get::<String,_>("variant_id")==v.get::<String,_>("id")){option value=(slot.get::<String,_>("id")){(slot.get::<String,_>("title"))"· "(billing::utc(slot.get("starts_at")))"UTC"}}}}} @else{(hidden("slot_id",""))}@if ["digital","membership"].contains(&p.get::<String,_>("kind").as_str()){(hidden("quantity","1"))} @else{label{"Quantity" input type="number" name="quantity" min="1" max="100" value="1";}}button{"Add to cart"}}} @else{a href="/login"{"Sign in to purchase"}}}} @if slots.len()>40 {a href=(format!("/shop/products/{}?calendar_start={}&calendar_after={}",id,slots[39].get::<i64,_>("starts_at"),slots[39].get::<String,_>("id"))) {"Next available times"}}}).await
 }
 async fn cart(
@@ -477,7 +476,7 @@ async fn my_orders(
 ) -> Result<Html<String>> {
     let s = session(&app, &h).await?;
     cursor(&q)?;
-    let rows=sqlx::query("SELECT id,total_minor,currency,payment_state,created_at FROM shop_orders WHERE user_id=$1 AND ($2='' OR id>$2) ORDER BY id LIMIT 41").bind(&s.user.id).bind(&q.after).fetch_all(&app.db.pool).await?;
+    let rows=sqlx::query("SELECT id,total_minor,currency,payment_state,created_at FROM shop_orders WHERE user_id=$1 AND id>$2 ORDER BY id LIMIT 41").bind(&s.user.id).bind(&q.after).fetch_all(&app.db.pool).await?;
     page(&app,None,"My orders",html!{(view::heading("Store","My orders","Your purchases, payment records and reservations."))ul class="content-list"{@for r in rows.iter().take(40){li{a href=(format!("/shop/orders/{}",r.get::<String,_>("id"))){(billing::utc(r.get("created_at")))"UTC · "(amount(r.get("total_minor"),&r.get::<String,_>("currency")))}"· "(r.get::<String,_>("payment_state"))}}}@if rows.len()>40{a href=(format!("/shop/orders?after={}",rows[39].get::<String,_>("id"))){"Next orders"}}}).await
 }
 async fn admin_order(
@@ -601,7 +600,7 @@ async fn subscriptions(
 ) -> Result<Html<String>> {
     let s = session(&app, &h).await?;
     cursor(&q)?;
-    let subs=sqlx::query("SELECT s.*,p.title FROM shop_subscriptions s JOIN shop_variants v ON v.id=s.variant_id JOIN shop_products p ON p.id=v.product_id WHERE s.user_id=$1 AND ($2='' OR s.id>$2) ORDER BY s.id LIMIT 41").bind(&s.user.id).bind(&q.after).fetch_all(&app.db.pool).await?;
+    let subs=sqlx::query("SELECT s.*,p.title FROM shop_subscriptions s JOIN shop_variants v ON v.id=s.variant_id JOIN shop_products p ON p.id=v.product_id WHERE s.user_id=$1 AND s.id>$2 ORDER BY s.id LIMIT 41").bind(&s.user.id).bind(&q.after).fetch_all(&app.db.pool).await?;
     let plans=sqlx::query("SELECT v.id,v.title,p.title AS product,p.entitlement,v.billing_interval,v.price_minor FROM shop_variants v JOIN shop_products p ON p.id=v.product_id WHERE p.kind='membership' AND p.published=1 AND v.active=1 AND v.member_price_minor=-1 AND v.billing_interval<>'' ORDER BY v.id LIMIT 100").fetch_all(&app.db.pool).await?;
     page(&app,None,"Subscriptions",html!{(view::heading("Store","My subscriptions","Access follows settled billing periods. Cancelling preserves the current paid period."))ul class="content-list"{@for sub in subs.iter().take(40){li{h2{(sub.get::<String,_>("title"))}p{(amount(sub.get("price_minor"),&app.config.commerce.currency))"/ "(sub.get::<String,_>("billing_interval"))"· "(sub.get::<String,_>("state"))}p{"Paid period ends "(billing::utc(sub.get("period_end")))"UTC"}@if ["active","past_due","pending"].contains(&sub.get::<String,_>("state").as_str()){form method="post" action=(format!("/shop/subscriptions/{}",sub.get::<String,_>("id"))){(view::csrf(&s))(hidden("action","cancel"))(hidden("version",&sub.get::<i64,_>("version").to_string()))button class="quiet"{"Cancel future billing"}}}@if sub.get::<String,_>("state")=="active"&&sub.get::<String,_>("provider")=="offline"{details{summary{"Change plan"}form method="post" action=(format!("/shop/subscriptions/{}",sub.get::<String,_>("id"))){(view::csrf(&s))(hidden("action","change"))(hidden("version",&sub.get::<i64,_>("version").to_string()))label {"New plan" select aria-label="New plan" name="variant_id" required {@for plan in plans.iter().filter(|p|p.get::<String,_>("entitlement")==sub.get::<String,_>("entitlement") && p.get::<String,_>("billing_interval")==sub.get::<String,_>("billing_interval") && p.get::<i64,_>("price_minor")!=sub.get::<i64,_>("price_minor")) {option value=(plan.get::<String,_>("id")) {(plan.get::<String,_>("product")) " · " (plan.get::<String,_>("title")) " · " (amount(plan.get("price_minor"),&app.config.commerce.currency))}}}}p{"Same access key and interval. Upgrades require a prorated payment; downgrades apply next period."}button{"Review plan change"}}}}}}}@if subs.len()>40{a href=(format!("/shop/subscriptions?after={}",subs[39].get::<String,_>("id"))){"Next subscriptions"}}}).await
 }

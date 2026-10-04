@@ -45,3 +45,4 @@ CREATE INDEX IF NOT EXISTS shop_resource_staff ON shop_resources(staff_id,id);
 CREATE INDEX IF NOT EXISTS shop_subscription_provider_due ON shop_subscriptions(provider,state,period_end,id);
 
 CREATE INDEX IF NOT EXISTS shop_provider_cancel_due ON shop_subscriptions(provider_cancel_pending,provider_cancel_at,id);
+CREATE INDEX IF NOT EXISTS shop_calendar_cursor ON shop_slots(starts_at,id);
