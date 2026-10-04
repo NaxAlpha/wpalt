@@ -2666,6 +2666,7 @@ async fn encrypted_recovery_survives_original_loss_and_reports_failed_independen
         let mut config = (*original.app.config).clone();
         config.recovery = recovery::Config {
             enabled: true,
+            incremental: false,
             key_file: key_path,
             destinations: vec![independent.path().to_owned()],
             interval_seconds: 60,
@@ -2785,6 +2786,28 @@ async fn anonymous_cache_never_reuses_sessions_and_invalidates_published_access_
             .unwrap()
             .contains("cached-public-story")
         );
+        let public_page = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/cached-public-story")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(public_page.headers()["x-wpalt-cache"], "miss");
+        let page_hit = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/cached-public-story")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(page_hit.headers()["x-wpalt-cache"], "hit");
         let second = router.clone().oneshot(request()).await.unwrap();
         assert_eq!(second.headers()["x-wpalt-cache"], "hit");
         let cookie = router
@@ -3086,4 +3109,275 @@ async fn privileged_audit_records_attempt_and_outcome_without_passwords_or_capab
         1
     );
     site.close().await;
+}
+
+#[tokio::test]
+async fn local_authenticator_requires_proof_rejects_replay_and_restores_with_one_use_recovery() {
+    use wpalt::operations::factor;
+    // RFC 4226 counter vectors establish interoperable HMAC-SHA1 truncation.
+    assert_eq!(factor::code(b"12345678901234567890", 0), "755224");
+    assert_eq!(factor::code(b"12345678901234567890", 1), "287082");
+    for pg in engines() {
+        let source = Site::new(pg, true).await;
+        let uri = factor::begin(&source.app, source.session(), PASSWORD)
+            .await
+            .unwrap();
+        assert!(uri.starts_with("otpauth://totp/wpalt:"));
+        let pending: String = sqlx::query_scalar("SELECT pending FROM user_factors")
+            .fetch_one(&source.app.db.pool)
+            .await
+            .unwrap();
+        let key = hex::decode(pending).unwrap();
+        let code = factor::code(&key, wpalt::now() / 30);
+        let recovery = factor::confirm(&source.app, source.session(), &code)
+            .await
+            .unwrap();
+        assert_eq!(recovery.len(), 8);
+        assert!(
+            auth::login(&source.app, "owner@example.test", PASSWORD)
+                .await
+                .is_err()
+        );
+        assert!(
+            auth::login_with_code(&source.app, "owner@example.test", PASSWORD, &code)
+                .await
+                .is_err(),
+            "enrollment proof cannot be reused"
+        );
+        assert!(
+            auth::login_with_code(&source.app, "owner@example.test", PASSWORD, &recovery[0])
+                .await
+                .is_ok()
+        );
+        assert!(
+            auth::login_with_code(&source.app, "owner@example.test", PASSWORD, &recovery[0])
+                .await
+                .is_err()
+        );
+        let (first, second) = tokio::join!(
+            auth::login_with_code(&source.app, "owner@example.test", PASSWORD, &recovery[3]),
+            auth::login_with_code(&source.app, "owner@example.test", PASSWORD, &recovery[3])
+        );
+        assert_eq!(
+            usize::from(first.is_ok()) + usize::from(second.is_ok()),
+            1,
+            "only one concurrent recovery-code login may commit"
+        );
+        let snapshot = backup::capture(&source.app).await.unwrap();
+        let fresh = Site::new(pg, false).await;
+        backup::restore(&fresh.app, &snapshot).await.unwrap();
+        assert!(
+            auth::login(&fresh.app, "owner@example.test", PASSWORD)
+                .await
+                .is_err()
+        );
+        assert!(
+            auth::login_with_code(&fresh.app, "owner@example.test", PASSWORD, &recovery[0])
+                .await
+                .is_err()
+        );
+        let (_, session) =
+            auth::login_with_code(&fresh.app, "owner@example.test", PASSWORD, &recovery[1])
+                .await
+                .unwrap();
+        factor::disable(&fresh.app, &session, PASSWORD, &recovery[2])
+            .await
+            .unwrap();
+        assert!(
+            auth::login(&fresh.app, "owner@example.test", PASSWORD)
+                .await
+                .is_ok()
+        );
+        source.close().await;
+        fresh.close().await;
+    }
+}
+
+#[tokio::test]
+async fn incremental_recovery_reuses_authenticated_chunks_and_rejects_incomplete_independent_sets()
+{
+    use wpalt::operations::{encryption, incremental};
+    let directory = tempfile::tempdir().unwrap();
+    let key = encryption::generate_key();
+    let mut source = vec![0u8; 200_000];
+    for (i, b) in source.iter_mut().enumerate() {
+        *b = (i % 251) as u8;
+    }
+    let manifest = incremental::write(directory.path(), &key, &source)
+        .await
+        .unwrap();
+    let count = std::fs::read_dir(directory.path().join("wpalt-objects"))
+        .unwrap()
+        .count();
+    let repeat = incremental::write(directory.path(), &key, &source)
+        .await
+        .unwrap();
+    assert_eq!(manifest, repeat);
+    assert_eq!(
+        std::fs::read_dir(directory.path().join("wpalt-objects"))
+            .unwrap()
+            .count(),
+        count
+    );
+    assert_eq!(
+        incremental::assemble(directory.path(), &key, &manifest, source.len())
+            .await
+            .unwrap(),
+        source
+    );
+    let path = std::fs::read_dir(directory.path().join("wpalt-objects"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    std::fs::remove_file(path).unwrap();
+    assert!(
+        incremental::assemble(directory.path(), &key, &manifest, source.len())
+            .await
+            .is_err()
+    );
+    assert!(
+        incremental::assemble(directory.path(), &key, &manifest, 1)
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn migration_and_incremental_restore_preserve_owned_graph_before_any_target_writes() {
+    use wpalt::operations::{encryption, incremental};
+    for pg in engines() {
+        let original = Site::new(pg, true).await;
+        content::save(
+            &original.app,
+            original.session(),
+            None,
+            input("incremental-owned-story", "publish"),
+        )
+        .await
+        .unwrap();
+        let current = backup::capture(&original.app).await.unwrap();
+        let mut old: serde_json::Value = serde_json::from_slice(&current).unwrap();
+        let mut payload: serde_json::Value =
+            serde_json::from_str(old["payload"].as_str().unwrap()).unwrap();
+        payload["schema"] = serde_json::json!(9);
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("user_factors");
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("user_passkeys");
+        let raw = serde_json::to_string(&payload).unwrap();
+        old["payload"] = serde_json::json!(raw);
+        old["sha256"] = serde_json::json!(auth::digest(raw.as_bytes()));
+        old["format"] = serde_json::json!("wpalt-backup-v8");
+        let legacy = serde_json::to_vec(&old).unwrap();
+        assert!(
+            backup::inspect(&original.app.config, &legacy).is_err(),
+            "ordinary recovery does not carry old runtime formats"
+        );
+        let migrated = backup::migrate_m6(&original.app.config, &legacy).unwrap();
+        assert_eq!(
+            backup::inspect(&original.app.config, &migrated).unwrap()["schema"],
+            10
+        );
+        let destination = tempfile::tempdir().unwrap();
+        let key = encryption::generate_key();
+        let manifest = incremental::write(destination.path(), &key, &migrated)
+            .await
+            .unwrap();
+        let encrypted = encryption::seal(&key, &manifest).unwrap();
+        // Lose the source; no parent snapshots or original DB are consulted.
+        original.close().await;
+        let fresh = Site::new(pg, false).await;
+        let manifest =
+            encryption::open(&key, &encrypted, fresh.app.config.max_backup_bytes).unwrap();
+        let decoded = incremental::assemble(
+            destination.path(),
+            &key,
+            &manifest,
+            fresh.app.config.max_backup_bytes,
+        )
+        .await
+        .unwrap();
+        backup::restore(&fresh.app, &decoded).await.unwrap();
+        assert!(
+            auth::login(&fresh.app, "owner@example.test", PASSWORD)
+                .await
+                .is_ok()
+        );
+        assert_eq!(
+            get(&fresh.app, "/incremental-owned-story", None).await.0,
+            StatusCode::OK
+        );
+        assert!(
+            backup::restore(&fresh.app, &decoded).await.is_err(),
+            "selective tools never overwrite a live graph"
+        );
+        fresh.close().await;
+    }
+}
+
+#[tokio::test]
+async fn recovery_cleanup_requires_current_preview_and_preserves_every_retained_point() {
+    use wpalt::operations::{encryption, incremental};
+    let dir = tempfile::tempdir().unwrap();
+    let key = encryption::generate_key();
+    let keep = vec![7u8; 90_000];
+    let discarded = vec![9u8; 90_000];
+    let manifest = incremental::write(dir.path(), &key, &keep).await.unwrap();
+    incremental::write(dir.path(), &key, &discarded)
+        .await
+        .unwrap();
+    let point = dir.path().join("wpalt-retained.wpbackup");
+    backup::write_private(&point, &encryption::seal(&key, &manifest).unwrap()).unwrap();
+    let preview = incremental::cleanup(dir.path(), &key, 1024 * 1024, None)
+        .await
+        .unwrap();
+    assert!(preview.unused_objects > 0);
+    assert!(!preview.deleted);
+    assert!(
+        incremental::cleanup(dir.path(), &key, 1024 * 1024, Some("stale-plan"))
+            .await
+            .is_err()
+    );
+    let deleted = incremental::cleanup(dir.path(), &key, 1024 * 1024, Some(&preview.plan))
+        .await
+        .unwrap();
+    assert!(deleted.deleted);
+    assert_eq!(
+        incremental::assemble(dir.path(), &key, &manifest, 1024 * 1024)
+            .await
+            .unwrap(),
+        keep
+    );
+    assert_eq!(
+        incremental::cleanup(dir.path(), &key, 1024 * 1024, None)
+            .await
+            .unwrap()
+            .unused_objects,
+        0
+    );
+    incremental::write(dir.path(), &key, &discarded)
+        .await
+        .unwrap();
+    let before = std::fs::read_dir(dir.path().join("wpalt-objects"))
+        .unwrap()
+        .count();
+    std::fs::write(&point, b"damaged recovery point").unwrap();
+    assert!(
+        incremental::cleanup(dir.path(), &key, 1024 * 1024, Some(&preview.plan))
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        std::fs::read_dir(dir.path().join("wpalt-objects"))
+            .unwrap()
+            .count(),
+        before,
+        "corrupt retained point stops deletion"
+    );
 }

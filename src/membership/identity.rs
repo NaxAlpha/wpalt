@@ -337,6 +337,16 @@ pub async fn identity_session(app: &App, issuer: &str, subject: &str) -> Result<
         csrf: auth::random_token(),
         hash: auth::digest(token.as_bytes()),
     };
+    let factor: Option<String> =
+        sqlx::query_scalar("SELECT secret FROM user_factors WHERE user_id=$1")
+            .bind(&session.user.id)
+            .fetch_optional(&app.db.pool)
+            .await?;
+    if factor.is_some_and(|s| !s.is_empty()) {
+        return Err(Error::invalid(
+            "This account requires local authenticator sign-in; use password and code.",
+        ));
+    }
     sqlx::query("INSERT INTO sessions(token_hash,user_id,csrf,expires_at) VALUES($1,$2,$3,$4)")
         .bind(&session.hash)
         .bind(&session.user.id)

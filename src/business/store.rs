@@ -159,19 +159,13 @@ pub async fn submit(app: &App, id: &str, version: i64, key: &str, input: &Value)
     }
     let entry = uuid::Uuid::new_v4().to_string();
     for field in &definition.form.fields {
-        if matches!(field.widget, Some(super::forms::Widget::Upload)) {
-            if let Some(capability) = values.get(&field.name).and_then(Value::as_str) {
-                let attachment = super::attachments::attach(
-                    &mut tx,
-                    id,
-                    version,
-                    &field.name,
-                    capability,
-                    &entry,
-                )
-                .await?;
-                values[&field.name] = Value::String(attachment);
-            }
+        if matches!(field.widget, Some(super::forms::Widget::Upload))
+            && let Some(capability) = values.get(&field.name).and_then(Value::as_str)
+        {
+            let attachment =
+                super::attachments::attach(&mut tx, id, version, &field.name, capability, &entry)
+                    .await?;
+            values[&field.name] = Value::String(attachment);
         }
     }
     super::quotas::reserve(app, &mut tx, "entries", 1, values.to_string().len() as i64).await?;

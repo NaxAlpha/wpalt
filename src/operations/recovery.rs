@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub enabled: bool,
+    pub incremental: bool,
     pub key_file: PathBuf,
     /// Existing owner-managed directories. A mounted NAS/secondary disk can be used;
     /// configuration alone cannot prove that it is physically independent.
@@ -70,7 +71,7 @@ pub async fn status(app: &App) -> Result<Status> {
 
 // Private write, fsync and atomic rename. Temp files never look like completed
 // packages. A crash after rename leaves a complete package, not half ciphertext.
-fn publish(path: &Path, bytes: &[u8], replace: bool) -> anyhow::Result<()> {
+pub(crate) fn publish(path: &Path, bytes: &[u8], replace: bool) -> anyhow::Result<()> {
     let parent = path
         .parent()
         .ok_or_else(|| anyhow::anyhow!("missing destination"))?;
@@ -187,7 +188,12 @@ pub async fn run(app: &App) -> Result<Status> {
                 ));
             }
             let path = destination.join(&state.package);
-            let bytes = encoded.clone();
+            let bytes = if config.incremental {
+                let manifest = super::incremental::write(&destination, &key, &plaintext).await?;
+                encryption::seal(&key, &manifest)?
+            } else {
+                encoded.clone()
+            };
             let output = path.clone();
             tokio::task::spawn_blocking(move || publish(&output, &bytes, false))
                 .await
@@ -196,7 +202,19 @@ pub async fn run(app: &App) -> Result<Status> {
             let stored =
                 backup::read_bounded(&path, app.config.max_backup_bytes + encryption::OVERHEAD)
                     .await?;
-            if encryption::open(&key, &stored, app.config.max_backup_bytes)? != plaintext {
+            let decrypted = encryption::open(&key, &stored, app.config.max_backup_bytes)?;
+            let checked = if super::incremental::is_manifest(&decrypted) {
+                super::incremental::assemble(
+                    &destination,
+                    &key,
+                    &decrypted,
+                    app.config.max_backup_bytes,
+                )
+                .await?
+            } else {
+                decrypted
+            };
+            if checked != plaintext {
                 return Err(Error::invalid("Stored backup verification failed."));
             }
             retain(

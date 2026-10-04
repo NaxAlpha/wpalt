@@ -36,6 +36,28 @@ pub fn router(app: App) -> Router {
         .route("/search", get(home))
         .route("/health", get(health))
         .route("/account", get(account))
+        .route(
+            "/account/passkeys/start",
+            post(passkey_register_start).layer(DefaultBodyLimit::max(128 * 1024)),
+        )
+        .route(
+            "/account/passkeys/finish",
+            post(passkey_register_finish).layer(DefaultBodyLimit::max(128 * 1024)),
+        )
+        .route("/account/passkeys/remove", post(passkey_remove))
+        .route(
+            "/passkeys/login/start",
+            post(passkey_login_start).layer(DefaultBodyLimit::max(128 * 1024)),
+        )
+        .route(
+            "/passkeys/login/finish",
+            post(passkey_login_finish).layer(DefaultBodyLimit::max(128 * 1024)),
+        )
+        .route("/assets/auth.js", get(auth_js))
+        .route("/account/security", get(factor_page))
+        .route("/account/security/begin", post(factor_begin))
+        .route("/account/security/confirm", post(factor_confirm))
+        .route("/account/security/disable", post(factor_disable))
         .route("/login", get(login_page).post(login))
         .route("/logout", post(logout))
         .route("/feed.xml", get(feed))
@@ -66,6 +88,7 @@ pub fn router(app: App) -> Router {
         .route("/admin/backup", post(download_backup))
         .route("/admin/recovery/run", post(run_recovery))
         .route("/admin/operations/integrity", post(integrity_scan))
+        .route("/admin/operations/cache/purge", post(cache_purge))
         .route("/admin/operations/audit", get(audit_history))
         .route("/admin/export", get(export_content))
         .route("/api/content", get(public_api))
@@ -107,7 +130,10 @@ async fn security_and_trace(
     let span = tracing::info_span!("request",request_id=%id,method=%method,route=%route);
     let privileged_write = method != axum::http::Method::GET
         && method != axum::http::Method::HEAD
-        && (route.starts_with("/admin") || route.starts_with("/api/admin"));
+        && (route.starts_with("/admin")
+            || route.starts_with("/api/admin")
+            || route.starts_with("/account/security")
+            || route.starts_with("/account/passkeys"));
     let permit = app.request_work.clone().try_acquire_owned();
     let protection = app
         .protection_limits
@@ -184,6 +210,9 @@ async fn security_and_trace(
                     | "/sitemap-index.xml"
                     | "/{locale}/"
                     | "/{locale}/search"
+                    | "/{slug}"
+                    | "/{locale}/{slug}"
+                    | "/api/content"
             )
             && request.uri().to_string().len() <= 2048;
         if candidate {
@@ -279,7 +308,8 @@ async fn security_and_trace(
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
         || route == "/login"
-        || route == "/account"
+        || route.starts_with("/account")
+        || route.starts_with("/passkeys")
         || route.starts_with("/members")
         || route.starts_with("/api/members")
         || route.starts_with("/shop")
@@ -338,7 +368,8 @@ async fn security_and_trace(
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
         || route == "/login"
-        || route == "/account"
+        || route.starts_with("/account")
+        || route.starts_with("/passkeys")
         || route.starts_with("/members")
         || route.starts_with("/api/members")
         || route.starts_with("/shop")
@@ -470,9 +501,12 @@ async fn login_page(State(app): State<App>, headers: HeaderMap) -> Result<Respon
 struct Login {
     email: String,
     password: String,
+    #[serde(default)]
+    code: String,
 }
 async fn login(State(app): State<App>, Form(input): Form<Login>) -> Result<Response> {
-    let (token, session) = auth::login(&app, &input.email, &input.password).await?;
+    let (token, session) =
+        auth::login_with_code(&app, &input.email, &input.password, &input.code).await?;
     let mut response = Redirect::to(if session.user.role == "subscriber" {
         "/account"
     } else {
@@ -494,7 +528,7 @@ async fn logout(
     headers: HeaderMap,
     Form(input): Form<Csrf>,
 ) -> Result<Response> {
-    let s = admin_session(&app, &headers).await?;
+    let s = auth::session(&app, &headers).await?;
     auth::csrf(&s, &input.csrf)?;
     let _guard = app.mutation().await;
     sqlx::query("DELETE FROM sessions WHERE token_hash=$1")
@@ -821,6 +855,9 @@ async fn render_post(
     )?)
     .into_response();
     if protected > 0 {
+        response
+            .headers_mut()
+            .insert("cache-control", HeaderValue::from_static("no-store"));
         response.headers_mut().insert(
             "x-robots-tag",
             HeaderValue::from_static("noindex, nofollow"),
@@ -1708,6 +1745,18 @@ async fn integrity_scan(
     auth::csrf(&session, &input.csrf)?;
     Ok(Json(crate::operations::integrity::scan(&app).await?))
 }
+async fn cache_purge(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<Csrf>,
+) -> Result<Redirect> {
+    let session = admin_session(&app, &headers).await?;
+    admin(&session)?;
+    auth::csrf(&session, &input.csrf)?;
+    let _guard = app.mutation().await;
+    app.page_cache.lock().await.clear();
+    Ok(Redirect::to("/admin/operations"))
+}
 async fn run_recovery(
     State(app): State<App>,
     headers: HeaderMap,
@@ -1723,6 +1772,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
     let s = admin_session(&app, &headers).await?;
     admin(&s)?;
     let recovery = crate::operations::recovery::status(&app).await?;
+    let cache = app.page_cache.lock().await.statistics();
     Ok(html_page(
         "Operations",
         &app.db.settings().await?,
@@ -1747,6 +1797,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
                 }
                 p class="muted" {"Keep the recovery key separately. Verify an independent copy by restoring into a fresh instance. A pending attempt after restart may have been interrupted; inspect destination packages before retrying."}
             }
+            section class="panel" {h2 {"Public response cache"}p {(if app.config.cache.enabled {"Enabled"}else{"Disabled"}) " · " (cache.0) " entries · " (cache.1) " bytes retained"}p {"Anonymous publications, listings, content projections and sitemaps only. Cookies, credentials and protected resources bypass shared storage. Browser page caching remains disabled so access changes take effect."}form method="post" action="/admin/operations/cache/purge" {(view::csrf(&s))button class="secondary" {"Purge public cache"}}}
             section class="panel" {h2 {"Stored-file integrity"}p {a href="/admin/operations/audit" {"Inspect privileged action history"}}
                 p {"Check database-recorded image and private attachment checksums without changing files. A bounded scan reports incomplete work; it does not certify malware-free content."}
                 form method="post" action="/admin/operations/integrity" {(view::csrf(&s))button class="secondary" {"Inspect stored-file integrity"}}
@@ -1840,9 +1891,224 @@ async fn update_user(
     Ok(Redirect::to("/admin/users"))
 }
 
+#[derive(Deserialize)]
+struct FactorInput {
+    csrf: String,
+    #[serde(default)]
+    password: String,
+    #[serde(default)]
+    code: String,
+}
+#[derive(Deserialize)]
+struct PasskeyStart {
+    #[serde(default)]
+    csrf: String,
+    #[serde(default)]
+    password: String,
+    #[serde(default)]
+    code: String,
+    #[serde(default)]
+    email: String,
+}
+#[derive(Deserialize)]
+struct PasskeyRegistrationInput {
+    csrf: String,
+    id: String,
+    credential: webauthn_rs::prelude::RegisterPublicKeyCredential,
+}
+#[derive(Deserialize)]
+struct PasskeyRemove {
+    csrf: String,
+    credential_id: String,
+    password: String,
+    #[serde(default)]
+    code: String,
+}
+async fn passkey_register_start(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Json(input): Json<PasskeyStart>,
+) -> Result<Json<crate::operations::passkeys::Challenge>> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    Ok(Json(
+        crate::operations::passkeys::register_start(&app, &s, &input.password, &input.code).await?,
+    ))
+}
+async fn passkey_register_finish(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Json(input): Json<PasskeyRegistrationInput>,
+) -> Result<Json<serde_json::Value>> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    crate::operations::passkeys::register_finish(
+        &app,
+        &s,
+        crate::operations::passkeys::Registration {
+            id: input.id,
+            credential: input.credential,
+        },
+    )
+    .await?;
+    Ok(Json(serde_json::json!({"redirect":"/account/security"})))
+}
+async fn passkey_login_start(
+    State(app): State<App>,
+    Json(input): Json<PasskeyStart>,
+) -> Result<Json<crate::operations::passkeys::Challenge>> {
+    Ok(Json(
+        crate::operations::passkeys::authenticate_start(&app, &input.email).await?,
+    ))
+}
+async fn passkey_login_finish(
+    State(app): State<App>,
+    Json(input): Json<crate::operations::passkeys::Authentication>,
+) -> Result<Response> {
+    let (token, s) = crate::operations::passkeys::authenticate_finish(&app, input).await?;
+    let mut response = Json(
+        serde_json::json!({"redirect":if s.user.role=="subscriber"{"/account"}else{"/admin"}}),
+    )
+    .into_response();
+    response.headers_mut().insert(
+        "set-cookie",
+        HeaderValue::from_str(&auth::cookie(&app, &token)).unwrap(),
+    );
+    Ok(response)
+}
+async fn passkey_remove(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<PasskeyRemove>,
+) -> Result<Redirect> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    let hash =
+        crate::operations::factor::authorize_change(&app, &s, &input.password, &input.code).await?;
+    let _guard = app.mutation().await;
+    crate::operations::factor::current_credential(&app, &s, &hash).await?;
+    let mut tx = app.db.pool.begin().await?;
+    if sqlx::query("DELETE FROM user_passkeys WHERE credential_id=$1 AND user_id=$2")
+        .bind(input.credential_id)
+        .bind(&s.user.id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected()
+        != 1
+    {
+        return Err(Error::not_found());
+    }
+    sqlx::query("DELETE FROM sessions WHERE user_id=$1 AND token_hash<>$2")
+        .bind(&s.user.id)
+        .bind(&s.hash)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(Redirect::to("/account/security"))
+}
+async fn auth_js() -> impl IntoResponse {
+    (
+        [
+            ("content-type", "text/javascript; charset=utf-8"),
+            ("cache-control", "no-cache"),
+        ],
+        include_str!("../assets/generated/auth.js"),
+    )
+}
+fn security_page(title: &str, settings: &Settings, body: Markup) -> Html<String> {
+    Html(view::member_layout(title, settings, body))
+}
+async fn factor_page(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {
+    let session = auth::session(&app, &headers).await?;
+    let enabled: Option<String> =
+        sqlx::query_scalar("SELECT secret FROM user_factors WHERE user_id=$1")
+            .bind(&session.user.id)
+            .fetch_optional(&app.db.pool)
+            .await?;
+    let passkey_rows = sqlx::query(
+        "SELECT credential_id FROM user_passkeys WHERE user_id=$1 ORDER BY credential_id LIMIT 8",
+    )
+    .bind(&session.user.id)
+    .fetch_all(&app.db.pool)
+    .await?;
+    Ok(security_page(
+        "Account security",
+        &app.db.settings().await?,
+        html! {
+            (view::heading("Account","Account security","Protect local sign-in with an authenticator you control."))
+            @if enabled.is_some_and(|s|!s.is_empty()) {
+                p {"Authenticator enabled. Sign in with password plus a fresh six-digit code or one-use recovery code."}
+                form class="panel" method="post" action="/account/security/disable" {(view::csrf(&session))label {"Current password" input type="password" name="password" required autocomplete="current-password";}label {"Authenticator or recovery code" input name="code" required autocomplete="one-time-code" maxlength="24";}button class="secondary" {"Disable authenticator & revoke other sessions"}}
+            } @else {
+                form class="panel" method="post" action="/account/security/begin" {(view::csrf(&session))label {"Current password" input type="password" name="password" required autocomplete="current-password";}button {"Set up authenticator"}}
+            }
+            section class="panel" {h2 {"Passkeys"}p {"Register a device with user verification. Passkeys can sign in independently; no vendor account is required by wpalt."}
+            form data-passkey="register" {(view::csrf(&session))label {"Current password" input type="password" name="password" required autocomplete="current-password";}label {"Authenticator or recovery code · if enabled" input name="code" autocomplete="one-time-code" maxlength="24";}button {"Register a passkey"}p role="status" aria-live="polite" {}}
+            @for key in &passkey_rows {
+                form method="post" action="/account/passkeys/remove" {(view::csrf(&session))input type="hidden" name="credential_id" value=(key.get::<String,_>("credential_id"));p {"Registered passkey " (key.get::<String,_>("credential_id").chars().take(12).collect::<String>())}label {"Current password" input type="password" name="password" required autocomplete="current-password";}label {"Authenticator or recovery code · if enabled" input name="code" autocomplete="one-time-code" maxlength="24";}button class="secondary" {"Remove passkey & revoke sessions"}}
+            }
+        }
+        script defer src="/assets/auth.js" {}
+        p {a href="/account" {"Return to account"}}
+        },
+    ))
+}
+async fn factor_begin(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<FactorInput>,
+) -> Result<Html<String>> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    let origin = url::Url::parse(&app.config.base_url).map_err(|_| Error::forbidden())?;
+    if !app.config.secure_cookie()
+        && !matches!(origin.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"))
+    {
+        return Err(Error::invalid(
+            "Authenticator enrollment requires HTTPS outside localhost.",
+        ));
+    }
+    let uri = crate::operations::factor::begin(&app, &s, &input.password).await?;
+    Ok(security_page(
+        "Confirm authenticator",
+        &app.db.settings().await?,
+        html! {
+            h1 {"Confirm authenticator"}p {"Add this setup URI to your authenticator. Keep it private; it expires in ten minutes."}
+            pre class="inline-code" {(uri)}
+            form class="panel" method="post" action="/account/security/confirm" {(view::csrf(&s))label {"Six-digit code" input name="code" required inputmode="numeric" autocomplete="one-time-code" minlength="6" maxlength="6";}button {"Enable authenticator"}}
+        },
+    ))
+}
+async fn factor_confirm(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<FactorInput>,
+) -> Result<Html<String>> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    let codes = crate::operations::factor::confirm(&app, &s, &input.code).await?;
+    Ok(security_page(
+        "Recovery codes",
+        &app.db.settings().await?,
+        html! {
+            h1 {"Save recovery codes"}p {"Authenticator enabled. Each code works once. Keep these codes offline; they are shown only now."}
+            pre class="inline-code" {(codes.join("\n"))}p {a href="/account/security" {"Return to account security"}}
+        },
+    ))
+}
+async fn factor_disable(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<FactorInput>,
+) -> Result<Redirect> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    crate::operations::factor::disable(&app, &s, &input.password, &input.code).await?;
+    Ok(Redirect::to("/account/security"))
+}
 async fn account(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
     let s = auth::session(&app, &headers).await?;
-    Ok(html_page("Your account",&app.db.settings().await?,None,html!{h1 {"Your account"}p {"Signed in as " (&s.user.name)}p {"Role: " (&s.user.role)}p {"This subscriber account does not grant access to site administration."}@if app.config.membership_enabled {p {a href="/members" {"Open my learning and communities"}}}form method="post" action="/logout" {(view::csrf(&s))button {"Sign out"}}}).into_response())
+    Ok(html_page("Your account",&app.db.settings().await?,None,html!{h1 {"Your account"}p {"Signed in as " (&s.user.name)}p {"Role: " (&s.user.role)}p {a href="/account/security" {"Account security"}}p {"This subscriber account does not grant access to site administration."}@if app.config.membership_enabled {p {a href="/members" {"Open my learning and communities"}}}form method="post" action="/logout" {(view::csrf(&s))button {"Sign out"}}}).into_response())
 }
 
 async fn form_embed_js(State(app): State<App>) -> Result<Response> {

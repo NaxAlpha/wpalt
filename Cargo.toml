@@ -2,7 +2,7 @@
 name = "wpalt"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 description = "Owner-controlled Rust publishing CMS"
 publish = false
 
@@ -20,6 +20,8 @@ lettre = { version = "=0.11.23", default-features = false, features = ["builder"
 pulldown-cmark = "0.13"
 rand = "0.8"
 ring = "=0.17.14"
+webauthn-rs = "=0.5.5"
+openssl = { version = "0.10", features = ["vendored"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_urlencoded = "0.7"

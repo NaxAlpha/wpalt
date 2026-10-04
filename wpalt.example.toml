@@ -90,6 +90,8 @@ ca_cert_file = "" # Optional private CA for owner/test infrastructure, <=32 KiB 
 # Scheduled authenticated encrypted recovery. Destinations must already exist;
 # mounted independent storage is owner-managed. Do not put the key in them.
 [recovery]
+# Deduplicate encrypted chunks; keep sibling wpalt-objects with every retained package.
+incremental = false
 enabled = false
 key_file = "/secure/wpalt-recovery.key"
 destinations = ["/mnt/independent/wpalt-backups"]

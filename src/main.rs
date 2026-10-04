@@ -57,6 +57,31 @@ enum Command {
     RecoveryStatus,
     /// Scan stored media/private attachment inventory without changing files.
     IntegrityScan,
+    /// Validate a full recovery graph without restoring it.
+    RecoveryInspect {
+        input: PathBuf,
+        #[arg(long)]
+        key_file: Option<PathBuf>,
+    },
+    /// Extract one validated media/private attachment as a new private file.
+    RecoveryFile {
+        input: PathBuf,
+        id: String,
+        output: PathBuf,
+        #[arg(long)]
+        key_file: Option<PathBuf>,
+    },
+    /// Migrate an M6 plaintext archive to current format, preserving its data.
+    MigrateBackup { input: PathBuf, output: PathBuf },
+    /// Preview unused encrypted chunks; --execute requires the preview plan hash.
+    RecoveryPrune {
+        destination: PathBuf,
+        key_file: PathBuf,
+        #[arg(long)]
+        execute: Option<String>,
+    },
+    /// Emergency local host-owner recovery. Server must be stopped.
+    AuthReset { email: String },
     /// Restore a snapshot into an EMPTY database/data directory, with the server stopped.
     Restore {
         input: PathBuf,
@@ -592,6 +617,41 @@ async fn main() -> anyhow::Result<()> {
         println!("{}", serde_json::to_string_pretty(&config.redacted())?);
         return Ok(());
     }
+    // Portable recovery tools operate on files/config only: no live server,
+    // database, site lock, installation or vendor account is needed.
+    match &cli.command {
+        Command::RecoveryInspect { input, key_file } => {
+            let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(
+                    &backup::inspect(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?
+                )?
+            );
+            return Ok(());
+        }
+        Command::RecoveryFile {
+            input,
+            id,
+            output,
+            key_file,
+        } => {
+            let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
+            backup::extract_file(&config, &bytes, id, output).map_err(|e| anyhow::anyhow!(e.1))?;
+            println!("Recovered a new private file.");
+            return Ok(());
+        }
+        Command::MigrateBackup { input, output } => {
+            let bytes = backup::read_bounded(input, config.max_backup_bytes)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            let bytes = backup::migrate_m6(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?;
+            backup::write_private(output, &bytes)?;
+            println!("Migrated a new private archive.");
+            return Ok(());
+        }
+        _ => {}
+    }
     tracing_subscriber::fmt()
         .json()
         .with_env_filter(if config.debug {
@@ -623,6 +683,46 @@ async fn main() -> anyhow::Result<()> {
             anyhow::ensure!(
                 state.copies.iter().all(|c| c.state == "verified"),
                 "one or more backup copies failed"
+            );
+        }
+        Command::RecoveryPrune {
+            destination,
+            key_file,
+            execute,
+        } => {
+            let key = wpalt::operations::encryption::read_key(&key_file)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            let report = wpalt::operations::incremental::cleanup(
+                &destination,
+                &key,
+                app.config.max_backup_bytes,
+                execute.as_deref(),
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Command::RecoveryInspect { .. }
+        | Command::RecoveryFile { .. }
+        | Command::MigrateBackup { .. } => unreachable!(),
+        Command::AuthReset { email } => {
+            let mut tx = app.db.pool.begin().await?;
+            let user: String =
+                sqlx::query_scalar("SELECT id FROM users WHERE email=$1 AND role<>'disabled'")
+                    .bind(email.to_ascii_lowercase())
+                    .fetch_one(&mut *tx)
+                    .await?;
+            for table in ["user_factors", "user_passkeys", "sessions"] {
+                sqlx::query(&format!("DELETE FROM {table} WHERE user_id=$1"))
+                    .bind(&user)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+            tx.commit().await?;
+            tracing::warn!(event="offline_authenticator_reset",user_id=%user);
+            println!(
+                "Local authenticators and sessions cleared. Password sign-in remains required."
             );
         }
         Command::IntegrityScan => {
@@ -682,8 +782,26 @@ async fn main() -> anyhow::Result<()> {
                 let key = wpalt::operations::encryption::read_key(&path)
                     .await
                     .map_err(|e| anyhow::anyhow!(e.1))?;
-                wpalt::operations::encryption::open(&key, &bytes, app.config.max_backup_bytes)
-                    .map_err(|e| anyhow::anyhow!(e.1))?
+                {
+                    let decoded = wpalt::operations::encryption::open(
+                        &key,
+                        &bytes,
+                        app.config.max_backup_bytes,
+                    )
+                    .map_err(|e| anyhow::anyhow!(e.1))?;
+                    if wpalt::operations::incremental::is_manifest(&decoded) {
+                        wpalt::operations::incremental::assemble(
+                            input.parent().unwrap_or(std::path::Path::new(".")),
+                            &key,
+                            &decoded,
+                            app.config.max_backup_bytes,
+                        )
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e.1))?
+                    } else {
+                        decoded
+                    }
+                }
             } else {
                 bytes
             };
@@ -886,5 +1004,38 @@ async fn optimize_bulk(app: &App) {
     if let Err(error) = app.db.optimize_after_bulk_write().await {
         tracing::warn!(event = "bulk_maintenance_failed", error = %error,
             "Content was committed; database maintenance should be retried by the operator");
+    }
+}
+
+async fn recovery_bytes(
+    config: &Config,
+    input: &std::path::Path,
+    key_path: Option<&std::path::Path>,
+) -> anyhow::Result<Vec<u8>> {
+    let encoded = backup::read_bounded(
+        input,
+        config.max_backup_bytes + wpalt::operations::encryption::OVERHEAD,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!(e.1))?;
+    let Some(path) = key_path else {
+        return Ok(encoded);
+    };
+    let key = wpalt::operations::encryption::read_key(path)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.1))?;
+    let decoded = wpalt::operations::encryption::open(&key, &encoded, config.max_backup_bytes)
+        .map_err(|e| anyhow::anyhow!(e.1))?;
+    if wpalt::operations::incremental::is_manifest(&decoded) {
+        Ok(wpalt::operations::incremental::assemble(
+            input.parent().unwrap_or(std::path::Path::new(".")),
+            &key,
+            &decoded,
+            config.max_backup_bytes,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!(e.1))?)
+    } else {
+        Ok(decoded)
     }
 }

@@ -190,8 +190,8 @@ async fn claim(
     .bind(engagement::token(&h).unwrap_or_default())
     .fetch_optional(&app.db.pool)
     .await?;
-    if let Some(path) = path {
-        if let Err(error) = engagement::conversion(
+    if let Some(path) = path
+        && let Err(error) = engagement::conversion(
             &app,
             &h,
             result["id"].as_str().unwrap_or_default(),
@@ -199,12 +199,11 @@ async fn claim(
             "offer_claim",
         )
         .await
-        {
-            tracing::warn!(
-                status = error.0.as_u16(),
-                "Offer conversion was not recorded"
-            );
-        }
+    {
+        tracing::warn!(
+            status = error.0.as_u16(),
+            "Offer conversion was not recorded"
+        );
     }
     Ok(Json(result))
 }

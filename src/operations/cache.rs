@@ -116,6 +116,9 @@ impl Cache {
             },
         );
     }
+    pub fn statistics(&self) -> (usize, usize) {
+        (self.entries.len(), self.bytes)
+    }
     pub fn clear(&mut self) {
         self.entries.clear();
         self.bytes = 0;

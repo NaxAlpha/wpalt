@@ -29,6 +29,26 @@ pub async fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>> {
 // Types and table names are an allowlist, never supplied by an archive.
 const TABLES: &[(&str, &[(&str, bool)])] = &[
     (
+        "user_passkeys",
+        &[
+            ("credential_id", false),
+            ("user_id", false),
+            ("definition", false),
+            ("version", true),
+        ],
+    ),
+    (
+        "user_factors",
+        &[
+            ("user_id", false),
+            ("secret", false),
+            ("pending", false),
+            ("pending_until", true),
+            ("last_step", true),
+            ("recovery", false),
+        ],
+    ),
+    (
         "discovery_settings",
         &[("id", true), ("definition", false), ("version", true)],
     ),
@@ -1075,7 +1095,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     }
     let snapshot = Snapshot {
         private_files,
-        schema: 9,
+        schema: 10,
         created_at: crate::now(),
         tables,
         files,
@@ -1083,7 +1103,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v8".into(),
+        format: "wpalt-backup-v9".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -1094,20 +1114,20 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     tracing::info!(event = "backup_created", bytes = encoded.len());
     Ok(encoded)
 }
-pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
-    if encoded.len() > app.config.max_backup_bytes {
+fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> {
+    if encoded.len() > config.max_backup_bytes {
         return Err(Error::invalid("Backup exceeds the configured size limit."));
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v8"
+    if envelope.format != "wpalt-backup-v9"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 9
+    if snapshot.schema != 10
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -1131,6 +1151,59 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             {
                 return Err(Error::invalid("Backup row has an invalid shape."));
             }
+        }
+    }
+    let user_ids: HashSet<&str> = snapshot.tables["users"]
+        .iter()
+        .map(|r| r["id"].as_str().unwrap())
+        .collect();
+    let mut passkey_ids = HashSet::new();
+    let mut passkey_counts = BTreeMap::<&str, usize>::new();
+    for row in &snapshot.tables["user_passkeys"] {
+        let user = row["user_id"].as_str().unwrap();
+        let id = row["credential_id"].as_str().unwrap();
+        let raw = row["definition"].as_str().unwrap();
+        if raw.len() > 64 * 1024
+            || !user_ids.contains(user)
+            || !passkey_ids.insert(id)
+            || row["version"].as_i64().unwrap() < 1
+        {
+            return Err(Error::invalid("Invalid passkey graph."));
+        }
+        let key: webauthn_rs::prelude::Passkey =
+            serde_json::from_str(raw).map_err(|_| Error::invalid("Invalid passkey definition."))?;
+        if hex::encode(key.cred_id().as_ref()) != id {
+            return Err(Error::invalid("Passkey identity mismatch."));
+        }
+        let count = passkey_counts.entry(user).or_default();
+        *count += 1;
+        if *count > 8 {
+            return Err(Error::invalid("Account passkey budget exceeded."));
+        }
+    }
+    let mut factor_users = HashSet::new();
+    for row in &snapshot.tables["user_factors"] {
+        let user = row["user_id"].as_str().unwrap();
+        let secret = row["secret"].as_str().unwrap();
+        let pending = row["pending"].as_str().unwrap();
+        let valid_secret = |value: &str| {
+            value.is_empty() || (value.len() == 40 && value.bytes().all(|b| b.is_ascii_hexdigit()))
+        };
+        let recovery: Vec<String> = serde_json::from_str(row["recovery"].as_str().unwrap())
+            .map_err(|_| Error::invalid("Invalid backup recovery codes."))?;
+        if !user_ids.contains(user)
+            || !factor_users.insert(user)
+            || !valid_secret(secret)
+            || !valid_secret(pending)
+            || row["last_step"].as_i64().unwrap() < -1
+            || row["pending_until"].as_i64().unwrap() < 0
+            || recovery.len() > 8
+            || recovery
+                .iter()
+                .any(|h| h.len() != 64 || !h.bytes().all(|b| b.is_ascii_hexdigit()))
+            || recovery.iter().collect::<HashSet<_>>().len() != recovery.len()
+        {
+            return Err(Error::invalid("Invalid authenticator recovery graph."));
         }
     }
     for row in &snapshot.tables["users"] {
@@ -1285,10 +1358,10 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             .ok_or(Error::invalid("Invalid backup settings."))
     };
     crate::content::validate_settings(&crate::model::Settings {
-        business_enabled: app.config.business_enabled,
-        membership_enabled: app.config.membership_enabled,
-        commerce_enabled: app.config.commerce.enabled,
-        engagement_available: app.config.engagement.enabled,
+        business_enabled: config.business_enabled,
+        membership_enabled: config.membership_enabled,
+        commerce_enabled: config.commerce.enabled,
+        engagement_available: config.engagement.enabled,
         analytics: None,
         title: setting_string("title")?,
         description: setting_string("description")?,
@@ -1324,7 +1397,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
         };
         if !seen.insert(&file.filename)
             || !safe_filename(&file.filename)
-            || file.data.len() > app.config.max_upload_bytes
+            || file.data.len() > config.max_upload_bytes
             || digest(&file.data) != file.sha256
             || file.sha256 != *hash
             || file.data.len() as i64 != *size
@@ -1469,7 +1542,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     }
     crate::business::backup_validation::validate(&snapshot.tables)?;
     crate::membership::backup::validate(&snapshot.tables)?;
-    crate::commerce::backup::validate(&snapshot.tables, &app.config.commerce)?;
+    crate::commerce::backup::validate(&snapshot.tables, &config.commerce)?;
     let post_kinds: BTreeMap<_, _> = snapshot.tables["posts"]
         .iter()
         .map(|row| (row["id"].as_str().unwrap(), row["kind"].as_str().unwrap()))
@@ -1534,6 +1607,11 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     for row in &snapshot.tables["theme_revisions"] {
         crate::theme::Package::parse_historical(row["package"].as_str().unwrap(), &registry)?;
     }
+    Ok(snapshot)
+}
+
+pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
+    let snapshot = validate(&app.config, encoded)?;
     let _guard = app.mutation().await;
     let mut tx = app.db.pool.begin().await?;
     for (name, _) in TABLES {
@@ -1577,7 +1655,15 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
         .execute(&mut *tx)
         .await?;
     sqlx::raw_sql("DELETE FROM shop_settings; DELETE FROM business_usage; DELETE FROM engagement_settings; DELETE FROM engagement_usage; DELETE FROM engagement_event_names; DELETE FROM engagement_dimension_values;").execute(&mut *tx).await?;
-    for (name, columns) in TABLES {
+    for (name, columns) in TABLES
+        .iter()
+        .filter(|(name, _)| *name != "user_factors" && *name != "user_passkeys")
+        .chain(
+            TABLES
+                .iter()
+                .filter(|(name, _)| *name == "user_factors" || *name == "user_passkeys"),
+        )
+    {
         for row in &snapshot.tables[*name] {
             let mut q = QueryBuilder::<Any>::new(format!(
                 "INSERT INTO {name}({}) VALUES(",
@@ -1647,4 +1733,74 @@ pub fn write_private(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
     file.write_all(bytes)?;
     file.sync_all()?;
     Ok(())
+}
+
+/// Inspect a complete current-format recovery graph without writing it.
+pub fn inspect(config: &crate::config::Config, encoded: &[u8]) -> Result<serde_json::Value> {
+    let snapshot = validate(config, encoded)?;
+    Ok(
+        serde_json::json!({"schema":snapshot.schema,"created_at":snapshot.created_at,"tables":snapshot.tables.iter().map(|(name,rows)|(name.clone(),rows.len())).collect::<BTreeMap<_,_>>(),"media_files":snapshot.files.len(),"private_files":snapshot.private_files.len()}),
+    )
+}
+/// Selective file recovery to a NEW private owner-selected path. Does not inject
+/// rows into a live site or broaden the original protected-resource graph.
+pub fn extract_file(
+    config: &crate::config::Config,
+    encoded: &[u8],
+    id: &str,
+    output: &Path,
+) -> Result<()> {
+    uuid::Uuid::parse_str(id).map_err(|_| Error::invalid("Use a media or attachment UUID."))?;
+    let snapshot = validate(config, encoded)?;
+    let filename = snapshot.tables["media"]
+        .iter()
+        .chain(snapshot.tables["form_attachments"].iter())
+        .find(|r| r["id"].as_str() == Some(id))
+        .and_then(|r| r["filename"].as_str())
+        .ok_or_else(Error::not_found)?;
+    let file = snapshot
+        .files
+        .iter()
+        .chain(snapshot.private_files.iter())
+        .find(|f| f.filename == filename)
+        .ok_or_else(Error::not_found)?;
+    write_private(output, &file.data)
+        .map_err(|_| Error::invalid("Cannot create a new private recovered file."))?;
+    Ok(())
+}
+/// One-off pre-adoption archive migration, outside ordinary request/restore code.
+pub fn migrate_m6(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<u8>> {
+    if encoded.len() > config.max_backup_bytes {
+        return Err(Error::invalid("Backup exceeds configured budget."));
+    }
+    let envelope: Envelope =
+        serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid M6 archive."))?;
+    if envelope.format != "wpalt-backup-v8"
+        || digest(envelope.payload.as_bytes()) != envelope.sha256
+    {
+        return Err(Error::invalid("Invalid M6 archive format/checksum."));
+    }
+    let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
+        .map_err(|_| Error::invalid("Invalid M6 archive graph."))?;
+    if snapshot.schema != 9
+        || snapshot.tables.contains_key("user_factors")
+        || snapshot.tables.contains_key("user_passkeys")
+    {
+        return Err(Error::invalid(
+            "Archive is not an unmigrated M6 recovery point.",
+        ));
+    }
+    snapshot.schema = 10;
+    snapshot.tables.insert("user_factors".into(), vec![]);
+    snapshot.tables.insert("user_passkeys".into(), vec![]);
+    let payload = serde_json::to_string(&snapshot)
+        .map_err(|_| Error::invalid("Archive migration failed."))?;
+    let output = serde_json::to_vec(&Envelope {
+        format: "wpalt-backup-v9".into(),
+        sha256: digest(payload.as_bytes()),
+        payload,
+    })
+    .map_err(|_| Error::invalid("Archive migration failed."))?;
+    validate(config, &output)?;
+    Ok(output)
 }

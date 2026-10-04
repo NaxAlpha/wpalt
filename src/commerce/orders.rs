@@ -658,10 +658,10 @@ async fn payment_tx(
         .fetch_optional(&mut **tx)
         .await?
         .ok_or_else(Error::not_found)?;
-    if let Some((_, version)) = actor {
-        if order.get::<i64, _>("version") != version {
-            return Err(Error::conflict());
-        }
+    if let Some((_, version)) = actor
+        && order.get::<i64, _>("version") != version
+    {
+        return Err(Error::conflict());
     }
     if order.get::<String, _>("provider") != p.provider
         || order.get::<String, _>("currency") != p.currency

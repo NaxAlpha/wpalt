@@ -113,10 +113,10 @@ pub async fn add_user(
 #[derive(Default)]
 pub struct LoginLimits {
     global: VecDeque<i64>,
-    failures: HashMap<String, (i64, u32)>,
+    pub(crate) failures: HashMap<String, (i64, u32)>,
 }
 impl LoginLimits {
-    fn check(&mut self, email: &str, time: i64) -> Result<()> {
+    pub(crate) fn check(&mut self, email: &str, time: i64) -> Result<()> {
         self.global.retain(|t| *t > time - 60);
         self.failures.retain(|_, (t, _)| *t > time - 900);
         if self.global.len() >= 30
@@ -133,7 +133,7 @@ impl LoginLimits {
         self.global.push_back(time);
         Ok(())
     }
-    fn failed(&mut self, email: String, time: i64) {
+    pub(crate) fn failed(&mut self, email: String, time: i64) {
         if self.failures.len() < 1024 || self.failures.contains_key(&email) {
             let entry = self.failures.entry(email).or_insert((time, 0));
             entry.1 += 1;
@@ -141,6 +141,14 @@ impl LoginLimits {
     }
 }
 pub async fn login(app: &App, email: &str, password: &str) -> Result<(String, Session)> {
+    login_with_code(app, email, password, "").await
+}
+pub async fn login_with_code(
+    app: &App,
+    email: &str,
+    password: &str,
+    factor_code: &str,
+) -> Result<(String, Session)> {
     let email = email.to_ascii_lowercase();
     if email.len() > 254 || password.len() > 256 {
         return Err(Error(
@@ -195,7 +203,7 @@ pub async fn login(app: &App, email: &str, password: &str) -> Result<(String, Se
             "Email or password is incorrect.",
         ));
     }
-    app.login_limits.lock().await.failures.remove(&key);
+
     let r = row.unwrap();
     let token = random_token();
     let session = Session {
@@ -208,17 +216,33 @@ pub async fn login(app: &App, email: &str, password: &str) -> Result<(String, Se
         csrf: random_token(),
         hash: digest(token.as_bytes()),
     };
-    persist_session(app, &session, &verified_hash).await?;
+    if let Err(error) = persist_session_with_code(app, &session, &verified_hash, factor_code).await
+    {
+        app.login_limits.lock().await.failed(key, now());
+        return Err(error);
+    }
+    app.login_limits.lock().await.failures.remove(&key);
     tracing::info!(event = "login_succeeded");
     Ok((token, session))
 }
 /// Password work runs outside the mutation coordinator. Recheck the verified
 /// credential at the session commit boundary so concurrent revocation wins.
+#[cfg(test)]
 async fn persist_session(app: &App, session: &Session, verified_hash: &str) -> Result<()> {
+    persist_session_with_code(app, session, verified_hash, "").await
+}
+async fn persist_session_with_code(
+    app: &App,
+    session: &Session,
+    verified_hash: &str,
+    factor_code: &str,
+) -> Result<()> {
     let _guard = app.mutation().await;
+    let mut tx = app.db.pool.begin().await?;
+    crate::operations::factor::verify(&mut tx, &session.user.id, factor_code).await?;
     sqlx::query("DELETE FROM sessions WHERE expires_at<$1")
         .bind(now())
-        .execute(&app.db.pool)
+        .execute(&mut *tx)
         .await?;
     let inserted = sqlx::query("INSERT INTO sessions(token_hash,user_id,csrf,expires_at) SELECT $1,id,$3,$4 FROM users WHERE id=$2 AND password_hash=$5 AND role=$6")
         .bind(&session.hash)
@@ -227,7 +251,7 @@ async fn persist_session(app: &App, session: &Session, verified_hash: &str) -> R
         .bind(now() + app.config.session_seconds)
         .bind(verified_hash)
         .bind(&session.user.role)
-        .execute(&app.db.pool)
+        .execute(&mut *tx)
         .await?;
     if inserted.rows_affected() != 1 {
         return Err(Error(
@@ -235,6 +259,7 @@ async fn persist_session(app: &App, session: &Session, verified_hash: &str) -> R
             "Email or password is incorrect.",
         ));
     }
+    tx.commit().await?;
     Ok(())
 }
 pub async fn session(app: &App, headers: &HeaderMap) -> Result<Session> {

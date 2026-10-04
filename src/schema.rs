@@ -397,15 +397,14 @@ impl Registry {
             };
             match field.kind.as_str() {
                 "relationship" => {
-                    if let Some(id) = value.as_str() {
-                        if relations
+                    if let Some(id) = value.as_str()
+                        && relations
                             .insert(id.into(), field.target.clone())
                             .is_some_and(|old| old != field.target)
-                        {
-                            return Err(Error::invalid(
-                                "A record cannot represent two different relationship target models.",
-                            ));
-                        }
+                    {
+                        return Err(Error::invalid(
+                            "A record cannot represent two different relationship target models.",
+                        ));
                     }
                 }
                 "media" => {

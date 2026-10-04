@@ -121,9 +121,8 @@ pub async fn subscribe(
         return Ok(());
     }
     let id: String = contact.get("id");
-    if let Some(existing)=sqlx::query("SELECT state,policy,expires_at FROM audience_memberships WHERE contact_id=$1 AND list_id=$2").bind(&id).bind(&action.list).fetch_optional(&mut **tx).await? {
-  if existing.get::<String,_>("state")=="withdrawn" || (existing.get::<String,_>("policy")==action.policy && (existing.get::<String,_>("state")=="confirmed" || existing.get::<i64,_>("expires_at")>now())) {return Ok(());}
- }
+    if let Some(existing)=sqlx::query("SELECT state,policy,expires_at FROM audience_memberships WHERE contact_id=$1 AND list_id=$2").bind(&id).bind(&action.list).fetch_optional(&mut **tx).await?
+  && (existing.get::<String,_>("state")=="withdrawn" || (existing.get::<String,_>("policy")==action.policy && (existing.get::<String,_>("state")=="confirmed" || existing.get::<i64,_>("expires_at")>now()))) {return Ok(());}
     let nonce = auth::random_token();
     let withdraw = auth::random_token();
     sqlx::query("INSERT INTO audience_memberships(contact_id,list_id,state,policy,nonce_hash,withdraw_hash,expires_at,created_at) VALUES($1,$2,'pending',$3,$4,$5,$6,$7) ON CONFLICT(contact_id,list_id) DO UPDATE SET state='pending',policy=$3,nonce_hash=$4,withdraw_hash=$5,expires_at=$6,confirmed_at=0")

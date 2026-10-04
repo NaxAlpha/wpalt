@@ -142,10 +142,10 @@ impl FormDefinition {
                         "Conditions must reference an earlier field.",
                     ));
                 }
-                if let Condition::Equal { value, .. } = condition {
-                    if value.is_object() || value.is_array() || value.to_string().len() > 8000 {
-                        return Err(Error::invalid("Conditions compare bounded scalar values."));
-                    }
+                if let Condition::Equal { value, .. } = condition
+                    && (value.is_object() || value.is_array() || value.to_string().len() > 8000)
+                {
+                    return Err(Error::invalid("Conditions compare bounded scalar values."));
                 }
             }
             if let Some(calculation) = &field.calculation {

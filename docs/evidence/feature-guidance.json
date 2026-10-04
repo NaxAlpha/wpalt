@@ -1166,6 +1166,43 @@
         "relevant vulnerability"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-local-authentication",
+      "area": "Local TOTP/passkeys and portable incremental recovery",
+      "scope": "Schema 10 M7 implementation",
+      "basis": "internal-with-upstream",
+      "sources": [
+        "https://www.rfc-editor.org/rfc/rfc6238",
+        "https://docs.rs/webauthn-rs/latest/webauthn_rs/struct.Webauthn.html",
+        "https://docs.rs/webauthn-rs/latest/webauthn_rs/prelude/struct.Passkey.html"
+      ],
+      "applicable_versions": [
+        "webauthn-rs 0.5.5",
+        "Rust 1.88 minimum",
+        "wpalt schema 10, archive v9"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "TOTP codes cannot be replayed; recovery codes consumed transactionally; revoked sessions cannot finish enrollment.",
+        "WebAuthn user verification, exact origin and signature checks use the maintained library; private bounded single-use challenges and current credential versions.",
+        "Incremental points validate reconstructed graphs; pruning verifies retained points before deletion; explicit migrations stay outside ordinary restore."
+      ],
+      "tests": [
+        "local_authenticator_requires_proof_rejects_replay_and_restores_with_one_use_recovery",
+        "migration_and_incremental_restore_preserve_owned_graph_before_any_target_writes",
+        "recovery_cleanup_requires_current_preview_and_preserves_every_retained_point",
+        "scripts/operations_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected release",
+        "upstream version changes",
+        "relevant vulnerability"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

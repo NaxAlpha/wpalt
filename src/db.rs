@@ -85,7 +85,8 @@ impl Db {
                     || version == Some(6)
                     || version == Some(7)
                     || version == Some(8)
-                    || version == Some(9),
+                    || version == Some(9)
+                    || version == Some(10),
                 "unsupported schema version; use the documented migration/reset path"
             );
         }
@@ -100,6 +101,12 @@ impl Db {
         }
         let mut tx = self.pool.begin().await?;
         sqlx::raw_sql(SCHEMA).execute(&mut *tx).await?;
+        sqlx::raw_sql(crate::operations::passkeys::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::operations::factor::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
         sqlx::raw_sql(crate::business::store::SCHEMA)
             .execute(&mut *tx)
             .await?;
@@ -189,7 +196,7 @@ impl Db {
             currency == self.commerce_currency,
             "Commerce currency differs from stored catalog; use matching configuration or an explicit migration"
         );
-        sqlx::query("UPDATE schema_version SET version=9 WHERE id=1")
+        sqlx::query("UPDATE schema_version SET version=10 WHERE id=1")
             .execute(&mut *tx)
             .await?;
         if self.postgres {

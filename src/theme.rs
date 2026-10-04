@@ -278,39 +278,40 @@ impl Package {
                 "Link destinations must be text URLs or bindings.",
             ));
         }
-        if n.image.is_object() {
-            if let Some(kind) = binding_kind(&n.image, r, model, params) {
-                let expected = if n.kind == "image" {
-                    "media"
-                } else {
-                    "gallery"
-                };
-                if kind != expected {
-                    return Err(Error::invalid(
-                        "Image/gallery binding has the wrong declared field type.",
-                    ));
-                }
-            }
-        }
-        if n.kind == "repeater" {
-            if let Some(kind) = binding_kind(&json!({"bind":n.source}), r, model, params) {
-                if !["repeater", "flexible", "gallery"].contains(&kind.as_str()) {
-                    return Err(Error::invalid("Repeaters must bind a declared list field."));
-                }
-            }
-        }
-
-        if let Some(id) = n.image.as_str() {
-            if !id.is_empty() && uuid::Uuid::parse_str(id).is_err() {
+        if n.image.is_object()
+            && let Some(kind) = binding_kind(&n.image, r, model, params)
+        {
+            let expected = if n.kind == "image" {
+                "media"
+            } else {
+                "gallery"
+            };
+            if kind != expected {
                 return Err(Error::invalid(
-                    "Literal media must reference an uploaded media UUID.",
+                    "Image/gallery binding has the wrong declared field type.",
                 ));
             }
         }
-        if let Some(url) = n.href.as_str() {
-            if !url.is_empty() && !content::safe_nav_url(url) {
-                return Err(Error::invalid("Unsafe theme link URL."));
-            }
+        if n.kind == "repeater"
+            && let Some(kind) = binding_kind(&json!({"bind":n.source}), r, model, params)
+            && !["repeater", "flexible", "gallery"].contains(&kind.as_str())
+        {
+            return Err(Error::invalid("Repeaters must bind a declared list field."));
+        }
+
+        if let Some(id) = n.image.as_str()
+            && !id.is_empty()
+            && uuid::Uuid::parse_str(id).is_err()
+        {
+            return Err(Error::invalid(
+                "Literal media must reference an uploaded media UUID.",
+            ));
+        }
+        if let Some(url) = n.href.as_str()
+            && !url.is_empty()
+            && !content::safe_nav_url(url)
+        {
+            return Err(Error::invalid("Unsafe theme link URL."));
         }
         if n.kind == "component" {
             let c = self
@@ -840,10 +841,10 @@ async fn validate_literal_references(app: &App, package: &Package) -> Result<()>
         if n.kind == "form" {
             forms.insert(n.text.as_str().unwrap_or("").to_owned());
         }
-        if let Some(id) = n.image.as_str() {
-            if uuid::Uuid::parse_str(id).is_ok() {
-                media.insert(id.into());
-            }
+        if let Some(id) = n.image.as_str()
+            && uuid::Uuid::parse_str(id).is_ok()
+        {
+            media.insert(id.into());
         }
         if n.kind == "component" {
             for (key, value) in &n.arguments {
@@ -1184,21 +1185,21 @@ pub async fn context_with_discovery(
     for n in nodes {
         if n.kind == "component" {
             for (key, value) in &n.arguments {
-                if let Some(id) = value.as_str() {
-                    if uuid::Uuid::parse_str(id).is_ok() {
-                        match package.components[&n.component].parameters[key].as_str() {
-                            "media" => media.push(id.into()),
-                            "relationship" => literal_relations.push(id.to_owned()),
-                            _ => {}
-                        }
+                if let Some(id) = value.as_str()
+                    && uuid::Uuid::parse_str(id).is_ok()
+                {
+                    match package.components[&n.component].parameters[key].as_str() {
+                        "media" => media.push(id.into()),
+                        "relationship" => literal_relations.push(id.to_owned()),
+                        _ => {}
                     }
                 }
             }
         }
-        if let Some(id) = n.image.as_str() {
-            if uuid::Uuid::parse_str(id).is_ok() {
-                media.push(id.to_owned())
-            }
+        if let Some(id) = n.image.as_str()
+            && uuid::Uuid::parse_str(id).is_ok()
+        {
+            media.push(id.to_owned())
         }
     }
     registry.references(
@@ -1329,10 +1330,10 @@ impl Context {
             _ => &self.root[root],
         };
         for key in parts {
-            if let Some(id) = value.as_str() {
-                if let Some(related) = self.relations.get(id) {
-                    value = related
-                }
+            if let Some(id) = value.as_str()
+                && let Some(related) = self.relations.get(id)
+            {
+                value = related
             }
             value = value.get(key).unwrap_or(&Value::Null);
         }
