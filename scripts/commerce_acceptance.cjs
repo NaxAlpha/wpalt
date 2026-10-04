@@ -202,10 +202,10 @@ module.exports = async (owner, origin, output) => {
     await shopper.reload();
     assert((await shopper.locator("main").innerText()).includes("USD 18.00"));
     await measure(shopper, "customer-receipt");
-    await merchant
-      .getByRole("button", { name: "Mark fulfilled", exact: true })
-      .click();
-    await merchant.waitForLoadState("load");
+    await submit(
+      merchant,
+      merchant.getByRole("button", { name: "Mark fulfilled", exact: true }),
+    );
     await merchant.getByText("Request refund", { exact: true }).click();
     await merchant
       .getByLabel("Actual refund amount", { exact: true })
@@ -305,6 +305,13 @@ module.exports = async (owner, origin, output) => {
       .filter({ hasText: "Create resource" })
       .click();
     await merchant
+      .locator("form")
+      .filter({
+        has: merchant.getByRole("button", {
+          name: "Create resource",
+          exact: true,
+        }),
+      })
       .getByLabel("Resource name", { exact: true })
       .fill("M6 Studio");
     await submit(
