@@ -3566,3 +3566,111 @@ async fn paginated_integrity_reaches_late_damage_and_labels_patterns_without_del
         site.close().await;
     }
 }
+
+/// A local challenge admits one submission, binds its destination and rejects
+/// forged/replayed work before moderation. Both supported database engines run this.
+#[tokio::test]
+async fn local_abuse_guard_binds_resource_and_admits_only_one_racing_submitter() {
+    for pg in engines() {
+        let mut site = Site::new(pg, true).await;
+        let config = std::sync::Arc::make_mut(&mut site.app.config);
+        config.spam.enabled = true;
+        config.spam.proof_bits = 8;
+        config.spam.max_links = 1;
+        content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("guarded-story", "publish"),
+        )
+        .await
+        .unwrap();
+        let resource = "comment:guarded-story";
+        let (status, _, bytes) = request(
+            &site.app,
+            "POST",
+            "/api/spam/challenge",
+            None,
+            "application/json",
+            serde_json::to_vec(&serde_json::json!({"resource":resource})).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let challenge: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let token = challenge["token"].as_str().unwrap().to_owned();
+        let solution = (0..1048576)
+            .map(|n| n.to_string())
+            .find(|n| wpalt::operations::spam::solved(&token, n, 8))
+            .unwrap();
+        let proof = wpalt::operations::spam::Proof {
+            token: token.clone(),
+            solution: solution.clone(),
+            website: String::new(),
+        };
+        assert!(
+            wpalt::operations::spam::verify(&site.app, "form:other", &proof, "hello")
+                .await
+                .is_err()
+        );
+        assert!(
+            wpalt::operations::spam::verify(&site.app, resource, &proof, "HTTP://a HTTPS://b")
+                .await
+                .is_err()
+        );
+        let honeypot = wpalt::operations::spam::Proof {
+            token: token.clone(),
+            solution: solution.clone(),
+            website: "bot.example".into(),
+        };
+        assert!(
+            wpalt::operations::spam::verify(&site.app, resource, &honeypot, "hello")
+                .await
+                .is_err()
+        );
+        let body = format!(
+            "name=Visitor&body=A+useful+comment&token={token}&solution={solution}&website="
+        )
+        .into_bytes();
+        let (left, right) = tokio::join!(
+            request(
+                &site.app,
+                "POST",
+                "/guarded-story/comments",
+                None,
+                "application/x-www-form-urlencoded",
+                body.clone()
+            ),
+            request(
+                &site.app,
+                "POST",
+                "/guarded-story/comments",
+                None,
+                "application/x-www-form-urlencoded",
+                body
+            )
+        );
+        assert_eq!(
+            [left.0, right.0]
+                .iter()
+                .filter(|s| **s == StatusCode::OK)
+                .count(),
+            1
+        );
+        assert_eq!(
+            [left.0, right.0]
+                .iter()
+                .filter(|s| **s == StatusCode::FORBIDDEN)
+                .count(),
+            1
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM comments")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            count, 1,
+            "a losing replay must not create a moderation entry"
+        );
+        site.close().await;
+    }
+}

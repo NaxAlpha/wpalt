@@ -55,6 +55,12 @@ enum Command {
     RecoveryRun,
     /// Inspect durable recovery copy and interruption status.
     RecoveryStatus,
+    /// Verify a separately retained encrypted recovery point before replacing the executable.
+    UpgradePrepare {
+        output: PathBuf,
+        #[arg(long)]
+        key_file: PathBuf,
+    },
     /// Scan stored media/private attachment inventory without changing files.
     IntegrityScan {
         #[arg(long, default_value = "")]
@@ -683,6 +689,12 @@ async fn main() -> anyhow::Result<()> {
             );
         }
         Command::Config => unreachable!(),
+        Command::UpgradePrepare { output, key_file } => {
+            let receipt = wpalt::operations::upgrade::prepare(&app, &output, &key_file)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            println!("{}", serde_json::to_string_pretty(&receipt)?);
+        }
         Command::RecoveryRun => {
             let state = wpalt::operations::recovery::run(&app)
                 .await

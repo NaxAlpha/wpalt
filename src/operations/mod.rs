@@ -9,3 +9,5 @@ pub mod media;
 pub mod passkeys;
 pub mod protection;
 pub mod recovery;
+pub mod spam;
+pub mod upgrade;

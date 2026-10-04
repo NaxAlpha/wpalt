@@ -43,6 +43,7 @@ async function freePort() {
     config,
     `database_url = "sqlite://${temporary}/site.db?mode=rwc"\ndata_dir = "${temporary}/data"\nlisten = "127.0.0.1:${port}"\nbase_url = "${origin}"\n`,
   );
+  if (process.env.WPALT_SPAM_ONLY) fs.appendFileSync(config, "\n[spam]\nenabled = true\nproof_bits = 8\n");
   command(
     config,
     ["init", "--admin-email", "owner@example.test"],
@@ -101,6 +102,10 @@ async function freePort() {
     page.getByRole("button", { name: "Sign in", exact: true }),
   );
   await page.waitForURL(origin + "/admin");
+  if (process.env.WPALT_SPAM_ONLY) {
+    await require("./spam_acceptance.cjs")(owner, origin, output);
+    return;
+  }
   if (process.env.WPALT_OPERATIONS_ONLY) {
     await require("./operations_acceptance.cjs")(owner, origin, output, password);
     return;

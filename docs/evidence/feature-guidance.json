@@ -1236,6 +1236,37 @@
         "relevant vulnerability"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-SPAM",
+      "area": "Local submission abuse friction",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Bot_Management_and_Anti-Automation_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 10",
+        "Browser Web Crypto"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Layer bounded challenges and heuristics with input validation, rate limits and moderation; do not claim proof of human identity or shared spam classification.",
+        "Authenticate resource and expiry; admit each proof once; bound client work and replay memory; no foreign services or fingerprints."
+      ],
+      "tests": [
+        "local_abuse_guard_binds_resource_and_admits_only_one_racing_submitter",
+        "scripts/spam_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected release",
+        "upstream guidance change",
+        "relevant vulnerability"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

@@ -1742,9 +1742,14 @@
       "capability": "Honeypots, proof-of-work and basic spam heuristics",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Opt-in local comment/form honeypot, destination-bound single-use proof-of-work and bounded link heuristic; no shared classification or human-identity guarantee.",
+      "m7_evidence": [
+        "../tests/acceptance.rs",
+        "../scripts/spam_acceptance.cjs"
+      ]
     },
     {
       "id": "F109",
@@ -1853,7 +1858,7 @@
       "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Scheduled copies, per-destination retention and durable copy status; pre-upgrade workflow remains outstanding.",
+      "m7_coverage": "Scheduled copies and per-destination retention/status; upgrade-prepare verifies a separately retained encrypted checkpoint and executable/archive identities before owner-managed replacement. Rollback is explicit fresh restore with the retained executable.",
       "evidence": [
         "m7-contract.md",
         "resilient-operations.md",

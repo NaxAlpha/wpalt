@@ -117,3 +117,12 @@ await build({
   target: ["es2020"],
   outfile: "../assets/generated/auth.js",
 });
+
+await build({
+  entryPoints: ["spam.mjs"],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: ["es2020"],
+  outfile: "../assets/generated/spam.js",
+});

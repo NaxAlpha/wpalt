@@ -1,4 +1,5 @@
 import { h, render, Fragment } from "preact";
+import { proof } from "./spam.mjs";
 import { useEffect, useState, useRef } from "preact/hooks";
 import {
   Button,
@@ -1202,7 +1203,17 @@ function VisitorForm({ host }) {
         version: Number(host.dataset.version),
         values: current.values,
       };
-      await request(`/api/forms/${host.dataset.id}/entries`, pending.current);
+      const payload =
+        host.dataset.spam === "true"
+          ? {
+              ...pending.current,
+              spam: await proof(
+                `form:${host.dataset.id}`,
+                event.currentTarget?.elements.namedItem("website")?.value || "",
+              ),
+            }
+          : pending.current;
+      await request(`/api/forms/${host.dataset.id}/entries`, payload);
       pending.current = null;
       try {
         localStorage.removeItem(storageKey);
@@ -1219,6 +1230,9 @@ function VisitorForm({ host }) {
     return <Notice>Your response has been received. Thank you.</Notice>;
   return (
     <form onSubmit={submit}>
+      {host.dataset.spam === "true" && (
+        <input type="hidden" name="website" value="" />
+      )}
       {last > 0 && (
         <p>
           Step {step + 1} of {last + 1}

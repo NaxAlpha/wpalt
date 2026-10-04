@@ -36,6 +36,11 @@ pub fn router(app: App) -> Router {
         .route("/", get(home))
         .route("/search", get(home))
         .route("/health", get(health))
+        .route(
+            "/api/spam/challenge",
+            post(spam_challenge).layer(DefaultBodyLimit::max(1024)),
+        )
+        .route("/assets/spam.js", get(spam_js))
         .route("/account", get(account))
         .route(
             "/account/passkeys/start",
@@ -473,6 +478,23 @@ async fn editor_js() -> impl IntoResponse {
         include_str!("../assets/generated/editor.js"),
     )
 }
+async fn spam_js() -> impl IntoResponse {
+    (
+        [("content-type", "text/javascript; charset=utf-8")],
+        include_str!("../assets/generated/spam.js"),
+    )
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SpamResource {
+    resource: String,
+}
+async fn spam_challenge(
+    State(app): State<App>,
+    Json(input): Json<SpamResource>,
+) -> Result<Json<crate::operations::spam::Challenge>> {
+    Ok(Json(crate::operations::spam::issue(&app, &input.resource)?))
+}
 async fn health(State(app): State<App>) -> Result<Json<serde_json::Value>> {
     let initialized: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM settings")
         .fetch_one(&app.db.pool)
@@ -845,8 +867,10 @@ async fn render_post(
     let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))            section class="comments" {p class="muted" {@for t in terms {a href=(format!("{}?{}={}",discovery.path(&locale,""),t.get::<String,_>("kind"),t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
                     h2 {"Conversation"}
                     @for c in comments {article class="comment" {strong {(c.get::<String,_>("name"))}p {(c.get::<String,_>("body"))}}}
-                    @if protected == 0 {form method="post" action=(format!("/{slug}/comments")) {label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}
+                    @if protected == 0 {form method="post" action=(format!("/{slug}/comments")) data-spam-resource=[app.config.spam.enabled.then(||format!("comment:{slug}"))] {
+                        @if app.config.spam.enabled {input type="hidden" name="website" value="";p role="status" aria-live="polite" {}}label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}
                         p class="muted" {"Comments are reviewed before publication."}button {"Submit for review"}}}
+                    @if app.config.spam.enabled {script defer src="/assets/spam.js"{}}
                 }
     };
     let mut response = Html(crate::theme::document(
@@ -1513,6 +1537,12 @@ async fn media_file(
 struct CommentInput {
     name: String,
     body: String,
+    #[serde(default)]
+    token: String,
+    #[serde(default)]
+    solution: String,
+    #[serde(default)]
+    website: String,
 }
 async fn comment(
     State(app): State<App>,
@@ -1529,6 +1559,17 @@ async fn comment(
             "Use a name up to 100 characters and a comment up to 4000 characters.",
         ));
     }
+    crate::operations::spam::verify(
+        &app,
+        &format!("comment:{slug}"),
+        &crate::operations::spam::Proof {
+            token: input.token,
+            solution: input.solution,
+            website: input.website,
+        },
+        &input.body,
+    )
+    .await?;
     let client = connection
         .map(|c| c.0.0.ip().to_string())
         .unwrap_or_else(|| "local-test".into());
@@ -1889,6 +1930,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
                 p class="muted" {"Keep the recovery key separately. Verify an independent copy by restoring into a fresh instance. A pending attempt after restart may have been interrupted; inspect destination packages before retrying."}
             }
             section class="panel" {h2 {"Public response cache"}p {(if app.config.cache.enabled {"Enabled"}else{"Disabled"}) " · " (cache.0) " entries · " (cache.1) " bytes retained"}p {"Anonymous publications, listings, content projections and sitemaps only. Cookies, credentials and protected resources bypass shared storage. Browser page caching remains disabled so access changes take effect."}form method="post" action="/admin/operations/cache/purge" {(view::csrf(&s))button class="secondary" {"Purge public cache"}} form method="post" action="/admin/operations/cache/preload" {(view::csrf(&s))button class="secondary" disabled[!app.config.cache.enabled] {"Preload recent public pages"}}}
+            section class="panel" {h2 {"Local submission guard"}p {(if app.config.spam.enabled {"Enabled"} else {"Disabled"}) " for public comments and forms."}p class="muted" {"When enabled, submissions need a short same-origin computation. Honeypots, link limits, moderation and existing rate limits work together. This does not identify humans or use shared reputation. Configure [spam] to adjust the policy."}}
             section class="panel" {h2 {"Stored-file integrity"}p {a href="/admin/operations/audit" {"Inspect privileged action history"}}
                 p {"Check database-recorded image and private attachment checksums without changing files. A bounded scan reports incomplete work; it does not certify malware-free content."}
                 form method="post" action="/admin/operations/integrity" {(view::csrf(&s))button class="secondary" {"Inspect stored-file integrity"}}
