@@ -22,6 +22,13 @@ module.exports = async (owner, origin, output) => {
   const measure = async (p, name) => {
     for (const width of [320, 768, 1440]) {
       await p.setViewportSize({ width, height: 1000 });
+      await p.evaluate(() => window.scrollTo(0, 0));
+      await p.evaluate(
+        () =>
+          new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          ),
+      );
       const geometry = await ui.geometry(p);
       report.measurements.push({ surface: name, state: "normal", ...geometry });
       assert.deepEqual(geometry.failures, [], `${name} ${width}`);
@@ -41,10 +48,7 @@ module.exports = async (owner, origin, output) => {
       assert.deepEqual(spacing.failures, [], `${name} spaced ${width}`);
       await spaced.evaluate((n) => n.remove());
     }
-    await p.addScriptTag({ url: origin + "/__ui_fixture/commerce-axe.js" });
-    const a11y = await ui.accessibility(p);
-    report.accessibility.push({ surface: name, ...a11y });
-    assert.deepEqual(a11y.violations, [], `${name} accessibility`);
+    await ui.accessibility(p, origin, name, report);
   };
   for (const p of [merchant, shopper]) {
     p.on("pageerror", (e) => report.script_errors.push(e.message));
@@ -52,7 +56,7 @@ module.exports = async (owner, origin, output) => {
       if (!r.url().startsWith(origin + "/"))
         report.remote_requests.push(r.url());
     });
-    await p.route(origin + "/__ui_fixture/commerce-axe.js", (r) =>
+    await p.route(origin + "/__ui_fixture/axe.js", (r) =>
       r.fulfill({
         contentType: "text/javascript",
         body: fs.readFileSync(
@@ -234,6 +238,185 @@ module.exports = async (owner, origin, output) => {
     report.journey.push(
       "Merchant records actual payment, fulfills, authorizes a full refund and restocks only after recording its completion.",
     );
+    const addProduct = async (kind, title, price, interval = "") => {
+      await merchant.goto(origin + "/admin/shop");
+      await merchant
+        .locator("summary")
+        .filter({ hasText: "Create product" })
+        .click();
+      const create = merchant.locator("form").filter({
+        has: merchant.getByRole("button", {
+          name: "Create product",
+          exact: true,
+        }),
+      });
+      await create.getByLabel("Product title", { exact: true }).fill(title);
+      await create.getByLabel("URL slug", { exact: true }).fill("m6-" + kind);
+      await create
+        .getByLabel("Product type", { exact: true })
+        .selectOption(kind);
+      await create
+        .getByLabel("Description", { exact: true })
+        .fill("Clear synthetic local terms.");
+      if (kind === "membership")
+        await create
+          .getByLabel("Access key (membership required)", { exact: true })
+          .fill("m6-studio");
+      await create.getByLabel("Publish product", { exact: true }).check();
+      await submit(
+        merchant,
+        create.getByRole("button", { name: "Create product", exact: true }),
+      );
+      const id = merchant.url().split("/").pop();
+      const variant = merchant.locator("form").filter({
+        has: merchant.getByRole("button", {
+          name: "Create variant",
+          exact: true,
+        }),
+      });
+      await variant
+        .getByLabel("Variant title", { exact: true })
+        .fill("Standard");
+      await variant
+        .getByLabel("Unique SKU", { exact: true })
+        .fill("M6-" + kind);
+      await variant.getByLabel("Price", { exact: true }).fill(price);
+      await variant
+        .getByLabel("Billing interval (fixed-price memberships only)", {
+          exact: true,
+        })
+        .selectOption(interval);
+      await submit(
+        merchant,
+        variant.getByRole("button", { name: "Create variant", exact: true }),
+      );
+      return {
+        id,
+        variant: await merchant
+          .locator('input[name="variant_id"]')
+          .first()
+          .inputValue(),
+      };
+    };
+    const booking = await addProduct("booking", "M6 Consultation", "60.00");
+    await merchant.goto(origin + "/admin/shop");
+    await merchant
+      .locator("summary")
+      .filter({ hasText: "Create resource" })
+      .click();
+    await merchant
+      .getByLabel("Resource name", { exact: true })
+      .fill("M6 Studio");
+    await submit(
+      merchant,
+      merchant.getByRole("button", { name: "Create resource", exact: true }),
+    );
+    await merchant
+      .locator("summary")
+      .filter({ hasText: "Create slot" })
+      .click();
+    const slotForm = merchant.locator("form").filter({
+      has: merchant.getByRole("button", { name: "Create slot", exact: true }),
+    });
+    await slotForm
+      .getByLabel("Resource", { exact: true })
+      .selectOption({ label: "M6 Studio" });
+    await slotForm
+      .getByLabel("Booking variant", { exact: true })
+      .selectOption(booking.variant);
+    const start = new Date(Date.now() + 3 * 86400000);
+    await slotForm
+      .getByLabel("Starts at (UTC)", { exact: true })
+      .fill(start.toISOString().slice(0, 16));
+    await slotForm
+      .getByLabel("Ends at (UTC)", { exact: true })
+      .fill(new Date(start.getTime() + 3600000).toISOString().slice(0, 16));
+    await slotForm.getByLabel("Group capacity", { exact: true }).fill("2");
+    await submit(
+      merchant,
+      slotForm.getByRole("button", { name: "Create slot", exact: true }),
+    );
+    await measure(merchant, "reservation-calendar");
+    await shopper.goto(origin + "/shop/products/" + booking.id);
+    await measure(shopper, "booking-product");
+    await submit(
+      shopper,
+      shopper.getByRole("button", { name: "Add to cart", exact: true }),
+    );
+    await submit(
+      shopper,
+      shopper.getByRole("button", { name: "Place order", exact: true }),
+    );
+    const reservation = shopper.url().split("/").pop();
+    await merchant.goto(origin + "/admin/shop/orders/" + reservation);
+    await merchant
+      .getByLabel("Actual received payment reference", { exact: true })
+      .fill("browser-reservation-payment");
+    await submit(
+      merchant,
+      merchant.getByRole("button", {
+        name: "Record received payment",
+        exact: true,
+      }),
+    );
+    await shopper.reload();
+    await measure(shopper, "confirmed-reservation");
+    await submit(
+      shopper,
+      shopper.getByRole("button", {
+        name: "Request cancellation",
+        exact: true,
+      }),
+    );
+    await merchant.reload();
+    assert(
+      (await merchant.locator("main").innerText()).includes("cancel_requested"),
+    );
+    report.journey.push(
+      "Merchant creates a UTC group slot; shopper reserves, receives a paid reservation and requests cancellation without fabricating a refund.",
+    );
+    const membership = await addProduct(
+      "membership",
+      "M6 Studio membership",
+      "25.00",
+      "month",
+    );
+    await shopper.goto(origin + "/shop/products/" + membership.id);
+    await submit(
+      shopper,
+      shopper.getByRole("button", { name: "Add to cart", exact: true }),
+    );
+    await submit(
+      shopper,
+      shopper.getByRole("button", { name: "Place order", exact: true }),
+    );
+    const membershipOrder = shopper.url().split("/").pop();
+    await merchant.goto(origin + "/admin/shop/orders/" + membershipOrder);
+    await merchant
+      .getByLabel("Actual received payment reference", { exact: true })
+      .fill("browser-membership-payment");
+    await submit(
+      merchant,
+      merchant.getByRole("button", {
+        name: "Record received payment",
+        exact: true,
+      }),
+    );
+    await shopper.goto(origin + "/shop/subscriptions");
+    await measure(shopper, "active-subscription");
+    await submit(
+      shopper,
+      shopper.getByRole("button", {
+        name: "Cancel future billing",
+        exact: true,
+      }),
+    );
+    assert(
+      (await shopper.locator("main").innerText()).includes("cancel_at_end"),
+    );
+    report.journey.push(
+      "A recorded membership payment starts a real local paid period; customer cancellation preserves it and stops future billing.",
+    );
     await merchant.goto(origin + "/admin/shop");
     await merchant.evaluate(() =>
       document.querySelectorAll("main details").forEach((d) => (d.open = true)),
@@ -242,7 +425,7 @@ module.exports = async (owner, origin, output) => {
     await shopper.goto(origin + "/shop/orders");
     await measure(shopper, "order-history");
     await shopper.goto(origin + "/shop/subscriptions");
-    await measure(shopper, "subscriptions-empty");
+    await measure(shopper, "subscription-history");
     assert.equal(report.script_errors.length, 0);
     assert.equal(report.remote_requests.length, 0);
     report.product_id = productId;

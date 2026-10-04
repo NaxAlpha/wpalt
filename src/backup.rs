@@ -792,6 +792,8 @@ const TABLES: &[(&str, &[(&str, bool)])] = &[
             ("state", false),
             ("provider", false),
             ("provider_ref", false),
+            ("provider_cancel_pending", true),
+            ("provider_cancel_at", true),
             ("grant_id", false),
             ("next_variant", false),
             ("next_price_minor", true),

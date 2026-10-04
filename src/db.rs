@@ -168,6 +168,11 @@ impl Db {
         sqlx::raw_sql(crate::membership::SCHEMA)
             .execute(&mut *tx)
             .await?;
+        let reserved:i64=sqlx::query_scalar("SELECT COUNT(*) FROM posts WHERE slug IN ('shop','commerce') OR published_slug IN ('shop','commerce')").fetch_one(&mut *tx).await?;
+        anyhow::ensure!(
+            reserved == 0,
+            "Commerce reserves /shop and /commerce. Rename conflicting content with the matching older runtime before upgrading"
+        );
         sqlx::raw_sql(crate::commerce::SCHEMA)
             .execute(&mut *tx)
             .await?;

@@ -375,7 +375,8 @@ async fn invoice_payment(app: &App, value: &Value, order: &str, sub_ref: &str) -
             period_end: end,
         },
     )
-    .await
+    .await?;
+    Ok(())
 }
 async fn reconcile(app: &App, event: &Value) -> Result<()> {
     let kind = string(event, "/type")?;
@@ -437,15 +438,7 @@ async fn reconcile(app: &App, event: &Value) -> Result<()> {
                 .await?;
             } else {
                 provider_id(sub, "sub_")?;
-                let subscription = api(
-                    app,
-                    reqwest::Method::GET,
-                    &format!("subscriptions/{sub}"),
-                    "",
-                    &[],
-                )
-                .await?;
-                let inv = provider_id(string(&subscription, "/latest_invoice")?, "in_")?;
+                let inv = provider_id(string(&value, "/invoice")?, "in_")?;
                 let invoice = api(
                     app,
                     reqwest::Method::GET,
@@ -485,23 +478,47 @@ async fn reconcile(app: &App, event: &Value) -> Result<()> {
             string(&value, "/parent/subscription_details/subscription")?,
             "sub_",
         )?;
-        let sub = sqlx::query(
-            "SELECT * FROM shop_subscriptions WHERE provider='stripe' AND provider_ref=$1",
+        let existing: Option<String> = sqlx::query_scalar(
+            "SELECT id FROM shop_subscriptions WHERE provider='stripe' AND provider_ref=$1",
         )
         .bind(reference)
         .fetch_optional(&app.db.pool)
         .await?;
-        let Some(sub) = sub else {
-            return Err(Error::not_found());
-        };
+        if existing.is_none() {
+            let remote = api(
+                app,
+                reqwest::Method::GET,
+                &format!("subscriptions/{reference}"),
+                "",
+                &[],
+            )
+            .await?;
+            let initial = string(&remote, "/metadata/wpalt_order")?;
+            crate::membership::uuid(initial)?;
+            let _guard = app.mutations.lock().await;
+            let changed=sqlx::query("UPDATE shop_subscriptions SET provider_ref=$1,version=version+1 WHERE provider='stripe' AND (provider_ref='' OR provider_ref=$1) AND id=(SELECT subscription_id FROM shop_orders WHERE id=$2 AND provider='stripe' AND provider_ref<>'')").bind(reference).bind(initial).execute(&app.db.pool).await?;
+            if changed.rows_affected() != 1 {
+                return Err(Error::not_found());
+            }
+        }
+        let sub = sqlx::query(
+            "SELECT * FROM shop_subscriptions WHERE provider='stripe' AND provider_ref=$1",
+        )
+        .bind(reference)
+        .fetch_one(&app.db.pool)
+        .await?;
         if string(&value, "/status")? == "paid" {
             let line = value.pointer("/lines/data/0").ok_or_else(unavailable)?;
             let start = integer(line, "/period/start")?;
             let end = integer(line, "/period/end")?;
-            let order = if start == sub.get::<i64, _>("period_start") {
-                sqlx::query_scalar("SELECT id FROM shop_orders WHERE subscription_id=$1 AND period_start=$2 AND payment_state IN ('paid','partially_refunded','refunded','needs_refund') ORDER BY created_at,id LIMIT 1").bind(sub.get::<String,_>("id")).bind(start).fetch_one(&app.db.pool).await?
-            } else {
+            let reason = string(&value, "/billing_reason")?;
+            let order = if reason == "subscription_create" {
+                sqlx::query_scalar("SELECT id FROM shop_orders WHERE subscription_id=$1 AND purpose='purchase' ORDER BY created_at,id LIMIT 1").bind(sub.get::<String,_>("id")).fetch_one(&app.db.pool).await?
+            } else if reason == "subscription_cycle" && !sub.get::<String, _>("grant_id").is_empty()
+            {
                 billing::provider_invoice(app, reference, start, end).await?
+            } else {
+                return Err(Error::conflict());
             };
             invoice_payment(app, &value, &order, reference).await?;
         } else if kind == "invoice.payment_failed" {
@@ -531,7 +548,7 @@ async fn reconcile(app: &App, event: &Value) -> Result<()> {
         };
         if let Some(state) = state {
             sqlx::query(
-                "UPDATE shop_subscriptions SET state=$1,version=version+1 WHERE provider_ref=$2",
+                "UPDATE shop_subscriptions SET state=$1,version=version+1 WHERE provider_ref=$2 AND (state<>'cancelled' OR $1='cancelled')",
             )
             .bind(state)
             .bind(object)
@@ -575,6 +592,39 @@ pub async fn process(app: &App) -> Result<usize> {
                 sqlx::query("UPDATE shop_provider_events SET attempts=attempts+1,next_at=$1 WHERE id=$2 AND state='pending'").bind(now()+30).bind(row.get::<String,_>("id")).execute(&app.db.pool).await?;
                 tracing::warn!(event="commerce_reconciliation_pending",event_id=%row.get::<String,_>("id"),status=e.0.as_u16());
             }
+        }
+    }
+    // A completed refund or late recurring payment must also stop future provider
+    // collections. Persisted work survives transport failure and fresh recovery.
+    let cancellations = sqlx::query("SELECT id,provider_ref FROM shop_subscriptions WHERE provider_cancel_pending=1 AND provider_cancel_at<=$1 ORDER BY provider_cancel_at,id LIMIT 40").bind(now()).fetch_all(&app.db.pool).await?;
+    for sub in cancellations {
+        let id: String = sub.get("id");
+        let reference: String = sub.get("provider_ref");
+        let result = async {
+            provider_id(&reference, "sub_")?;
+            let value = api(
+                app,
+                reqwest::Method::POST,
+                &format!("subscriptions/{reference}"),
+                &format!("wpalt-stop-billing-{id}"),
+                &form(&[("cancel_at_period_end", "true".into())]),
+            )
+            .await?;
+            if string(&value, "/id")? != reference
+                || value.get("cancel_at_period_end").and_then(Value::as_bool) != Some(true)
+            {
+                return Err(Error::conflict());
+            }
+            Ok(())
+        }
+        .await;
+        let _guard = app.mutations.lock().await;
+        if result.is_ok() {
+            sqlx::query("UPDATE shop_subscriptions SET provider_cancel_pending=0,provider_cancel_at=0 WHERE id=$1 AND provider_ref=$2").bind(&id).bind(&reference).execute(&app.db.pool).await?;
+            done += 1;
+        } else {
+            sqlx::query("UPDATE shop_subscriptions SET provider_cancel_at=$1 WHERE id=$2 AND provider_cancel_pending=1").bind(now()+30).bind(&id).execute(&app.db.pool).await?;
+            tracing::warn!(event="commerce_billing_stop_pending",subscription_id=%id);
         }
     }
     Ok(done)
@@ -626,11 +676,14 @@ pub async fn refund(app: &App, s: &Session, id: &str) -> Result<()> {
 }
 pub async fn cancel_subscription(app: &App, s: &Session, id: &str, version: i64) -> Result<()> {
     customer(app, s).await?;
-    let sub=sqlx::query("SELECT provider_ref,version FROM shop_subscriptions WHERE id=$1 AND user_id=$2 AND provider='stripe'").bind(id).bind(&s.user.id).fetch_optional(&app.db.pool).await?.ok_or_else(Error::not_found)?;
+    let sub=sqlx::query("SELECT provider_ref,version,state FROM shop_subscriptions WHERE id=$1 AND user_id=$2 AND provider='stripe'").bind(id).bind(&s.user.id).fetch_optional(&app.db.pool).await?.ok_or_else(Error::not_found)?;
     if sub.get::<i64, _>("version") != version {
         return Err(Error::conflict());
     }
     let reference: String = sub.get("provider_ref");
+    if reference.is_empty() && sub.get::<String, _>("state") == "pending" {
+        return billing::cancel(app, s, id, version).await;
+    }
     provider_id(&reference, "sub_")?;
     let value = api(
         app,
@@ -640,11 +693,32 @@ pub async fn cancel_subscription(app: &App, s: &Session, id: &str, version: i64)
         &form(&[("cancel_at_period_end", "true".into())]),
     )
     .await?;
-    if value.get("cancel_at_period_end").and_then(Value::as_bool) != Some(true) {
+    if string(&value, "/id")? != reference
+        || value.get("cancel_at_period_end").and_then(Value::as_bool) != Some(true)
+    {
         return Err(Error::conflict());
     }
     let _g = app.mutations.lock().await;
     customer(app, s).await?;
-    sqlx::query("UPDATE shop_subscriptions SET state='cancel_at_end',version=version+1 WHERE id=$1 AND provider_ref=$2").bind(id).bind(reference).execute(&app.db.pool).await?;
+    let mut tx = app.db.pool.begin().await?;
+    let current: String = sqlx::query_scalar(
+        "SELECT state FROM shop_subscriptions WHERE id=$1 AND user_id=$2 AND provider_ref=$3",
+    )
+    .bind(id)
+    .bind(&s.user.id)
+    .bind(&reference)
+    .fetch_one(&mut *tx)
+    .await?;
+    let due = sqlx::query(
+        "SELECT * FROM shop_orders WHERE subscription_id=$1 AND payment_state='awaiting'",
+    )
+    .bind(id)
+    .fetch_all(&mut *tx)
+    .await?;
+    for order in due {
+        orders::cancel_tx(&mut tx, &order, "cancelled").await?;
+    }
+    sqlx::query("UPDATE shop_subscriptions SET state=$1,next_variant='',next_price_minor=-1,provider_cancel_pending=0,provider_cancel_at=0,version=version+1 WHERE id=$2 AND provider_ref=$3").bind(if current=="active" || current=="cancel_at_end" {"cancel_at_end"} else {"cancelled"}).bind(id).bind(reference).execute(&mut *tx).await?;
+    tx.commit().await?;
     Ok(())
 }

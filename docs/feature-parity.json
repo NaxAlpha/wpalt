@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md",
-  "milestone": "M5 defined scope verified locally; exact delivery CI/artifact status on PR #10",
+  "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
+  "milestone": "M6 defined scope verified locally; final-source delivery gates and exact clean artifact on PR #12",
   "capabilities": [
     {
       "id": "F001",
@@ -998,9 +998,18 @@
       "capability": "Catalog, variants and digital products",
       "deployment": "L",
       "milestone": "M6",
-      "status": "planned",
+      "status": "verified-local-defined-M6-scope; final-CI-status-on-PR-12",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m6_coverage": "Published physical/digital/membership/booking products; up to 100 variants per product; finite stock and shared protected private downloads. No full WooCommerce extension ecosystem claim.",
+      "evidence": [
+        "m6-contract.md",
+        "commerce-reservations.md",
+        "evidence/m6-verification.md",
+        "../tests/support/commerce_journeys.rs",
+        "../scripts/commerce_acceptance.cjs",
+        "../scripts/cli_acceptance.py"
+      ]
     },
     {
       "id": "F062",
@@ -1008,9 +1017,18 @@
       "capability": "Cart, checkout state and orders",
       "deployment": "L",
       "milestone": "M6",
-      "status": "planned",
+      "status": "verified-local-defined-M6-scope; final-CI-status-on-PR-12",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m6_coverage": "Persistent authenticated 20-line carts, authoritative quote review, idempotent snapshotted orders, bounded private/merchant lists and separate settlement/fulfillment. Guest checkout remains outside this defined scope.",
+      "evidence": [
+        "m6-contract.md",
+        "commerce-reservations.md",
+        "evidence/m6-verification.md",
+        "../tests/support/commerce_journeys.rs",
+        "../scripts/commerce_acceptance.cjs",
+        "../scripts/cli_acceptance.py"
+      ]
     },
     {
       "id": "F063",
@@ -1018,9 +1036,18 @@
       "capability": "Inventory and reservation locks",
       "deployment": "L",
       "milestone": "M6",
-      "status": "planned",
+      "status": "verified-local-defined-M6-scope; final-CI-status-on-PR-12",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m6_coverage": "Transactional last-unit/last-slot holds, expiry/release, exact settlement allocations and final full-refund restocking; one owning process per site, distributed coordination remains M9.",
+      "evidence": [
+        "m6-contract.md",
+        "commerce-reservations.md",
+        "evidence/m6-verification.md",
+        "../tests/support/commerce_journeys.rs",
+        "../scripts/commerce_acceptance.cjs",
+        "../scripts/cli_acceptance.py"
+      ]
     },
     {
       "id": "F064",
@@ -1028,9 +1055,18 @@
       "capability": "Coupons, discounts and member pricing",
       "deployment": "L",
       "milestone": "M6",
-      "status": "planned",
+      "status": "verified-local-defined-M6-scope; final-CI-status-on-PR-12",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m6_coverage": "Integer basis-point coupons, product/member eligibility, bounded redemption counts, current entitlement pricing and M4 one-time reward codes. Recurring purchases are one fixed-price item without coupon/member adjustment.",
+      "evidence": [
+        "m6-contract.md",
+        "commerce-reservations.md",
+        "evidence/m6-verification.md",
+        "../tests/support/commerce_journeys.rs",
+        "../scripts/commerce_acceptance.cjs",
+        "../scripts/cli_acceptance.py"
+      ]
     },
     {
       "id": "F065",
@@ -1038,9 +1074,18 @@
       "capability": "Booking calendars, staff/resources and group capacity",
       "deployment": "L",
       "milestone": "M6",
-      "status": "planned",
+      "status": "verified-local-defined-M6-scope; final-CI-status-on-PR-12",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m6_coverage": "Explicit UTC resource/staff calendars, group capacity, overlap protection including reassignment, current staff authority and cursor access to later slots; external calendar sync remains F070.",
+      "evidence": [
+        "m6-contract.md",
+        "commerce-reservations.md",
+        "evidence/m6-verification.md",
+        "../tests/support/commerce_journeys.rs",
+        "../scripts/commerce_acceptance.cjs",
+        "../scripts/cli_acceptance.py"
+      ]
     },
     {
       "id": "F066",
@@ -1048,9 +1093,18 @@
       "capability": "Local appointment confirmations and reminder scheduling",
       "deployment": "L",
       "milestone": "M6",
-      "status": "planned",
+      "status": "verified-local-defined-M6-scope; final-CI-status-on-PR-12",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m6_coverage": "Durable service confirmation/reminder/cancellation through shared local mail_jobs; local spool or configured SMTP, no delivery claim when mail is disabled and no recall of in-flight mail.",
+      "evidence": [
+        "m6-contract.md",
+        "commerce-reservations.md",
+        "evidence/m6-verification.md",
+        "../tests/support/commerce_journeys.rs",
+        "../scripts/commerce_acceptance.cjs",
+        "../scripts/cli_acceptance.py"
+      ]
     },
     {
       "id": "F067",
@@ -1058,9 +1112,18 @@
       "capability": "Subscription schedules, proration and dunning state",
       "deployment": "L",
       "milestone": "M6",
-      "status": "planned",
+      "status": "verified-local-defined-M6-scope; final-CI-status-on-PR-12",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m6_coverage": "Paid period access, local renewal invoices/dunning/cancel, integer upgrade proration and accepted next-period downgrade prices; no simulated collection or hosted plan-change parity.",
+      "evidence": [
+        "m6-contract.md",
+        "commerce-reservations.md",
+        "evidence/m6-verification.md",
+        "../tests/support/commerce_journeys.rs",
+        "../scripts/commerce_acceptance.cjs",
+        "../scripts/cli_acceptance.py"
+      ]
     },
     {
       "id": "F068",
@@ -1068,9 +1131,18 @@
       "capability": "Refund/admin transaction workflow",
       "deployment": "L",
       "milestone": "M6",
-      "status": "planned",
+      "status": "verified-local-defined-M6-scope; final-CI-status-on-PR-12",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m6_coverage": "Actual payment receipts, fulfillment, reserved bounded partial/full refunds, own-grant revocation, manual affiliate payouts and fresh recovery of financial facts; records are not jurisdiction-certified tax invoices.",
+      "evidence": [
+        "m6-contract.md",
+        "commerce-reservations.md",
+        "evidence/m6-verification.md",
+        "../tests/support/commerce_journeys.rs",
+        "../scripts/commerce_acceptance.cjs",
+        "../scripts/cli_acceptance.py"
+      ]
     },
     {
       "id": "F069",
@@ -1078,9 +1150,15 @@
       "capability": "Card settlement and recurring collection",
       "deployment": "E",
       "milestone": "M6",
-      "status": "optional-connector-or-external-boundary",
+      "status": "optional-Stripe-HTTPS-adapter-verified; provider-account-sandbox-not-certified",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m6_coverage": "Hosted Checkout with pinned API, raw signatures, canonical one-time/recurring exact-money reconciliation, delayed initial invoice identity, refund and period-end cancel. Local HTTPS protocol fixture is not an actual Stripe-account test; card settlement remains external.",
+      "evidence": [
+        "commerce-reservations.md",
+        "evidence/m6-verification.md",
+        "../tests/support/commerce_journeys.rs"
+      ]
     },
     {
       "id": "F070",
@@ -1090,7 +1168,8 @@
       "milestone": "M6",
       "status": "optional-connector-or-external-boundary",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m6_coverage": "Explicit external boundary. Local merchant-set flat shipping/tax and UTC slots do not reproduce carrier labels/rates, external calendars, jurisdictional datasets or filing."
     },
     {
       "id": "F071",
@@ -1100,7 +1179,8 @@
       "milestone": "M6",
       "status": "optional-connector-or-external-boundary",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m6_coverage": "Explicit external boundary. Local merchant-set flat shipping/tax and UTC slots do not reproduce carrier labels/rates, external calendars, jurisdictional datasets or filing."
     },
     {
       "id": "F072",

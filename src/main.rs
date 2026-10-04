@@ -244,10 +244,10 @@ async fn shop_command(app: &App, command: ShopCommand) -> wpalt::error::Result<(
             c::tick(app).await?
         ),
         ShopCommand::Report => {
-            let r=sqlx::query("SELECT (SELECT COUNT(*) FROM shop_products) AS products,(SELECT COUNT(*) FROM shop_orders WHERE payment_state='awaiting') AS awaiting,(SELECT COUNT(*) FROM shop_orders WHERE payment_state='needs_refund') AS needs_refund,(SELECT COUNT(*) FROM shop_subscriptions WHERE state='past_due') AS past_due,(SELECT records FROM shop_usage WHERE id=1) AS records").fetch_one(&app.db.pool).await?;
+            let r=sqlx::query("SELECT (SELECT COUNT(*) FROM shop_products) AS products,(SELECT COUNT(*) FROM shop_orders WHERE payment_state='awaiting') AS awaiting,(SELECT COUNT(*) FROM shop_orders WHERE payment_state='needs_refund') AS needs_refund,(SELECT COUNT(*) FROM shop_subscriptions WHERE state='past_due') AS past_due,(SELECT COUNT(*) FROM shop_subscriptions WHERE provider_cancel_pending=1) AS pending_billing_stop,(SELECT records FROM shop_usage WHERE id=1) AS records").fetch_one(&app.db.pool).await?;
             println!(
                 "{}",
-                serde_json::json!({"currency":app.config.commerce.currency,"products":r.get::<i64,_>("products"),"awaiting_payment":r.get::<i64,_>("awaiting"),"needs_refund":r.get::<i64,_>("needs_refund"),"past_due":r.get::<i64,_>("past_due"),"records":r.get::<i64,_>("records")})
+                serde_json::json!({"currency":app.config.commerce.currency,"products":r.get::<i64,_>("products"),"awaiting_payment":r.get::<i64,_>("awaiting"),"needs_refund":r.get::<i64,_>("needs_refund"),"past_due":r.get::<i64,_>("past_due"),"pending_billing_stop":r.get::<i64,_>("pending_billing_stop"),"records":r.get::<i64,_>("records")})
             );
         }
         ShopCommand::SeedDemo => {

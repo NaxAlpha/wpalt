@@ -997,7 +997,7 @@
         "business-rule or migration changes",
         "security guidance update"
       ],
-      "status": "implemented; integrated verification in progress"
+      "status": "defined-scope verified locally; final-source CI and artifact gates on PR #12"
     },
     {
       "feature_id": "M6-02",
@@ -1032,7 +1032,7 @@
         "business-rule or migration changes",
         "security guidance update"
       ],
-      "status": "implemented; integrated verification in progress"
+      "status": "defined-scope verified locally; final-source CI and artifact gates on PR #12"
     },
     {
       "feature_id": "M6-03",
@@ -1068,7 +1068,7 @@
         "business-rule or migration changes",
         "security guidance update"
       ],
-      "status": "implemented; integrated verification in progress"
+      "status": "defined-scope verified locally; final-source CI and artifact gates on PR #12"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

@@ -53,6 +53,19 @@ pub async fn slot(app: &App, s: &Session, input: &SlotInput) -> Result<String> {
             .fetch_optional(&mut *tx)
             .await?;
     let staff = staff.ok_or_else(Error::not_found)?;
+    if !staff.is_empty() {
+        let valid: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM users WHERE id=$1 AND role IN ('admin','editor')",
+        )
+        .bind(&staff)
+        .fetch_one(&mut *tx)
+        .await?;
+        if valid != 1 {
+            return Err(Error::invalid(
+                "The assigned staff account is no longer active.",
+            ));
+        }
+    }
     let kind:Option<String>=sqlx::query_scalar("SELECT p.kind FROM shop_variants v JOIN shop_products p ON p.id=v.product_id WHERE v.id=$1 AND v.active=1 AND p.published=1").bind(&input.variant_id).fetch_optional(&mut *tx).await?;
     if kind.as_deref() != Some("booking") {
         return Err(Error::invalid(
@@ -178,4 +191,40 @@ pub async fn notify(app: &App) -> Result<usize> {
     }
     tx.commit().await?;
     Ok(count)
+}
+
+pub async fn edit_resource(
+    app: &App,
+    s: &Session,
+    id: &str,
+    version: i64,
+    title: &str,
+    staff: &str,
+    active: bool,
+) -> Result<()> {
+    text(title, 160)?;
+    if !staff.is_empty() {
+        crate::membership::uuid(staff)?;
+    }
+    let _guard = app.mutations.lock().await;
+    owner(app, s).await?;
+    let mut tx = app.db.pool.begin().await?;
+    if !staff.is_empty() {
+        let role: Option<String> = sqlx::query_scalar("SELECT role FROM users WHERE id=$1")
+            .bind(staff)
+            .fetch_optional(&mut *tx)
+            .await?;
+        if !matches!(role.as_deref(), Some("admin" | "editor")) {
+            return Err(Error::invalid("Choose an active staff account."));
+        }
+        let overlap:i64=sqlx::query_scalar("SELECT COUNT(*) FROM shop_slots a JOIN shop_slots b ON a.starts_at<b.ends_at AND a.ends_at>b.starts_at JOIN shop_resources r ON r.id=b.resource_id WHERE a.resource_id=$1 AND b.resource_id<>$1 AND r.staff_id=$2 AND (a.active=1 OR a.held+a.booked>0) AND (b.active=1 OR b.held+b.booked>0)").bind(id).bind(staff).fetch_one(&mut *tx).await?;
+        if overlap != 0 {
+            return Err(Error::invalid(
+                "The new staff assignment would overlap existing reservations.",
+            ));
+        }
+    }
+    if sqlx::query("UPDATE shop_resources SET title=$1,staff_id=$2,active=$3,version=version+1 WHERE id=$4 AND version=$5").bind(title.trim()).bind(staff).bind(i64::from(active)).bind(id).bind(version).execute(&mut *tx).await?.rows_affected()!=1{return Err(Error::conflict())}
+    tx.commit().await?;
+    Ok(())
 }

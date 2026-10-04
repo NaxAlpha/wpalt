@@ -467,6 +467,13 @@ pub fn validate(t: &Tables, c: &Config) -> Result<()> {
         {
             return Err(bad());
         }
+        if !(0..=1).contains(&n(sub, "provider_cancel_pending"))
+            || n(sub, "provider_cancel_at") < 0
+            || n(sub, "provider_cancel_pending") == 1
+                && (s(sub, "provider") != "stripe" || s(sub, "provider_ref").is_empty())
+        {
+            return Err(bad());
+        }
         money(n(sub, "price_minor"))?;
         if !s(sub, "provider_ref").is_empty() && !subrefs.insert(s(sub, "provider_ref")) {
             return Err(bad());

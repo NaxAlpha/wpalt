@@ -286,3 +286,7 @@ The user authorized M5 PR #10, merged as `323f25c27669a071f2344ce3f40318a3d86a4e
 ### M6 preparation — 2026-10-04
 
 User authorized merging delivery PR #11 and proceeding with M6. PR #11 merged to `55cc1d8538e07bf01e4e2827b26379f58da00608`; its actual-main run 37167056070 passed all six jobs and published the first independently verified nightly archive. M6 is active under [the commerce contract](m6-contract.md), with [operating rules](commerce-reservations.md), ADR 0008 and [verification-in-progress](evidence/m6-verification.md). No M6 completion/M7 start or provider sandbox-certification claim is made until the delivery gates and user review are satisfied.
+
+### M6 local integration and delivery review — 2026-10-04
+
+[Delivery PR #12](https://github.com/NaxAlpha/wpalt/pull/12) integrates the local store, real-payment reconciliation, shared paid access, billing, UTC resource reservations, service outbox and recovery. Twelve connected M6 journeys supplement the cumulative suite; [verification](evidence/m6-verification.md) and [operating limits](commerce-reservations.md) define tested coverage rather than broad plugin parity. Final-source CI and independently checked clean archive determine ready status. Human merge remains separate; M7 has not started.

@@ -919,11 +919,801 @@ async fn commerce_https_provider_requires_tls_raw_signatures_exact_money_and_ide
         std::fs::write(&spec, serde_json::to_vec(&data).unwrap()).unwrap();
         payments::refund(&app, site.session(), &rid).await.unwrap();
         assert_eq!(state(&site, &id).await, "refunded");
+        // An invoice can arrive before Checkout completion. Canonical subscription
+        // metadata establishes the mapping without granting access on a redirect.
+        let (_, plan) = product(&site, "membership", 1000, -1, "month").await;
+        let mut recurring = cart(&site, &buyer, &plan, "", 1).await;
+        recurring.provider = "stripe".into();
+        let initial = orders::checkout(&app, &buyer, &recurring).await.unwrap();
+        data["POST"]["/checkout/sessions"] = serde_json::json!({"key":format!("wpalt-checkout-{initial}"),"fields":{"mode":"subscription","line_items[0][price_data][recurring][interval]":"month","subscription_data[metadata][wpalt_order]":initial},"body":{"id":"cs_recurring","client_reference_id":initial,"amount_total":1000,"currency":"usd","url":"https://checkout.stripe.com/c/pay/recurring"}});
+        data["GET"]["/checkout/sessions/cs_recurring"] = serde_json::json!({"body":{"id":"cs_recurring","client_reference_id":initial,"payment_status":"paid","status":"complete","subscription":"sub_recurring","invoice":"in_initial"}});
+        data["GET"]["/subscriptions/sub_recurring"] = serde_json::json!({"body":{"id":"sub_recurring","metadata":{"wpalt_order":initial},"latest_invoice":"in_initial","status":"active","cancel_at_period_end":false}});
+        let first_start = wpalt::now();
+        let first_end = billing::period_end(first_start, "month").unwrap();
+        let invoice = |start, end, intent: &str, reason: &str| serde_json::json!({"status":"paid","currency":"usd","total":1000,"amount_due":1000,"amount_paid":1000,"amount_remaining":0,"billing_reason":reason,"status_transitions":{"paid_at":wpalt::now()},"parent":{"subscription_details":{"subscription":"sub_recurring"}},"lines":{"data":[{"period":{"start":start,"end":end}}],"has_more":false},"payments":{"data":[{"status":"paid","amount_paid":1000,"payment":{"type":"payment_intent","payment_intent":intent}}],"has_more":false}});
+        data["GET"]["/invoices/in_initial"] = serde_json::json!({"body":invoice(first_start,first_end,"pi_initial","subscription_create")});
+        std::fs::write(&spec, serde_json::to_vec(&data).unwrap()).unwrap();
+        payments::checkout(&app, &buyer, &initial).await.unwrap();
+        let deliver = |id: &str, kind: &str, object: &str| {
+            serde_json::to_vec(&serde_json::json!({"id":id,"api_version":payments::API_VERSION,"type":kind,"created":wpalt::now(),"data":{"object":{"id":object}}})).unwrap()
+        };
+        let e = deliver("evt_invoice_first", "invoice.paid", "in_initial");
+        payments::receive(&app, &signature("whsec_fixture", wpalt::now(), &e), &e)
+            .await
+            .unwrap();
+        assert_eq!(payments::process(&app).await.unwrap(), 1);
+        assert_eq!(state(&site, &initial).await, "paid");
+        let e = deliver(
+            "evt_checkout_later",
+            "checkout.session.completed",
+            "cs_recurring",
+        );
+        payments::receive(&app, &signature("whsec_fixture", wpalt::now(), &e), &e)
+            .await
+            .unwrap();
+        assert_eq!(payments::process(&app).await.unwrap(), 1);
+        let sid: String = sqlx::query_scalar("SELECT subscription_id FROM shop_orders WHERE id=$1")
+            .bind(&initial)
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        let next_end = billing::period_end(first_end, "month").unwrap();
+        data["GET"]["/invoices/in_renewal"] = serde_json::json!({"body":invoice(first_end,next_end,"pi_renewal","subscription_cycle")});
+        data["GET"]["/subscriptions/sub_recurring"]["body"]["latest_invoice"] = "in_renewal".into();
+        std::fs::write(&spec, serde_json::to_vec(&data).unwrap()).unwrap();
+        let e = deliver("evt_renewal", "invoice.paid", "in_renewal");
+        payments::receive(&app, &signature("whsec_fixture", wpalt::now(), &e), &e)
+            .await
+            .unwrap();
+        assert_eq!(payments::process(&app).await.unwrap(), 1);
+        // A delayed initial session must use its own invoice, never latest_invoice.
+        let e = deliver(
+            "evt_old_checkout",
+            "checkout.session.completed",
+            "cs_recurring",
+        );
+        payments::receive(&app, &signature("whsec_fixture", wpalt::now(), &e), &e)
+            .await
+            .unwrap();
+        assert_eq!(payments::process(&app).await.unwrap(), 1);
+        let periods:i64=sqlx::query_scalar("SELECT COUNT(*) FROM shop_payments p JOIN shop_orders o ON o.id=p.order_id WHERE o.subscription_id=$1").bind(&sid).fetch_one(&app.db.pool).await.unwrap();
+        assert_eq!(periods, 2);
+        let version: i64 = sqlx::query_scalar("SELECT version FROM shop_subscriptions WHERE id=$1")
+            .bind(&sid)
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        data["POST"]["/subscriptions/sub_recurring"] = serde_json::json!({"key":format!("wpalt-cancel-{sid}-{version}"),"fields":{"cancel_at_period_end":"true"},"body":{"id":"sub_recurring","cancel_at_period_end":true}});
+        std::fs::write(&spec, serde_json::to_vec(&data).unwrap()).unwrap();
+        payments::cancel_subscription(&app, &buyer, &sid, version)
+            .await
+            .unwrap();
+        let status: String = sqlx::query_scalar("SELECT state FROM shop_subscriptions WHERE id=$1")
+            .bind(&sid)
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(status, "cancel_at_end");
+        // Full refund persists the obligation to stop external future billing,
+        // even when that provider operation is temporarily unavailable.
+        let renewal: String = sqlx::query_scalar(
+            "SELECT id FROM shop_orders WHERE subscription_id=$1 AND purpose='renewal'",
+        )
+        .bind(&sid)
+        .fetch_one(&app.db.pool)
+        .await
+        .unwrap();
+        let refund = orders::refund_request(
+            &app,
+            site.session(),
+            &renewal,
+            order_version(&site, &renewal).await,
+            &orders::RefundInput {
+                request_key: uuid::Uuid::new_v4().to_string(),
+                amount_minor: 1000,
+                reason: "Return recurring period".into(),
+                restock: false,
+            },
+        )
+        .await
+        .unwrap();
+        data["POST"]["/refunds"] = serde_json::json!({"key":format!("wpalt-refund-{refund}"),"fields":{"payment_intent":"pi_renewal","amount":"1000","metadata[wpalt_refund]":refund},"body":{"id":"re_recurring","payment_intent":"pi_renewal","amount":1000,"currency":"usd","status":"succeeded","metadata":{"wpalt_refund":refund}}});
+        data["POST"]["/subscriptions/sub_recurring"] = serde_json::json!({"key":format!("wpalt-stop-billing-{sid}"),"fields":{"cancel_at_period_end":"true"},"status":503,"body":{}});
+        std::fs::write(&spec, serde_json::to_vec(&data).unwrap()).unwrap();
+        payments::refund(&app, site.session(), &refund)
+            .await
+            .unwrap();
+        assert_eq!(state(&site, &renewal).await, "refunded");
+        assert_eq!(payments::process(&app).await.unwrap(), 0);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(
+                "SELECT provider_cancel_pending FROM shop_subscriptions WHERE id=$1"
+            )
+            .bind(&sid)
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap(),
+            1
+        );
+        let waiting = Site::new(pg, false).await;
+        backup::restore(&waiting.app, &backup::capture(&app).await.unwrap())
+            .await
+            .unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(
+                "SELECT provider_cancel_pending FROM shop_subscriptions WHERE id=$1"
+            )
+            .bind(&sid)
+            .fetch_one(&waiting.app.db.pool)
+            .await
+            .unwrap(),
+            1
+        );
+        waiting.close().await;
+        data["POST"]["/subscriptions/sub_recurring"]["status"] = 200.into();
+        data["POST"]["/subscriptions/sub_recurring"]["body"] =
+            serde_json::json!({"id":"sub_recurring","cancel_at_period_end":true});
+        std::fs::write(&spec, serde_json::to_vec(&data).unwrap()).unwrap();
+        sqlx::query("UPDATE shop_subscriptions SET provider_cancel_at=0 WHERE id=$1")
+            .bind(&sid)
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(payments::process(&app).await.unwrap(), 1);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(
+                "SELECT provider_cancel_pending FROM shop_subscriptions WHERE id=$1"
+            )
+            .bind(&sid)
+            .fetch_one(&app.db.pool)
+            .await
+            .unwrap(),
+            0
+        );
+        let third_end = billing::period_end(next_end, "month").unwrap();
+        data["GET"]["/invoices/in_after_cancel"] = serde_json::json!({"body":invoice(next_end,third_end,"pi_after_cancel","subscription_cycle")});
+        std::fs::write(&spec, serde_json::to_vec(&data).unwrap()).unwrap();
+        let e = deliver("evt_money_after_cancel", "invoice.paid", "in_after_cancel");
+        payments::receive(&app, &signature("whsec_fixture", wpalt::now(), &e), &e)
+            .await
+            .unwrap();
+        assert_eq!(
+            payments::process(&app).await.unwrap(),
+            2,
+            "Record late money and retry the durable billing stop, never reactivate access."
+        );
+        let late: String = sqlx::query_scalar(
+            "SELECT payment_state FROM shop_orders WHERE subscription_id=$1 AND period_start=$2",
+        )
+        .bind(&sid)
+        .bind(next_end)
+        .fetch_one(&app.db.pool)
+        .await
+        .unwrap();
+        assert_eq!(late, "needs_refund");
+        let mut pending = cart(&site, &buyer, &plan, "", 1).await;
+        pending.provider = "stripe".into();
+        let unpaid = orders::checkout(&app, &buyer, &pending).await.unwrap();
+        let pending_sid: String =
+            sqlx::query_scalar("SELECT subscription_id FROM shop_orders WHERE id=$1")
+                .bind(&unpaid)
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap();
+        payments::cancel_subscription(&app, &buyer, &pending_sid, 1)
+            .await
+            .unwrap();
+        assert_eq!(state(&site, &unpaid).await, "cancelled");
         let recovered = Site::new(pg, false).await;
         backup::restore(&recovered.app, &backup::capture(&app).await.unwrap())
             .await
             .unwrap();
         recovered.close().await;
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn commerce_populated_catalog_cart_and_order_history_remain_bounded_and_indexed() {
+    let mut evidence = vec![];
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let (token, buyer) = shopper(&site, "volume-store@example.test").await;
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        let mut chosen = vec![];
+        let at = wpalt::now();
+        for i in 0..1000 {
+            let p = uuid::Uuid::new_v4().to_string();
+            let v = uuid::Uuid::new_v4().to_string();
+            let order = uuid::Uuid::new_v4().to_string();
+            if i < 20 {
+                chosen.push(v.clone())
+            }
+            sqlx::query("INSERT INTO shop_products(id,slug,title,description,kind,published,created_at) VALUES($1,$2,$3,'Populated store fixture','physical',1,$4)").bind(&p).bind(format!("volume-{i}")).bind(format!("Product {i}")).bind(at).execute(&mut *tx).await.unwrap();
+            sqlx::query("INSERT INTO shop_variants(id,product_id,title,sku,price_minor,stock_total) VALUES($1,$2,'Standard',$3,500,100)").bind(&v).bind(&p).bind(format!("SKU-{i}")).execute(&mut *tx).await.unwrap();
+            sqlx::query("INSERT INTO shop_orders(id,user_id,request_key,request_digest,cart_version,customer_name,customer_email,shipping_address,currency,subtotal_minor,discount_minor,tax_minor,shipping_minor,total_minor,tax_bps,tax_shipping,provider,payment_state,fulfillment,expires_at,created_at) VALUES($1,$2,$1,$3,0,'Shopper','volume-store@example.test','Synthetic','USD',500,0,0,0,500,0,0,'offline','cancelled','cancelled',$4,$4)").bind(&order).bind(&buyer.user.id).bind(auth::digest(order.as_bytes())).bind(at).execute(&mut *tx).await.unwrap();
+            sqlx::query("INSERT INTO shop_order_lines(id,order_id,variant_id,product_id,title,sku,kind,quantity,unit_minor,line_minor,allocation) VALUES($1,$2,$3,$4,$5,$6,'physical',1,500,500,'released')").bind(uuid::Uuid::new_v4().to_string()).bind(&order).bind(v).bind(p).bind(format!("Product {i}")).bind(format!("SKU-{i}")).execute(&mut *tx).await.unwrap();
+        }
+        tx.commit().await.unwrap();
+        for v in &chosen {
+            let ver = orders::cart_version(&site.app, &buyer.user.id)
+                .await
+                .unwrap();
+            orders::set_cart(&site.app, &buyer, ver, v, "", 1)
+                .await
+                .unwrap();
+        }
+        let mut quote_times = vec![];
+        let mut request_times = vec![];
+        for _ in 0..30 {
+            let start = std::time::Instant::now();
+            let q = orders::quote(&site.app, &buyer, "").await.unwrap();
+            quote_times.push(start.elapsed().as_secs_f64() * 1000.);
+            assert_eq!(q.lines.len(), 20);
+            assert_eq!(q.total_minor, 10000);
+            let start = std::time::Instant::now();
+            let (status, html) = get(&site.app, "/shop/orders", Some(&token)).await;
+            request_times.push(start.elapsed().as_secs_f64() * 1000.);
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(html.matches("href=\"/shop/orders/").count(), 40);
+        }
+        let (status, html) = get(&site.app, "/shop", None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(html.matches("href=\"/shop/products/").count(), 40);
+        let mut page = "/shop/orders".to_string();
+        let mut seen = HashSet::new();
+        loop {
+            let (_, html) = get(&site.app, &page, Some(&token)).await;
+            for tail in html.split("href=\"/shop/orders/").skip(1) {
+                assert!(seen.insert(tail.split('"').next().unwrap().to_string()));
+            }
+            if let Some((_, tail)) = html.split_once("href=\"/shop/orders?after=") {
+                page = format!("/shop/orders?after={}", tail.split('"').next().unwrap());
+                assert!(seen.len() <= 1000);
+            } else {
+                break;
+            }
+        }
+        assert_eq!(seen.len(), 1000);
+        sqlx::raw_sql("ANALYZE")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let prefix = if pg {
+            "EXPLAIN "
+        } else {
+            "EXPLAIN QUERY PLAN "
+        };
+        let mut plans = vec![];
+        for query in [format!("SELECT id FROM shop_orders WHERE user_id='{}' AND id>'00000000-0000-0000-0000-000000000000' ORDER BY id LIMIT 41",buyer.user.id),"SELECT id FROM shop_products WHERE published=1 AND id>'00000000-0000-0000-0000-000000000000' ORDER BY id LIMIT 41".into(),format!("SELECT variant_id FROM shop_cart_lines WHERE user_id='{}' ORDER BY variant_id,slot_id LIMIT 21",buyer.user.id),"SELECT id FROM shop_slots WHERE variant_id='00000000-0000-0000-0000-000000000000' AND active=1 AND starts_at>1 ORDER BY starts_at,id LIMIT 41".into()]{let rows=sqlx::query(&format!("{prefix}{query}")).fetch_all(&site.app.db.pool).await.unwrap();plans.push(rows.iter().map(|r|if pg{r.get::<String,_>(0)}else{r.get::<String,_>("detail")}).collect::<Vec<_>>());}
+        quote_times.sort_by(f64::total_cmp);
+        request_times.sort_by(f64::total_cmp);
+        evidence.push(serde_json::json!({"engine":if pg{"postgres"}else{"sqlite"},"conditions":"Debug integration router/domain calls, 1000 products/variants and consistent cancelled orders/lines; 20-line cart; 30 warm samples; no production-capacity claim or brittle timing threshold","quote_p50_ms":quote_times[14],"quote_p95_ms":quote_times[28],"private_order_request_p50_ms":request_times[14],"private_order_request_p95_ms":request_times[28],"plans":plans,"pagination":"All 1000 private orders reached once through bounded 40-row pages"}));
+        site.close().await;
+    }
+    std::fs::create_dir_all("work").unwrap();
+    std::fs::write(
+        "work/m6-volume.json",
+        serde_json::to_vec_pretty(&evidence).unwrap(),
+    )
+    .unwrap();
+}
+
+#[tokio::test]
+async fn commerce_protected_download_authority_quota_and_late_money_remain_safe() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let (token, buyer) = shopper(&site, "protected-shopper@example.test").await;
+        assert_eq!(
+            upload(&site, "purchase.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let media: String = sqlx::query_scalar("SELECT id FROM media")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let p = catalog::save_product(
+            &site.app,
+            site.session(),
+            None,
+            0,
+            &catalog::ProductInput {
+                slug: "paid-download".into(),
+                title: "Protected guide".into(),
+                description: "Private purchased media".into(),
+                kind: "digital".into(),
+                entitlement: "guide".into(),
+                access_seconds: 0,
+                download_id: media.clone(),
+                published: true,
+            },
+        )
+        .await
+        .unwrap();
+        let v = catalog::save_variant(
+            &site.app,
+            site.session(),
+            &p,
+            None,
+            0,
+            &catalog::VariantInput {
+                title: "Guide".into(),
+                sku: "PRIVATE-GUIDE".into(),
+                price_minor: 900,
+                member_price_minor: -1,
+                member_key: String::new(),
+                stock_total: -1,
+                billing_interval: String::new(),
+                active: true,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            get(&site.app, &format!("/media/{media}"), Some(&token))
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        let input = cart(&site, &buyer, &v, "", 1).await;
+        let id = orders::checkout(&site.app, &buyer, &input).await.unwrap();
+        pay(&site, &id, "guide-payment").await;
+        assert_eq!(
+            request(
+                &site.app,
+                "GET",
+                &format!("/media/{media}"),
+                Some(&token),
+                "",
+                vec![]
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        let (_, html) = get(&site.app, &format!("/shop/orders/{id}"), Some(&token)).await;
+        assert!(html.contains(&format!("href=\"/media/{media}\"")));
+        let refund = orders::refund_request(
+            &site.app,
+            site.session(),
+            &id,
+            order_version(&site, &id).await,
+            &orders::RefundInput {
+                request_key: uuid::Uuid::new_v4().to_string(),
+                amount_minor: 900,
+                reason: "Returned guide".into(),
+                restock: false,
+            },
+        )
+        .await
+        .unwrap();
+        orders::record_offline_refund(&site.app, site.session(), &refund, "guide-return", 900)
+            .await
+            .unwrap();
+        assert_eq!(
+            get(&site.app, &format!("/media/{media}"), Some(&token))
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        let (_, physical) = product(&site, "physical", 700, 1, "").await;
+        let input = cart(&site, &buyer, &physical, "", 1).await;
+        let held = orders::checkout(&site.app, &buyer, &input).await.unwrap();
+        orders::cancel(&site.app, &buyer, &held, 1).await.unwrap();
+        orders::confirm_payment(
+            &site.app,
+            &orders::Payment {
+                order_id: held.clone(),
+                provider: "offline".into(),
+                reference: "late-actual-payment".into(),
+                amount_minor: 700,
+                currency: "USD".into(),
+                paid_at: wpalt::now(),
+                subscription_ref: String::new(),
+                period_start: 0,
+                period_end: 0,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(state(&site, &held).await, "needs_refund");
+        let stock: i64 = sqlx::query_scalar("SELECT held+sold FROM shop_variants WHERE id=$1")
+            .bind(&physical)
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(stock, 0);
+        let input = cart(&site, &buyer, &physical, "", 1).await;
+        sqlx::query("UPDATE shop_usage SET limit_records=records WHERE id=1")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert!(orders::checkout(&site.app, &buyer, &input).await.is_err());
+        let present: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM shop_orders WHERE request_key=$1")
+                .bind(&input.request_key)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(present, 0);
+        let held_stock: i64 = sqlx::query_scalar("SELECT held FROM shop_variants WHERE id=$1")
+            .bind(&physical)
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(held_stock, 0);
+        sqlx::query("UPDATE shop_usage SET limit_records=1000000 WHERE id=1")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let mut disabled = site.app.clone();
+        let mut cfg = disabled.config.as_ref().clone();
+        cfg.commerce.enabled = false;
+        disabled.config = std::sync::Arc::new(cfg);
+        assert_eq!(
+            get(&disabled, "/shop", Some(&token)).await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert!(orders::quote(&disabled, &buyer, "").await.is_err());
+        assert_eq!(wpalt::commerce::tick(&disabled).await.unwrap(), 0);
+        sqlx::query("UPDATE users SET role='disabled' WHERE id=$1")
+            .bind(&buyer.user.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert!(orders::checkout(&site.app, &buyer, &input).await.is_err());
+        sqlx::query("UPDATE users SET role='subscriber' WHERE id=$1")
+            .bind(&buyer.user.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let fresh = Site::new(pg, false).await;
+        backup::restore(&fresh.app, &backup::capture(&site.app).await.unwrap())
+            .await
+            .unwrap();
+        fresh.close().await;
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn commerce_reward_redemption_survives_privacy_erasure_without_reusable_codes() {
+    use wpalt::business::{engagement, promotions};
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let (_, buyer) = shopper(&site, "reward-buyer@example.test").await;
+        sqlx::query("UPDATE engagement_settings SET enabled=1 WHERE id=1")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let promotion = promotions::create(&site.app, "Store reward").await.unwrap();
+        promotions::save(
+            &site.app,
+            &promotion,
+            1,
+            "a",
+            &wpalt::document::empty(),
+            promotions::Target::default(),
+            true,
+            false,
+            true,
+        )
+        .await
+        .unwrap();
+        promotions::reward(&site.app, &promotion, "Store discount", 1, 1)
+            .await
+            .unwrap();
+        let policy: i64 = sqlx::query_scalar("SELECT version FROM engagement_settings WHERE id=1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let token = engagement::consent(
+            &site.app,
+            &axum::http::HeaderMap::new(),
+            true,
+            false,
+            policy,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let mut h = axum::http::HeaderMap::new();
+        h.insert("cookie", format!("wpalt_visitor={token}").parse().unwrap());
+        promotions::visit(
+            &site.app,
+            &h,
+            promotions::Visit {
+                path: "/".into(),
+                device: "desktop".into(),
+                referrer: "direct".into(),
+            },
+        )
+        .await
+        .unwrap();
+        let claim = promotions::claim(&site.app, &h, &promotion).await.unwrap();
+        let code = claim["code"].as_str().unwrap();
+        let reward: String =
+            sqlx::query_scalar("SELECT reward_id FROM promotion_claims WHERE code=$1")
+                .bind(code)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        catalog::discount(
+            &site.app,
+            site.session(),
+            &catalog::DiscountInput {
+                code: "REWARD".into(),
+                title: "Earned offer".into(),
+                bps: 1000,
+                starts_at: wpalt::now() - 1,
+                expires_at: wpalt::now() + 86400,
+                max_uses: 0,
+                member_key: String::new(),
+                product_id: String::new(),
+                reward_id: reward,
+                active: true,
+            },
+            0,
+        )
+        .await
+        .unwrap();
+        let (_, v) = product(&site, "physical", 1000, 3, "").await;
+        let input = cart(&site, &buyer, &v, "", 1).await;
+        let q = orders::quote(&site.app, &buyer, "REWARD").await.unwrap();
+        let input = orders::Checkout {
+            quote_hash: q.hash,
+            discount_code: "REWARD".into(),
+            reward_code: code.into(),
+            ..input
+        };
+        let id = orders::checkout(&site.app, &buyer, &input).await.unwrap();
+        pay(&site, &id, "reward-payment").await;
+        let input = cart(&site, &buyer, &v, "", 1).await;
+        let q = orders::quote(&site.app, &buyer, "REWARD").await.unwrap();
+        assert!(
+            orders::checkout(
+                &site.app,
+                &buyer,
+                &orders::Checkout {
+                    quote_hash: q.hash,
+                    discount_code: "REWARD".into(),
+                    reward_code: code.into(),
+                    ..input
+                }
+            )
+            .await
+            .is_err()
+        );
+        engagement::consent(&site.app, &h, false, false, policy)
+            .await
+            .unwrap();
+        let erased: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM promotion_claims")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(erased, 0);
+        let used: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM shop_reward_redemptions WHERE state='used'")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(used, 1);
+        let restored = Site::new(pg, false).await;
+        backup::restore(&restored.app, &backup::capture(&site.app).await.unwrap())
+            .await
+            .unwrap();
+        restored.close().await;
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn commerce_upgrade_preserves_existing_site_and_rejects_route_and_currency_conflicts() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let post = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("before-commerce", "publish"),
+        )
+        .await
+        .unwrap();
+        // Reconstruct the merged M5 schema boundary, keeping its real publishing/account data.
+        for table in wpalt::commerce::budget::TABLES.iter().rev() {
+            sqlx::query(&format!("DROP TABLE {table}"))
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+        }
+        for table in ["shop_settings", "shop_usage"] {
+            sqlx::query(&format!("DROP TABLE {table}"))
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+        }
+        sqlx::query("UPDATE schema_version SET version=8 WHERE id=1")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE posts SET slug='shop',published_slug='shop' WHERE id=$1")
+            .bind(&post.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let err = site.app.db.migrate().await.unwrap_err().to_string();
+        assert!(
+            err.to_lowercase().contains("rename"),
+            "The old runtime can resolve a route collision before upgrade: {err}"
+        );
+        let version: i64 = sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            version, 8,
+            "Rejected migration must preserve the original schema boundary."
+        );
+        sqlx::query(
+            "UPDATE posts SET slug='before-commerce',published_slug='before-commerce' WHERE id=$1",
+        )
+        .bind(&post.id)
+        .execute(&site.app.db.pool)
+        .await
+        .unwrap();
+        site.app.db.migrate().await.unwrap();
+        assert!(
+            get(&site.app, "/before-commerce", None)
+                .await
+                .1
+                .contains("independent publishing")
+        );
+        let cfg = (*site.app.config).clone();
+        site.app.db.pool.close().await;
+        let upgraded = App::open(cfg.clone()).await.unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT version FROM schema_version WHERE id=1")
+                .fetch_one(&upgraded.db.pool)
+                .await
+                .unwrap(),
+            9
+        );
+        let (token, owner) = auth::login(&upgraded, "owner@example.test", PASSWORD)
+            .await
+            .unwrap();
+        assert!(!token.is_empty());
+        assert_eq!(owner.user.id, site.session().user.id);
+        upgraded.db.pool.close().await;
+        let mut changed = cfg;
+        changed.commerce.currency = "EUR".into();
+        assert!(
+            App::open(changed).await.is_err(),
+            "A currency setting cannot reinterpret existing money."
+        );
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn commerce_calendar_pages_and_resource_reassignment_preserve_bookable_capacity() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let (p, v) = product(&site, "booking", 1200, -1, "").await;
+        let r = booking::resource(&site.app, site.session(), "Room A", &site.session().user.id)
+            .await
+            .unwrap();
+        let other = booking::resource(&site.app, site.session(), "Room B", "")
+            .await
+            .unwrap();
+        let start = wpalt::now() + 4 * 86400;
+        for i in 0..42 {
+            booking::slot(
+                &site.app,
+                site.session(),
+                &booking::SlotInput {
+                    resource_id: r.clone(),
+                    variant_id: v.clone(),
+                    starts_at: start + i * 3600,
+                    ends_at: start + i * 3600 + 1800,
+                    capacity: 2,
+                },
+            )
+            .await
+            .unwrap();
+        }
+        booking::slot(
+            &site.app,
+            site.session(),
+            &booking::SlotInput {
+                resource_id: other.clone(),
+                variant_id: v.clone(),
+                starts_at: start,
+                ends_at: start + 1800,
+                capacity: 2,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(
+            booking::edit_resource(
+                &site.app,
+                site.session(),
+                &other,
+                1,
+                "Room B",
+                &site.session().user.id,
+                true
+            )
+            .await
+            .is_err(),
+            "Reassignment must not double-book a staff member."
+        );
+        booking::edit_resource(
+            &site.app,
+            site.session(),
+            &other,
+            1,
+            "Room B paused",
+            "",
+            false,
+        )
+        .await
+        .unwrap();
+        assert!(
+            booking::edit_resource(&site.app, site.session(), &other, 1, "Stale edit", "", true)
+                .await
+                .is_err()
+        );
+        let admin = get(&site.app, "/admin/shop", Some(&site.token)).await.1;
+        assert!(admin.contains("Next reservations"));
+        let public = get(&site.app, &format!("/shop/products/{p}"), None).await.1;
+        assert!(public.contains("Next available times"));
+        let last: String =
+            sqlx::query_scalar("SELECT id FROM shop_slots WHERE resource_id=$1 AND starts_at=$2")
+                .bind(&r)
+                .bind(start + 39 * 3600)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        let next = get(
+            &site.app,
+            &format!(
+                "/shop/products/{p}?calendar_start={}&calendar_after={last}",
+                start + 39 * 3600
+            ),
+            None,
+        )
+        .await
+        .1;
+        assert!(!next.contains("Next available times"));
+        // Disabling the assigned staff after display must invalidate a fresh cart allocation.
+        let slot: String = sqlx::query_scalar(
+            "SELECT id FROM shop_slots WHERE resource_id=$1 ORDER BY starts_at LIMIT 1",
+        )
+        .bind(&r)
+        .fetch_one(&site.app.db.pool)
+        .await
+        .unwrap();
+        let (_, buyer) = shopper(&site, "calendar@example.test").await;
+        sqlx::query("UPDATE users SET role='disabled' WHERE id=$1")
+            .bind(&site.session().user.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            orders::set_cart(
+                &site.app,
+                &buyer,
+                orders::cart_version(&site.app, &buyer.user.id)
+                    .await
+                    .unwrap(),
+                &v,
+                &slot,
+                1
+            )
+            .await
+            .is_err()
+        );
         site.close().await;
     }
 }

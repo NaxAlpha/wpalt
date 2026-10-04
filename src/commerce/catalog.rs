@@ -192,6 +192,16 @@ pub async fn save_variant(
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     crate::membership::uuid(&id)?;
     if version == 0 {
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM shop_variants WHERE product_id=$1")
+                .bind(product)
+                .fetch_one(&mut *tx)
+                .await?;
+        if count >= 100 {
+            return Err(Error::invalid(
+                "A product supports at most 100 variants; create a separate product for another collection.",
+            ));
+        }
         sqlx::query("INSERT INTO shop_variants(id,product_id,title,sku,price_minor,member_price_minor,member_key,stock_total,billing_interval,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)").bind(&id).bind(product).bind(v.title.trim()).bind(&v.sku).bind(v.price_minor).bind(v.member_price_minor).bind(&v.member_key).bind(v.stock_total).bind(&v.billing_interval).bind(i64::from(v.active)).execute(&mut *tx).await?;
     } else {
         let interval: String = sqlx::query_scalar(

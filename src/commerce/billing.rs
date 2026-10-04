@@ -134,7 +134,10 @@ pub async fn cancel(app: &App, s: &Session, id: &str, version: i64) -> Result<()
     if sub.get::<i64, _>("version") != version {
         return Err(Error::conflict());
     }
-    if sub.get::<String, _>("provider") == "stripe" {
+    if sub.get::<String, _>("provider") == "stripe"
+        && !(sub.get::<String, _>("state") == "pending"
+            && sub.get::<String, _>("provider_ref").is_empty())
+    {
         return Err(Error::invalid(
             "Use the hosted subscription cancellation action.",
         ));
@@ -256,11 +259,7 @@ pub(crate) async fn provider_invoice(
             .await?
             .ok_or_else(Error::not_found)?;
     if let Some(id)=sqlx::query_scalar("SELECT id FROM shop_orders WHERE subscription_id=$1 AND period_start=$2 AND purpose='renewal'").bind(s.get::<String,_>("id")).bind(start).fetch_optional(&mut *tx).await?{return Ok(id)}
-    if start < s.get::<i64, _>("period_end")
-        || end <= start
-        || end - start > 370 * 86400
-        || s.get::<String, _>("state") == "cancelled"
-    {
+    if start < s.get::<i64, _>("period_end") || end <= start || end - start > 370 * 86400 {
         return Err(Error::conflict());
     }
     let id = invoice(

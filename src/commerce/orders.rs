@@ -84,7 +84,7 @@ pub async fn set_cart(
         ));
     }
     if !slot.is_empty() && quantity > 0 {
-        let count:i64=sqlx::query_scalar("SELECT COUNT(*) FROM shop_slots s JOIN shop_resources r ON r.id=s.resource_id WHERE s.id=$1 AND s.variant_id=$2 AND s.active=1 AND r.active=1 AND s.starts_at>$3").bind(slot).bind(variant).bind(now()).fetch_one(&mut *tx).await?;
+        let count:i64=sqlx::query_scalar("SELECT COUNT(*) FROM shop_slots s JOIN shop_resources r ON r.id=s.resource_id WHERE s.id=$1 AND s.variant_id=$2 AND s.active=1 AND r.active=1 AND (r.staff_id='' OR EXISTS(SELECT 1 FROM users staff WHERE staff.id=r.staff_id AND staff.role IN ('admin','editor'))) AND s.starts_at>$3").bind(slot).bind(variant).bind(now()).fetch_one(&mut *tx).await?;
         if count != 1 {
             return Err(Error::invalid("This slot is not available."));
         }
@@ -164,7 +164,7 @@ pub(crate) async fn quote_tx(tx: &mut Tx<'_>, user: &str, code: &str) -> Result<
     let settings = sqlx::query("SELECT * FROM shop_settings WHERE id=1")
         .fetch_one(&mut **tx)
         .await?;
-    let rows=sqlx::query("SELECT c.variant_id,c.slot_id,c.quantity,v.title AS variant_title,v.sku,v.price_minor,v.member_price_minor,v.member_key,v.stock_total,v.held,v.sold,v.billing_interval,v.active AS variant_active,p.id AS product_id,p.title,p.kind,p.entitlement,p.access_seconds,p.published,s.id AS slot_exists,s.variant_id AS slot_variant,s.starts_at,s.capacity,s.held AS slot_held,s.booked,s.active AS slot_active,r.active AS resource_active,CASE WHEN v.member_price_minor>=0 AND EXISTS(SELECT 1 FROM member_grants g WHERE g.user_id=$1 AND g.entitlement=v.member_key AND g.revoked=0 AND g.starts_at<=$2 AND (g.expires_at=0 OR g.expires_at>$2)) THEN v.member_price_minor ELSE v.price_minor END AS unit_minor FROM shop_cart_lines c JOIN shop_variants v ON v.id=c.variant_id JOIN shop_products p ON p.id=v.product_id LEFT JOIN shop_slots s ON s.id=c.slot_id LEFT JOIN shop_resources r ON r.id=s.resource_id WHERE c.user_id=$1 ORDER BY c.variant_id,c.slot_id LIMIT 21").bind(user).bind(at).fetch_all(&mut **tx).await?;
+    let rows=sqlx::query("SELECT c.variant_id,c.slot_id,c.quantity,v.title AS variant_title,v.sku,v.price_minor,v.member_price_minor,v.member_key,v.stock_total,v.held,v.sold,v.billing_interval,v.active AS variant_active,p.id AS product_id,p.title,p.kind,p.entitlement,p.access_seconds,p.published,s.id AS slot_exists,s.variant_id AS slot_variant,s.starts_at,s.capacity,s.held AS slot_held,s.booked,s.active AS slot_active,CASE WHEN r.active=1 AND (r.staff_id='' OR EXISTS(SELECT 1 FROM users staff WHERE staff.id=r.staff_id AND staff.role IN ('admin','editor'))) THEN 1 ELSE 0 END AS resource_active,CASE WHEN v.member_price_minor>=0 AND EXISTS(SELECT 1 FROM member_grants g WHERE g.user_id=$1 AND g.entitlement=v.member_key AND g.revoked=0 AND g.starts_at<=$2 AND (g.expires_at=0 OR g.expires_at>$2)) THEN v.member_price_minor ELSE v.price_minor END AS unit_minor FROM shop_cart_lines c JOIN shop_variants v ON v.id=c.variant_id JOIN shop_products p ON p.id=v.product_id LEFT JOIN shop_slots s ON s.id=c.slot_id LEFT JOIN shop_resources r ON r.id=s.resource_id WHERE c.user_id=$1 ORDER BY c.variant_id,c.slot_id LIMIT 21").bind(user).bind(at).fetch_all(&mut **tx).await?;
     if rows.is_empty() || rows.len() > 20 {
         return Err(Error::invalid(
             "Your cart is empty or exceeds the supported size.",
@@ -425,7 +425,7 @@ pub async fn checkout(app: &App, s: &Session, input: &Checkout) -> Result<String
             ));
         }
         if !line.slot_id.is_empty()
-            && sqlx::query("UPDATE shop_slots SET held=held+$1 WHERE id=$2 AND variant_id=$3 AND active=1 AND starts_at>$4 AND capacity-held-booked>=$1 AND EXISTS(SELECT 1 FROM shop_resources r WHERE r.id=shop_slots.resource_id AND r.active=1)").bind(line.quantity).bind(&line.slot_id).bind(&line.variant_id).bind(now()).execute(&mut *tx).await?.rows_affected()!=1{return Err(Error::invalid("The last slot was taken; no order or payment was created."))}
+            && sqlx::query("UPDATE shop_slots SET held=held+$1 WHERE id=$2 AND variant_id=$3 AND active=1 AND starts_at>$4 AND capacity-held-booked>=$1 AND EXISTS(SELECT 1 FROM shop_resources r WHERE r.id=shop_slots.resource_id AND r.active=1 AND (r.staff_id='' OR EXISTS(SELECT 1 FROM users staff WHERE staff.id=r.staff_id AND staff.role IN ('admin','editor'))))").bind(line.quantity).bind(&line.slot_id).bind(&line.variant_id).bind(now()).execute(&mut *tx).await?.rows_affected()!=1{return Err(Error::invalid("The last slot was taken; no order or payment was created."))}
 
         sqlx::query("INSERT INTO shop_order_lines(id,order_id,variant_id,product_id,title,sku,kind,quantity,unit_minor,line_minor,slot_id,entitlement,access_seconds,allocation,billing_interval) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'held',$14)").bind(uuid::Uuid::new_v4().to_string()).bind(&id).bind(&line.variant_id).bind(&line.product_id).bind(&line.title).bind(&line.sku).bind(&line.kind).bind(line.quantity).bind(line.unit_minor).bind(line.line_minor).bind(&line.slot_id).bind(&line.entitlement).bind(line.access_seconds).bind(&line.billing_interval).execute(&mut *tx).await?;
     }
@@ -457,11 +457,10 @@ pub async fn checkout(app: &App, s: &Session, input: &Checkout) -> Result<String
             .await?;
     }
     audit(&mut tx, &id, &s.user.id, "checkout", q.total_minor).await?;
-    tx.commit().await?;
-    drop(_guard);
     if q.total_minor == 0 {
-        confirm_payment(
+        payment_tx(
             app,
+            &mut tx,
             &Payment {
                 order_id: id.clone(),
                 provider: input.provider.clone(),
@@ -473,9 +472,11 @@ pub async fn checkout(app: &App, s: &Session, input: &Checkout) -> Result<String
                 period_start: 0,
                 period_end: 0,
             },
+            None,
         )
         .await?;
     }
+    tx.commit().await?;
     tracing::info!(event="commerce_checkout_created",order_id=%id,total_minor=q.total_minor);
     Ok(id)
 }
@@ -641,9 +642,20 @@ async fn confirm_payment_as(app: &App, p: &Payment, actor: Option<(&Session, i64
         return Err(Error::forbidden());
     }
     let mut tx = app.db.pool.begin().await?;
+    payment_tx(app, &mut tx, p, actor).await?;
+    tx.commit().await?;
+    tracing::info!(event="commerce_payment_reconciled",order_id=%p.order_id,amount_minor=p.amount_minor);
+    Ok(())
+}
+async fn payment_tx(
+    app: &App,
+    tx: &mut Tx<'_>,
+    p: &Payment,
+    actor: Option<(&Session, i64)>,
+) -> Result<()> {
     let order = sqlx::query("SELECT * FROM shop_orders WHERE id=$1")
         .bind(&p.order_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut **tx)
         .await?
         .ok_or_else(Error::not_found)?;
     if let Some((_, version)) = actor {
@@ -659,7 +671,7 @@ async fn confirm_payment_as(app: &App, p: &Payment, actor: Option<(&Session, i64
             "Payment does not match the authoritative order.",
         ));
     }
-    if let Some(old)=sqlx::query("SELECT order_id,amount_minor,currency FROM shop_payments WHERE provider=$1 AND reference=$2").bind(&p.provider).bind(&p.reference).fetch_optional(&mut *tx).await?{if old.get::<String,_>("order_id")!=p.order_id||old.get::<i64,_>("amount_minor")!=p.amount_minor||old.get::<String,_>("currency")!=p.currency{return Err(Error::conflict())}return Ok(())}
+    if let Some(old)=sqlx::query("SELECT order_id,amount_minor,currency FROM shop_payments WHERE provider=$1 AND reference=$2").bind(&p.provider).bind(&p.reference).fetch_optional(&mut **tx).await?{if old.get::<String,_>("order_id")!=p.order_id||old.get::<i64,_>("amount_minor")!=p.amount_minor||old.get::<String,_>("currency")!=p.currency{return Err(Error::conflict())}return Ok(())}
     if order.get::<i64, _>("paid_minor") != 0
         || !["awaiting", "cancelled", "failed"]
             .contains(&order.get::<String, _>("payment_state").as_str())
@@ -668,41 +680,54 @@ async fn confirm_payment_as(app: &App, p: &Payment, actor: Option<(&Session, i64
     }
     let lines = sqlx::query("SELECT * FROM shop_order_lines WHERE order_id=$1 ORDER BY id")
         .bind(&p.order_id)
-        .fetch_all(&mut *tx)
+        .fetch_all(&mut **tx)
         .await?;
     let user: String = order.get("user_id");
     let role: String = sqlx::query_scalar("SELECT role FROM users WHERE id=$1")
         .bind(&user)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await?;
     let mut late = order.get::<String, _>("payment_state") != "awaiting"
         || order.get::<i64, _>("expires_at") <= p.paid_at
         || role == "disabled";
+    if !order.get::<String, _>("subscription_id").is_empty() {
+        let sub = sqlx::query("SELECT state,period_end FROM shop_subscriptions WHERE id=$1")
+            .bind(order.get::<String, _>("subscription_id"))
+            .fetch_one(&mut **tx)
+            .await?;
+        let state: String = sub.get("state");
+        late |= state == "cancelled"
+            || state == "cancel_at_end"
+                && order.get::<String, _>("purpose") == "renewal"
+                && order.get::<i64, _>("period_start") >= sub.get::<i64, _>("period_end");
+    }
     for l in &lines {
         if l.get::<String, _>("allocation") != "held" {
             late = true
         }
         let slot: String = l.get("slot_id");
         if !slot.is_empty() {
-            let good:i64=sqlx::query_scalar("SELECT COUNT(*) FROM shop_slots s JOIN shop_resources r ON r.id=s.resource_id WHERE s.id=$1 AND s.active=1 AND r.active=1 AND s.starts_at>$2").bind(slot).bind(now()).fetch_one(&mut *tx).await?;
+            let good:i64=sqlx::query_scalar("SELECT COUNT(*) FROM shop_slots s JOIN shop_resources r ON r.id=s.resource_id WHERE s.id=$1 AND s.active=1 AND r.active=1 AND (r.staff_id='' OR EXISTS(SELECT 1 FROM users staff WHERE staff.id=r.staff_id AND staff.role IN ('admin','editor'))) AND s.starts_at>$2").bind(slot).bind(now()).fetch_one(&mut **tx).await?;
             late |= good != 1;
         }
     }
-    sqlx::query("INSERT INTO shop_payments(id,order_id,provider,reference,amount_minor,currency,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)").bind(uuid::Uuid::new_v4().to_string()).bind(&p.order_id).bind(&p.provider).bind(&p.reference).bind(p.amount_minor).bind(&p.currency).bind(now()).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO shop_payments(id,order_id,provider,reference,amount_minor,currency,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)").bind(uuid::Uuid::new_v4().to_string()).bind(&p.order_id).bind(&p.provider).bind(&p.reference).bind(p.amount_minor).bind(&p.currency).bind(now()).execute(&mut **tx).await?;
     if late {
         if order.get::<String, _>("payment_state") == "awaiting" {
-            cancel_tx(&mut tx, &order, "cancelled").await?;
+            cancel_tx(tx, &order, "cancelled").await?;
         }
-        sqlx::query("UPDATE shop_orders SET paid_minor=$1,payment_ref=$2,payment_state='needs_refund',fulfillment='cancelled',version=version+1 WHERE id=$3").bind(p.amount_minor).bind(&p.reference).bind(&p.order_id).execute(&mut *tx).await?;
+        if !p.subscription_ref.is_empty() && !order.get::<String, _>("subscription_id").is_empty() {
+            sqlx::query("UPDATE shop_subscriptions SET provider_ref=$1,state='cancelled',provider_cancel_pending=1,provider_cancel_at=0,version=version+1 WHERE id=$2 AND (provider_ref='' OR provider_ref=$1)").bind(&p.subscription_ref).bind(order.get::<String,_>("subscription_id")).execute(&mut **tx).await?;
+        }
+        sqlx::query("UPDATE shop_orders SET paid_minor=$1,payment_ref=$2,payment_state='needs_refund',fulfillment='cancelled',version=version+1 WHERE id=$3").bind(p.amount_minor).bind(&p.reference).bind(&p.order_id).execute(&mut **tx).await?;
         audit(
-            &mut tx,
+            tx,
             &p.order_id,
             &p.provider,
             "late_payment_needs_refund",
             p.amount_minor,
         )
         .await?;
-        tx.commit().await?;
         tracing::warn!(event="commerce_late_payment",order_id=%p.order_id);
         return Ok(());
     }
@@ -713,7 +738,7 @@ async fn confirm_payment_as(app: &App, p: &Payment, actor: Option<(&Session, i64
     if !subscription.is_empty() {
         let sub = sqlx::query("SELECT * FROM shop_subscriptions WHERE id=$1")
             .bind(&subscription)
-            .fetch_one(&mut *tx)
+            .fetch_one(&mut **tx)
             .await?;
         if purpose == "purchase" {
             ends = billing::period_end(starts, &sub.get::<String, _>("billing_interval"))?;
@@ -734,26 +759,26 @@ async fn confirm_payment_as(app: &App, p: &Payment, actor: Option<(&Session, i64
             starts = p.period_start;
             ends = p.period_end;
         }
-        sqlx::query("UPDATE shop_subscriptions SET state='active',period_start=$1,period_end=$2,provider_ref=CASE WHEN $3<>'' THEN $3 ELSE provider_ref END,version=version+1 WHERE id=$4").bind(starts).bind(ends).bind(&p.subscription_ref).bind(&subscription).execute(&mut *tx).await?;
+        sqlx::query("UPDATE shop_subscriptions SET state='active',period_start=$1,period_end=$2,provider_ref=CASE WHEN $3<>'' THEN $3 ELSE provider_ref END,version=version+1 WHERE id=$4").bind(starts).bind(ends).bind(&p.subscription_ref).bind(&subscription).execute(&mut **tx).await?;
         if purpose != "purchase" {
             let variant: String = lines[0].get("variant_id");
             let price: i64 = order.get("target_price_minor");
-            sqlx::query("UPDATE shop_subscriptions SET variant_id=$1,price_minor=$2,next_variant='',next_price_minor=-1,version=version+1 WHERE id=$3").bind(variant).bind(price).bind(&subscription).execute(&mut *tx).await?;
+            sqlx::query("UPDATE shop_subscriptions SET variant_id=$1,price_minor=$2,next_variant='',next_price_minor=-1,version=version+1 WHERE id=$3").bind(variant).bind(price).bind(&subscription).execute(&mut **tx).await?;
         }
         sqlx::query("UPDATE shop_orders SET period_start=$1,period_end=$2 WHERE id=$3")
             .bind(starts)
             .bind(ends)
             .bind(&p.order_id)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await?;
     }
     for l in &lines {
         let quantity: i64 = l.get("quantity");
-        sqlx::query("UPDATE shop_variants SET held=held-CASE WHEN stock_total>=0 THEN $1 ELSE 0 END,sold=sold+CASE WHEN stock_total>=0 THEN $1 ELSE 0 END WHERE id=$2").bind(quantity).bind(l.get::<String,_>("variant_id")).execute(&mut *tx).await?;
+        sqlx::query("UPDATE shop_variants SET held=held-CASE WHEN stock_total>=0 THEN $1 ELSE 0 END,sold=sold+CASE WHEN stock_total>=0 THEN $1 ELSE 0 END WHERE id=$2").bind(quantity).bind(l.get::<String,_>("variant_id")).execute(&mut **tx).await?;
         let slot: String = l.get("slot_id");
         if !slot.is_empty() {
-            let at:i64=sqlx::query_scalar("UPDATE shop_slots SET held=held-$1,booked=booked+$1 WHERE id=$2 RETURNING starts_at").bind(quantity).bind(&slot).fetch_one(&mut *tx).await?;
-            booking::schedule(&mut tx, &p.order_id, &slot, at).await?;
+            let at:i64=sqlx::query_scalar("UPDATE shop_slots SET held=held-$1,booked=booked+$1 WHERE id=$2 RETURNING starts_at").bind(quantity).bind(&slot).fetch_one(&mut **tx).await?;
+            booking::schedule(tx, &p.order_id, &slot, at).await?;
         }
         let entitlement: String = l.get("entitlement");
         let mut grant = String::new();
@@ -776,29 +801,29 @@ async fn confirm_payment_as(app: &App, p: &Payment, actor: Option<(&Session, i64
                         .ok_or(Error::invalid("Access timestamp overflow."))?
                 }
             };
-            sqlx::query("INSERT INTO member_grants(id,user_id,entitlement,starts_at,expires_at,origin,created_at) VALUES($1,$2,$3,$4,$5,$6,$4)").bind(&grant).bind(&user).bind(&entitlement).bind(starts).bind(expiry).bind(format!("order:{}",p.order_id)).execute(&mut *tx).await?;
+            sqlx::query("INSERT INTO member_grants(id,user_id,entitlement,starts_at,expires_at,origin,created_at) VALUES($1,$2,$3,$4,$5,$6,$4)").bind(&grant).bind(&user).bind(&entitlement).bind(starts).bind(expiry).bind(format!("order:{}",p.order_id)).execute(&mut **tx).await?;
             if !subscription.is_empty() {
                 sqlx::query("UPDATE shop_subscriptions SET grant_id=$1 WHERE id=$2")
                     .bind(&grant)
                     .bind(&subscription)
-                    .execute(&mut *tx)
+                    .execute(&mut **tx)
                     .await?;
             }
         }
-        sqlx::query("UPDATE shop_order_lines SET allocation='sold',grant_id=$1 WHERE id=$2 AND allocation='held'").bind(grant).bind(l.get::<String,_>("id")).execute(&mut *tx).await?;
+        sqlx::query("UPDATE shop_order_lines SET allocation='sold',grant_id=$1 WHERE id=$2 AND allocation='held'").bind(grant).bind(l.get::<String,_>("id")).execute(&mut **tx).await?;
     }
     let code: String = order.get("discount_code");
     if !code.is_empty() {
         sqlx::query("UPDATE shop_discounts SET held=held-1,used=used+1 WHERE code=$1")
             .bind(code)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await?;
     }
     sqlx::query(
         "UPDATE shop_reward_redemptions SET state='used' WHERE order_id=$1 AND state='held'",
     )
     .bind(&p.order_id)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
     let referral: String = order.get("referral_id");
     if !referral.is_empty() {
@@ -806,7 +831,7 @@ async fn confirm_payment_as(app: &App, p: &Payment, actor: Option<(&Session, i64
             order.get::<i64, _>("subtotal_minor") - order.get::<i64, _>("discount_minor"),
             order.get("commission_bps"),
         )?;
-        sqlx::query("INSERT INTO member_commissions(id,referral_id,reference,amount_minor,currency,state,created_at) VALUES($1,$2,$3,$4,$5,'recorded',$6) ON CONFLICT(reference) DO NOTHING").bind(uuid::Uuid::new_v4().to_string()).bind(referral).bind(format!("order:{}",p.order_id)).bind(commission).bind(&p.currency).bind(now()).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO member_commissions(id,referral_id,reference,amount_minor,currency,state,created_at) VALUES($1,$2,$3,$4,$5,'recorded',$6) ON CONFLICT(reference) DO NOTHING").bind(uuid::Uuid::new_v4().to_string()).bind(referral).bind(format!("order:{}",p.order_id)).bind(commission).bind(&p.currency).bind(now()).execute(&mut **tx).await?;
     }
     let fulfilled = lines.iter().all(|l| {
         matches!(
@@ -814,23 +839,21 @@ async fn confirm_payment_as(app: &App, p: &Payment, actor: Option<(&Session, i64
             "digital" | "membership"
         )
     });
-    sqlx::query("UPDATE shop_orders SET payment_state='paid',paid_minor=$1,payment_ref=$2,fulfillment=$3,version=version+1 WHERE id=$4").bind(p.amount_minor).bind(&p.reference).bind(if fulfilled{"fulfilled"}else{"unfulfilled"}).bind(&p.order_id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE shop_orders SET payment_state='paid',paid_minor=$1,payment_ref=$2,fulfillment=$3,version=version+1 WHERE id=$4").bind(p.amount_minor).bind(&p.reference).bind(if fulfilled{"fulfilled"}else{"unfulfilled"}).bind(&p.order_id).execute(&mut **tx).await?;
     if lines
         .iter()
         .all(|l| l.get::<String, _>("slot_id").is_empty())
     {
-        sqlx::query("INSERT INTO shop_notifications(id,order_id,kind,due_at,created_at) VALUES($1,$2,'confirmation',$3,$3) ON CONFLICT(order_id,kind,slot_id) DO NOTHING").bind(uuid::Uuid::new_v4().to_string()).bind(&p.order_id).bind(now()).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO shop_notifications(id,order_id,kind,due_at,created_at) VALUES($1,$2,'confirmation',$3,$3) ON CONFLICT(order_id,kind,slot_id) DO NOTHING").bind(uuid::Uuid::new_v4().to_string()).bind(&p.order_id).bind(now()).execute(&mut **tx).await?;
     }
     audit(
-        &mut tx,
+        tx,
         &p.order_id,
         &p.provider,
         "payment_confirmed",
         p.amount_minor,
     )
     .await?;
-    tx.commit().await?;
-    tracing::info!(event="commerce_payment_confirmed",order_id=%p.order_id,amount_minor=p.amount_minor);
     Ok(())
 }
 pub async fn cancel(app: &App, s: &Session, id: &str, version: i64) -> Result<()> {
@@ -1024,7 +1047,7 @@ async fn confirm_refund_as(
                     .await?;
             if let Some(grant) = grant {
                 let affected:i64=sqlx::query_scalar("SELECT COUNT(*) FROM shop_order_lines WHERE order_id=$1 AND grant_id=$2 AND grant_id<>''").bind(&order_id).bind(&grant).fetch_one(&mut *tx).await?;
-                sqlx::query("UPDATE shop_subscriptions SET state=$1,version=version+1 WHERE id=$2")
+                sqlx::query("UPDATE shop_subscriptions SET state=$1,provider_cancel_pending=CASE WHEN provider='stripe' AND provider_ref<>'' THEN 1 ELSE 0 END,provider_cancel_at=0,version=version+1 WHERE id=$2")
                     .bind(if affected == 1 {
                         "cancelled"
                     } else {
