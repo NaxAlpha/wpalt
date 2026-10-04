@@ -929,6 +929,41 @@
         "relevant vulnerability or deprecation"
       ],
       "status": "reviewed; exact delivery status tracked on PR #10"
+    },
+    {
+      "feature_id": "DELIVERY-RELEASE",
+      "area": "Verified automatic development releases and CI",
+      "scope": "Delivery",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax",
+        "https://cli.github.com/manual/gh_release_create",
+        "https://github.com/rustsec/rustsec/blob/main/cargo-audit/README.md"
+      ],
+      "applicable_versions": [
+        "GitHub Actions hosted Ubuntu 24.04",
+        "GitHub CLI hosted runner",
+        "cargo-audit 0.22.2",
+        "Rust 1.98.1"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2027-01-02",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Gate main-only prereleases on all checks; verify exact clean source/assets/checksums; keep reruns safe; refresh advisories on every run; retain behavioral coverage."
+      ],
+      "tests": [
+        "tests/pipeline/test_release_build.py",
+        "current-source CI all jobs",
+        "post-merge first-live-release verification"
+      ],
+      "triggers": [
+        "affected release/CI change",
+        "action/CLI/toolchain update",
+        "relevant vulnerability or permissions change"
+      ],
+      "status": "reviewed; live publication verified after delivery PR merge"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

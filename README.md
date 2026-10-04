@@ -59,3 +59,5 @@ The pre-M3 supporting work uses semantic tokens and native components, measured 
 M1–M8 are pre-adoption development. M2 provides typed models, parameterized reusable components, responsive templates, relational/repeater bindings, options and theme publication through a bundled studio. Full WordPress/plugin parity and multi-server operation remain later milestones. M1 operates one application process per site/data directory, with manual unencrypted backups and fresh-target restore. Licensing is not yet selected. No WordPress or plugin implementation code is incorporated.
 
 The integrated writing milestone and its structured-document API/migration are documented in [authoring](docs/authoring.md). This remains a pre-adoption milestone build; full WordPress/plugin parity is the roadmap goal, not the current capability claim.
+
+Development distribution and pipeline: [automatic releases and CI](docs/automatic-releases.md).
