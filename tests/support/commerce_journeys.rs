@@ -861,7 +861,44 @@ async fn commerce_https_provider_requires_tls_raw_signatures_exact_money_and_ide
                 .is_err()
         );
         let sig = signature("whsec_fixture", at, &raw);
-        payments::receive(&app, &sig, &raw).await.unwrap();
+        let unsigned = Request::builder()
+            .method("POST")
+            .uri("/commerce/stripe/webhook")
+            .header("content-type", "application/json")
+            .body(Body::from(raw.clone()))
+            .unwrap();
+        assert!(
+            !wpalt::web::router(app.clone())
+                .oneshot(unsigned)
+                .await
+                .unwrap()
+                .status()
+                .is_success()
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM shop_provider_events")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            0
+        );
+        let signed = Request::builder()
+            .method("POST")
+            .uri("/commerce/stripe/webhook")
+            .header("origin", "https://provider.example")
+            .header("stripe-signature", &sig)
+            .header("content-type", "application/json")
+            .body(Body::from(raw.clone()))
+            .unwrap();
+        assert_eq!(
+            wpalt::web::router(app.clone())
+                .oneshot(signed)
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::NO_CONTENT,
+            "Only the exact signed processor route bypasses browser origin enforcement."
+        );
         payments::receive(&app, &sig, &raw).await.unwrap();
         assert_eq!(payments::process(&app).await.unwrap(), 0);
         assert_eq!(state(&site, &id).await, "awaiting"); // Signed object's fake amount never grants access; retrieved mismatch also fails.
@@ -1258,6 +1295,62 @@ async fn commerce_protected_download_authority_quota_and_late_money_remain_safe(
         let input = cart(&site, &buyer, &v, "", 1).await;
         let id = orders::checkout(&site.app, &buyer, &input).await.unwrap();
         pay(&site, &id, "guide-payment").await;
+        // Every new native mutation consumes CSRF before its operation; shared
+        // middleware also rejects a foreign-origin request with a correct token.
+        for path in [
+            "/shop/cart".to_string(),
+            "/shop/checkout".into(),
+            format!("/shop/orders/{id}"),
+            "/shop/subscriptions/00000000-0000-0000-0000-000000000001".into(),
+            "/admin/shop".into(),
+            format!("/admin/shop/products/{p}"),
+            format!("/admin/shop/orders/{id}"),
+        ] {
+            let t = if path.starts_with("/admin/") {
+                &site.token
+            } else {
+                &token
+            };
+            assert_eq!(
+                request(
+                    &site.app,
+                    "POST",
+                    &path,
+                    Some(t),
+                    "application/x-www-form-urlencoded",
+                    b"csrf=wrong&action=payment".to_vec()
+                )
+                .await
+                .0,
+                StatusCode::FORBIDDEN,
+                "Missing commerce CSRF boundary on {path}"
+            );
+        }
+        assert_eq!(
+            get(&site.app, "/admin/shop", Some(&token)).await.0,
+            StatusCode::FORBIDDEN
+        );
+        let cross_origin = Request::builder()
+            .method("POST")
+            .uri("/shop/cart")
+            .header("origin", "https://foreign.example")
+            .header("cookie", format!("wpalt_session={token}"))
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(format!("csrf={}", buyer.csrf)))
+            .unwrap();
+        assert_eq!(
+            wpalt::web::router(site.app.clone())
+                .oneshot(cross_origin)
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            state(&site, &id).await,
+            "paid",
+            "Rejected requests must not mutate the financial state."
+        );
         assert_eq!(
             request(
                 &site.app,
