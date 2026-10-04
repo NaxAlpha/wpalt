@@ -34,6 +34,7 @@ fn layout_inner(
                     a href="/admin" {"Overview"}
                     @if s.can_edit() {a href="/admin/posts" {"Content"} a href="/admin/media" {"Media library"} @if settings.business_enabled {a href="/admin/forms" {"Forms"} a href="/admin/audience" {"Audience"} a href="/admin/mail" {"Mail"} @if settings.engagement_available && s.is_admin() {a href="/admin/engagement" {"Engagement"}}}}
                     @if s.is_admin() && settings.membership_enabled {a href="/admin/members" {"Members"}a href="/admin/courses" {"Courses"}}
+                    @if s.is_admin() && settings.commerce_enabled {a href="/admin/shop" {"Commerce"}}
                     @if s.can_moderate() {a href="/admin/comments" {"Comments"}}
                     @if s.is_admin() {a href="/admin/builder" {"Design studio"} a href="/admin/discovery" {"Discovery"} a href="/admin/settings" {"Site settings"} a href="/admin/operations" {"Operations"}}
                     a href="/" {"View website ↗"}

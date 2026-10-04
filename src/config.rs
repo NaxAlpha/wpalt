@@ -16,6 +16,7 @@ pub struct Config {
     pub business_enabled: bool,
     pub membership_enabled: bool,
     pub membership_max_records: i64,
+    pub commerce: crate::commerce::Config,
     pub identity: crate::membership::identity::Config,
     pub business_limits: crate::business::quotas::Config,
     pub mail: crate::business::mail::MailConfig,
@@ -41,6 +42,7 @@ impl Default for Config {
             business_enabled: true,
             membership_enabled: true,
             membership_max_records: 1_000_000,
+            commerce: Default::default(),
             identity: Default::default(),
             business_limits: Default::default(),
             mail: crate::business::mail::MailConfig::default(),
@@ -91,12 +93,28 @@ impl Config {
                 .parse()
                 .context("WPALT_MEMBERSHIP_ENABLED must be true or false")?;
         }
+        if let Ok(v) = std::env::var("WPALT_COMMERCE_ENABLED") {
+            c.commerce.enabled = v
+                .parse()
+                .context("WPALT_COMMERCE_ENABLED must be true or false")?;
+        }
+        if let Ok(v) = std::env::var("WPALT_STRIPE_SECRET_KEY") {
+            c.commerce.stripe.secret_key = v;
+        }
+        if let Ok(v) = std::env::var("WPALT_STRIPE_WEBHOOK_SECRET") {
+            c.commerce.stripe.webhook_secret = v;
+        }
         if let Ok(v) = std::env::var("WPALT_IDENTITY_CLIENT_SECRET") {
             c.identity.client_secret = v;
         }
         Ok(c)
     }
     pub fn validate(&self) -> anyhow::Result<()> {
+        self.commerce.validate()?;
+        ensure!(
+            !self.commerce.stripe.enabled || self.base_url.starts_with("https://"),
+            "Hosted payments require an HTTPS base_url"
+        );
         self.identity.validate()?;
         ensure!(
             (1..=1_000_000_000).contains(&self.membership_max_records),
@@ -204,6 +222,8 @@ impl Config {
             connection["username"] = serde_json::Value::String("[REDACTED]".into());
         }
         value["identity"]["client_secret"] = "[REDACTED]".into();
+        value["commerce"]["stripe"]["secret_key"] = "[REDACTED]".into();
+        value["commerce"]["stripe"]["webhook_secret"] = "[REDACTED]".into();
         value
     }
 }

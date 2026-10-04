@@ -8,9 +8,12 @@ pub struct Db {
     pub postgres: bool,
     pub business_enabled: bool,
     pub membership_enabled: bool,
+    pub commerce_enabled: bool,
     pub membership_max_records: i64,
     pub engagement_available: bool,
     pub respect_dnt: bool,
+    pub commerce_currency: String,
+    pub commerce_max_records: i64,
 }
 impl Db {
     pub async fn open(config: &Config) -> anyhow::Result<Self> {
@@ -56,9 +59,12 @@ impl Db {
             postgres,
             business_enabled: config.business_enabled,
             membership_enabled: config.membership_enabled,
+            commerce_enabled: config.commerce.enabled,
             membership_max_records: config.membership_max_records,
             engagement_available: config.business_enabled && config.engagement.enabled,
             respect_dnt: config.engagement.respect_dnt,
+            commerce_currency: config.commerce.currency.clone(),
+            commerce_max_records: config.commerce.max_records,
         })
     }
     pub async fn migrate(&self) -> anyhow::Result<()> {
@@ -78,7 +84,8 @@ impl Db {
                     || version == Some(5)
                     || version == Some(6)
                     || version == Some(7)
-                    || version == Some(8),
+                    || version == Some(8)
+                    || version == Some(9),
                 "unsupported schema version; use the documented migration/reset path"
             );
         }
@@ -161,7 +168,23 @@ impl Db {
         sqlx::raw_sql(crate::membership::SCHEMA)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("UPDATE schema_version SET version=8 WHERE id=1")
+        sqlx::raw_sql(crate::commerce::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query(
+            "INSERT INTO shop_settings(id,currency) VALUES(1,$1) ON CONFLICT(id) DO NOTHING",
+        )
+        .bind(&self.commerce_currency)
+        .execute(&mut *tx)
+        .await?;
+        let currency: String = sqlx::query_scalar("SELECT currency FROM shop_settings WHERE id=1")
+            .fetch_one(&mut *tx)
+            .await?;
+        anyhow::ensure!(
+            currency == self.commerce_currency,
+            "Commerce currency differs from stored catalog; use matching configuration or an explicit migration"
+        );
+        sqlx::query("UPDATE schema_version SET version=9 WHERE id=1")
             .execute(&mut *tx)
             .await?;
         if self.postgres {
@@ -175,6 +198,9 @@ impl Db {
         tx.commit().await?;
         crate::business::entries::prepare_search(self).await?;
         crate::membership::budget::prepare(self)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?;
+        crate::commerce::budget::prepare(self)
             .await
             .map_err(|e| anyhow::anyhow!(e.1))?;
         Ok(())
@@ -227,6 +253,7 @@ impl Db {
         Ok(Settings {
             business_enabled: self.business_enabled,
             membership_enabled: self.membership_enabled,
+            commerce_enabled: self.commerce_enabled,
             engagement_available: self.engagement_available,
             analytics: if self.engagement_available && r.get::<i64, _>("analytics_enabled") == 1 {
                 Some(crate::business::engagement::PublicState {

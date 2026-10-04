@@ -34,6 +34,11 @@ impl IntoResponse for Error {
 impl From<sqlx::Error> for Error {
     fn from(e: sqlx::Error) -> Self {
         if let sqlx::Error::Database(db) = &e {
+            if db.message() == "shop_record_limit" {
+                return Self::invalid(
+                    "Commerce record limit reached. Increase the configured budget before retrying.",
+                );
+            }
             if db.message() == "member_record_limit" {
                 return Self::invalid(
                     "Membership record limit reached. Increase the configured budget or remove records before retrying.",

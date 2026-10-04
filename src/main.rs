@@ -65,11 +65,247 @@ enum Command {
         #[command(subcommand)]
         command: MemberCommand,
     },
+    /// Offline commerce setup, reconciliation and maintenance.
+    Shop {
+        #[command(subcommand)]
+        command: ShopCommand,
+    },
     /// Populate an initialized empty site with reviewable example content.
     SeedDemo {
         #[arg(long, default_value_t = 8)]
         posts: u32,
     },
+}
+#[derive(Subcommand)]
+enum ShopCommand {
+    ProductImport {
+        input: PathBuf,
+        #[arg(long)]
+        id: Option<String>,
+        #[arg(long, default_value_t = 0)]
+        version: i64,
+    },
+    VariantImport {
+        product: String,
+        input: PathBuf,
+        #[arg(long)]
+        id: Option<String>,
+        #[arg(long, default_value_t = 0)]
+        version: i64,
+    },
+    DiscountImport {
+        input: PathBuf,
+        #[arg(long, default_value_t = 0)]
+        version: i64,
+    },
+    Resource {
+        title: String,
+        #[arg(long, default_value = "")]
+        staff: String,
+    },
+    SlotImport {
+        input: PathBuf,
+    },
+    Payment {
+        order: String,
+        reference: String,
+    },
+    Refund {
+        order: String,
+        input: PathBuf,
+    },
+    RefundConfirm {
+        refund: String,
+        reference: String,
+    },
+    Fulfill {
+        order: String,
+    },
+    Rules {
+        #[arg(long)]
+        tax_bps: i64,
+        #[arg(long)]
+        shipping_minor: i64,
+        #[arg(long)]
+        tax_shipping: bool,
+    },
+    Maintenance,
+    Report,
+    SeedDemo,
+}
+async fn shop_command(app: &App, command: ShopCommand) -> wpalt::error::Result<()> {
+    use sqlx::Row;
+    use wpalt::{commerce as c, error::Error};
+    let r = sqlx::query(
+        "SELECT id,email,name,role FROM users WHERE role='admin' ORDER BY created_at,id LIMIT 1",
+    )
+    .fetch_optional(&app.db.pool)
+    .await?
+    .ok_or_else(Error::not_found)?;
+    let s = Session {
+        user: User {
+            id: r.get("id"),
+            email: r.get("email"),
+            name: r.get("name"),
+            role: r.get("role"),
+        },
+        csrf: String::new(),
+        hash: String::new(),
+    };
+    c::owner(app, &s).await?;
+    match command {
+        ShopCommand::ProductImport { input, id, version } => {
+            let bytes = backup::read_bounded(&input, 32768).await?;
+            let p = serde_json::from_slice(&bytes)
+                .map_err(|_| Error::invalid("Invalid product JSON."))?;
+            println!(
+                "{}",
+                c::catalog::save_product(app, &s, id.as_deref(), version, &p).await?
+            );
+        }
+        ShopCommand::VariantImport {
+            product,
+            input,
+            id,
+            version,
+        } => {
+            let bytes = backup::read_bounded(&input, 32768).await?;
+            let v = serde_json::from_slice(&bytes)
+                .map_err(|_| Error::invalid("Invalid variant JSON."))?;
+            println!(
+                "{}",
+                c::catalog::save_variant(app, &s, &product, id.as_deref(), version, &v).await?
+            );
+        }
+        ShopCommand::DiscountImport { input, version } => {
+            let bytes = backup::read_bounded(&input, 32768).await?;
+            let d = serde_json::from_slice(&bytes)
+                .map_err(|_| Error::invalid("Invalid discount JSON."))?;
+            c::catalog::discount(app, &s, &d, version).await?;
+            println!("Discount saved.");
+        }
+        ShopCommand::Resource { title, staff } => {
+            println!("{}", c::booking::resource(app, &s, &title, &staff).await?)
+        }
+        ShopCommand::SlotImport { input } => {
+            let bytes = backup::read_bounded(&input, 32768).await?;
+            let i =
+                serde_json::from_slice(&bytes).map_err(|_| Error::invalid("Invalid slot JSON."))?;
+            println!("{}", c::booking::slot(app, &s, &i).await?);
+        }
+        ShopCommand::Payment { order, reference } => {
+            let v = sqlx::query_scalar("SELECT version FROM shop_orders WHERE id=$1")
+                .bind(&order)
+                .fetch_one(&app.db.pool)
+                .await?;
+            c::orders::record_offline(app, &s, &order, v, &reference).await?;
+            println!("Actual payment recorded.");
+        }
+        ShopCommand::Refund { order, input } => {
+            let bytes = backup::read_bounded(&input, 32768).await?;
+            let i = serde_json::from_slice(&bytes)
+                .map_err(|_| Error::invalid("Invalid refund JSON."))?;
+            let v = sqlx::query_scalar("SELECT version FROM shop_orders WHERE id=$1")
+                .bind(&order)
+                .fetch_one(&app.db.pool)
+                .await?;
+            println!(
+                "{}",
+                c::orders::refund_request(app, &s, &order, v, &i).await?
+            );
+        }
+        ShopCommand::RefundConfirm { refund, reference } => {
+            let a = sqlx::query_scalar("SELECT amount_minor FROM shop_refunds WHERE id=$1")
+                .bind(&refund)
+                .fetch_one(&app.db.pool)
+                .await?;
+            c::orders::record_offline_refund(app, &s, &refund, &reference, a).await?;
+            println!("Actual refund recorded.");
+        }
+        ShopCommand::Fulfill { order } => {
+            let v = sqlx::query_scalar("SELECT version FROM shop_orders WHERE id=$1")
+                .bind(&order)
+                .fetch_one(&app.db.pool)
+                .await?;
+            c::orders::fulfill(app, &s, &order, v).await?;
+            println!("Fulfillment recorded.");
+        }
+        ShopCommand::Rules {
+            tax_bps,
+            shipping_minor,
+            tax_shipping,
+        } => {
+            let v = c::settings(app).await?.get("version");
+            c::catalog::set_rules(app, &s, v, tax_bps, shipping_minor, tax_shipping).await?;
+            println!("Store rules saved.");
+        }
+        ShopCommand::Maintenance => println!(
+            "{} commerce transitions processed; no offline payment was fabricated.",
+            c::tick(app).await?
+        ),
+        ShopCommand::Report => {
+            let r=sqlx::query("SELECT (SELECT COUNT(*) FROM shop_products) AS products,(SELECT COUNT(*) FROM shop_orders WHERE payment_state='awaiting') AS awaiting,(SELECT COUNT(*) FROM shop_orders WHERE payment_state='needs_refund') AS needs_refund,(SELECT COUNT(*) FROM shop_subscriptions WHERE state='past_due') AS past_due,(SELECT records FROM shop_usage WHERE id=1) AS records").fetch_one(&app.db.pool).await?;
+            println!(
+                "{}",
+                serde_json::json!({"currency":app.config.commerce.currency,"products":r.get::<i64,_>("products"),"awaiting_payment":r.get::<i64,_>("awaiting"),"needs_refund":r.get::<i64,_>("needs_refund"),"past_due":r.get::<i64,_>("past_due"),"records":r.get::<i64,_>("records")})
+            );
+        }
+        ShopCommand::SeedDemo => {
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM shop_products")
+                .fetch_one(&app.db.pool)
+                .await?;
+            if count != 0 {
+                return Err(Error::invalid("Commerce demo requires an empty catalog."));
+            }
+            let mut booking = None;
+            for (kind, title, price, stock, interval) in [
+                ("physical", "Field notebook", 1800, 20, ""),
+                ("digital", "Independent publishing guide", 900, -1, ""),
+                ("membership", "Studio membership", 2500, -1, "month"),
+                ("booking", "Editorial consultation", 6000, -1, ""),
+            ] {
+                let id=c::catalog::save_product(app,&s,None,0,&c::catalog::ProductInput{slug:kind.into(),title:title.into(),description:"Synthetic demonstration. Clear terms, local records, no external payment required.".into(),kind:kind.into(),entitlement:if kind=="membership"{"studio".into()}else{String::new()},access_seconds:0,download_id:String::new(),published:true}).await?;
+                let v = c::catalog::save_variant(
+                    app,
+                    &s,
+                    &id,
+                    None,
+                    0,
+                    &c::catalog::VariantInput {
+                        title: "Standard".into(),
+                        sku: format!("DEMO-{kind}"),
+                        price_minor: price,
+                        member_price_minor: -1,
+                        member_key: String::new(),
+                        stock_total: stock,
+                        billing_interval: interval.into(),
+                        active: true,
+                    },
+                )
+                .await?;
+                if kind == "booking" {
+                    booking = Some(v)
+                }
+            }
+            let resource = c::booking::resource(app, &s, "Editorial studio", &s.user.id).await?;
+            c::booking::slot(
+                app,
+                &s,
+                &c::booking::SlotInput {
+                    resource_id: resource,
+                    variant_id: booking.unwrap(),
+                    starts_at: wpalt::now() + 3 * 86400,
+                    ends_at: wpalt::now() + 3 * 86400 + 3600,
+                    capacity: 4,
+                },
+            )
+            .await?;
+            println!(
+                "Four sample products and one reservation slot created. Visit /shop and /admin/shop."
+            );
+        }
+    }
+    Ok(())
 }
 #[derive(Subcommand)]
 enum ThemeCommand {
@@ -424,6 +660,9 @@ async fn main() -> anyhow::Result<()> {
             result.map_err(|e| anyhow::anyhow!(e.1))?;
             println!("Theme operation completed.");
         }
+        Command::Shop { command } => shop_command(&app, command)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?,
         Command::Member { command } => member_command(&app, command)
             .await
             .map_err(|e| anyhow::anyhow!(e.1))?,
@@ -445,6 +684,9 @@ async fn main() -> anyhow::Result<()> {
                     }
                     if wpalt::business::campaigns::tick(&scheduled).await.is_err() {
                         tracing::error!(event = "campaign_tick_failed");
+                    }
+                    if wpalt::commerce::tick(&scheduled).await.is_err() {
+                        tracing::error!(event = "commerce_tick_failed");
                     }
                     if wpalt::business::mail::tick(&scheduled).await.is_err() {
                         tracing::error!(event = "mail_tick_failed");

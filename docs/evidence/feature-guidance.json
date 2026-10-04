@@ -964,6 +964,111 @@
         "relevant vulnerability or permissions change"
       ],
       "status": "reviewed; live publication verified after delivery PR merge"
+    },
+    {
+      "feature_id": "M6-01",
+      "area": "Local commerce, pricing and allocations",
+      "scope": "M6",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html",
+        "https://docs.stripe.com/currencies"
+      ],
+      "applicable_versions": [
+        "Stripe API 2026-09-30.endive",
+        "wpalt schema 9",
+        "WCAG 2.2 for applicable UI criteria"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2027-01-02",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Server-authoritative checked minor-unit totals; conditional capacity and durable idempotency; snapshotted financial rules; no fabricated offline collection."
+      ],
+      "tests": [
+        "commerce_checkout_snapshots_prices_refunds_stock_and_preserves_financial_graph",
+        "commerce_last_unit_and_last_slot_have_one_winner_and_expiring_holds_are_reusable",
+        "commerce_member_pricing_referrals_discounts_and_free_orders_share_local_accounts"
+      ],
+      "triggers": [
+        "affected release",
+        "provider API or webhook-version changes",
+        "business-rule or migration changes",
+        "security guidance update"
+      ],
+      "status": "implemented; integrated verification in progress"
+    },
+    {
+      "feature_id": "M6-02",
+      "area": "Optional hosted payment boundary",
+      "scope": "M6",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.stripe.com/api/versioning",
+        "https://docs.stripe.com/webhooks",
+        "https://docs.stripe.com/api/checkout/sessions/create",
+        "https://docs.stripe.com/api/invoice-payment/object",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Third_Party_Payment_Gateway_Integration_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "Stripe API 2026-09-30.endive",
+        "wpalt schema 9",
+        "WCAG 2.2 for applicable UI criteria"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2027-01-02",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Pin API 2026-09-30.endive; verify signed original bytes/freshness before storage; retrieve canonical objects; exact currency/amount/mapping; stable refund/payment idempotency; no card entry or secret logs."
+      ],
+      "tests": [
+        "commerce_https_provider_requires_tls_raw_signatures_exact_money_and_idempotent_refunds"
+      ],
+      "triggers": [
+        "affected release",
+        "provider API or webhook-version changes",
+        "business-rule or migration changes",
+        "security guidance update"
+      ],
+      "status": "implemented; integrated verification in progress"
+    },
+    {
+      "feature_id": "M6-03",
+      "area": "Paid access, billing and full financial recovery",
+      "scope": "M6",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html",
+        "https://docs.stripe.com/billing/subscriptions/webhooks",
+        "https://www.w3.org/TR/WCAG22/"
+      ],
+      "applicable_versions": [
+        "Stripe API 2026-09-30.endive",
+        "wpalt schema 9",
+        "WCAG 2.2 for applicable UI criteria"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2027-01-02",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Current account authority; settled period access and narrow refund revocation; no marketing-consent side effect; validate whole financial graph before writes; shared measured frontend."
+      ],
+      "tests": [
+        "commerce_recurring_access_needs_payment_and_refunds_revoke_only_the_purchase",
+        "commerce_renewal_dunning_and_downgrade_keep_agreed_prices_and_require_real_collection",
+        "commerce_archive_rejects_financial_and_allocation_tampering_before_writes",
+        "scripts/commerce_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected release",
+        "provider API or webhook-version changes",
+        "business-rule or migration changes",
+        "security guidance update"
+      ],
+      "status": "implemented; integrated verification in progress"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

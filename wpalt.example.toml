@@ -69,3 +69,20 @@ token_url = ""
 jwks_url = ""
 ca_cert_file = "" # Optional public PEM root certificate for an owner-controlled private PKI; never a private key.
 # Enabling requires an HTTPS base_url and explicit HTTPS provider endpoints.
+
+# M6 owner-hosted commerce. Currency is immutable once the database is initialized.
+[commerce]
+enabled = true
+currency = "USD" # USD/EUR/GBP use minor cents; JPY uses whole yen.
+hold_seconds = 900 # 60..3600; hosted Checkout holds are at least 1800 seconds.
+max_records = 1000000
+referral_bps = 500 # 5%, from settled subtotal after discounts.
+
+[commerce.stripe]
+enabled = false
+# Set WPALT_STRIPE_SECRET_KEY and WPALT_STRIPE_WEBHOOK_SECRET in the environment.
+# Requires HTTPS base_url. Pin endpoint API version 2026-09-30.endive.
+secret_key = ""
+webhook_secret = ""
+api_url = "" # Empty = https://api.stripe.com/v1. Explicit HTTPS overrides only.
+ca_cert_file = "" # Optional private CA for owner/test infrastructure, <=32 KiB PEM.

@@ -282,3 +282,7 @@ The user authorized merging review PR #9 and continuing with M5. PR #9 merged as
 ## M5 merged; delivery improvements before M6 — 2026-10-04
 
 The user authorized M5 PR #10, merged as `323f25c27669a071f2344ce3f40318a3d86a4e0a`. Its final PR gates and independently checked clean archive passed; actual-main run 37154694774 is tracked separately. Before M6, the user requested a dedicated PR for dated automatic releases and CI optimization without reducing meaningful coverage. [Release/CI contract](automatic-releases.md) defines that delivery work. M6 has not started.
+
+### M6 preparation — 2026-10-04
+
+User authorized merging delivery PR #11 and proceeding with M6. PR #11 merged to `55cc1d8538e07bf01e4e2827b26379f58da00608`; its actual-main run 37167056070 passed all six jobs and published the first independently verified nightly archive. M6 is active under [the commerce contract](m6-contract.md), with [operating rules](commerce-reservations.md), ADR 0008 and [verification-in-progress](evidence/m6-verification.md). No M6 completion/M7 start or provider sandbox-certification claim is made until the delivery gates and user review are satisfied.

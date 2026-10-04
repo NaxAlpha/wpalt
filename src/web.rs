@@ -31,6 +31,7 @@ pub fn router(app: App) -> Router {
         .merge(business)
         .merge(crate::discovery::routes())
         .merge(crate::membership::web::routes(&app))
+        .merge(crate::commerce::web::routes(&app))
         .route("/", get(home))
         .route("/search", get(home))
         .route("/health", get(health))
@@ -111,6 +112,7 @@ async fn security_and_trace(
         && method != axum::http::Method::HEAD
         && auth::same_origin(&app, request.headers()).is_err()
         && !capability_navigation(&route, request.headers())
+        && !(method == axum::http::Method::POST && route == "/commerce/stripe/webhook")
     {
         Error::forbidden().into_response()
     } else {
@@ -139,6 +141,8 @@ async fn security_and_trace(
         || route == "/account"
         || route.starts_with("/members")
         || route.starts_with("/api/members")
+        || route.starts_with("/shop")
+        || route.starts_with("/commerce/")
         || (route.starts_with("/audience/") || route.starts_with("/registration/"))
         || route.starts_with("/api/forms/")
         || route.starts_with("/api/engagement/")
@@ -152,6 +156,8 @@ async fn security_and_trace(
         || route == "/{locale}/{slug}"
         || route.starts_with("/members")
         || route.starts_with("/api/members")
+        || route.starts_with("/shop")
+        || route.starts_with("/commerce/")
     {
         h.insert("cache-control", HeaderValue::from_static("no-store"));
     }
@@ -194,6 +200,8 @@ async fn security_and_trace(
         || route == "/account"
         || route.starts_with("/members")
         || route.starts_with("/api/members")
+        || route.starts_with("/shop")
+        || route.starts_with("/commerce/")
         || route == "/logout"
         || (route.starts_with("/audience/") || route.starts_with("/registration/"))
         || route.starts_with("/api/forms/")
@@ -1428,6 +1436,7 @@ async fn save_settings(
     let settings = Settings {
         business_enabled: app.config.business_enabled,
         membership_enabled: app.config.membership_enabled,
+        commerce_enabled: app.config.commerce.enabled,
         engagement_available: app.config.engagement.enabled,
         analytics: None,
         title: input.title,
