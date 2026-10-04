@@ -61,6 +61,10 @@ enum Command {
         #[arg(long)]
         key_file: PathBuf,
     },
+    /// Native PostgreSQL 17 archive_command helper; independent of the app process lock.
+    WalStore { input: PathBuf, name: String },
+    /// Native PostgreSQL 17 restore_command helper; replaces the engine output atomically.
+    WalRestore { name: String, output: PathBuf },
     /// Scan stored media/private attachment inventory without changing files.
     IntegrityScan {
         #[arg(long, default_value = "")]
@@ -634,6 +638,20 @@ async fn main() -> anyhow::Result<()> {
     // Portable recovery tools operate on files/config only: no live server,
     // database, site lock, installation or vendor account is needed.
     match &cli.command {
+        Command::WalStore { input, name } => {
+            wpalt::operations::postgres_archive::store(&config, input, name)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            println!("WAL stored and verified.");
+            return Ok(());
+        }
+        Command::WalRestore { name, output } => {
+            wpalt::operations::postgres_archive::restore(&config, name, output)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            println!("Authenticated WAL restored.");
+            return Ok(());
+        }
         Command::RecoveryInspect { input, key_file } => {
             let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
             println!(
@@ -781,7 +799,9 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             .map_err(|e| anyhow::anyhow!(e.1))?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
-        Command::RecoveryInspect { .. }
+        Command::WalStore { .. }
+        | Command::WalRestore { .. }
+        | Command::RecoveryInspect { .. }
         | Command::RecoveryFile { .. }
         | Command::MigrateBackup { .. } => unreachable!(),
         Command::AuthReset { email } => {

@@ -7,6 +7,7 @@ pub mod incremental;
 pub mod integrity;
 pub mod media;
 pub mod passkeys;
+pub mod postgres_archive;
 pub mod protection;
 pub mod recovery;
 pub mod spam;

@@ -3827,3 +3827,75 @@ async fn local_abuse_guard_binds_resource_and_admits_only_one_racing_submitter()
         site.close().await;
     }
 }
+
+/// A native archive retry preserves the same segment; authenticated filename and
+/// cluster identity are checked before an engine output can be replaced.
+#[tokio::test]
+async fn native_wal_archive_is_idempotent_bound_to_cluster_and_preserves_output_on_corruption() {
+    use wpalt::operations::{encryption, postgres_archive as wal};
+    let directory = tempfile::tempdir().unwrap();
+    let archive = directory.path().join("archive");
+    std::fs::create_dir(&archive).unwrap();
+    let key_path = directory.path().join("key");
+    backup::write_private(
+        &key_path,
+        hex::encode(encryption::generate_key()).as_bytes(),
+    )
+    .unwrap();
+    let config = Config {
+        postgres_archive: wal::Config {
+            enabled: true,
+            system_id: "123456789".into(),
+            key_file: key_path,
+            directory: archive.clone(),
+            max_segment_bytes: 1024 * 1024,
+        },
+        ..Default::default()
+    };
+    let name = "000000010000000000000001";
+    let mut segment = vec![0u8; 1024 * 1024];
+    segment[0..2].copy_from_slice(&0xD116u16.to_le_bytes());
+    segment[2..4].copy_from_slice(&2u16.to_le_bytes());
+    segment[4..8].copy_from_slice(&1u32.to_le_bytes());
+    segment[8..16].copy_from_slice(&1048576u64.to_le_bytes());
+    segment[24..32].copy_from_slice(&123456789u64.to_le_bytes());
+    segment[32..36].copy_from_slice(&1048576u32.to_le_bytes());
+    segment[36..40].copy_from_slice(&8192u32.to_le_bytes());
+    segment[128..136].copy_from_slice(b"WAL_DATA");
+    let input = directory.path().join("input");
+    std::fs::write(&input, &segment).unwrap();
+    wal::store(&config, &input, name).await.unwrap();
+    let package = archive.join(format!("{name}.wpwal"));
+    let first = std::fs::read(&package).unwrap();
+    wal::store(&config, &input, name).await.unwrap();
+    assert_eq!(
+        std::fs::read(&package).unwrap(),
+        first,
+        "idempotent retry cannot reseal or replace an existing segment"
+    );
+    let output = directory.path().join("engine-output");
+    std::fs::write(&output, b"previous engine bytes").unwrap();
+    wal::restore(&config, name, &output).await.unwrap();
+    assert_eq!(std::fs::read(&output).unwrap(), segment);
+    let mut swapped = config.clone();
+    swapped.postgres_archive.system_id = "123456790".into();
+    assert!(wal::restore(&swapped, name, &output).await.is_err());
+    let other = "000000010000000000000002";
+    std::fs::write(archive.join(format!("{other}.wpwal")), &first).unwrap();
+    assert!(wal::restore(&config, other, &output).await.is_err());
+    let mut damaged = first;
+    *damaged.last_mut().unwrap() ^= 1;
+    std::fs::write(&package, damaged).unwrap();
+    assert!(wal::restore(&config, name, &output).await.is_err());
+    assert_eq!(
+        std::fs::read(&output).unwrap(),
+        segment,
+        "failed authentication cannot touch existing engine output"
+    );
+    assert!(wal::store(&config, &input, "../outside").await.is_err());
+    assert!(!wal::valid_name("000000010000000000000001.partial"));
+    assert!(
+        wal::valid_name("00000002.history")
+            && wal::valid_name("000000010000000000000001.00000028.backup")
+    );
+}

@@ -51,3 +51,7 @@ http-body-util = "0.1"
 lto = "thin"
 codegen-units = 1
 strip = true
+
+# Narrow upstream maintenance patch, verified against registry source in CI.
+[patch.crates-io]
+rav1e = { path = "vendor/rav1e" }

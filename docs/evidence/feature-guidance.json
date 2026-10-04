@@ -1276,7 +1276,8 @@
       "sources": [
         "https://docs.rs/image/0.25.9/image/codecs/avif/struct.AvifEncoder.html",
         "https://docs.rs/image/0.25.9/image/codecs/webp/struct.WebPDecoder.html",
-        "https://docs.rs/image/0.25.9/image/codecs/png/struct.PngDecoder.html"
+        "https://docs.rs/image/0.25.9/image/codecs/png/struct.PngDecoder.html",
+        "https://github.com/xiph/rav1e/commit/c247d53ae43dd1312dbd90117c45e4c0ee6b06ce"
       ],
       "applicable_versions": [
         "image 0.25.9",
@@ -1289,11 +1290,13 @@
       "maintenance_owner": "wpalt maintainers",
       "requirements": [
         "Bound AVIF output pixels and encoder threads; do not silently discard animation.",
-        "Authenticate each request before byte-cache reuse; separate retained storage budgets from transient worker allocations."
+        "Authenticate each request before byte-cache reuse; separate retained storage budgets from transient worker allocations.",
+        "Verify every vendor-source byte against the registry checksum plus the narrow upstream pastey/lifetime maintenance transformations; remove the path patch when a reviewed registry release contains the fix."
       ],
       "tests": [
         "native_image_derivatives_preserve_private_authority_and_validate_processing_limits",
-        "scripts/operations_acceptance.cjs"
+        "scripts/operations_acceptance.cjs",
+        "scripts/verify_encoder_vendor.py"
       ],
       "triggers": [
         "encoder or browser changes",
@@ -1301,6 +1304,40 @@
         "affected release"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-PG-NATIVE-WAL",
+      "area": "Native PostgreSQL archival and point-in-time recovery",
+      "scope": "M7 PostgreSQL 17 integration; real-engine verification pending",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.postgresql.org/docs/17/continuous-archiving.html",
+        "https://github.com/postgres/postgres/blob/REL_17_STABLE/src/include/access/xlog_internal.h",
+        "https://hub.docker.com/_/postgres"
+      ],
+      "applicable_versions": [
+        "PostgreSQL 17 native long-page headers",
+        "wpalt-postgres-wal-v1"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Distinguish native physical base+WAL chain from logical application snapshots; maintain matching immutable media independently.",
+        "Bind encrypted segments to cluster identifier and native filename; fail before replacement on missing, wrong-key, wrong-identity or corrupted records.",
+        "Do not overwrite different archived segments or prune a chain without proven retained-base coverage."
+      ],
+      "tests": [
+        "native_wal_archive_is_idempotent_bound_to_cluster_and_preserves_output_on_corruption",
+        "scripts/native_pitr_acceptance.py"
+      ],
+      "triggers": [
+        "PostgreSQL major/version or image changes",
+        "relevant vulnerabilities",
+        "affected release"
+      ],
+      "status": "implementation-reviewed; real-engine-test-pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

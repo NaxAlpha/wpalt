@@ -1984,12 +1984,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "paste"
-version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
-
-[[package]]
 name = "pastey"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2373,8 +2367,6 @@ dependencies = [
 [[package]]
 name = "rav1e"
 version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43b6dd56e85d9483277cde964fd1bdb0428de4fec5ebba7540995639a21cb32b"
 dependencies = [
  "aligned-vec",
  "arbitrary",
@@ -2395,7 +2387,7 @@ dependencies = [
  "noop_proc_macro",
  "num-derive",
  "num-traits",
- "paste",
+ "pastey",
  "profiling",
  "rand 0.9.5",
  "rand_chacha 0.9.0",

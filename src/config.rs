@@ -13,6 +13,7 @@ pub struct Config {
     pub listen: SocketAddr,
     pub base_url: String,
     pub debug: bool,
+    pub postgres_archive: crate::operations::postgres_archive::Config,
     pub media: crate::operations::media::Config,
     pub spam: crate::operations::spam::Config,
     pub protection: crate::operations::protection::Config,
@@ -44,6 +45,7 @@ impl Default for Config {
             listen: "127.0.0.1:3000".parse().unwrap(),
             base_url: "http://127.0.0.1:3000".into(),
             debug: false,
+            postgres_archive: Default::default(),
             media: Default::default(),
             spam: Default::default(),
             protection: Default::default(),
@@ -123,6 +125,7 @@ impl Config {
         self.protection.validate()?;
         self.spam.validate()?;
         self.media.validate()?;
+        self.postgres_archive.validate()?;
         self.cache.validate()?;
         self.recovery.validate()?;
         self.commerce.validate()?;
