@@ -28,7 +28,7 @@ pub async fn read_key(path: &Path) -> Result<[u8; 32]> {
             return Err(Error::invalid("Recovery key must be private (chmod 600)."));
         }
     }
-    let raw = crate::backup::read_bounded(path, 65).await?;
+    let raw = crate::backup::read_bounded(path, 66).await?;
     let text = std::str::from_utf8(&raw)
         .map_err(|_| Error::invalid("Invalid recovery key."))?
         .trim_end_matches(['\n', '\r']);

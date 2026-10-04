@@ -56,6 +56,7 @@ pub fn router(app: App) -> Router {
         .route("/admin/media", get(media_list).post(upload))
         .route("/admin/media/{id}", post(update_media))
         .route("/media/{id}", get(media_file))
+        .route("/media/{id}/resize/{width}", get(media_derivative))
         .route("/admin/comments", get(comments))
         .route("/admin/comments/{id}", post(moderate))
         .route("/admin/settings", get(settings_page).post(save_settings))
@@ -64,6 +65,8 @@ pub fn router(app: App) -> Router {
         .route("/admin/operations", get(operations))
         .route("/admin/backup", post(download_backup))
         .route("/admin/recovery/run", post(run_recovery))
+        .route("/admin/operations/integrity", post(integrity_scan))
+        .route("/admin/operations/audit", get(audit_history))
         .route("/admin/export", get(export_content))
         .route("/api/content", get(public_api))
         .route("/api/admin/media", get(media_picker))
@@ -102,8 +105,54 @@ async fn security_and_trace(
         .map(|p| p.as_str().to_owned())
         .unwrap_or_else(|| "unmatched".into());
     let span = tracing::info_span!("request",request_id=%id,method=%method,route=%route);
+    let privileged_write = method != axum::http::Method::GET
+        && method != axum::http::Method::HEAD
+        && (route.starts_with("/admin") || route.starts_with("/api/admin"));
     let permit = app.request_work.clone().try_acquire_owned();
-    let mut response = if permit.is_err() {
+    let protection = app
+        .protection_limits
+        .lock()
+        .await
+        .check(&app.config.protection, &request);
+    let admitted = permit.is_ok() && protection.is_ok();
+    let actor = if privileged_write && admitted {
+        auth::session(&app, request.headers())
+            .await
+            .ok()
+            .map(|s| s.user.id)
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let mut audit_started = false;
+    let audit_failure = if privileged_write && admitted {
+        let intent = crate::operations::audit::Event {
+            at: now(),
+            request_id: id.clone(),
+            actor: actor.clone(),
+            route: route.clone(),
+            phase: "intent".into(),
+            status: 0,
+        };
+        match crate::operations::audit::append(&app, intent).await {
+            Ok(()) => {
+                audit_started = true;
+                None
+            }
+            Err(_) => Some(Error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Cannot persist privileged action history. Check site storage before retrying.",
+            )),
+        }
+    } else {
+        None
+    };
+    let mut response = if let Some(error) = audit_failure {
+        error.into_response()
+    } else if let Err(error) = protection {
+        tracing::warn!(event="local_request_blocked", route=%route, status=error.0.as_u16());
+        error.into_response()
+    } else if permit.is_err() {
         Error(
             StatusCode::SERVICE_UNAVAILABLE,
             "Server is busy. Try again shortly.",
@@ -125,6 +174,9 @@ async fn security_and_trace(
             && !request.headers().contains_key("cookie")
             && !request.headers().contains_key("authorization")
             && !request.headers().contains_key("range")
+            && !request.headers().contains_key("if-none-match")
+            && !request.headers().contains_key("if-modified-since")
+            && !request.headers().contains_key("cache-control")
             && matches!(
                 route.as_str(),
                 "/" | "/search"
@@ -140,7 +192,12 @@ async fn security_and_trace(
             let generation = app
                 .cache_generation
                 .load(std::sync::atomic::Ordering::SeqCst);
-            let key = request.uri().to_string();
+            let encoding = request
+                .headers()
+                .get("accept-encoding")
+                .and_then(|h| h.to_str().ok())
+                .unwrap_or("");
+            let key = format!("{}|encoding={}", request.uri(), encoding);
             let cached = app
                 .page_cache
                 .lock()
@@ -195,6 +252,28 @@ async fn security_and_trace(
         && response.status() == StatusCode::UNAUTHORIZED
     {
         response = Redirect::to("/login").into_response();
+    }
+    if audit_started {
+        let outcome = crate::operations::audit::Event {
+            at: now(),
+            request_id: id.clone(),
+            actor,
+            route: route.clone(),
+            phase: "response".into(),
+            status: response.status().as_u16(),
+        };
+        if crate::operations::audit::append(&app, outcome)
+            .await
+            .is_err()
+        {
+            // The action may have committed. Never replace its successful response
+            // with an error that encourages blindly replaying a financial mutation.
+            tracing::error!(event="audit_outcome_write_failed", request_id=%id, route=%route);
+            response.headers_mut().insert(
+                "x-wpalt-audit",
+                HeaderValue::from_static("outcome-write-failed"),
+            );
+        }
     }
     let h = response.headers_mut();
     if route.starts_with("/admin")
@@ -1140,7 +1219,7 @@ async fn media_list(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
         html! {
             (view::heading("Assets","Media library","Upload images, describe them and choose who can access them. SVG and executable uploads are not accepted."))
             section class="panel" {form method="post" action="/admin/media" enctype="multipart/form-data" {(view::csrf(&s))div class="field-row" {label {"Image" input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/gif" required;}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" {"Public"}option value="private" {"Editors only"}}}}label {"Alternative text" input name="alt" maxlength="500";}button {"Upload image"}}}
-            div class="cards" {@for r in rows {@let id=r.get::<String,_>("id");section class="panel media-card" {img src=(format!("/media/{id}")) alt=(r.get::<String,_>("alt"));h3 {(r.get::<String,_>("original_name"))}p class="muted" {(r.get::<i64,_>("size")/1024) " KiB"}code {(format!("![description](/media/{id})"))}
+            div class="cards" {@for r in rows {@let id=r.get::<String,_>("id");section class="panel media-card" {img src=(format!("/media/{id}")) alt=(r.get::<String,_>("alt")) loading="lazy";h3 {(r.get::<String,_>("original_name"))}p class="muted" {(r.get::<i64,_>("size")/1024) " KiB"}code {(format!("![description](/media/{id})"))}
                 form method="post" action=(format!("/admin/media/{id}")) {(view::csrf(&s))label {"Alternative text" input name="alt" value=(r.get::<String,_>("alt")) maxlength="500";}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" selected[r.get::<String,_>("visibility")=="public"] {"Public"}option value="private" selected[r.get::<String,_>("visibility")=="private"] {"Editors only"}}}button class="secondary" {"Save details"}}
             }}}
         },
@@ -1279,6 +1358,41 @@ async fn update_media(
         return Err(Error::not_found());
     }
     Ok(Redirect::to("/admin/media"))
+}
+async fn media_derivative(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path((id, width)): Path<(String, u32)>,
+) -> Result<Response> {
+    if ![320, 640, 1280, 1920].contains(&width) {
+        return Err(Error::invalid("Unsupported image width."));
+    }
+    let permit = app.media_work.clone().try_acquire_owned().map_err(|_| {
+        Error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Image processing is busy. Try again shortly.",
+        )
+    })?;
+    // Same policy and current role checks as original delivery, including private
+    // editor-only images and paid entitlement revocation. Never expose a filesystem path.
+    let original = media_file(State(app), headers, Path(id)).await?;
+    let bytes = axum::body::to_bytes(original.into_body(), 32 * 1024 * 1024)
+        .await
+        .map_err(|_| Error::invalid("Cannot read bounded source image."))?;
+    let output = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        crate::operations::media::derivative(&bytes, width)
+    })
+    .await
+    .map_err(|_| Error::invalid("Image worker interrupted."))??;
+    Ok((
+        [
+            ("content-type", "image/webp"),
+            ("cache-control", "no-store"),
+        ],
+        output,
+    )
+        .into_response())
 }
 async fn media_file(
     State(app): State<App>,
@@ -1576,6 +1690,24 @@ async fn add_user(
     })?;
     Ok(Redirect::to("/admin/users"))
 }
+async fn audit_history(
+    State(app): State<App>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<crate::operations::audit::Event>>> {
+    let session = admin_session(&app, &headers).await?;
+    admin(&session)?;
+    Ok(Json(crate::operations::audit::read(&app).await?))
+}
+async fn integrity_scan(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<Csrf>,
+) -> Result<Json<crate::operations::integrity::Report>> {
+    let session = admin_session(&app, &headers).await?;
+    admin(&session)?;
+    auth::csrf(&session, &input.csrf)?;
+    Ok(Json(crate::operations::integrity::scan(&app).await?))
+}
 async fn run_recovery(
     State(app): State<App>,
     headers: HeaderMap,
@@ -1614,6 +1746,10 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
                     p {"Configure a private recovery key, existing destinations, interval and retention in [recovery] to enable scheduled encrypted copies."}
                 }
                 p class="muted" {"Keep the recovery key separately. Verify an independent copy by restoring into a fresh instance. A pending attempt after restart may have been interrupted; inspect destination packages before retrying."}
+            }
+            section class="panel" {h2 {"Stored-file integrity"}p {a href="/admin/operations/audit" {"Inspect privileged action history"}}
+                p {"Check database-recorded image and private attachment checksums without changing files. A bounded scan reports incomplete work; it does not certify malware-free content."}
+                form method="post" action="/admin/operations/integrity" {(view::csrf(&s))button class="secondary" {"Inspect stored-file integrity"}}
             }
             details class="panel" {summary {"Effective configuration · secrets redacted"}pre class="inline-code" {(serde_json::to_string_pretty(&app.config.redacted()).unwrap())}}
         },

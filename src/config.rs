@@ -13,6 +13,7 @@ pub struct Config {
     pub listen: SocketAddr,
     pub base_url: String,
     pub debug: bool,
+    pub protection: crate::operations::protection::Config,
     pub cache: crate::operations::cache::Config,
     pub recovery: crate::operations::recovery::Config,
     pub business_enabled: bool,
@@ -41,6 +42,7 @@ impl Default for Config {
             listen: "127.0.0.1:3000".parse().unwrap(),
             base_url: "http://127.0.0.1:3000".into(),
             debug: false,
+            protection: Default::default(),
             cache: Default::default(),
             recovery: Default::default(),
             business_enabled: true,
@@ -114,6 +116,7 @@ impl Config {
         Ok(c)
     }
     pub fn validate(&self) -> anyhow::Result<()> {
+        self.protection.validate()?;
         self.cache.validate()?;
         self.recovery.validate()?;
         self.commerce.validate()?;

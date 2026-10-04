@@ -2845,3 +2845,245 @@ async fn anonymous_cache_never_reuses_sessions_and_invalidates_published_access_
         site.close().await;
     }
 }
+
+#[tokio::test]
+async fn local_request_rules_cannot_be_bypassed_with_forwarded_headers_or_cached_pages() {
+    use axum::extract::ConnectInfo;
+    use std::net::SocketAddr;
+    let mut site = Site::new(false, true).await;
+    let mut config = (*site.app.config).clone();
+    config.cache.enabled = true;
+    config.protection = wpalt::operations::protection::Config {
+        enabled: true,
+        denied_prefixes: vec!["/admin".into()],
+        denied_peers: vec!["192.0.2.9".parse().unwrap()],
+        requests_per_window: 2,
+        window_seconds: 60,
+    };
+    site.app.config = std::sync::Arc::new(config);
+    let router = wpalt::web::router(site.app.clone());
+    let request = |path: &str, peer: &str| {
+        let mut request = Request::builder()
+            .uri(path)
+            .header("x-forwarded-for", "198.51.100.100")
+            .body(Body::empty())
+            .unwrap();
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(peer.parse::<SocketAddr>().unwrap()));
+        request
+    };
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/admin", "192.0.2.1:1234"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/", "192.0.2.9:1234"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/", "192.0.2.1:1234"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/", "192.0.2.1:1235"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/", "192.0.2.1:1236"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/", "192.0.2.2:1234"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        router
+            .oneshot(request("/health", "192.0.2.1:1234"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    site.close().await;
+}
+
+#[tokio::test]
+async fn native_image_derivatives_preserve_private_authority_and_validate_processing_limits() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        assert_eq!(
+            upload(&site, "private.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let id: String = sqlx::query_scalar("SELECT id FROM media LIMIT 1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let router = wpalt::web::router(site.app.clone());
+        let path = format!("/media/{id}/resize/320");
+        assert!(
+            !router
+                .clone()
+                .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .status()
+                .is_success()
+        );
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(&path)
+                    .header("cookie", format!("wpalt_session={}", site.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        assert_eq!(response.headers()["content-type"], "image/webp");
+        let bytes = axum::body::to_bytes(response.into_body(), 1_000_000)
+            .await
+            .unwrap();
+        assert_eq!(
+            image::guess_format(&bytes).unwrap(),
+            image::ImageFormat::WebP
+        );
+        let decoded = image::load_from_memory(&bytes).unwrap();
+        let source = image::load_from_memory(&png()).unwrap();
+        assert_eq!(
+            decoded.width(),
+            source.width(),
+            "small images are never enlarged"
+        );
+        assert!(wpalt::operations::media::derivative(&png(), 999).is_err());
+        assert!(wpalt::operations::media::derivative(b"not an image", 320).is_err());
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn integrity_scan_reports_damaged_private_files_without_modifying_them() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        assert_eq!(
+            upload(&site, "private.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let clean = wpalt::operations::integrity::scan(&site.app).await.unwrap();
+        assert_eq!(clean.checked, 1);
+        assert!(clean.failed.is_empty() && !clean.limited);
+        let filename: String = sqlx::query_scalar("SELECT filename FROM media LIMIT 1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let path = site.app.config.data_dir.join("media").join(filename);
+        std::fs::write(&path, b"damaged-image").unwrap();
+        let damaged = wpalt::operations::integrity::scan(&site.app).await.unwrap();
+        assert_eq!(damaged.failed.len(), 1);
+        assert_eq!(std::fs::read(&path).unwrap(), b"damaged-image");
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn privileged_audit_records_attempt_and_outcome_without_passwords_or_capabilities() {
+    let site = Site::new(false, true).await;
+    let router = wpalt::web::router(site.app.clone());
+    let response = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/users")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .header("origin", site.app.config.origin())
+                .body(Body::from(
+                    "password=secret-that-must-not-be-logged&csrf=private-capability",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(!response.status().is_success());
+    let events = wpalt::operations::audit::read(&site.app).await.unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].phase, "response");
+    assert_eq!(events[1].phase, "intent");
+    assert_eq!(events[0].request_id, events[1].request_id);
+    assert!(events[0].actor.is_empty());
+    let raw =
+        std::fs::read_to_string(site.app.config.data_dir.join("privileged-audit.jsonl")).unwrap();
+    assert!(!raw.contains("secret-that-must-not-be-logged") && !raw.contains("private-capability"));
+    let denied = router
+        .oneshot(
+            Request::builder()
+                .uri("/admin/operations/audit")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_ne!(denied.status(), StatusCode::OK);
+    // If intent cannot be persisted, no privileged handler is dispatched.
+    let journal = site.app.config.data_dir.join("privileged-audit.jsonl");
+    std::fs::remove_file(&journal).unwrap();
+    std::fs::create_dir(&journal).unwrap();
+    let blocked = wpalt::web::router(site.app.clone())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/users")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .header("origin", site.app.config.origin())
+                .header("cookie", format!("wpalt_session={}", site.token))
+                .body(Body::from(
+                    "name=Unwritten&email=new@example.test&role=admin&password=never-create-me",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(blocked.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap(),
+        1
+    );
+    site.close().await;
+}

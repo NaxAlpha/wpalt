@@ -4,8 +4,8 @@ Optional PostgreSQL URL MUST identify an empty, isolated test database.
 """
 import argparse,concurrent.futures,hashlib,json,math,os,platform,secrets,socket,subprocess,tempfile,time,urllib.request
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--binary',default='target/release/wpalt');p.add_argument('--posts',type=int,default=1000);p.add_argument('--requests',type=int,default=200);p.add_argument('--postgres-url');p.add_argument('--wordpress-url');p.add_argument('--composed',action='store_true');p.add_argument('--discovery',action='store_true');p.add_argument('--commerce',action='store_true');p.add_argument('--debug',action='store_true');p.add_argument('--output',default='work/benchmark.json');args=p.parse_args()
-binary=Path(args.binary).resolve();results={'machine':{'platform':platform.platform(),'cpu':platform.processor(),'logical_cpus':os.cpu_count()},'posts_requested':args.posts,'requests_per_scenario':args.requests,'binary_bytes':binary.stat().st_size,'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'conditions':'Full uncompressed HTML document; warm application; no browser asset/render timing; no application response cache; localhost; Python HTTP client overhead included.','debug_logging':args.debug,'commerce_fixture':('four physical/digital/monthly membership/group-booking products, one UTC slot, no invented payments' if args.commerce else None),'profiles':[]}
+p=argparse.ArgumentParser();p.add_argument('--binary',default='target/release/wpalt');p.add_argument('--posts',type=int,default=1000);p.add_argument('--requests',type=int,default=200);p.add_argument('--postgres-url');p.add_argument('--wordpress-url');p.add_argument('--composed',action='store_true');p.add_argument('--discovery',action='store_true');p.add_argument('--commerce',action='store_true');p.add_argument('--debug',action='store_true');p.add_argument('--cached',action='store_true');p.add_argument('--output',default='work/benchmark.json');args=p.parse_args()
+binary=Path(args.binary).resolve();results={'machine':{'platform':platform.platform(),'cpu':platform.processor(),'logical_cpus':os.cpu_count()},'posts_requested':args.posts,'requests_per_scenario':args.requests,'binary_bytes':binary.stat().st_size,'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'conditions':'Full uncompressed HTML document; warm application; no browser asset/render timing; localhost; Python HTTP client overhead included. Cache allowlist/TTL enabled only with --cached; private/story/commerce routes bypass.', 'cache_enabled':args.cached,'debug_logging':args.debug,'commerce_fixture':('four physical/digital/monthly membership/group-booking products, one UTC slot, no invented payments' if args.commerce else None),'profiles':[]}
 def percentile(values,p):return sorted(values)[max(0,math.ceil(len(values)*p)-1)]
 def load(url,concurrency):
     def one(_):
@@ -24,6 +24,8 @@ with tempfile.TemporaryDirectory(prefix='wpalt-benchmark-') as temporary:
         origin=f'http://127.0.0.1:{port}';directory=root/engine;directory.mkdir();cfg=directory/'config.toml'
         url=db or f'sqlite://{directory}/site.db?mode=rwc'
         cfg.write_text(f'database_url = "{url}"\ndata_dir = "{directory}/data"\nlisten = "127.0.0.1:{port}"\nbase_url = "{origin}"\ndebug = {str(args.debug).lower()}\n')
+        if args.cached:
+            with cfg.open('a') as f:f.write('[cache]\nenabled = true\n')
         def run(*arguments,input=None):
             r=subprocess.run([str(binary),'--config',str(cfg),*arguments],input=input,text=True,capture_output=True)
             assert r.returncode==0,(arguments,r.stderr)

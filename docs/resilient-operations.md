@@ -1,6 +1,6 @@
 # Owner-operated resilience — M7 implementation guide
 
-Implementation in progress. Only the recovery/cache slices described here currently exist; this does not declare M7 or its broad parity families complete.
+Implementation in progress. Only the recovery/cache/local-rule slices described here currently exist; this does not declare M7 or its broad parity families complete.
 
 ## Recovery keys and portable packages
 
@@ -26,4 +26,24 @@ Shared application mutation guards advance the cache generation at entry and exi
 
 ## Current evidence and remaining work
 
-Readable acceptance journeys cover encrypted fresh-engine recovery, separately held keys, original database unavailability, private media, wrong keys/tampering/truncation/budget rejection, retention, failed destination reporting, anonymous cache hit/bypass and protected-content invalidation. Local execution initially uses SQLite; real PostgreSQL is required by CI before verification claims include both engines. Full financial/learning recovery, browser geometry/error flows, performance/WordPress comparisons, further security/media/cleanup/PITR/incremental recovery and integrated release gates remain outstanding. See m7-contract.md; the full 27 planned families remain visible and are not marked complete.
+Readable acceptance journeys cover encrypted fresh-engine recovery, separately held keys, original database unavailability, private media, wrong keys/tampering/truncation/budget rejection, retention, failed destination reporting, anonymous cache hit/bypass and protected-content invalidation. The first committed recovery/cache checkpoint (1af9b71) passed real SQLite/PostgreSQL and cumulative browser/CLI CI in run 37178094283. Later local rules/media/scan additions require their own exact-source CI before inclusion in that claim. Full financial/learning recovery, browser geometry/error flows, performance/WordPress comparisons, further security/media/cleanup/PITR/incremental recovery and integrated release gates remain outstanding. See m7-contract.md; the full 27 planned families remain visible and are not marked complete.
+
+## Local request protections
+
+Configure `[protection]` with `enabled`, literal `denied_prefixes`, exact `denied_peers`, `requests_per_window` and `window_seconds`. Matching path prefixes use segment boundaries, not arbitrary regex code. Rate counters key the actual TCP peer, not X-Forwarded-For. Behind a proxy, this means a shared proxy counter; configure protections at that outer proxy rather than assuming forwarded user identity. Health reads bypass the rate counter but not explicit deny rules. Active peer counter storage is bounded to 4,096; exhaustion fails closed instead of evicting active counters and granting fresh budgets. Request concurrency, timeouts and body limits remain in force. This local protection is not edge DDoS absorption. Changes require restart; keep the config/CLI recovery path available if an owner deliberately blocks their administration routes.
+
+Draft milestone delivery: https://github.com/NaxAlpha/wpalt/pull/13. Not ready for merge.
+
+## Native image derivatives
+
+`/media/{id}/resize/{width}` produces WebP at one of 320/640/1280/1920 pixels without enlarging originals. The same current role/entitlement checks as original media run before processing. Output is no-store, never a private-file cache bypass. Native blocking workers hold the bounded media semaphore throughout decoding/encoding; source bytes, pixels and decode allocations are bounded. PNG/JPEG/WebP are accepted; GIF derivatives are explicitly rejected to avoid silently removing animation. On-demand processing currently avoids persisted derivative recovery/cleanup complexity; AVIF, derivative reuse, video processing and richer authoring integration remain M7 work.
+
+## Stored-file inventory scan
+
+`wpalt integrity-scan` or Operations → Inspect stored-file integrity checks stored image/private attachment paths, regular-file metadata, byte counts and authoritative SHA-256. It does not remove or quarantine files. Work is bounded to 1,000 rows per inventory and 64 MiB total; a limited result explicitly fails the CLI success gate, rather than certifying unexamined files. Browser access requires administrator authority and CSRF. Broader inventory pagination, known-pattern malware rules and scan history are still required in M7.
+
+Image dimensions are strict decoder limits. The image library documents allocation limits as best-effort; the configured 64 MiB decode allowance is not a guaranteed process-memory ceiling. Worker admission also bounds simultaneous decoding.
+
+## Privileged HTTP action history
+
+Native `/admin` and `/api/admin` writes persist a private journal intent before dispatch and response status afterward. Failure to persist intent stops dispatch. If an action committed but its outcome cannot be written, the response is preserved with `x-wpalt-audit: outcome-write-failed` and an error diagnostic; a misleading failure must not encourage blind replay. Interrupted intents explicitly lack a paired outcome. Matched route patterns, request correlation, current local actor ID, timestamp and status are recorded; bodies, query values, passwords, session/CSRF tokens and email addresses are excluded. Operations links the administrator-only recent history (200 records). Two bounded 1-MiB private files retain current/previous logs; archive externally for longer retention. This is an operational HTTP journal, not tamper-proof storage, a database transaction ledger, or coverage of offline CLI/background actions; broader shared audit integration remains M7 work. Files are not currently included in the logical recovery archive.

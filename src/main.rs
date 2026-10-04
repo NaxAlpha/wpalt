@@ -55,6 +55,8 @@ enum Command {
     RecoveryRun,
     /// Inspect durable recovery copy and interruption status.
     RecoveryStatus,
+    /// Scan stored media/private attachment inventory without changing files.
+    IntegrityScan,
     /// Restore a snapshot into an EMPTY database/data directory, with the server stopped.
     Restore {
         input: PathBuf,
@@ -621,6 +623,16 @@ async fn main() -> anyhow::Result<()> {
             anyhow::ensure!(
                 state.copies.iter().all(|c| c.state == "verified"),
                 "one or more backup copies failed"
+            );
+        }
+        Command::IntegrityScan => {
+            let report = wpalt::operations::integrity::scan(&app)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            anyhow::ensure!(
+                report.failed.is_empty() && !report.limited,
+                "integrity scan found failures or reached its bounded workload; inspect the report"
             );
         }
         Command::RecoveryStatus => {
