@@ -8,6 +8,13 @@ const root = path.resolve(__dirname, "..");
 const output = path.join(root, "work/ui-review");
 
 async function geometry(page) {
+  // Locator visibility after navigation does not establish stylesheet/font readiness.
+  // Measure a completed rendered document, retaining every geometry assertion.
+  await page.waitForLoadState("load");
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
   return page.evaluate((c) => {
     const failures = [],
       components = [];

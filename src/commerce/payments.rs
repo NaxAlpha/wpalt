@@ -226,7 +226,7 @@ pub async fn checkout(app: &App, s: &Session, id: &str) -> Result<String> {
     {
         return Err(unavailable());
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     customer(app, s).await?;
     let changed=sqlx::query("UPDATE shop_orders SET provider_ref=$1 WHERE id=$2 AND (provider_ref='' OR provider_ref=$1)").bind(reference).bind(id).execute(&app.db.pool).await?;
     if changed.rows_affected() != 1 {
@@ -299,7 +299,7 @@ pub async fn receive(app: &App, signature: &str, raw: &[u8]) -> Result<()> {
     };
     let digest = crate::auth::digest(raw);
     let body = std::str::from_utf8(raw).map_err(|_| Error::invalid("Invalid event encoding."))?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     if let Some(old) =
         sqlx::query_scalar::<_, String>("SELECT digest FROM shop_provider_events WHERE id=$1")
             .bind(id)
@@ -450,7 +450,7 @@ async fn reconcile(app: &App, event: &Value) -> Result<()> {
                 invoice_payment(app, &invoice, order, sub).await?;
             }
         } else if string(&value, "/status")? == "expired" {
-            let _g = app.mutation().await;
+            let _g = app.mutation().await?;
             let mut tx = app.db.pool.begin().await?;
             let row =
                 sqlx::query("SELECT * FROM shop_orders WHERE id=$1 AND payment_state='awaiting'")
@@ -495,7 +495,7 @@ async fn reconcile(app: &App, event: &Value) -> Result<()> {
             .await?;
             let initial = string(&remote, "/metadata/wpalt_order")?;
             crate::membership::uuid(initial)?;
-            let _guard = app.mutation().await;
+            let _guard = app.mutation().await?;
             let changed=sqlx::query("UPDATE shop_subscriptions SET provider_ref=$1,version=version+1 WHERE provider='stripe' AND (provider_ref='' OR provider_ref=$1) AND id=(SELECT subscription_id FROM shop_orders WHERE id=$2 AND provider='stripe' AND provider_ref<>'')").bind(reference).bind(initial).execute(&app.db.pool).await?;
             if changed.rows_affected() != 1 {
                 return Err(Error::not_found());
@@ -522,7 +522,7 @@ async fn reconcile(app: &App, event: &Value) -> Result<()> {
             };
             invoice_payment(app, &value, &order, reference).await?;
         } else if kind == "invoice.payment_failed" {
-            let _g = app.mutation().await;
+            let _g = app.mutation().await?;
             sqlx::query("UPDATE shop_subscriptions SET state='past_due',version=version+1 WHERE id=$1 AND period_end<=$2 AND state='active'").bind(sub.get::<String,_>("id")).bind(now()).execute(&app.db.pool).await?;
         }
         return Ok(());
@@ -538,7 +538,7 @@ async fn reconcile(app: &App, event: &Value) -> Result<()> {
         )
         .await?;
         let status = string(&value, "/status")?;
-        let _g = app.mutation().await;
+        let _g = app.mutation().await?;
         let state = if ["canceled", "unpaid", "incomplete_expired"].contains(&status) {
             Some("cancelled")
         } else if value.get("cancel_at_period_end").and_then(Value::as_bool) == Some(true) {
@@ -583,12 +583,12 @@ pub async fn process(app: &App) -> Result<usize> {
             .map_err(|_| Error::invalid("Invalid stored provider event."))?;
         match reconcile(app, &v).await {
             Ok(()) => {
-                let _guard = app.mutation().await;
+                let _guard = app.mutation().await?;
                 sqlx::query("UPDATE shop_provider_events SET state='processed' WHERE id=$1 AND state='pending'").bind(row.get::<String,_>("id")).execute(&app.db.pool).await?;
                 done += 1;
             }
             Err(e) => {
-                let _guard = app.mutation().await;
+                let _guard = app.mutation().await?;
                 sqlx::query("UPDATE shop_provider_events SET attempts=attempts+1,next_at=$1 WHERE id=$2 AND state='pending'").bind(now()+30).bind(row.get::<String,_>("id")).execute(&app.db.pool).await?;
                 tracing::warn!(event="commerce_reconciliation_pending",event_id=%row.get::<String,_>("id"),status=e.0.as_u16());
             }
@@ -618,7 +618,7 @@ pub async fn process(app: &App) -> Result<usize> {
             Ok(())
         }
         .await;
-        let _guard = app.mutation().await;
+        let _guard = app.mutation().await?;
         if result.is_ok() {
             sqlx::query("UPDATE shop_subscriptions SET provider_cancel_pending=0,provider_cancel_at=0 WHERE id=$1 AND provider_ref=$2").bind(&id).bind(&reference).execute(&app.db.pool).await?;
             done += 1;
@@ -648,7 +648,7 @@ async fn settle_refund(app: &App, v: &Value) -> Result<()> {
         )
         .await?;
     } else if ["failed", "canceled"].contains(&string(v, "/status")?) {
-        let _g = app.mutation().await;
+        let _g = app.mutation().await?;
         sqlx::query("UPDATE shop_refunds SET state='failed',provider_ref=$1 WHERE id=$2 AND state='pending'").bind(string(v,"/id")?).bind(id).execute(&app.db.pool).await?;
     }
     Ok(())
@@ -698,7 +698,7 @@ pub async fn cancel_subscription(app: &App, s: &Session, id: &str, version: i64)
     {
         return Err(Error::conflict());
     }
-    let _g = app.mutation().await;
+    let _g = app.mutation().await?;
     customer(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     let current: String = sqlx::query_scalar(

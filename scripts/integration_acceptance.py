@@ -19,6 +19,8 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
         return r
     run('init','--admin-email','owner@example.test',stdin=password+'\n')
     run('seed-demo','--posts','30')
+    with sqlite3.connect(root/'site.db') as db:
+        definition=json.loads(db.execute('SELECT definition FROM discovery_settings WHERE id=1').fetchone()[0]);definition['languages'].append({'code':'fr','label':'Français','direction':'ltr','navigation':[],'search_label':'Rechercher'});db.execute('UPDATE discovery_settings SET definition=?,version=version+1 WHERE id=1',(json.dumps(definition),))
     def issue(name,draft):
         file=root/(name+'.token')
         argv=['integration','create','--user-email','owner@example.test','--name',name,'--days','7']
@@ -63,7 +65,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
                 page=request(path);assert len(page['content'])<=25
                 seen.extend(p['id'] for p in page['content']);path='/api/v1/content?after='+page['next'] if page['next'] else None
             assert len(seen)==len(set(seen)) and len(seen)>=30
-            draft={'title':'An external proposal','slug':'external-proposal','kind':'post','body':'PRIVATE_EXTERNAL_DRAFT','action':'save','version':0}
+            draft={'title':'An external proposal','slug':'external-proposal','kind':'post','body':'PRIVATE_EXTERNAL_DRAFT','action':'save','version':0,'locale':'en','translation_group':'external_translation'}
             request('/api/v1/content',method='POST',data=draft,status=403)
             saved=request('/api/v1/content',token=draft_token,method='POST',data=draft)
             id_=saved['id'];assert saved['status']=='draft'
@@ -83,7 +85,10 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
                     size=int(self.headers.get('Content-Length','0'));assert size<=512*1024
                     payload=json.loads(self.rfile.read(size));received.append(payload)
                     assert not self.headers.get('Authorization')
-                    generated=json.dumps({'palette':'paper','font':'serif','reading_width':720,'home_columns':2,'gap':24}) if payload.get('format') else 'A separately reviewed local suggestion.'
+                    if payload.get('format',{}).get('required')==['title','body']:
+                        generated=json.dumps({'title':'Une proposition','body':'Une traduction proposée.'})
+                    else:
+                        generated=json.dumps({'palette':'paper','font':'serif','reading_width':720,'home_columns':2,'gap':24}) if payload.get('format') else 'A separately reviewed local suggestion.'
                     raw=json.dumps({'response':generated}).encode()
                     self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
             model=ThreadingHTTPServer(('127.0.0.1',0),Model)
@@ -117,8 +122,20 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
                 assert generated['status']=='draft' and generated['published_body']==''
                 assert 'separately reviewed' in generated['body']
                 external('apply',proposal,'--execute',preview['plan'],token_file=draft_file,ok=False) # Unique slug prevents duplicate retry effects.
+                translation=root/'translation.json'
+                count=len(received)
+                external('translate','--source',id_,'--slug','same-locale','--locale','en','--ollama',f'http://127.0.0.1:{model.server_port}','--model','synthetic-contract-fixture','--output',root/'same-locale.json',ok=False)
+                assert len(received)==count and not (root/'same-locale.json').exists()
+                translated_preview=json.loads(external('translate','--source',id_,'--slug','translated-proposal','--locale','fr','--ollama',f'http://127.0.0.1:{model.server_port}','--model','synthetic-contract-fixture','--output',translation).stdout)
+                assert translation.stat().st_mode&0o077==0
+                external('apply',translation,'--execute',translated_preview['plan'],ok=False)
+                translated=json.loads(external('apply',translation,'--execute',translated_preview['plan'],token_file=draft_file).stdout)
+                current_translation=request('/api/v1/content/'+translated['draft_id'])['content']
+                assert current_translation['status']=='draft' and current_translation['locale']=='fr' and current_translation['translation_group']=='external_translation' and current_translation['published_body']=='' and current_translation['seo']=='{}'
+                external('apply',translation,'--execute',translated_preview['plan'],token_file=draft_file,ok=False)
                 request('/api/v1/content/'+id_,token=draft_token,method='PUT',data={**draft,'body':'Changed source','version':2})
                 external('apply',proposal,'--execute',preview['plan'],token_file=draft_file,ok=False)
+                external('apply',translation,'--execute',translated_preview['plan'],token_file=draft_file,ok=False)
                 external('suggest','--source',id_,'--slug','refused-cloud','--ollama','https://external.example','--model','fixture','--output',root/'refused.json',ok=False)
                 assert not (root/'refused.json').exists()
             finally:model.shutdown();model.server_close();thread.join(timeout=5)
@@ -174,6 +191,6 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
     text=log.read_text()
     assert all(value not in text for value in [password,read_token,draft_token,'PRIVATE_EXTERNAL_DRAFT'])
     with sqlite3.connect(root/'site.db') as db:
-        assert db.execute('SELECT version FROM schema_version').fetchone()[0]==14
-        assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0]==len(seen)+2
+        assert db.execute('SELECT version FROM schema_version').fetchone()[0]==15
+        assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0]==len(seen)+3
 print('PASS: native scoped credentials, bounded external pagination/drafts, conflict/publication/origin/cookie denial, stopped-host revocation, fresh recovery without delegated authority and redacted diagnostics')

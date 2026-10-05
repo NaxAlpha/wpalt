@@ -207,7 +207,7 @@ pub async fn protect(
     if !["post", "media"].contains(&kind) || opens < 0 || !(0..=31536000).contains(&delay) {
         return Err(Error::invalid("Check resource type and unlock dates."));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let table = if kind == "post" { "posts" } else { "media" };
     let exists: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table} WHERE id=$1"))
         .bind(id)
@@ -356,7 +356,7 @@ pub async fn save_course(
     publish: bool,
 ) -> Result<i64> {
     c.validate()?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     let stored=sqlx::query("UPDATE member_courses SET title=$1,policy_id=$2,draft=$3,version=version+1 WHERE id=$4 AND version=$5 RETURNING version").bind(&c.title).bind(&c.policy_id).bind(serde_json::to_string(c).map_err(|_|Error::invalid("Invalid course."))?).bind(id).bind(version).fetch_optional(&mut *tx).await?.ok_or_else(Error::conflict)?;
     let next: i64 = stored.get("version");
@@ -469,7 +469,7 @@ pub async fn assess(
     if assignment.len() > 16000 {
         return Err(Error::invalid("Assignment is limited to 16,000 bytes."));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     require(app, "course", course, Some(&s.user.id)).await?;
     let (c, current) = live(app, course).await?;
     if current != version {
@@ -538,7 +538,7 @@ pub async fn grade(
     if feedback.len() > 4000 {
         return Err(Error::invalid("Feedback is limited to 4,000 bytes."));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     let r=sqlx::query("UPDATE member_assignments SET state=$1,feedback=$2,version=version+1 WHERE id=$3 AND version=$4 RETURNING course_id,course_version,lesson_id,user_id").bind(if approved{"approved"}else{"changes"}).bind(feedback).bind(id).bind(version).fetch_optional(&mut *tx).await?.ok_or_else(Error::conflict)?;
     if approved {
@@ -566,7 +566,7 @@ pub async fn grade(
     Ok(())
 }
 pub async fn certificate(app: &App, s: &Session, course: &str) -> Result<String> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     require(app, "course", course, Some(&s.user.id)).await?;
     let (c, v) = live(app, course).await?;
     let completed:Vec<String>=sqlx::query_scalar("SELECT lesson_id FROM member_progress WHERE course_id=$1 AND course_version=$2 AND user_id=$3 AND completed_at>0").bind(course).bind(v).bind(&s.user.id).fetch_all(&app.db.pool).await?;
@@ -614,7 +614,7 @@ pub async fn group(app: &App, title: &str, manager: &str, seats: i64) -> Result<
     Ok(id)
 }
 pub async fn seat(app: &App, s: &Session, group: &str, email: &str, remove: bool) -> Result<()> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     let g = sqlx::query("SELECT manager_id,seat_limit FROM member_groups WHERE id=$1")
         .bind(group)
@@ -682,7 +682,7 @@ pub async fn claim_gift(app: &App, s: &Session, token: &str) -> Result<()> {
     if token.len() != 64 || !token.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(Error::not_found());
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     let time = now();
     let r=sqlx::query("UPDATE member_gifts SET claimed_by=$1 WHERE token_hash=$2 AND claimed_by='' AND expires_at>$3 RETURNING id,entitlement,duration_seconds").bind(&s.user.id).bind(crate::auth::digest(token.as_bytes())).bind(time).fetch_optional(&mut *tx).await?.ok_or(Error::invalid("Gift is expired or already claimed."))?;
@@ -692,7 +692,7 @@ pub async fn claim_gift(app: &App, s: &Session, token: &str) -> Result<()> {
 }
 pub async fn discuss(app: &App, s: &Session, group: &str, body: &str) -> Result<()> {
     label(body, 4000)?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let n: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM member_group_users WHERE group_id=$1 AND user_id=$2",
     )
@@ -788,7 +788,7 @@ pub async fn reset_progress(
     lesson: &str,
     user: &str,
 ) -> Result<()> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     let updated=sqlx::query("UPDATE member_progress SET attempts=0,best_score=0,completed_at=0 WHERE course_id=$1 AND course_version=$2 AND lesson_id=$3 AND user_id=$4").bind(course).bind(version).bind(lesson).bind(user).execute(&mut *tx).await?;
     if updated.rows_affected() != 1 {
@@ -807,7 +807,7 @@ pub async fn release(app: &App, kind: &str, id: &str) -> Result<()> {
         return Err(Error::invalid("Select content or media."));
     }
     uuid(id)?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let row =
         sqlx::query("SELECT course_id FROM member_resources WHERE kind=$1 AND resource_id=$2")
             .bind(kind)

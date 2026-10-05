@@ -32,7 +32,7 @@ impl Config {
         Ok(())
     }
 }
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Used {
     entries: BTreeMap<String, i64>,
 }

@@ -164,7 +164,7 @@ async fn admin_action(
             .await?;
         }
         "revoke" => {
-            let _guard = app.mutation().await;
+            let _guard = app.mutation().await?;
             staff(&app, &s).await?;
             if sqlx::query(
                 "UPDATE member_grants SET revoked=1,version=version+1 WHERE id=$1 AND version=$2",
@@ -180,7 +180,7 @@ async fn admin_action(
             }
         }
         "policy-toggle" => {
-            let _guard = app.mutation().await;
+            let _guard = app.mutation().await?;
             staff(&app, &s).await?;
             if sqlx::query("UPDATE member_policies SET enabled=1-enabled,version=version+1 WHERE id=$1 AND version=$2").bind(i.id).bind(i.version).execute(&app.db.pool).await?.rows_affected()!=1{return Err(Error::conflict())}
         }
@@ -207,7 +207,7 @@ async fn admin_action(
         }
         "grade" => grade(&app, &i.id, i.version, i.decision == "approve", &i.feedback).await?,
         "identity-remove" => {
-            let _guard = app.mutation().await;
+            let _guard = app.mutation().await?;
             staff(&app, &s).await?;
             let mut tx = app.db.pool.begin().await?;
             let user: Option<String> = sqlx::query_scalar(
@@ -714,7 +714,7 @@ async fn save_profile(
     if i.biography.len() > 2000 {
         return Err(Error::invalid("Biography is limited to 2,000 bytes."));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     sqlx::query("UPDATE users SET name=$1 WHERE id=$2")
         .bind(i.name.trim())

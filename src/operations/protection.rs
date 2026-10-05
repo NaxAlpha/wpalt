@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     net::{IpAddr, SocketAddr},
-    time::{Duration, Instant},
 };
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -49,9 +48,9 @@ impl Config {
         Ok(())
     }
 }
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Limits {
-    peers: BTreeMap<String, (Instant, u32)>,
+    peers: BTreeMap<String, (i64, u32)>,
 }
 impl Limits {
     pub fn check(&mut self, config: &Config, request: &Request<Body>) -> crate::error::Result<()> {
@@ -80,11 +79,11 @@ impl Limits {
             return Ok(());
         }
         let key = peer.map_or_else(|| "unknown-local-peer".into(), |ip| ip.to_string());
-        let now = Instant::now();
-        let window = Duration::from_secs(config.window_seconds);
+        let now = crate::now();
+        let window = config.window_seconds as i64;
         if !self.peers.contains_key(&key) && self.peers.len() >= 4096 {
             self.peers
-                .retain(|_, (start, _)| now.duration_since(*start) < window);
+                .retain(|_, (start, _)| now.saturating_sub(*start) < window);
             if self.peers.len() >= 4096 {
                 // Fail closed instead of evicting an active attacker's counter.
                 return Err(Error(
@@ -94,7 +93,7 @@ impl Limits {
             }
         }
         let (start, used) = self.peers.entry(key).or_insert((now, 0));
-        if now.duration_since(*start) >= window {
+        if now.saturating_sub(*start) >= window {
             *start = now;
             *used = 0;
         }

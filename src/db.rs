@@ -2,9 +2,13 @@ use crate::{config::Config, error::Result, model::Settings};
 use sqlx::{Any, AnyPool, ConnectOptions, Execute, QueryBuilder, Row, any::AnyPoolOptions};
 use std::str::FromStr;
 
+pub const SCHEMA_VERSION: i64 = 15;
+
 #[derive(Clone)]
 pub struct Db {
     pub pool: AnyPool,
+    pub application_name: String,
+    pub directory_digest: String,
     pub postgres: bool,
     pub business_enabled: bool,
     pub membership_enabled: bool,
@@ -19,6 +23,12 @@ impl Db {
     pub async fn open(config: &Config) -> anyhow::Result<Self> {
         sqlx::any::install_default_drivers();
         let postgres = config.database_url.starts_with("postgres");
+        // PostgreSQL truncates application_name at 63 bytes. Use a stable
+        // directory identity so credential/URL changes cannot hide older work.
+        let directory = std::fs::canonicalize(&config.data_dir)?;
+        let directory_digest = crate::auth::digest(directory.as_os_str().as_encoded_bytes());
+        let application_name = format!("wpalt:{}", &directory_digest[..56]);
+        let connection_name = application_name.clone();
         let options = sqlx::any::AnyConnectOptions::from_str(&config.database_url)?
             .log_statements(if config.debug {
                 tracing::log::LevelFilter::Debug
@@ -31,8 +41,10 @@ impl Db {
             );
         let pool = AnyPoolOptions::new()
             .max_connections(config.database_connections)
+            .min_connections(1)
             .acquire_timeout(std::time::Duration::from_secs(10))
             .after_connect(move |conn, _| {
+                let connection_name = connection_name.clone();
                 Box::pin(async move {
                     if !postgres {
                         sqlx::query("PRAGMA foreign_keys=ON")
@@ -45,6 +57,10 @@ impl Db {
                             .execute(&mut *conn)
                             .await?;
                     } else {
+                        sqlx::query("SELECT set_config('application_name',$1,false)")
+                            .bind(connection_name)
+                            .execute(&mut *conn)
+                            .await?;
                         sqlx::query("SET statement_timeout = '10s'")
                             .execute(&mut *conn)
                             .await?;
@@ -56,6 +72,8 @@ impl Db {
             .await?;
         Ok(Self {
             pool,
+            application_name,
+            directory_digest,
             postgres,
             business_enabled: config.business_enabled,
             membership_enabled: config.membership_enabled,
@@ -90,7 +108,8 @@ impl Db {
                     || version == Some(11)
                     || version == Some(12)
                     || version == Some(13)
-                    || version == Some(14),
+                    || version == Some(14)
+                    || version == Some(SCHEMA_VERSION),
                 "unsupported schema version; use the documented migration/reset path"
             );
         }
@@ -216,7 +235,11 @@ impl Db {
         crate::platform::events::initialize(&mut tx)
             .await
             .map_err(|e| anyhow::anyhow!(e.1))?;
-        sqlx::query("UPDATE schema_version SET version=14 WHERE id=1")
+        sqlx::raw_sql(crate::platform::local_processes::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE schema_version SET version=$1 WHERE id=1")
+            .bind(SCHEMA_VERSION)
             .execute(&mut *tx)
             .await?;
         if self.postgres {

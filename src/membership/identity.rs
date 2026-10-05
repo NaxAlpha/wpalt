@@ -134,7 +134,7 @@ async fn start(State(app): State<App>) -> Result<Response> {
     let nonce = auth::random_token();
     let verifier = auth::random_token();
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     sqlx::query("DELETE FROM identity_flows WHERE expires_at<=$1")
         .bind(now())
         .execute(&app.db.pool)
@@ -324,7 +324,7 @@ async fn callback(
     Ok(response)
 }
 pub async fn identity_session(app: &App, issuer: &str, subject: &str) -> Result<(String, Session)> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let r=sqlx::query("SELECT u.id,u.email,u.name,u.role FROM member_identities i JOIN users u ON u.id=i.user_id WHERE i.issuer=$1 AND i.subject=$2 AND u.role<>'disabled'").bind(issuer).bind(subject).fetch_optional(&app.db.pool).await?.ok_or_else(Error::forbidden)?;
     let token = auth::random_token();
     let session = Session {

@@ -31,6 +31,27 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Review stopped-site translation duplication or explicitly selected field sync.
+    TranslationPrepare {
+        source: String,
+        #[arg(long)]
+        locale: String,
+        #[arg(long)]
+        slug: String,
+        #[arg(long)]
+        target: Option<String>,
+        #[arg(long, value_delimiter = ',')]
+        fields: Vec<String>,
+        #[arg(long)]
+        execute: Option<String>,
+    },
+    /// Independently observe owner-selected sites from a private fleet manifest.
+    FleetInspect { manifest: PathBuf },
+    /// Stopped-site public content-link graph and advisory editorial measurements.
+    ContentAudit {
+        #[arg(long, default_value = "")]
+        keyword: String,
+    },
     /// Stopped-host least-privilege credentials for external integrations.
     Integration {
         #[command(subcommand)]
@@ -79,9 +100,44 @@ enum Command {
         admin_name: String,
     },
     /// Run the web server and durable publication scheduler.
-    Serve,
+    Serve {
+        /// Use a separately operated worker instead of the embedded scheduler.
+        #[arg(long)]
+        external_worker: bool,
+    },
+    /// Run coordinated background work on a local-process site.
+    Worker {
+        /// One bounded cycle for an owner-operated system scheduler.
+        #[arg(long)]
+        once: bool,
+    },
+    /// Offline exact-plan reconciliation after an interrupted local-process operation.
+    LocalResume {
+        #[arg(long)]
+        execute: Option<String>,
+        #[arg(long)]
+        acknowledge_external_effects: bool,
+    },
+    /// Show effective module admission and domain ownership without opening a site.
+    Modules,
     /// Show validated effective configuration with credentials redacted.
     Config,
+    /// Export effective configuration to a NEW private file; secrets are redacted by default.
+    ConfigExport {
+        output: PathBuf,
+        #[arg(long)]
+        include_secrets: bool,
+    },
+    /// Review a private current-version transfer; write a NEW config with an exact plan.
+    ConfigImport {
+        input: PathBuf,
+        #[arg(long)]
+        accept_secrets: bool,
+        #[arg(long, requires = "output")]
+        execute: Option<String>,
+        #[arg(long, requires = "execute")]
+        output: Option<PathBuf>,
+    },
     /// Create an offline database-and-media snapshot in a new private file.
     Backup {
         output: PathBuf,
@@ -100,6 +156,22 @@ enum Command {
         output: PathBuf,
         #[arg(long)]
         key_file: PathBuf,
+    },
+    /// Review/apply the supported stopped-host schema upgrade after creating encrypted recovery.
+    Upgrade {
+        /// Explicitly review verified physical PostgreSQL recovery into a fresh host directory.
+        #[arg(long, requires = "source_origin")]
+        rebind_directory: bool,
+        #[arg(long, requires = "rebind_directory")]
+        source_origin: Option<String>,
+        #[arg(long, requires = "rebind_directory")]
+        acknowledge_source_stopped: bool,
+        #[arg(long, requires_all = ["recovery_output", "key_file"])]
+        execute: Option<String>,
+        #[arg(long, requires = "execute")]
+        recovery_output: Option<PathBuf>,
+        #[arg(long, requires = "execute")]
+        key_file: Option<PathBuf>,
     },
     /// Native PostgreSQL 17 archive_command helper; independent of the app process lock.
     WalStore { input: PathBuf, name: String },
@@ -691,17 +763,34 @@ fn password() -> anyhow::Result<String> {
     );
     Ok(password)
 }
-fn lock(config: &Config) -> anyhow::Result<std::fs::File> {
+fn lock(config: &Config, shared: bool) -> anyhow::Result<std::fs::File> {
     config.prepare_directories()?;
     let mut options = std::fs::OpenOptions::new();
     options.create(true).read(true).write(true).truncate(false);
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
+        options
+            .mode(0o600)
+            .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
     }
     let file = options.open(config.data_dir.join(".wpalt.lock"))?;
-    file.try_lock_exclusive().map_err(|_| {
+    let metadata = file.metadata()?;
+    anyhow::ensure!(metadata.is_file(), "Lifecycle lock must be a regular file.");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        anyhow::ensure!(
+            metadata.mode() & 0o077 == 0 && metadata.nlink() == 1,
+            "Lifecycle lock must be private and have exactly one link."
+        );
+    }
+    (if shared {
+        FileExt::try_lock_shared(&file)
+    } else {
+        file.try_lock_exclusive()
+    })
+    .map_err(|_| {
         anyhow::anyhow!(
             "this data directory is already in use; stop the server before offline operations"
         )
@@ -740,6 +829,70 @@ async fn main() -> anyhow::Result<()> {
     if matches!(cli.command, Command::Config) {
         println!("{}", serde_json::to_string_pretty(&config.redacted())?);
         return Ok(());
+    }
+    if let Command::FleetInspect { manifest } = &cli.command {
+        let report = wpalt::platform::fleet::inspect(manifest).await?;
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        anyhow::ensure!(
+            report["all_ready"] == true,
+            "Some fleet nodes are unavailable or unauthorized; inspect the observation."
+        );
+        return Ok(());
+    }
+    if matches!(cli.command, Command::Modules) {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&wpalt::platform::modules::report(&config))?
+        );
+        return Ok(());
+    }
+    match &cli.command {
+        Command::ConfigExport {
+            output,
+            include_secrets,
+        } => {
+            wpalt::platform::config_transfer::export(&config, output, *include_secrets)?;
+            println!("Private configuration export created; contains_secrets={include_secrets}.");
+            return Ok(());
+        }
+        Command::ConfigImport {
+            input,
+            accept_secrets,
+            execute,
+            output,
+        } => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                let metadata = std::fs::symlink_metadata(input)?;
+                anyhow::ensure!(
+                    metadata.is_file() && metadata.nlink() == 1 && metadata.mode() & 0o077 == 0,
+                    "Configuration transfer input must be a private regular file."
+                );
+            }
+            let bytes = backup::read_bounded(input, wpalt::platform::config_transfer::MAX_BYTES)
+                .await
+                .map_err(|_| anyhow::anyhow!("Cannot read bounded configuration package."))?;
+            let (transferred, report) =
+                wpalt::platform::config_transfer::preview(&bytes, *accept_secrets)?;
+            if let Some(plan) = execute {
+                wpalt::platform::config_transfer::execute(
+                    &transferred,
+                    &report,
+                    plan,
+                    output
+                        .as_deref()
+                        .ok_or_else(|| anyhow::anyhow!("Output is required."))?,
+                )?;
+                println!(
+                    "Private configuration created. Review effective configuration before starting the target."
+                );
+            } else {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            }
+            return Ok(());
+        }
+        _ => {}
     }
     // Portable recovery tools operate on files/config only: no live server,
     // database, site lock, installation or vendor account is needed.
@@ -885,13 +1038,71 @@ async fn main() -> anyhow::Result<()> {
         })
         .with_writer(std::io::stderr)
         .init();
-    let _lock = lock(&config)?;
-    let app = App::open(config).await?;
+    let _lock = lock(
+        &config,
+        config.local_processes
+            && matches!(cli.command, Command::Serve { .. } | Command::Worker { .. }),
+    )?;
+    if let Command::LocalResume {
+        execute,
+        acknowledge_external_effects,
+    } = &cli.command
+    {
+        anyhow::ensure!(
+            config.local_processes,
+            "local-resume requires local_processes=true"
+        );
+        let mut inspection = config.clone();
+        inspection.local_processes = false;
+        let app = App::open(inspection).await?;
+        let report = wpalt::platform::local_processes::resume(
+            &config,
+            &app,
+            execute.as_deref(),
+            *acknowledge_external_effects,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!(e.1))?;
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
+    if let Command::Upgrade {
+        rebind_directory,
+        source_origin,
+        acknowledge_source_stopped,
+        execute,
+        recovery_output,
+        key_file,
+    } = &cli.command
+    {
+        let app = App::open_maintenance(config.clone(), *rebind_directory).await?;
+        let report = wpalt::operations::upgrade::apply(
+            &app,
+            &config,
+            wpalt::operations::upgrade::Request {
+                execute: execute.as_deref(),
+                output: recovery_output.as_deref(),
+                key_file: key_file.as_deref(),
+                rebind_origin: source_origin.as_deref(),
+                acknowledge_source_stopped: *acknowledge_source_stopped,
+            },
+        )
+        .await?;
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
+    let runtime = matches!(cli.command, Command::Serve { .. } | Command::Worker { .. });
+    let app = if runtime {
+        App::open_runtime(config).await?
+    } else {
+        App::open(config).await?
+    };
     anyhow::ensure!(
         !app.clone_held.load(std::sync::atomic::Ordering::SeqCst)
             || matches!(
                 cli.command,
-                Command::Serve
+                Command::Serve { .. }
+                    | Command::Worker { .. }
                     | Command::CloneActivate { .. }
                     | Command::Backup { .. }
                     | Command::RecoveryStatus
@@ -902,6 +1113,9 @@ async fn main() -> anyhow::Result<()> {
     );
     // Journal command classes without collecting argv, paths or secrets.
     let route = match &cli.command {
+        Command::TranslationPrepare {
+            execute: Some(_), ..
+        } => Some("cli:translation-prepare"),
         Command::Integration { .. } => Some("cli:integration"),
         Command::Init { .. } => Some("cli:init"),
         Command::Backup { .. } => Some("cli:backup"),
@@ -1103,7 +1317,13 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             }
             println!("{}", serde_json::to_string_pretty(&prepared.report)?);
         }
-        Command::Config => unreachable!(),
+        Command::FleetInspect { .. }
+        | Command::Config
+        | Command::Modules
+        | Command::ConfigExport { .. }
+        | Command::ConfigImport { .. }
+        | Command::Upgrade { .. }
+        | Command::LocalResume { .. } => unreachable!(),
         Command::UpgradePrepare { output, key_file } => {
             let receipt = wpalt::operations::upgrade::prepare(&app, &output, &key_file)
                 .await
@@ -1191,6 +1411,32 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
                 .map_err(|e| anyhow::anyhow!(e.1))?;
             backup::write_private(&output, &bytes)?;
             println!("Created a new private account-linked data export.");
+        }
+        Command::TranslationPrepare {
+            source,
+            locale,
+            slug,
+            target,
+            fields,
+            execute,
+        } => {
+            let report = wpalt::platform::translations::prepare(
+                &app,
+                wpalt::platform::translations::Request {
+                    source: &source,
+                    locale: &locale,
+                    slug: &slug,
+                    target: target.as_deref(),
+                    fields: &fields,
+                    execute: execute.as_deref(),
+                },
+            )
+            .await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Command::ContentAudit { keyword } => {
+            let report = wpalt::platform::content_audit::report(&app, &keyword).await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Command::JobHistory => {
             let cycles = wpalt::operations::jobs::read(&app)
@@ -1366,69 +1612,103 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             .await
             .map_err(|e| anyhow::anyhow!(e.1))?,
         Command::SeedDemo { posts } => seed(&app, posts).await?,
-        Command::Serve => {
+        Command::Worker { once } => {
+            anyhow::ensure!(
+                app.config.local_processes,
+                "A separate worker requires local_processes=true"
+            );
+            let (stop, receiver) = tokio::sync::watch::channel(false);
+            let node_id = app.node_id.clone();
+            tracing::info!(event="worker_started",node_id=%node_id,once);
+            let mut job = tokio::spawn(worker_loop(app, once, receiver));
+            tokio::select! {
+                result = &mut job => { result??; },
+                _ = shutdown() => {
+                    tracing::info!(event="worker_stop_requested",node_id=%node_id,once);
+                    let _ = stop.send(true); drain_worker(job).await?;
+                }
+            }
+            tracing::info!(event="worker_stopped",node_id=%node_id,once);
+        }
+        Command::Serve { external_worker } => {
             app.db.settings().await.map_err(|_| {
                 anyhow::anyhow!("site is not initialized; run wpalt init or restore first")
             })?;
-            let scheduled = app.clone();
-            let job = tokio::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(
-                    scheduled.config.scheduler_seconds,
-                ));
-                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-                loop {
-                    interval.tick().await;
-                    if scheduled
-                        .clone_held
-                        .load(std::sync::atomic::Ordering::SeqCst)
-                    {
-                        continue;
-                    }
-                    use wpalt::operations::jobs::{run_cycle, stage, stage_unit};
-                    if run_cycle(&scheduled, async {
-                        vec![
-                            stage_unit("recovery", wpalt::operations::recovery::tick(&scheduled))
-                                .await,
-                            stage("publication", content::publish_due(&scheduled)).await,
-                            stage("campaigns", wpalt::business::campaigns::tick(&scheduled)).await,
-                            stage("commerce", wpalt::commerce::tick(&scheduled)).await,
-                            stage("mail", wpalt::business::mail::tick(&scheduled)).await,
-                            stage_unit(
-                                "engagement-retention",
-                                wpalt::business::engagement::cleanup(&scheduled),
-                            )
-                            .await,
-                            stage_unit(
-                                "quota-retention",
-                                wpalt::business::quotas::cleanup(&scheduled),
-                            )
-                            .await,
-                            stage_unit("maintenance", cleanup(&scheduled)).await,
-                        ]
-                    })
-                    .await
-                    .is_err()
-                    {
-                        tracing::error!(
-                            event = "background_history_failed",
-                            action = "inspect_site_storage"
-                        );
-                    }
-                }
-            });
+            let (stop, receiver) = tokio::sync::watch::channel(false);
+            let job = if external_worker {
+                None
+            } else {
+                Some(tokio::spawn(worker_loop(app.clone(), false, receiver)))
+            };
             let listener = tokio::net::TcpListener::bind(app.config.listen).await?;
-            tracing::info!(event="server_started",listen=%app.config.listen);
-            axum::serve(
+            tracing::info!(event="server_started",listen=%app.config.listen,node_id=%app.node_id);
+            let result = axum::serve(
                 listener,
                 wpalt::web::router(app)
                     .into_make_service_with_connect_info::<std::net::SocketAddr>(),
             )
             .with_graceful_shutdown(shutdown())
-            .await?;
-            job.abort();
+            .await;
+            let _ = stop.send(true);
+            if let Some(job) = job {
+                drain_worker(job).await?;
+            }
+            result?;
         }
     }
     Ok(())
+}
+
+async fn drain_worker(mut job: tokio::task::JoinHandle<anyhow::Result<()>>) -> anyhow::Result<()> {
+    match tokio::time::timeout(std::time::Duration::from_secs(60), &mut job).await {
+        Ok(result) => result?,
+        Err(_) => {
+            job.abort();
+            anyhow::bail!(
+                "Worker did not drain; inspect local coordination and external effects before resuming."
+            );
+        }
+    }
+}
+async fn worker_loop(
+    app: App,
+    once: bool,
+    mut stop: tokio::sync::watch::Receiver<bool>,
+) -> anyhow::Result<()> {
+    use wpalt::operations::jobs::{run_cycle, stage, stage_unit};
+    let mut interval =
+        tokio::time::interval(std::time::Duration::from_secs(app.config.scheduler_seconds));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        tokio::select! { _ = stop.changed() => return Ok(()), _ = interval.tick() => {} }
+        if !app.config.local_processes && app.clone_held.load(std::sync::atomic::Ordering::SeqCst) {
+            if once {
+                return Ok(());
+            }
+            continue;
+        }
+        run_cycle(&app, async {
+            vec![
+                stage_unit("recovery", wpalt::operations::recovery::tick(&app)).await,
+                stage("publication", content::publish_due(&app)).await,
+                stage("campaigns", wpalt::business::campaigns::tick(&app)).await,
+                stage("commerce", wpalt::commerce::tick(&app)).await,
+                stage("mail", wpalt::business::mail::tick(&app)).await,
+                stage_unit(
+                    "engagement-retention",
+                    wpalt::business::engagement::cleanup(&app),
+                )
+                .await,
+                stage_unit("quota-retention", wpalt::business::quotas::cleanup(&app)).await,
+                stage_unit("maintenance", cleanup(&app)).await,
+            ]
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e.1))?;
+        if once {
+            return Ok(());
+        }
+    }
 }
 
 async fn shutdown() {
@@ -1445,7 +1725,7 @@ async fn shutdown() {
     }
 }
 async fn cleanup(app: &App) -> wpalt::error::Result<()> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     sqlx::query("DELETE FROM sessions WHERE expires_at<$1")
         .bind(wpalt::now())
         .execute(&app.db.pool)

@@ -154,7 +154,7 @@ pub async fn cleanup(app: &App) -> Result<()> {
     }
     // Capture holds this same single-server coordinator through database and file reads.
     // An expired staged file must not be unlinked from an in-flight recovery point.
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     use sqlx::Row;
     let mut tx = app.db.pool.begin().await?;
     release(&mut tx, "registrations", 0, 0).await?;

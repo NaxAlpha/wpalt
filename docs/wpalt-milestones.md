@@ -310,3 +310,11 @@ M8 draft delivery: [PR #14](https://github.com/NaxAlpha/wpalt/pull/14). Track ex
 ## M8 implementation delivery — 2026-10-05
 
 The selected M8 contract is implemented: bounded offline migration and explicit plugin definitions, scoped integrations and durable content-event delivery, independent local generation workers and native themes. Implementation-source run 37288548870 passed all seven applicable gates; clean archive independently verified. [Verification](evidence/m8-verification.md) records actual plugin versions, resource measurements and broader parity limits. PR #14 remains unmerged and final documentation-source gates precede readiness. M9 remains separate.
+
+## M8 merged; M9 active — 2026-10-05
+
+User approved PR #14 merge, completed as `c12c6894f5c7969344a74e67cd742f971db381d5`. Final PR checks and exact archive passed; actual-main release verification is tracked separately in [M9 ledger](evidence/m9-progress.md). M9 is active under [its contract](m9-contract.md), including multi-node correctness, upgrade/support baseline and full capability reconciliation. No distributed readiness or final product completion is claimed.
+
+## Owner-approved delivery boundary — 2026-10-06
+
+The owner explicitly directed remaining missing feature breadth across all milestones into [the deferred backlog](deferred-features.md), authorized readiness and merge of M9 PR #16, and retained the complete product goal for future staged work. [Decision 0014](decisions/0014-deferred-parity-release.md) records this alignment. The verified current native/local-process scope is accepted for delivery; it is not universal plugin parity, a public production-support policy or a license selection. Deferred scope/adoption choices do not block this authorized merge.

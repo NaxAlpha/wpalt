@@ -2,7 +2,7 @@ use super::*;
 use sqlx::{Any, Row, Transaction};
 pub async fn resource(app: &App, s: &Session, title: &str, staff: &str) -> Result<String> {
     text(title, 160)?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     owner(app, s).await?;
     if !staff.is_empty() {
         crate::membership::uuid(staff)?;
@@ -44,7 +44,7 @@ pub async fn slot(app: &App, s: &Session, input: &SlotInput) -> Result<String> {
             "Choose a future UTC slot up to one day long and a supported capacity.",
         ));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     owner(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     let staff: Option<String> =
@@ -96,7 +96,7 @@ pub async fn edit_slot(
             "Capacity must be between one and one thousand.",
         ));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     owner(app, s).await?;
     if sqlx::query("UPDATE shop_slots SET capacity=$1,active=$2,version=version+1 WHERE id=$3 AND version=$4 AND held+booked<=$1").bind(capacity).bind(i64::from(active)).bind(id).bind(version).execute(&app.db.pool).await?.rows_affected()!=1{return Err(Error::conflict())}
     Ok(())
@@ -125,7 +125,7 @@ pub async fn notify(app: &App) -> Result<usize> {
     if !app.config.business_enabled || !app.config.mail.enabled {
         return Ok(0);
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     let rows=sqlx::query("SELECT n.id,n.order_id,n.kind,n.slot_id,o.customer_email,o.customer_name,o.payment_state,s.starts_at,s.ends_at,r.title AS resource FROM shop_notifications n JOIN shop_orders o ON o.id=n.order_id LEFT JOIN shop_slots s ON s.id=n.slot_id LEFT JOIN shop_resources r ON r.id=s.resource_id WHERE n.state='pending' AND n.due_at<=$1 ORDER BY n.due_at,n.id LIMIT 40").bind(crate::now()).fetch_all(&mut *tx).await?;
     let count = rows.len();
@@ -206,7 +206,7 @@ pub async fn edit_resource(
     if !staff.is_empty() {
         crate::membership::uuid(staff)?;
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     owner(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     if !staff.is_empty() {

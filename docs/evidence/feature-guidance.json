@@ -1977,6 +1977,128 @@
         "native graph or authority change"
       ],
       "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
+    },
+    {
+      "feature_id": "M9-01",
+      "area": "Effective module admission and ownership inventory",
+      "scope": "Validated offline CLI inventory, not distributed authority or dynamic code loading",
+      "basis": "internal",
+      "sources": [
+        "https://github.com/NaxAlpha/wpalt/blob/395b9ecbe966b9dc1ed75cdc50356875343dc489/docs/distributed-operations.md",
+        "https://github.com/NaxAlpha/wpalt/blob/395b9ecbe966b9dc1ed75cdc50356875343dc489/src/platform/modules.rs"
+      ],
+      "applicable_versions": [
+        "wpalt-module-inventory-v1"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Parent module admission controls dependent module availability.",
+        "Inventory does not open a database, create site state or emit credentials.",
+        "Domain ownership is unique and dependency identities are known."
+      ],
+      "tests": [
+        "scripts/module_acceptance.py"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "module ownership or configuration admission change"
+      ],
+      "status": "Working CLI slice verified locally with strict Clippy; full M9 registry/cluster delivery remains pending."
+    },
+    {
+      "feature_id": "M9-02",
+      "area": "Same-host process authority and maintenance",
+      "scope": "Unix/PostgreSQL canonical directory, shared temporary server security, fail-closed interruption and exact stopped-site recovery/config transfer; no multi-host failover claim",
+      "basis": "primary-source-and-internal-contract",
+      "sources": [
+        "https://www.postgresql.org/docs/17/runtime-config-logging.html#GUC-APPLICATION-NAME",
+        "https://www.postgresql.org/docs/17/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW",
+        "https://github.com/kanidm/webauthn-rs/blob/d2c10d53ca5ef033d37ee6462e936e9eb72ad98c/webauthn-rs/src/lib.rs"
+      ],
+      "applicable_versions": [
+        "PostgreSQL 17",
+        "webauthn-rs 0.5.5",
+        "native schema 14 -> 15",
+        "portable graph 12",
+        "wpalt-configuration-v1",
+        "wpalt-local-process-state-v1"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Database authority binds to the same canonical site directory; runtime does not migrate older schemas.",
+        "Application-name identity fits PostgreSQL NAMEDATALEN and remains stable across credentials for drain checks.",
+        "Serialized passkey ceremonies remain in private bounded server storage, never cookies or portable packages; cross-node replay stays refused.",
+        "Shared abuse/security/cache state persists under host ownership; only unchanged read-only state skips redundant sync.",
+        "Interrupted native mutations require stopped-host native graph and external-effect reconciliation.",
+        "Private secret transfer is explicit, exact-plan bound and validated; supported schema migration follows verified encrypted recovery.",
+        "Runtime identity binds exact executable bytes and derived consent manifest; coordinated timing retains the native request identity.",
+        "Physical PostgreSQL recovery retains directory authority until explicit stopped-source exact-plan rebind, verified encrypted graph, revoked transient grants and held account/queue review."
+      ],
+      "tests": [
+        "scripts/local_process_acceptance.py",
+        "scripts/browser_acceptance.cjs with WPALT_LOCAL_PROCESSES=1",
+        "scripts/config_transfer_acceptance.py",
+        "scripts/maintenance_acceptance.py",
+        "tests/acceptance.rs",
+        "scripts/native_pitr_acceptance.py"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "PostgreSQL or WebAuthn dependency update",
+        "authority/storage/worker/configuration/upgrade change"
+      ],
+      "status": "Implementation checkpoint: local native/process/config/maintenance and cumulative browser evidence recorded; exact-source GitHub and final M9 capability/resource gates remain active. WebAuthn library source checked from checksum-verified Cargo package and its immutable upstream VCS identity; docs.rs fetching unavailable."
+    },
+    {
+      "feature_id": "M9-03",
+      "area": "Bounded local editorial, translation and fleet tools",
+      "scope": "F009/F011/F031/F034/F130 working slices; no universal language quality, ranking score or bulk fleet mutation claim",
+      "basis": "primary-source-and-internal-contract",
+      "sources": [
+        "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+        "https://developers.google.com/search/docs/crawling-indexing/links-crawlable",
+        "https://docs.ollama.com/api/generate",
+        "https://docs.ollama.com/capabilities/structured-outputs",
+        "https://github.com/NaxAlpha/wpalt/blob/7b530c06fd82374c69adbc0f2cbf678681413ea3/docs/m9-contract.md",
+        "https://ollama.com/library/qwen3:1.7b"
+      ],
+      "applicable_versions": [
+        "native schema 15",
+        "canonical document 1",
+        "Ollama 0.35.1",
+        "wpalt-fleet-v1",
+        "wpalt-content-audit-v1",
+        "wpalt-translation-plan-v1",
+        "Qwen3 1.7B / 8f68893c685c"
+      ],
+      "last_checked": "2026-10-06",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Editorial graph is bounded and publication-only; no ranking or universal language segmentation claim.",
+        "Translation duplicates unscheduled drafts or explicitly selected working fields, never silently replacing translated publication or access policies.",
+        "Local model title/body proposals require source-bound review, native validation and owner publication; actual model output needs factual/language review.",
+        "Independent fleet observation isolates outages and revoked grants with finite transport/work/input budgets, no redirects or credential/content disclosure."
+      ],
+      "tests": [
+        "tests/acceptance.rs content_audit and translation_duplication",
+        "scripts/fleet_acceptance.py",
+        "scripts/integration_acceptance.py",
+        "scripts/local_ai_reference.py --translation"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "search-engine or model protocol guidance changes",
+        "native publication/translation/integration credential changes"
+      ],
+      "status": "Native editorial/translation real-engine and independent fleet/worker transport checks pass locally. The 0.6B model failed meaningful translation; actual Qwen3 1.7B synthetic French facts/draft/privacy reference passes with human editing required. Exact-source CI and final M9 resource/capability gates remain active."
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

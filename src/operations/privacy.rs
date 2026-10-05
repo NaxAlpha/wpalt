@@ -138,7 +138,7 @@ async fn create(
         return Err(Error::invalid("Choose access or erasure review."));
     }
     let (session, verified) = proof(&app, &headers, &input).await?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     current(&app, &headers, &session, &verified).await?;
     let mut tx = app.db.pool.begin().await?;
     let existing: Option<String> = sqlx::query_scalar(
@@ -240,7 +240,7 @@ async fn resolve(
             "Record a clear handling outcome up to 2,000 bytes.",
         ));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let s = owner(&app, &headers).await?;
     auth::csrf(&s, &input.csrf)?;
     if sqlx::query("UPDATE privacy_requests SET state=$1,response=$2,resolved_at=$3,version=version+1 WHERE id=$4 AND state='requested' AND version=$5").bind(&input.state).bind(input.response.trim()).bind(crate::now()).bind(&id).bind(input.version).execute(&app.db.pool).await?.rows_affected()!=1{return Err(Error::conflict());}
@@ -495,7 +495,7 @@ async fn erase_account(
     .await
     .map_err(|_| Error::invalid("Account credential removal worker failed."))?
     .map_err(|_| Error::invalid("Account credential removal failed."))?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let actor = owner(&app, &headers).await?;
     auth::csrf(&actor, &input.csrf)?;
     let mut tx = app.db.pool.begin().await?;
