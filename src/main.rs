@@ -41,6 +41,8 @@ enum Command {
         #[arg(long)]
         media_dir: Option<PathBuf>,
         #[arg(long)]
+        field_mapping: Option<PathBuf>,
+        #[arg(long)]
         owner_email: String,
         #[arg(long, requires = "output")]
         execute: Option<String>,
@@ -903,6 +905,7 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
         Command::WordPressPrepare {
             input,
             media_dir,
+            field_mapping,
             owner_email,
             execute,
             output,
@@ -910,11 +913,20 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             let bytes = backup::read_bounded(&input, wpalt::platform::wordpress::MAX_BYTES)
                 .await
                 .map_err(|e| anyhow::anyhow!(e.1))?;
-            let prepared = wpalt::platform::wordpress::prepare_with_media(
+            let mapping = if let Some(path) = field_mapping {
+                let raw = backup::read_bounded(&path, wpalt::platform::acf::MAX_BYTES)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e.1))?;
+                Some(wpalt::platform::acf::Mapping::parse(&raw).map_err(|e| anyhow::anyhow!(e.1))?)
+            } else {
+                None
+            };
+            let prepared = wpalt::platform::wordpress::prepare_with_mapping(
                 &app,
                 &bytes,
                 &owner_email,
                 media_dir.as_deref(),
+                mapping.as_ref(),
             )
             .await
             .map_err(|e| anyhow::anyhow!(e.1))?;

@@ -1,0 +1,8 @@
+{
+  "format": "wpalt-acf-scalar-map-v1",
+  "fields": [
+    {"source_name": "garden_teaser", "source_key": "field_garden_teaser", "target_name": "teaser", "kind": "string"},
+    {"source_name": "reading_count", "source_key": "field_reading_count", "target_name": "reading_count", "kind": "number"},
+    {"source_name": "show_marker", "source_key": "field_show_marker", "target_name": "show_marker", "kind": "boolean"}
+  ]
+}

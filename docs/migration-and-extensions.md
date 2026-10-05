@@ -31,3 +31,20 @@ Optional `--media-dir` maps `_wp_attached_file` paths within an independently co
 `cargo test --locked wordpress_preview_package` runs the connected core journey on SQLite and on real PostgreSQL when `TEST_DATABASE_URL` is configured. It verifies namespace aliases/spoofing, malformed XML/entities/duplicate identities, deterministic previews, unchanged template, private-access/payment safety, local-image bytes, traversal/symlink rejection, fresh recovery, redirects and occupied-target refusal. `python3 scripts/migration_acceptance.py --binary PATH` exercises the actual CLI/private-file/exact-plan boundary. No full migration/extension completion claim.
 
 WordPress core `_pingme`, `_encloseme` and `_trackbackme` flags are reported as source work that is not replayed. They do not force otherwise safe published content into draft. No ping, enclosure discovery or trackback request is sent by migration. Unknown plugin metadata still requires review.
+
+## Explicit ACF scalar fields
+
+Supply `--field-mapping fields.json` to `wordpress-prepare` for selected source registrations. The preview includes the mapping identity; execution requires a new plan when the mapping changes. Example:
+
+```json
+{
+  "format": "wpalt-acf-scalar-map-v1",
+  "fields": [
+    {"source_name": "garden_teaser", "source_key": "field_garden_teaser", "target_name": "teaser", "kind": "string"}
+  ]
+}
+```
+
+The source value `garden_teaser` must have exactly one `_garden_teaser` reference to that explicit field key. Missing/wrong/duplicate selected references reject the package. At most 32 mappings and a 128 KiB mapping file are admitted; source/target names currently use the native lowercase ASCII identifier grammar. Registered text/textarea/single scalar values map to native strings up to 8,000 bytes, number values to finite native JSON numbers within the browser-safe magnitude (absolute value ≤ 9,007,199,254,740,991), and true/false metadata strictly from `0`/`1`. Integers beyond that range must explicitly map to strings; they are never silently rounded. Decimal numbers use the native JSON floating-point contract and are not an exact financial ledger. Fields are optional shared native definitions; conflicting template definitions fail validation.
+
+Selected ACF values become editable native structured fields after fresh recovery. Mapping fields does not interpret PHP objects/arrays, repeaters/flexible layouts, media IDs, relationships, ACF registration code or access rules. Source content bearing unknown metadata stays draft even when selected scalar fields are preserved. Review permissions and publish through the normal native workflow. Other source fields remain reported for further adapters; retain the source and field registrations independently.

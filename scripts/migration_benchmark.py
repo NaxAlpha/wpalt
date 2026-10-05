@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Measure bounded offline assessment using the actual distribution executable.
 
-Per-process wait4 resource usage; input parsing and full report serialization are
+Native child resource usage through an exec’d minimal timer; input parsing and full report serialization are
 included. This is not a restore, database or universal WordPress parity benchmark.
 """
 import argparse
 import hashlib
 import json
-import os
+import re
 import platform
 import statistics
 import subprocess
@@ -20,10 +20,11 @@ parser.add_argument('--binary', required=True)
 parser.add_argument('--output', default='work/m8-migration-profile.json')
 args = parser.parse_args()
 binary = Path(args.binary).resolve()
-assert hasattr(os, 'wait4'), 'Use a supported POSIX measurement host'
+assert platform.system() in ('Darwin', 'Linux') and Path('/usr/bin/time').is_file(), 'Use a supported host with /usr/bin/time'
 report = {'format': 'wpalt-migration-profile-v1', 'machine': platform.platform(),
           'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
           'scope': 'Offline WXR assessment: process startup, XML/tree admission, classification and complete JSON report serialization. No DB, media mapping, HTML conversion or recovery cost included.',
+          'measurement': 'Wall includes the minimal timer launcher; CPU/RSS come from its spawned native command, excluding Python fork high-water memory. CPU timer values have platform rounding. All output counts reconcile.',
           'profiles': []}
 with tempfile.TemporaryDirectory(prefix='wpalt-migration-profile-') as temporary:
     root = Path(temporary)
@@ -37,17 +38,29 @@ with tempfile.TemporaryDirectory(prefix='wpalt-migration-profile-') as temporary
         for _ in range(3):
             with tempfile.TemporaryFile() as errors, tempfile.TemporaryFile() as result:
                 started = time.perf_counter()
-                process = subprocess.Popen([str(binary), '--config', str(config), 'wordpress-assess', str(source)], stdout=result, stderr=errors)
-                _, status, usage = os.wait4(process.pid, 0)
-                process.returncode = os.waitstatus_to_exitcode(status)
-                errors.seek(0)
-                assert process.returncode == 0, errors.read().decode(errors='replace')
+                metrics = root/'timer.txt'
+                timer = ['/usr/bin/time', '-l'] if platform.system() == 'Darwin' else ['/usr/bin/time', '-v', '-o', str(metrics)]
+                process = subprocess.run([*timer, str(binary), '--config', str(config), 'wordpress-assess', str(source)], stdout=result, stderr=errors, timeout=60)
                 elapsed = (time.perf_counter()-started)*1000
+                errors.seek(0); stderr = errors.read().decode(errors='replace')
+                assert process.returncode == 0, stderr
+                if platform.system() == 'Darwin':
+                    resident = re.search(r'(\d+)\s+maximum resident set size', stderr)
+                    cpu = re.search(r'([\d.]+)\s+user\s+([\d.]+)\s+sys', stderr)
+                    assert resident and cpu, 'Native BSD timer fields missing'
+                    peak = int(resident.group(1)); cpu_ms = sum(float(v) for v in cpu.groups())*1000
+                else:
+                    timing = metrics.read_text()
+                    resident = re.search(r'Maximum resident set size \(kbytes\): (\d+)', timing)
+                    user = re.search(r'User time \(seconds\): ([\d.]+)', timing)
+                    system = re.search(r'System time \(seconds\): ([\d.]+)', timing)
+                    assert resident and user and system, 'Native GNU timer fields missing'
+                    peak = int(resident.group(1))*1024; cpu_ms = (float(user.group(1))+float(system.group(1)))*1000
                 result.seek(0); assessment = json.load(result)
                 assert assessment['source_items'] == count and assessment['supported_core_items'] == count
                 samples.append({'wall_ms': round(elapsed, 3),
-                                'cpu_ms': round((usage.ru_utime+usage.ru_stime)*1000, 3),
-                                'peak_rss_bytes': usage.ru_maxrss*(1 if platform.system() == 'Darwin' else 1024)})
+                                'cpu_ms': round(cpu_ms, 3),
+                                'peak_rss_bytes': peak})
         assert not (root/'unused.db').exists() and not (root/'unused').exists()
         report['profiles'].append({'items': count, 'input_bytes': source.stat().st_size,
                                    'input_sha256': hashlib.sha256(source.read_bytes()).hexdigest(),

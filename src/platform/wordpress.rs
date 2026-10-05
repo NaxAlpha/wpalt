@@ -305,6 +305,19 @@ pub async fn prepare_with_media(
     owner_email: &str,
     media_dir: Option<&std::path::Path>,
 ) -> Result<crate::backup::selection::Prepared> {
+    prepare_with_mapping(app, bytes, owner_email, media_dir, None).await
+}
+
+pub async fn prepare_with_mapping(
+    app: &crate::App,
+    bytes: &[u8],
+    owner_email: &str,
+    media_dir: Option<&std::path::Path>,
+    mapping: Option<&super::acf::Mapping>,
+) -> Result<crate::backup::selection::Prepared> {
+    if let Some(mapping) = mapping {
+        mapping.validate()?;
+    }
     let assessment = assess(bytes)?;
     let captured = crate::backup::capture(app).await?;
     let envelope: Value = serde_json::from_slice(&captured).map_err(|_| invalid())?;
@@ -359,6 +372,11 @@ pub async fn prepare_with_media(
         settings["title"] = assessment.site_title.clone().into();
     }
     settings["description"] = assessment.site_description.clone().into();
+    if let Some(mapping) = mapping {
+        settings["field_schema"] = mapping
+            .schema(settings["field_schema"].as_str().ok_or_else(invalid)?)?
+            .into();
+    }
     let mut posts = Vec::new();
     let mut terms = BTreeMap::new();
     let mut assignments = Vec::new();
@@ -455,6 +473,11 @@ pub async fn prepare_with_media(
         map_document(&mut document.root, &media_urls, &links, &mut warnings);
         let document = crate::document::Document::parse(&document.encode())?;
         let body = document.markdown();
+        let fields = if let Some(mapping) = mapping {
+            mapping.values(item)?
+        } else {
+            "{}".into()
+        };
         let published = publicly_importable(item);
         let id = stable_id(&assessment.source_sha256, "post", source_id);
         let date = chrono::NaiveDateTime::parse_from_str(
@@ -488,7 +511,7 @@ pub async fn prepare_with_media(
         }
         let seo = serde_json::to_string(&seo).map_err(|_| invalid())?;
         crate::discovery::Seo::parse(&seo)?;
-        posts.push(json!({"id":id,"slug":slug,"kind":kind,"title":title,"body":body,"document":encoded,"fields":"{}","blocks":"[]","status":if published {"published"}else{"draft"},"version":1,"published_slug":if published{slug}else{""},"published_title":if published{title}else{""},"published_body":if published{body.as_str()}else{""},"published_document":if published{encoded.as_str()}else{empty.as_str()},"published_fields":"{}","published_blocks":"[]","publish_at":0,"published_at":if published{date}else{0},"updated_at":date,"author_id":owner,"locale":"en","translation_group":"","seo":seo,"published_locale":"en","published_translation_group":"","published_seo":if published{seo.as_str()}else{"{}"}}));
+        posts.push(json!({"id":id,"slug":slug,"kind":kind,"title":title,"body":body,"document":encoded,"fields":fields,"blocks":"[]","status":if published {"published"}else{"draft"},"version":1,"published_slug":if published{slug}else{""},"published_title":if published{title}else{""},"published_body":if published{body.as_str()}else{""},"published_document":if published{encoded.as_str()}else{empty.as_str()},"published_fields":if published{fields.as_str()}else{"{}"},"published_blocks":"[]","publish_at":0,"published_at":if published{date}else{0},"updated_at":date,"author_id":owner,"locale":"en","translation_group":"","seo":seo,"published_locale":"en","published_translation_group":"","published_seo":if published{seo.as_str()}else{"{}"}}));
         for category in item.all("category") {
             let domain = category
                 .attributes
@@ -595,7 +618,7 @@ pub async fn prepare_with_media(
     .map_err(|_| invalid())?;
     crate::backup::inspect(&app.config, &bytes)?;
     let output_hash = digest(&bytes);
-    let report = json!({"format":"wpalt-wordpress-package-preview-v1","source_sha256":assessment.source_sha256,"source_site":assessment.origin,"site_settings":{"title":snapshot["tables"]["settings"][0]["title"],"description":snapshot["tables"]["settings"][0]["description"]},"target_origin":app.config.origin(),"owner_email":owner_email,"output_sha256":output_hash,"counts":counts,"media_mapped":media_urls.len(),"warnings":warnings,"boundary":"Fresh-target package only; source/template unchanged, safely mapped public content stays published, ambiguous access stays draft, private/future/pending become drafts, no imported credentials/network/plugin execution. Only explicitly supplied local media is embedded. Retain raw WXR and review unsupported source independently."});
+    let report = json!({"format":"wpalt-wordpress-package-preview-v1","source_sha256":assessment.source_sha256,"source_site":assessment.origin,"site_settings":{"title":snapshot["tables"]["settings"][0]["title"],"description":snapshot["tables"]["settings"][0]["description"]},"target_origin":app.config.origin(),"owner_email":owner_email,"field_mapping":mapping.map(|m|m.report()),"output_sha256":output_hash,"counts":counts,"media_mapped":media_urls.len(),"warnings":warnings,"boundary":"Fresh-target package only; source/template unchanged, safely mapped public content stays published, ambiguous access stays draft, private/future/pending become drafts, no imported credentials/network/plugin execution. Only explicitly supplied local media is embedded. Retain raw WXR and review unsupported source independently."});
     let plan = digest(
         serde_json::to_string(&report)
             .map_err(|_| invalid())?

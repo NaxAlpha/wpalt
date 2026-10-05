@@ -37,4 +37,18 @@ with tempfile.TemporaryDirectory(prefix='wpalt-migration-') as tmp:
     changed=root/'changed.xml';changed.write_text(source.read_text().replace('quiet garden','changed garden'))
     run(template,'wordpress-prepare',changed,'--owner-email','owner@example.test','--media-dir',media,'--execute',preview['plan'],'--output',root/'changed.json',ok=False)
     assert not (root/'changed.json').exists()
+    # ACF mappings bind their field references/types and never infer public access.
+    acf_source=root/'acf.xml';acf_source.write_text(source.read_text().replace('<wp:comment>',(repository/'tests/fixtures/wordpress-acf-values.xml.fragment').read_text()+'<wp:comment>'))
+    mapping=repository/'tests/fixtures/wordpress-acf-map.json'
+    selected=('wordpress-prepare',acf_source,'--owner-email','owner@example.test','--field-mapping',mapping)
+    mapped_preview=json.loads(run(template,*selected).stdout)
+    mapped_output=root/'mapped.json';run(template,*selected,'--execute',mapped_preview['plan'],'--output',mapped_output)
+    mapped_target=config('mapped');run(mapped_target,'restore',mapped_output)
+    with sqlite3.connect(root/'mapped.db') as db:
+        row=db.execute("SELECT fields,status FROM posts WHERE slug='garden'").fetchone();fields=json.loads(row[0])
+        assert fields=={'teaser':'A field-owned garden story.','reading_count':12,'show_marker':False}
+        assert row[1]=='draft'
+    changed_map=root/'changed-map.json';selected_fields=json.loads(mapping.read_text());selected_fields['fields'][0]['target_name']='another_teaser';changed_map.write_text(json.dumps(selected_fields))
+    run(template,'wordpress-prepare',acf_source,'--owner-email','owner@example.test','--field-mapping',changed_map,'--execute',mapped_preview['plan'],'--output',root/'stale-mapped.json',ok=False)
+    assert not (root/'stale-mapped.json').exists()
 print('PASS: offline namespace-aware WXR assessment, exact-source preview, private non-overwriting package, local media, untouched template, fresh core recovery and safe private/payment mappings')

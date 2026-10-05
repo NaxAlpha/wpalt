@@ -5793,6 +5793,102 @@ async fn wordpress_preview_package_recovers_content_without_inventing_private_ac
                 .all(|p| p["status"] == "draft")
         );
         assert_eq!(snapshot["tables"]["media"][0]["visibility"], "private");
+        // Selected ACF references are typed and recoverable, never an access grant.
+        let acf_source = String::from_utf8(source.to_vec()).unwrap().replace(
+            "<wp:comment>",
+            &format!(
+                "{}<wp:comment>",
+                include_str!("fixtures/wordpress-acf-values.xml.fragment")
+            ),
+        );
+        let mapping =
+            wpalt::platform::acf::Mapping::parse(include_bytes!("fixtures/wordpress-acf-map.json"))
+                .unwrap();
+        let mapped = wordpress::prepare_with_mapping(
+            &template.app,
+            acf_source.as_bytes(),
+            &email,
+            None,
+            Some(&mapping),
+        )
+        .await
+        .unwrap();
+        assert_ne!(mapped.plan, prepared.plan);
+        let mapped_target = Site::new(postgres, false).await;
+        backup::restore(&mapped_target.app, &mapped.bytes)
+            .await
+            .unwrap();
+        let mapped_row =
+            sqlx::query("SELECT fields,status,published_fields FROM posts WHERE slug='garden'")
+                .fetch_one(&mapped_target.app.db.pool)
+                .await
+                .unwrap();
+        let values: serde_json::Value =
+            serde_json::from_str(&mapped_row.get::<String, _>("fields")).unwrap();
+        assert_eq!(values["teaser"], "A field-owned garden story.");
+        assert_eq!(values["reading_count"].as_u64(), Some(12));
+        assert_eq!(values["show_marker"], false);
+        assert_eq!(mapped_row.get::<String, _>("status"), "draft");
+        assert_eq!(mapped_row.get::<String, _>("published_fields"), "{}");
+        let registry = wpalt::schema::Registry::load(&mapped_target.app)
+            .await
+            .unwrap();
+        assert_eq!(registry.common.fields["teaser"].kind, "string");
+        for invalid_source in [
+            acf_source.replace("field_garden_teaser", "field_wrong_reference"),
+            acf_source.replace(
+                "<wp:meta_value>12</wp:meta_value>",
+                "<wp:meta_value>9007199254740993</wp:meta_value>",
+            ),
+        ] {
+            assert!(
+                wordpress::prepare_with_mapping(
+                    &template.app,
+                    invalid_source.as_bytes(),
+                    &email,
+                    None,
+                    Some(&mapping)
+                )
+                .await
+                .is_err()
+            );
+        }
+        let mut invalid_map: serde_json::Value =
+            serde_json::from_slice(include_bytes!("fixtures/wordpress-acf-map.json")).unwrap();
+        invalid_map["fields"][1]["target_name"] = "teaser".into();
+        assert!(
+            wpalt::platform::acf::Mapping::parse(&serde_json::to_vec(&invalid_map).unwrap())
+                .is_err()
+        );
+        // Large precise identifiers must be explicitly retained as strings.
+        let big_source = acf_source.replace(
+            "<wp:meta_value>12</wp:meta_value>",
+            "<wp:meta_value>9007199254740993</wp:meta_value>",
+        );
+        let mut string_map: serde_json::Value =
+            serde_json::from_slice(include_bytes!("fixtures/wordpress-acf-map.json")).unwrap();
+        string_map["fields"][1]["kind"] = "string".into();
+        let string_map =
+            wpalt::platform::acf::Mapping::parse(&serde_json::to_vec(&string_map).unwrap())
+                .unwrap();
+        let exact = wordpress::prepare_with_mapping(
+            &template.app,
+            big_source.as_bytes(),
+            &email,
+            None,
+            Some(&string_map),
+        )
+        .await
+        .unwrap();
+        let envelope: serde_json::Value = serde_json::from_slice(&exact.bytes).unwrap();
+        let snapshot: serde_json::Value =
+            serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        let exact_values: serde_json::Value =
+            serde_json::from_str(snapshot["tables"]["posts"][0]["fields"].as_str().unwrap())
+                .unwrap();
+        assert_eq!(exact_values["reading_count"], "9007199254740993");
+        assert_ne!(exact.plan, mapped.plan);
+        mapped_target.close().await;
         let unsafe_path = String::from_utf8(source.to_vec()).unwrap().replace(
             "2025/garden.png</wp:meta_value>",
             "../outside.png</wp:meta_value>",

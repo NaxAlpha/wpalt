@@ -44,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-m8-reference-') as temp:
     root = Path(temp)
     report = {'format': 'wpalt-m8-wordpress-reference-v1',
               'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
-              'scope': 'Actual synthetic core WXR export with free Yoast installed; core posts/private page, terms/comment/SEO and fresh recovery. Other plugin adapters remain separate gates.'}
+              'scope': 'Actual synthetic core WXR export with free Yoast and ACF installed; core posts/private page, terms/comment/SEO and fresh recovery. Explicit ACF scalars retain draft access; other adapters remain separate gates.'}
     try:
         for image in images:
             run('docker', 'pull', image)
@@ -78,18 +78,22 @@ with tempfile.TemporaryDirectory(prefix='wpalt-m8-reference-') as temp:
            '--admin_password='+password, '--admin_email=owner@example.test', '--skip-email')
         report['wordpress_version'] = wp('core', 'version')
         assert report['wordpress_version'] == '7.1.2'
-        wp('plugin', 'install', 'wordpress-seo', '--activate')
+        wp('plugin', 'install', 'wordpress-seo', 'advanced-custom-fields', '--activate')
         report['plugins'] = json.loads(wp('plugin', 'list', '--format=json'))
         seed = root/'seed.php'
         seed.write_text('''<?php
 foreach (get_posts(['post_type'=>'any','post_status'=>'any','numberposts'=>-1]) as $p) wp_delete_post($p->ID,true);
 update_option('permalink_structure','/%postname%/'); flush_rewrite_rules();
 $post=wp_insert_post(['post_title'=>'A reference journal','post_name'=>'reference-journal','post_status'=>'publish','post_content'=>'<h2>A calm morning</h2><p>A <strong>real export</strong> with useful words.</p>']);
+acf_add_local_field_group(['key'=>'group_m8','title'=>'Migration fields','fields'=>[['key'=>'field_m8_teaser','name'=>'garden_teaser','label'=>'Teaser','type'=>'text'],['key'=>'field_m8_count','name'=>'reading_count','label'=>'Count','type'=>'number'],['key'=>'field_m8_marker','name'=>'show_marker','label'=>'Marker','type'=>'true_false']],'location'=>[[['param'=>'post_type','operator'=>'==','value'=>'post']]]]);
+$typed=wp_insert_post(['post_title'=>'Typed fields','post_name'=>'typed-fields','post_status'=>'publish','post_content'=>'<p>Source fields need review.</p>']);
+update_field('field_m8_teaser','A registered source field.',$typed);update_field('field_m8_count',12,$typed);update_field('field_m8_marker',0,$typed);
+if(get_field('garden_teaser',$typed)!=='A registered source field.' || (int)get_field('reading_count',$typed)!==12 || get_field('show_marker',$typed)!==false) throw new Exception('ACF synthetic field seeding failed');
 $page=wp_insert_post(['post_type'=>'page','post_title'=>'Private notes','post_name'=>'private-notes','post_status'=>'private','post_content'=>'<p>Private source notes.</p>']);
 $term=wp_insert_term('Migration stories','category',['slug'=>'migration-stories']); wp_set_post_terms($post,[$term['term_id']],'category');
 update_post_meta($post,'_yoast_wpseo_metadesc','A real WordPress export migrated locally.');
 wp_insert_comment(['comment_post_ID'=>$post,'comment_author'=>'Reference visitor','comment_content'=>'Useful story.','comment_approved'=>1]);
-echo json_encode(['posts'=>2,'comments'=>1,'category'=>'migration-stories']);
+echo json_encode(['posts'=>3,'comments'=>1,'category'=>'migration-stories']);
 ''')
         run('docker', 'cp', str(seed), site+':/var/www/html/wpalt-m8-seed.php')
         report['source_counts'] = json.loads(wp('eval-file', '/var/www/html/wpalt-m8-seed.php'))
@@ -107,19 +111,27 @@ echo json_encode(['posts'=>2,'comments'=>1,'category'=>'migration-stories']);
         offline, template, target = config('offline'), config('template'), config('target')
         assessment = json.loads(native(offline, 'wordpress-assess', export))
         report['assessment'] = {key: assessment[key] for key in ('source_items', 'supported_core_items', 'types', 'warnings')}
-        assert assessment['source_items'] == 2 and assessment['supported_core_items'] == 2
+        assert assessment['source_items'] == 3 and assessment['supported_core_items'] == 3
         assert not (root/'offline.db').exists()
         native(template, 'init', '--admin-email', 'owner@example.test', stdin=password+'\n')
-        preview = json.loads(native(template, 'wordpress-prepare', export, '--owner-email', 'owner@example.test'))
+        mapping = root/'fields.json'
+        mapping.write_text(json.dumps({'format':'wpalt-acf-scalar-map-v1','fields':[
+            {'source_name':'garden_teaser','source_key':'field_m8_teaser','target_name':'teaser','kind':'string'},
+            {'source_name':'reading_count','source_key':'field_m8_count','target_name':'reading_count','kind':'number'},
+            {'source_name':'show_marker','source_key':'field_m8_marker','target_name':'show_marker','kind':'boolean'}]}))
+        preview = json.loads(native(template, 'wordpress-prepare', export, '--owner-email', 'owner@example.test', '--field-mapping', mapping))
         package = root/'migration.json'
-        native(template, 'wordpress-prepare', export, '--owner-email', 'owner@example.test', '--execute', preview['plan'], '--output', package)
+        native(template, 'wordpress-prepare', export, '--owner-email', 'owner@example.test', '--field-mapping', mapping, '--execute', preview['plan'], '--output', package)
         native(target, 'restore', package)
         with sqlite3.connect(root/'target.db') as db:
-            assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0] == 2
+            assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0] == 3
             journal = db.execute("SELECT status,published_body,seo FROM posts WHERE slug='reference-journal'").fetchone()
             assert journal[0] == 'published' and 'real export' in journal[1], {'observed_status': journal[0], 'assessment': report['assessment']}
             assert json.loads(journal[2])['description'] == 'A real WordPress export migrated locally.'
             assert db.execute("SELECT status FROM posts WHERE slug='private-notes'").fetchone()[0] == 'draft'
+            typed = db.execute("SELECT fields,status FROM posts WHERE slug='typed-fields'").fetchone()
+            assert json.loads(typed[0]) == {'teaser':'A registered source field.','reading_count':12,'show_marker':False}
+            assert typed[1] == 'draft'
             assert db.execute('SELECT COUNT(*) FROM comments').fetchone()[0] == 1
             assert db.execute("SELECT COUNT(*) FROM terms WHERE slug='migration-stories'").fetchone()[0] == 1
             assert db.execute('SELECT COUNT(*) FROM shop_orders').fetchone()[0] == 0
@@ -128,7 +140,7 @@ echo json_encode(['posts'=>2,'comments'=>1,'category'=>'migration-stories']);
             assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0] == 0
         report['assertions'] = ['real export accepted offline', 'exact preview execution', 'template unchanged',
                                 'counts and relationships recovered', 'private page retained as draft',
-                                'literal SEO preserved', 'no invented orders', 'occupied retry denied']
+                                'literal SEO preserved', 'registered ACF scalars recovered as draft', 'no invented orders', 'occupied retry denied']
         report['status'] = 'passed'
         output = Path(args.output); output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(report, indent=2)+'\n')
