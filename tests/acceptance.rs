@@ -6088,3 +6088,268 @@ async fn wordpress_preview_package_recovers_content_without_inventing_private_ac
         target.close().await;
     }
 }
+
+/// External code can read selected content and propose drafts, without acquiring
+/// publication or browser privileges; revocation and recovery close authority.
+#[tokio::test]
+async fn scoped_integration_drafts_revoke_without_publication_or_recovery_authority() {
+    use std::future::Future;
+    use wpalt::platform::integrations as api;
+    for postgres in engines() {
+        let site = Site::new(postgres, true).await;
+        let owner = site.session();
+        let reader = api::issue(
+            &site.app,
+            owner,
+            &owner.user.email,
+            "Read-only exporter",
+            false,
+            7,
+        )
+        .await
+        .unwrap();
+        let writer = api::issue(
+            &site.app,
+            owner,
+            &owner.user.email,
+            "Independent draft worker",
+            true,
+            7,
+        )
+        .await
+        .unwrap();
+        let headers = |token: &str| {
+            let mut headers = axum::http::HeaderMap::new();
+            headers.insert("authorization", format!("Bearer {token}").parse().unwrap());
+            headers
+        };
+        let actor = api::authenticate(&site.app, &headers(&writer.token), true)
+            .await
+            .unwrap();
+        assert!(
+            api::issue(&site.app, &actor, &owner.user.email, "Escalation", true, 7)
+                .await
+                .is_err()
+        );
+        assert!(
+            api::authenticate(&site.app, &headers(&reader.token), true)
+                .await
+                .is_err()
+        );
+        let router = wpalt::web::router(site.app.clone());
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/content")
+                    .header("authorization", format!("Bearer {}", reader.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        assert!(response.headers().get("set-cookie").is_none());
+        for (name, value) in [
+            ("cookie", format!("wpalt_session={}", site.token)),
+            ("origin", "https://untrusted.example".into()),
+        ] {
+            let response = router
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/api/v1/content")
+                        .header("authorization", format!("Bearer {}", reader.token))
+                        .header(name, value)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        }
+        let mut draft = input("external-draft", "save");
+        draft.body = "An independent worker suggestion.".into();
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/content")
+                    .header("authorization", format!("Bearer {}", reader.token))
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&draft).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/content")
+                    .header("authorization", format!("Bearer {}", writer.token))
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&draft).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let created: serde_json::Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        let id = created["id"].as_str().unwrap();
+        assert_eq!(created["status"], "draft");
+        assert_eq!(
+            wpalt::content::get(&site.app, id)
+                .await
+                .unwrap()
+                .published_body,
+            ""
+        );
+        draft.action = "publish".into();
+        draft.version = 1;
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri(format!("/api/v1/content/{id}"))
+                    .header("authorization", format!("Bearer {}", writer.token))
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&draft).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert!(
+            content::save(&site.app, &actor, Some(id), draft.clone())
+                .await
+                .is_err()
+        );
+        draft.action = "save".into();
+        let saved = content::save(&site.app, &actor, Some(id), draft.clone())
+            .await
+            .unwrap();
+        assert_eq!(saved.version, 2);
+        assert!(
+            content::save(&site.app, &actor, Some(id), draft.clone())
+                .await
+                .is_err()
+        );
+        // A scheduled working copy must not become an indirect publication path.
+        let mut scheduled_input = input("scheduled-integration-boundary", "schedule");
+        scheduled_input.publish_at = wpalt::now() + 3600;
+        let scheduled = content::save(&site.app, owner, None, scheduled_input.clone())
+            .await
+            .unwrap();
+        scheduled_input.action = "save".into();
+        scheduled_input.publish_at = 0;
+        scheduled_input.version = scheduled.version;
+        assert!(
+            content::save(&site.app, &actor, Some(&scheduled.id), scheduled_input)
+                .await
+                .is_err()
+        );
+        // Coordinate queue order without sleeps: revocation owns the next turn
+        // before an already-authenticated writer acquires the same mutex.
+        draft.version = 2;
+        let guard = site.app.mutation().await;
+        let mut revocation = Box::pin(api::revoke(&site.app, owner, &writer.id));
+        assert!(matches!(
+            std::future::poll_fn(|cx| std::task::Poll::Ready(revocation.as_mut().poll(cx))).await,
+            std::task::Poll::Pending
+        ));
+        let mut waiting_write = Box::pin(content::save(&site.app, &actor, Some(id), draft));
+        assert!(matches!(
+            std::future::poll_fn(|cx| std::task::Poll::Ready(waiting_write.as_mut().poll(cx)))
+                .await,
+            std::task::Poll::Pending
+        ));
+        drop(guard);
+        revocation.await.unwrap();
+        assert!(
+            waiting_write.await.is_err(),
+            "A queued writer cannot pass a winning revocation"
+        );
+        assert!(
+            api::authenticate(&site.app, &headers(&writer.token), false)
+                .await
+                .is_err()
+        );
+        // Credentials never become browser cookies or portable recovery grants.
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/posts")
+                    .header("cookie", format!("wpalt_session={}", reader.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        let archive = backup::capture(&site.app).await.unwrap();
+        assert!(
+            !String::from_utf8(archive.clone())
+                .unwrap()
+                .contains(&auth::digest(reader.token.as_bytes()))
+        );
+        let target = Site::new(postgres, false).await;
+        backup::restore(&target.app, &archive).await.unwrap();
+        assert!(
+            api::authenticate(&target.app, &headers(&reader.token), false)
+                .await
+                .is_err()
+        );
+        target.close().await;
+        let mut different_origin = site.app.clone();
+        let mut config = (*different_origin.config).clone();
+        config.base_url = "https://recovered.example.test".into();
+        different_origin.config = std::sync::Arc::new(config);
+        assert!(
+            api::authenticate(&different_origin, &headers(&reader.token), false)
+                .await
+                .is_err()
+        );
+        let expiring = api::issue(
+            &site.app,
+            owner,
+            &owner.user.email,
+            "Expiry fixture",
+            false,
+            1,
+        )
+        .await
+        .unwrap();
+        sqlx::query("UPDATE integration_credentials SET expires_at=0 WHERE id=$1")
+            .bind(&expiring.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            api::authenticate(&site.app, &headers(&expiring.token), false)
+                .await
+                .is_err()
+        );
+        // A changed account credential invalidates its delegated access immediately.
+        sqlx::query("UPDATE users SET password_hash=$1 WHERE id=$2")
+            .bind("changed-credential-fingerprint")
+            .bind(&owner.user.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            api::authenticate(&site.app, &headers(&reader.token), false)
+                .await
+                .is_err()
+        );
+        site.close().await;
+    }
+}

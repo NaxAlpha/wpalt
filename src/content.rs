@@ -158,6 +158,10 @@ pub async fn save(
     }
     let _guard = app.mutation().await;
     crate::auth::current_editor(app, session).await?;
+    if session.hash.starts_with("integration:") && (input.action != "save" || input.publish_at != 0)
+    {
+        return Err(Error::forbidden());
+    }
     let settings = app.db.settings().await?;
     validate_input(&input, &settings)?;
     let structured = !input.document.is_empty() && !input.import_markdown;
@@ -231,6 +235,9 @@ pub async fn save(
         None
     };
     if let Some(old) = &old {
+        if session.hash.starts_with("integration:") && old.status != "draft" {
+            return Err(Error::forbidden());
+        }
         if old.version != input.version {
             return Err(Error::conflict());
         }

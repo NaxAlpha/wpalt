@@ -31,6 +31,11 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Stopped-host least-privilege credentials for external integrations.
+    Integration {
+        #[command(subcommand)]
+        command: IntegrationCommand,
+    },
     /// Project bounded Elementor 0.4 content offline, with explicit losses.
     ElementorProject {
         input: PathBuf,
@@ -207,6 +212,26 @@ enum Command {
         posts: u32,
     },
 }
+#[derive(Subcommand)]
+enum IntegrationCommand {
+    /// Create content:read, optionally content:draft. Secret goes to a NEW private file.
+    Create {
+        #[arg(long)]
+        user_email: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        draft: bool,
+        #[arg(long, default_value_t = 7)]
+        days: i64,
+        output: PathBuf,
+    },
+    List,
+    Revoke {
+        id: String,
+    },
+}
+
 #[derive(Subcommand)]
 enum ShopCommand {
     ProductImport {
@@ -867,6 +892,7 @@ async fn main() -> anyhow::Result<()> {
     );
     // Journal command classes without collecting argv, paths or secrets.
     let route = match &cli.command {
+        Command::Integration { .. } => Some("cli:integration"),
         Command::Init { .. } => Some("cli:init"),
         Command::Backup { .. } => Some("cli:backup"),
         Command::WordPressPrepare {
@@ -933,6 +959,67 @@ async fn main() -> anyhow::Result<()> {
 
 async fn execute(app: App, command: Command) -> anyhow::Result<()> {
     match command {
+        Command::Integration { command } => {
+            use sqlx::Row;
+            let row = sqlx::query(
+                "SELECT id,email,name,role FROM users WHERE role='admin' ORDER BY id LIMIT 1",
+            )
+            .fetch_optional(&app.db.pool)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Initialize an owner account first."))?;
+            let owner = Session {
+                user: User {
+                    id: row.get("id"),
+                    email: row.get("email"),
+                    name: row.get("name"),
+                    role: row.get("role"),
+                },
+                hash: String::new(),
+                csrf: String::new(),
+            };
+            use wpalt::platform::integrations as api;
+            match command {
+                IntegrationCommand::List => println!(
+                    "{}",
+                    serde_json::to_string_pretty(
+                        &api::inventory(&app, &owner)
+                            .await
+                            .map_err(|e| anyhow::anyhow!(e.1))?
+                    )?
+                ),
+                IntegrationCommand::Revoke { id } => {
+                    api::revoke(&app, &owner, &id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e.1))?;
+                    println!("Credential revoked.");
+                }
+                IntegrationCommand::Create {
+                    user_email,
+                    name,
+                    draft,
+                    days,
+                    output,
+                } => {
+                    anyhow::ensure!(!output.exists(), "Choose a new private credential file.");
+                    let issued = api::issue(&app, &owner, &user_email, &name, draft, days)
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e.1))?;
+                    if let Err(error) = backup::write_private(&output, issued.token.as_bytes()) {
+                        api::revoke(&app, &owner, &issued.id)
+                            .await
+                            .map_err(|e| anyhow::anyhow!(e.1))?;
+                        return Err(error.context(
+                            "Credential delivery failed; its authorization was revoked.",
+                        ));
+                    }
+                    println!(
+                        "{}",
+                        serde_json::json!({"id":issued.id,"scopes":if draft {vec!["content:read","content:draft"]}else{vec!["content:read"]},"secret_written":true})
+                    );
+                }
+            }
+        }
+
         Command::Init {
             admin_email,
             admin_name,

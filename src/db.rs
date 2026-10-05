@@ -88,7 +88,8 @@ impl Db {
                     || version == Some(9)
                     || version == Some(10)
                     || version == Some(11)
-                    || version == Some(12),
+                    || version == Some(12)
+                    || version == Some(13),
                 "unsupported schema version; use the documented migration/reset path"
             );
         }
@@ -205,7 +206,10 @@ impl Db {
         sqlx::raw_sql(crate::operations::clone_hold::SCHEMA)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("UPDATE schema_version SET version=12 WHERE id=1")
+        sqlx::raw_sql(crate::platform::integrations::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE schema_version SET version=13 WHERE id=1")
             .execute(&mut *tx)
             .await?;
         if self.postgres {

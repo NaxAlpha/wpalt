@@ -99,7 +99,9 @@ $page=wp_insert_post(['post_type'=>'page','post_title'=>'Private notes','post_na
 $term=wp_insert_term('Migration stories','category',['slug'=>'migration-stories']); wp_set_post_terms($post,[$term['term_id']],'category');
 update_post_meta($post,'_yoast_wpseo_metadesc','A real WordPress export migrated locally.');
 wp_insert_comment(['comment_post_ID'=>$post,'comment_author'=>'Reference visitor','comment_content'=>'Useful story.','comment_approved'=>1]);
-echo json_encode(['posts'=>4,'comments'=>1,'category'=>'migration-stories']);
+$exportable=get_posts(['post_type'=>array_values(get_post_types(['can_export'=>true])),'post_status'=>['publish','draft','pending','private','future','inherit'],'numberposts'=>-1]);
+$types=[];foreach($exportable as $record){$types[$record->post_type]=($types[$record->post_type]??0)+1;}
+echo json_encode(['posts'=>4,'export_items'=>count($exportable),'types'=>$types,'comments'=>1,'category'=>'migration-stories']);
 ''')
         run('docker', 'cp', str(seed), site+':/var/www/html/wpalt-m8-seed.php')
         report['source_counts'] = json.loads(wp('eval-file', '/var/www/html/wpalt-m8-seed.php'))
@@ -117,7 +119,8 @@ echo json_encode(['posts'=>4,'comments'=>1,'category'=>'migration-stories']);
         offline, template, target = config('offline'), config('template'), config('target')
         assessment = json.loads(native(offline, 'wordpress-assess', export))
         report['assessment'] = {key: assessment[key] for key in ('source_items', 'supported_core_items', 'types', 'warnings')}
-        assert assessment['source_items'] == 4 and assessment['supported_core_items'] == 4
+        assert assessment['source_items'] == report['source_counts']['export_items'] and assessment['supported_core_items'] == 4
+        assert assessment['types'] == report['source_counts']['types']
         assert not (root/'offline.db').exists()
         native(template, 'init', '--admin-email', 'owner@example.test', stdin=password+'\n')
         mapping = root/'fields.json'

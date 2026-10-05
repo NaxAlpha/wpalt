@@ -298,6 +298,9 @@ pub fn csrf(session: &Session, value: &str) -> Result<()> {
 /// Logout/account changes use that same lock, so revocation before the write wins.
 /// Empty hashes are internal stopped-host CLI actors, never accepted from HTTP.
 pub async fn current_editor(app: &App, session: &Session) -> Result<()> {
+    if session.hash.starts_with("integration:") {
+        return crate::platform::integrations::current_draft_editor(app, session).await;
+    }
     let current: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users u WHERE u.id=$1 AND u.role=$2 AND u.role IN ('admin','editor') AND ($3='' OR EXISTS (SELECT 1 FROM sessions s WHERE s.token_hash=$3 AND s.user_id=u.id AND s.expires_at>$4))")
         .bind(&session.user.id)
         .bind(&session.user.role)
