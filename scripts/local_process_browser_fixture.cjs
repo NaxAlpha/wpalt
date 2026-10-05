@@ -32,7 +32,7 @@ module.exports=async function fixture(temporary){
    request.pipe(upstream);
   });await new Promise(r=>proxy.listen(publicPort,'127.0.0.1',r));
  },async close(){
-  if(proxy){await new Promise(r=>proxy.close(r));}
+  if(proxy){await new Promise(r=>{proxy.close(r);proxy.closeAllConnections();});}
   let failure;for(const child of children){try{await stop(child);}catch(e){failure=e;}}
   for(const fd of fds)fs.closeSync(fd);
   fs.writeFileSync(path.join(temporary,"../m9-browser-transport.json"),JSON.stringify({counts,staticFailures},null,2));

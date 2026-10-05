@@ -2007,6 +2007,50 @@
         "module ownership or configuration admission change"
       ],
       "status": "Working CLI slice verified locally with strict Clippy; full M9 registry/cluster delivery remains pending."
+    },
+    {
+      "feature_id": "M9-02",
+      "area": "Same-host process authority and maintenance",
+      "scope": "Unix/PostgreSQL canonical directory, shared temporary server security, fail-closed interruption and exact stopped-site recovery/config transfer; no multi-host failover claim",
+      "basis": "primary-source-and-internal-contract",
+      "sources": [
+        "https://www.postgresql.org/docs/17/runtime-config-logging.html#GUC-APPLICATION-NAME",
+        "https://www.postgresql.org/docs/17/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW",
+        "https://github.com/kanidm/webauthn-rs/blob/d2c10d53ca5ef033d37ee6462e936e9eb72ad98c/webauthn-rs/src/lib.rs"
+      ],
+      "applicable_versions": [
+        "PostgreSQL 17",
+        "webauthn-rs 0.5.5",
+        "native schema 14 -> 15",
+        "portable graph 12",
+        "wpalt-configuration-v1",
+        "wpalt-local-process-state-v1"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Database authority binds to the same canonical site directory; runtime does not migrate older schemas.",
+        "Application-name identity fits PostgreSQL NAMEDATALEN and remains stable across credentials for drain checks.",
+        "Serialized passkey ceremonies remain in private bounded server storage, never cookies or portable packages; cross-node replay stays refused.",
+        "Shared abuse/security/cache state persists under host ownership; only unchanged read-only state skips redundant sync.",
+        "Interrupted native mutations require stopped-host native graph and external-effect reconciliation.",
+        "Private secret transfer is explicit, exact-plan bound and validated; supported schema migration follows verified encrypted recovery."
+      ],
+      "tests": [
+        "scripts/local_process_acceptance.py",
+        "scripts/browser_acceptance.cjs with WPALT_LOCAL_PROCESSES=1",
+        "scripts/config_transfer_acceptance.py",
+        "scripts/maintenance_acceptance.py",
+        "tests/acceptance.rs"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "PostgreSQL or WebAuthn dependency update",
+        "authority/storage/worker/configuration/upgrade change"
+      ],
+      "status": "Implementation checkpoint: local native/process/config/maintenance and cumulative browser evidence recorded; exact-source GitHub and final M9 capability/resource gates remain active. WebAuthn library source checked from checksum-verified Cargo package and its immutable upstream VCS identity; docs.rs fetching unavailable."
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

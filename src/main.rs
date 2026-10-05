@@ -101,6 +101,22 @@ enum Command {
     Modules,
     /// Show validated effective configuration with credentials redacted.
     Config,
+    /// Export effective configuration to a NEW private file; secrets are redacted by default.
+    ConfigExport {
+        output: PathBuf,
+        #[arg(long)]
+        include_secrets: bool,
+    },
+    /// Review a private current-version transfer; write a NEW config with an exact plan.
+    ConfigImport {
+        input: PathBuf,
+        #[arg(long)]
+        accept_secrets: bool,
+        #[arg(long, requires = "output")]
+        execute: Option<String>,
+        #[arg(long, requires = "execute")]
+        output: Option<PathBuf>,
+    },
     /// Create an offline database-and-media snapshot in a new private file.
     Backup {
         output: PathBuf,
@@ -119,6 +135,15 @@ enum Command {
         output: PathBuf,
         #[arg(long)]
         key_file: PathBuf,
+    },
+    /// Review/apply the supported stopped-host schema upgrade after creating encrypted recovery.
+    Upgrade {
+        #[arg(long, requires_all = ["recovery_output", "key_file"])]
+        execute: Option<String>,
+        #[arg(long, requires = "execute")]
+        recovery_output: Option<PathBuf>,
+        #[arg(long, requires = "execute")]
+        key_file: Option<PathBuf>,
     },
     /// Native PostgreSQL 17 archive_command helper; independent of the app process lock.
     WalStore { input: PathBuf, name: String },
@@ -772,6 +797,54 @@ async fn main() -> anyhow::Result<()> {
         );
         return Ok(());
     }
+    match &cli.command {
+        Command::ConfigExport {
+            output,
+            include_secrets,
+        } => {
+            wpalt::platform::config_transfer::export(&config, output, *include_secrets)?;
+            println!("Private configuration export created; contains_secrets={include_secrets}.");
+            return Ok(());
+        }
+        Command::ConfigImport {
+            input,
+            accept_secrets,
+            execute,
+            output,
+        } => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                let metadata = std::fs::symlink_metadata(input)?;
+                anyhow::ensure!(
+                    metadata.is_file() && metadata.nlink() == 1 && metadata.mode() & 0o077 == 0,
+                    "Configuration transfer input must be a private regular file."
+                );
+            }
+            let bytes = backup::read_bounded(input, wpalt::platform::config_transfer::MAX_BYTES)
+                .await
+                .map_err(|_| anyhow::anyhow!("Cannot read bounded configuration package."))?;
+            let (transferred, report) =
+                wpalt::platform::config_transfer::preview(&bytes, *accept_secrets)?;
+            if let Some(plan) = execute {
+                wpalt::platform::config_transfer::execute(
+                    &transferred,
+                    &report,
+                    plan,
+                    output
+                        .as_deref()
+                        .ok_or_else(|| anyhow::anyhow!("Output is required."))?,
+                )?;
+                println!(
+                    "Private configuration created. Review effective configuration before starting the target."
+                );
+            } else {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            }
+            return Ok(());
+        }
+        _ => {}
+    }
     // Portable recovery tools operate on files/config only: no live server,
     // database, site lock, installation or vendor account is needed.
     match &cli.command {
@@ -941,6 +1014,24 @@ async fn main() -> anyhow::Result<()> {
         )
         .await
         .map_err(|e| anyhow::anyhow!(e.1))?;
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
+    if let Command::Upgrade {
+        execute,
+        recovery_output,
+        key_file,
+    } = &cli.command
+    {
+        let app = App::open_maintenance(config.clone()).await?;
+        let report = wpalt::operations::upgrade::apply(
+            &app,
+            &config,
+            execute.as_deref(),
+            recovery_output.as_deref(),
+            key_file.as_deref(),
+        )
+        .await?;
         println!("{}", serde_json::to_string_pretty(&report)?);
         return Ok(());
     }
@@ -1167,7 +1258,12 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             }
             println!("{}", serde_json::to_string_pretty(&prepared.report)?);
         }
-        Command::Config | Command::Modules | Command::LocalResume { .. } => unreachable!(),
+        Command::Config
+        | Command::Modules
+        | Command::ConfigExport { .. }
+        | Command::ConfigImport { .. }
+        | Command::Upgrade { .. }
+        | Command::LocalResume { .. } => unreachable!(),
         Command::UpgradePrepare { output, key_file } => {
             let receipt = wpalt::operations::upgrade::prepare(&app, &output, &key_file)
                 .await

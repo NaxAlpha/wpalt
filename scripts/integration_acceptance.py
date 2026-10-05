@@ -174,6 +174,6 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
     text=log.read_text()
     assert all(value not in text for value in [password,read_token,draft_token,'PRIVATE_EXTERNAL_DRAFT'])
     with sqlite3.connect(root/'site.db') as db:
-        assert db.execute('SELECT version FROM schema_version').fetchone()[0]==14
+        assert db.execute('SELECT version FROM schema_version').fetchone()[0]==15
         assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0]==len(seen)+2
 print('PASS: native scoped credentials, bounded external pagination/drafts, conflict/publication/origin/cookie denial, stopped-host revocation, fresh recovery without delegated authority and redacted diagnostics')

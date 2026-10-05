@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M7 merged/verified; selected M8 contract implemented and implementation checkpoint verified. PR #14 final documentation-source gates precede readiness; broader feature limits remain explicit.",
+  "milestone": "M8 merged and actual-main release independently verified; M9 local-process/configuration implementation under cumulative verification. No blanket premium-plugin or final release claim.",
   "capabilities": [
     {
       "id": "F001",
@@ -158,10 +158,15 @@
       "capability": "Multilingual slugs and metadata",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "verified-local-defined-multilingual-publication-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained."
+      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained.",
+      "m9_coverage": "Configured language slugs, publication-only localized canonical/hreflang, reciprocal published variants and draft exclusion; no automatic translation claim.",
+      "evidence": [
+        "../tests/acceptance.rs",
+        "m3-contract.md"
+      ]
     },
     {
       "id": "F011",
@@ -2058,9 +2063,14 @@
       "capability": "One module registry and ownership resolver",
       "deployment": "L",
       "milestone": "M9",
-      "status": "planned",
+      "status": "in-progress-M9",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m9_coverage": "Validated effective module inventory, parent admission, unique domain ownership and named dependencies; no dynamic code loader/unloading claim.",
+      "evidence": [
+        "../src/platform/modules.rs",
+        "../scripts/module_acceptance.py"
+      ]
     },
     {
       "id": "F125",
@@ -2068,9 +2078,15 @@
       "capability": "Unified settings/schema export and import",
       "deployment": "L",
       "milestone": "M9",
-      "status": "planned",
+      "status": "in-progress-M9",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m9_coverage": "Current-version effective config export/private exact-plan import; native settings/models/schema travel in validated portable recovery graph. Redacted record is inspection-only; no cross-version settings migration claim.",
+      "evidence": [
+        "../src/platform/config_transfer.rs",
+        "../scripts/config_transfer_acceptance.py",
+        "../src/backup.rs"
+      ]
     },
     {
       "id": "F126",
@@ -2078,9 +2094,14 @@
       "capability": "Background jobs, retries and health history",
       "deployment": "L",
       "milestone": "M9",
-      "status": "planned",
+      "status": "in-progress-M9",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m9_coverage": "Bounded native cycle/stage history and domain-specific durable retry/uncertain outcomes; shared local admission and explicit crash pause. Not generic exactly-once network effects.",
+      "evidence": [
+        "../src/operations/jobs.rs",
+        "../scripts/local_process_acceptance.py"
+      ]
     },
     {
       "id": "F127",
@@ -2088,9 +2109,14 @@
       "capability": "Reliable system-scheduled worker",
       "deployment": "W",
       "milestone": "M9",
-      "status": "planned",
+      "status": "in-progress-M9",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m9_coverage": "Independent supervised local-process worker and bounded --once system-scheduler cycle; external-worker server mode and graceful drain. Final termination/resource gates pending.",
+      "evidence": [
+        "../src/main.rs",
+        "../scripts/local_process_acceptance.py"
+      ]
     },
     {
       "id": "F128",
@@ -2098,9 +2124,15 @@
       "capability": "Local safe-mode and rollback controls",
       "deployment": "L",
       "milestone": "M9",
-      "status": "planned",
+      "status": "in-progress-M9",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m9_coverage": "Unresolved native mutation pauses all nodes; offline exact graph/external-effect review resumes; held fresh clones and encrypted pre-upgrade recovery support restore-based rollback. Full maintenance upgrade journey pending.",
+      "evidence": [
+        "distributed-operations.md",
+        "../src/platform/local_processes.rs",
+        "../src/operations/upgrade.rs"
+      ]
     },
     {
       "id": "F129",
@@ -2108,9 +2140,15 @@
       "capability": "Authorized snippets and developer hooks",
       "deployment": "L",
       "milestone": "M9",
-      "status": "planned",
+      "status": "in-progress-M9",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m9_coverage": "Scoped external content integrations, proposed drafts, durable events and owner-hosted generation/layout examples; arbitrary in-process executable snippets are not sandboxed or enabled. Developer-hook scope reconciliation pending.",
+      "evidence": [
+        "migration-and-extensions.md",
+        "../src/platform/integrations.rs",
+        "../src/platform/events.rs"
+      ]
     },
     {
       "id": "F130",

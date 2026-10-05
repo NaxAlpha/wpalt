@@ -565,7 +565,7 @@ async fn health(State(app): State<App>) -> Result<Json<serde_json::Value>> {
     let version: i64 = sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
         .fetch_one(&app.db.pool)
         .await?;
-    if version != 14 {
+    if version != crate::db::SCHEMA_VERSION {
         return Err(Error(
             StatusCode::SERVICE_UNAVAILABLE,
             "Runtime schema is incompatible; stop all nodes and review the offline upgrade path.",

@@ -19,6 +19,49 @@ use std::{
     },
 };
 
+pub const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS process_authority(id BIGINT PRIMARY KEY CHECK(id=1),directory_digest TEXT NOT NULL);";
+
+/// Bind native database authority to one canonical host directory. This private
+/// deployment identity is deliberately absent from portable recovery graphs.
+pub async fn verify_directory(db: &crate::db::Db, config: &Config, initialize: bool) -> Result<()> {
+    let present: i64 = if db.postgres {
+        sqlx::query_scalar(
+            "SELECT CASE WHEN to_regclass('process_authority') IS NULL THEN 0 ELSE 1 END",
+        )
+        .fetch_one(&db.pool)
+        .await?
+    } else {
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='process_authority'",
+        )
+        .fetch_one(&db.pool)
+        .await?
+    };
+    if present == 0 {
+        return if initialize {
+            Err(unavailable())
+        } else {
+            Ok(())
+        };
+    }
+    let directory = std::fs::canonicalize(&config.data_dir).map_err(|_| unavailable())?;
+    let digest = auth::digest(directory.as_os_str().as_encoded_bytes());
+    if initialize {
+        sqlx::query("INSERT INTO process_authority(id,directory_digest) VALUES(1,$1) ON CONFLICT(id) DO NOTHING")
+            .bind(&digest).execute(&db.pool).await?;
+    }
+    let stored: Option<String> =
+        sqlx::query_scalar("SELECT directory_digest FROM process_authority WHERE id=1")
+            .fetch_optional(&db.pool)
+            .await?;
+    if stored.as_ref().is_some_and(|s| s != &digest) || (initialize && stored.is_none()) {
+        return Err(Error::invalid(
+            "Database is bound to another site directory. Stop all nodes and use fresh-target recovery; do not create a second coordination root.",
+        ));
+    }
+    Ok(())
+}
+
 const MAX_STATE: usize = 4 * 1024 * 1024;
 fn unavailable() -> Error {
     Error(
@@ -94,7 +137,7 @@ impl Coordinator {
         value["listen"] = serde_json::Value::Null;
         value["debug"] = serde_json::Value::Null;
         value["runtime_version"] = env!("CARGO_PKG_VERSION").into();
-        value["database_schema"] = 14.into();
+        value["database_schema"] = crate::db::SCHEMA_VERSION.into();
         value["data_dir"] =
             serde_json::to_value(std::fs::canonicalize(&c.data_dir).map_err(|_| unavailable())?)
                 .map_err(|_| unavailable())?;
@@ -193,6 +236,10 @@ impl Coordinator {
         if state.spam_secret != *app.spam_secret {
             return Err(unavailable());
         }
+        let previous = auth::digest(
+            &serde_json::to_vec(&serde_json::to_value(&state).map_err(|_| unavailable())?)
+                .map_err(|_| unavailable())?,
+        );
         app.cache_generation
             .store(state.generation, Ordering::SeqCst);
         *app.login_limits.lock().await = state.login;
@@ -200,7 +247,7 @@ impl Coordinator {
         *app.spam_used.lock().await = state.spam;
         *app.passkey_ceremonies.lock().await = state.ceremonies;
         let (schema, held): (i64, i64) = sqlx::query_as("SELECT s.version,r.held FROM schema_version s CROSS JOIN recovery_mode r WHERE s.id=1 AND r.id=1").fetch_one(&app.db.pool).await?;
-        if schema != 14 {
+        if schema != crate::db::SCHEMA_VERSION {
             return Err(unavailable());
         }
         app.clone_held.store(held == 1, Ordering::SeqCst);
@@ -210,6 +257,7 @@ impl Coordinator {
             owned: self.owned.clone(),
             directory: self.directory.clone(),
             fingerprint: self.fingerprint.clone(),
+            previous,
         })
     }
 }
@@ -218,6 +266,7 @@ pub struct Guard {
     _file: File,
     directory: PathBuf,
     fingerprint: String,
+    previous: String,
 }
 impl Drop for Guard {
     fn drop(&mut self) {
@@ -254,7 +303,13 @@ impl Guard {
             )
             .map_err(|_| unavailable())?,
         };
-        let bytes = serde_json::to_vec(&state).map_err(|_| unavailable())?;
+        let bytes = serde_json::to_vec(&serde_json::to_value(&state).map_err(|_| unavailable())?)
+            .map_err(|_| unavailable())?;
+        if auth::digest(&bytes) == self.previous && !self.unresolved() {
+            // Read-only requests keep the same durable authority; no redundant fsync.
+            // Do not bypass admission, replay/abuse state or changed-generation writes.
+            return Ok(());
+        }
         // Keep ownership in the blocking task through sync, even if caller is aborted.
         tokio::task::spawn_blocking(move || {
             replace(&self.directory.join(".process-state.json"), &bytes)?;
@@ -337,7 +392,7 @@ pub async fn resume(
         Vec::new()
     };
     let plan = auth::digest(&serde_json::to_vec(&serde_json::json!({"state": auth::digest(&state_bytes), "intent": auth::digest(&intent), "domain": payload, "configuration": coordinator.fingerprint})).map_err(|_| unavailable())?);
-    let output = serde_json::json!({"format":"wpalt-local-resume-v1", "plan":plan, "graph":report, "paused":!intent.is_empty(), "configuration_changed":state.fingerprint != coordinator.fingerprint, "boundary":"All nodes stopped; validated native graph. Review external mail/payment/identity outcomes separately. Resume invalidates temporary challenges and rotates the spam key; it does not replay or settle external work."});
+    let mut output = serde_json::json!({"format":"wpalt-local-resume-v1", "executed":false, "plan":plan, "graph":report, "paused":!intent.is_empty(), "configuration_changed":state.fingerprint != coordinator.fingerprint, "boundary":"All nodes stopped; validated native graph. Review external mail/payment/identity outcomes separately. Resume invalidates temporary challenges and rotates the spam key; it does not replay or settle external work."});
     if let Some(expected) = execute {
         if expected != plan || !acknowledged {
             return Err(Error::invalid(
@@ -364,6 +419,8 @@ pub async fn resume(
         File::open(&config.data_dir)
             .and_then(|f| f.sync_all())
             .map_err(|_| unavailable())?;
+        output["executed"] = true.into();
+        output["paused"] = false.into();
     }
     Ok(output)
 }

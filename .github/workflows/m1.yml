@@ -100,6 +100,8 @@ jobs:
         run: python3 scripts/migration_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
       - name: Verify scoped external integrations through the clean executable
         run: python3 scripts/integration_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
+      - name: Verify explicit private configuration transfer
+        run: python3 scripts/config_transfer_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
       - name: Package source identity, executable and checksums
         run: python3 scripts/package_build.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --target x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -262,12 +264,23 @@ jobs:
         with:
           node-version: '22.18.0'
       - run: npm ci --prefix frontend --ignore-scripts
+      - run: npm --prefix frontend run build
+      - run: git diff --exit-code -- assets/generated/
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: wpalt-clean-linux-x86_64-${{ github.sha }}
           path: work/distribution
       - run: python3 scripts/release_build.py --directory work/distribution --source "$GITHUB_SHA" --extract work/verified-build
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Verify supported upgrade and rollback from published M8 executable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --depth=1 origin c12c6894f5c7969344a74e67cd742f971db381d5
+          gh release download nightly-202610050952-c12c6894f5c7 --pattern '*.tar.gz' --pattern SHA256SUMS --dir work/m8-runtime-reference
+          git show c12c6894f5c7969344a74e67cd742f971db381d5:scripts/release_build.py > work/m8-release-verifier.py
+          python3 work/m8-release-verifier.py --directory work/m8-runtime-reference --source c12c6894f5c7969344a74e67cd742f971db381d5 --extract work/m8-runtime-app
+          python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/m8-runtime-app/wpalt"
       - run: python3 scripts/module_acceptance.py --binary "$PWD/work/verified-build/wpalt"
       - run: python3 scripts/local_process_acceptance.py --binary "$PWD/work/verified-build/wpalt"
       - run: frontend/node_modules/.bin/playwright install --with-deps chromium

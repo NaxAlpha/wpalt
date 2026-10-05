@@ -2,7 +2,7 @@
 """Two real processes: shared authority/cache, conflict, worker and crash reconciliation.
 Uses a disposable PostgreSQL schema and synthetic content, never an existing site.
 """
-import argparse, concurrent.futures, http.cookiejar, json, os, re, secrets, shutil
+import argparse, concurrent.futures, hashlib, http.cookiejar, json, os, re, secrets, shutil
 import socket, subprocess, tempfile, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--binary',required=True);p.add_argument('--psql',default=shutil.which('psql'));p.add_argument('--output',default='work/m9-local-process-reference.json');a=p.parse_args()
@@ -48,7 +48,13 @@ try:
    raise AssertionError('Node did not become ready')
   def stop(node):
    if node.poll() is None:node.terminate();node.wait(timeout=15);assert node.returncode==0,'Normal node shutdown failed'
+  # A different coordination root must be rejected for the same native database.
+  wrong=root/'wrong-root.toml';wrong.write_text(configs[1].read_text().replace(str(data),str(root/'other-site')));wrong.chmod(0o600)
+  run('serve','--external-worker',cfg=wrong,ok=False)
   nodes=[start(0),start(1)]
+  expected_name='wpalt:'+hashlib.sha256(os.fsencode(data.resolve())).hexdigest()[:56]
+  names=sql(f"SELECT application_name FROM pg_stat_activity WHERE application_name='{expected_name}'").splitlines()
+  assert len(names)>=2 and all(name==expected_name and len(name)==62 for name in names), 'Both database operation identities must exactly match the bounded site identity'
   login=urllib.request.Request(origin+'/login',method='POST',headers={'Origin':origin,'Content-Type':'application/x-www-form-urlencoded'},data=urllib.parse.urlencode({'email':'owner@example.test','password':password}).encode())
   try:response=opener.open(login,timeout=15)
   except urllib.error.HTTPError as e:response=e
@@ -123,7 +129,7 @@ try:
   assert len(state['ceremonies']['entries'])==0
   for f in logfiles:f.flush()
   logs=''.join((root/f'node-{i}.log').read_text() for i in [0,1]);assert password not in logs and challenge['token'] not in logs
-  report={'format':'wpalt-m9-local-process-reference-v1','status':'passed','postgres_version':sql('SHOW server_version'),'processes':2,'elapsed_seconds':round(time.monotonic()-started,3),'assertions':['shared session and CSRF across nodes','cross-node cached publication invalidation','one winner for concurrent reviewed version','shared spam challenge and one-use replay protection','untrusted incomplete body times out without persistent site pause','login abuse budget spans alternating nodes','independent coordinated worker','offline lifecycle excludes running nodes','deterministic blocked-writer kill pauses other node','private security headers/correlated pause diagnostics','stale/no-ack resume fails','exact offline graph/external-effect reconciliation','restart preserves committed state and excludes blocked write','private server-side state and redacted logs'],'limits':['Same Unix host and exact shared site/configuration; serialized admission, not multi-host leases.','External effects require separate owner reconciliation; no exactly-once network claim.','Performance and remaining M9 workflows require their own evidence.']}
+  report={'format':'wpalt-m9-local-process-reference-v1','status':'passed','postgres_version':sql('SHOW server_version'),'processes':2,'elapsed_seconds':round(time.monotonic()-started,3),'assertions':['database rejects a second coordination directory','shared session and CSRF across nodes','cross-node cached publication invalidation','one winner for concurrent reviewed version','shared spam challenge and one-use replay protection','untrusted incomplete body times out without persistent site pause','login abuse budget spans alternating nodes','independent coordinated worker','offline lifecycle excludes running nodes','deterministic blocked-writer kill pauses other node','private security headers/correlated pause diagnostics','stale/no-ack resume fails','exact offline graph/external-effect reconciliation','restart preserves committed state and excludes blocked write','private server-side state and redacted logs'],'limits':['Same Unix host and exact shared site/configuration; serialized admission, not multi-host leases.','External effects require separate owner reconciliation; no exactly-once network claim.','Performance and remaining M9 workflows require their own evidence.']}
   out=Path(a.output);out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
 finally:
  if holder and holder.poll() is None:holder.kill();holder.wait(timeout=10)

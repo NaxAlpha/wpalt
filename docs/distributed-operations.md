@@ -18,7 +18,7 @@ wpalt --config node-a.toml worker
 
 Requests and worker cycles serialize under a host-owned admission lock. This protects existing domain/permission boundaries and shared temporary security state. Adding processes does not promise write-throughput scaling. Waits are bounded to ten seconds and each process retains finite admission/request budgets; HTTP timeouts remain configured separately. Shared state is capped at 4 MiB and stored privately; temporary passkey state never goes to the client or portable backups. Do not manually remove or replace coordination/lifecycle files while processes are running.
 
-All servers/workers hold a shared lifecycle lock. Ordinary offline CLI changes, snapshots, restoration and reconciliation require the exclusive lock and therefore all nodes stopped. Runtime checks the installed schema before serving and does not migrate it automatically. `/health` checks readiness; request diagnostics and `x-wpalt-node` identify an opaque node UUID without disclosing hostnames or credentials. Operations displays the current local-process boundary and node identity.
+All servers/workers hold a shared lifecycle lock. Ordinary offline CLI changes, snapshots, restoration and reconciliation require the exclusive lock and therefore all nodes stopped. Runtime checks native schema 15 before serving and does not migrate it automatically. The database binds to one canonical site-directory digest; a second directory for the same database is rejected before migration or runtime admission. Moving to another directory requires fresh-target database/media recovery, rather than creating an independent host lock for existing authority. `/health` checks readiness; request diagnostics and `x-wpalt-node` identify an opaque node UUID without disclosing hostnames or credentials. Operations displays the current local-process boundary and node identity.
 
 ## Interrupted operations and resume
 
@@ -45,3 +45,21 @@ Graceful server/worker shutdown drains an active worker cycle for up to 60 secon
 ## Verification and remaining work
 
 [Contract](m9-contract.md), [decision](decisions/0013-local-process-coordination.md), [ledger](evidence/m9-progress.md) and [coordination inventory](evidence/m9-coordination-inventory.md) distinguish working slices from verified release scope. `scripts/local_process_acceptance.py` uses a disposable real PostgreSQL schema and two independent processes. The browser suite's `WPALT_LOCAL_PROCESSES=1` mode exercises cumulative workflows through two nodes and a separate worker. Performance, supported upgrades/configuration transfer, full capability reconciliation and final artifact review remain mandatory M9 gates.
+
+## Private configuration transfer
+
+`wpalt --config site.toml config-export review.json` creates a new private redacted inspection record by default. Database connection credentials, SMTP credentials, identity secrets and Stripe credentials are omitted from reports. This record is not a runnable configuration transfer.
+
+For an owner-controlled move, explicitly use `config-export transfer.json --include-secrets`, retain the package privately, and review it with `config-import transfer.json --accept-secrets`. The preview reports validated redacted settings and an exact plan. `config-import transfer.json --accept-secrets --execute PLAN --output target.toml` writes a new private TOML file. Unsupported application/native-schema versions, invalid settings, non-private inputs, stale plans and existing output paths fail. No database, media, provider account or temporary security state is transferred, and no site is opened. Change paths/origin deliberately before reviewing a fresh plan; run `--config target.toml config` to inspect effective CLI/environment precedence. Securely remove secret transfer copies according to your storage policy after the target is verified.
+
+## Supported maintenance upgrade
+
+Normal `serve`/`worker` startup refuses older native schemas. For the M8 native schema 14 to M9 schema 15 transition, stop every node/worker, retain the old executable/private configuration and independent recovery key, then run `wpalt --config site.toml upgrade`. Preview opens the supported graph without migrations and binds the exact data/configuration and target executable. Create or independently retain a key using `recovery-key` before execution.
+
+```sh
+wpalt --config site.toml upgrade --execute REVIEWED_PLAN --recovery-output NEW_POINT.enc --key-file recovery.key
+```
+
+Execution verifies a new private encrypted full recovery graph before native migration. Stale plans, invalid graphs, existing recovery outputs and unsupported schemas fail before migration. Review any reported temporary-state boundary with `local-resume` before starting local-process nodes. Incompatible versions require a maintenance window; no rolling mixed-version compatibility layer is introduced. A failed migration preserves the recovery point; inspect the installed version and request a fresh plan before retrying. Roll back by restoring the pre-change point with the retained old executable into an empty database and directory, verify it, then switch the origin. Never run an older executable against upgraded data.
+
+`scripts/maintenance_acceptance.py` exercises data-bearing SQLite/PostgreSQL upgrade, precondition refusal/retry and fresh recovery. Locally it constructs an explicitly labelled schema-equivalent M8 fixture. Linux CI additionally downloads and independently verifies the actual published M8 executable, creates the source with it, and uses it for fresh-target rollback. These evidence boundaries are distinct.

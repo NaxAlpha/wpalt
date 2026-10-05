@@ -51,6 +51,13 @@ pub struct App {
     pub themes: Arc<Mutex<std::collections::BTreeMap<(String, i64), theme::Package>>>,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum Startup {
+    Migrate,
+    Runtime,
+    Maintenance,
+}
+
 impl App {
     pub async fn mutation(&self) -> error::Result<operations::cache::Mutation<'_>> {
         if let Some(c) = &self.local_coordinator {
@@ -65,12 +72,17 @@ impl App {
         })
     }
     pub async fn open(config: config::Config) -> anyhow::Result<Self> {
-        Self::open_checked(config, false).await
+        Self::open_checked(config, Startup::Migrate).await
     }
     pub async fn open_runtime(config: config::Config) -> anyhow::Result<Self> {
-        Self::open_checked(config, true).await
+        Self::open_checked(config, Startup::Runtime).await
     }
-    async fn open_checked(config: config::Config, runtime: bool) -> anyhow::Result<Self> {
+    /// Read the supported M8/M9 graph while stopped, without schema changes.
+    pub async fn open_maintenance(mut config: config::Config) -> anyhow::Result<Self> {
+        config.local_processes = false;
+        Self::open_checked(config, Startup::Maintenance).await
+    }
+    async fn open_checked(config: config::Config, startup_mode: Startup) -> anyhow::Result<Self> {
         config.validate()?;
         let consent_scripts = if config.business_enabled && config.engagement.enabled {
             operations::consent_scripts::Scripts::compile(&config.consent_scripts)?
@@ -99,7 +111,10 @@ impl App {
         let workers = config.worker_concurrency;
         let requests = config.request_concurrency;
         let db = db::Db::open(&config).await?;
-        if runtime {
+        platform::local_processes::verify_directory(&db, &config, false)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?;
+        if startup_mode != Startup::Migrate {
             let present: i64 = if db.postgres {
                 sqlx::query_scalar(
                     "SELECT CASE WHEN to_regclass('schema_version') IS NULL THEN 0 ELSE 1 END",
@@ -117,11 +132,17 @@ impl App {
                 .fetch_one(&db.pool)
                 .await?;
             anyhow::ensure!(
-                version == 14,
+                version == db::SCHEMA_VERSION
+                    || (startup_mode == Startup::Maintenance && version == 14),
                 "runtime schema is incompatible; stop all nodes and use the documented offline upgrade/recovery path"
             );
         } else {
             db.migrate().await?;
+        }
+        if startup_mode != Startup::Maintenance {
+            platform::local_processes::verify_directory(&db, &config, true)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
         }
         let clone_held = sqlx::query_scalar::<_, i64>("SELECT held FROM recovery_mode WHERE id=1")
             .fetch_one(&db.pool)

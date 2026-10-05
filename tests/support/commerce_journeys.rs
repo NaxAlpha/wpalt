@@ -1669,7 +1669,7 @@ async fn commerce_upgrade_preserves_existing_site_and_rejects_route_and_currency
                 .fetch_one(&upgraded.db.pool)
                 .await
                 .unwrap(),
-            14
+            wpalt::db::SCHEMA_VERSION
         );
         let (token, owner) = auth::login(&upgraded, "owner@example.test", PASSWORD)
             .await

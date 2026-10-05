@@ -16,6 +16,9 @@ async function scan(browser, origin, paths = ["/"], output) {
     if (url.origin!==origin && !["data:","blob:"].includes(url.protocol)) {foreign.add(url.origin);await route.abort();}else await route.continue();
   });
   const page=await context.newPage();
+  const failures=[];
+  page.on('requestfailed',r=>failures.push({path:new URL(r.url()).pathname,error:r.failure()?.errorText}));
+  page.on('response',r=>{if(r.status()>=400)failures.push({path:new URL(r.url()).pathname,status:r.status()});});
   async function snapshot(state){
     const cookies=(await context.cookies()).map(({name,domain,path,secure,httpOnly,sameSite,expires})=>({name,domain,path,secure,httpOnly,sameSite,expires}));
     const storage=await page.evaluate(()=>({local_storage_keys:Object.keys(localStorage).sort(),session_storage_keys:Object.keys(sessionStorage).sort(),script_sources:[...document.scripts].map(s=>s.src?new URL(s.src).pathname:"inline")}));
@@ -45,6 +48,10 @@ async function scan(browser, origin, paths = ["/"], output) {
     }
     report.blocked_external_origins=[...foreign].sort();
     report.status="completed";
+  }catch(error){
+    const diagnostic=await page.evaluate(()=>({path:location.pathname,dialogs:[...document.querySelectorAll('dialog')].map(n=>({id:n.id,open:n.open})),controls:[...document.querySelectorAll('#engagement-controls button')].map(n=>({label:n.textContent,disabled:n.disabled})),privacy_status:document.querySelector('#engagement-controls [role="status"]')?.textContent})).catch(()=>({page_closed:true}));
+    console.error('Cookie scan diagnostic:',JSON.stringify({failures,ui:diagnostic}));
+    throw error;
   }finally{await context.close();}
   if (output) {
     fs.mkdirSync(path.dirname(output),{recursive:true});
