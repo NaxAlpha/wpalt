@@ -16,3 +16,5 @@ pub mod spam;
 pub mod upgrade;
 
 pub mod video;
+
+pub mod variants;

@@ -129,7 +129,7 @@ pub fn router(app: App) -> Router {
 }
 async fn security_and_trace(
     State(app): State<App>,
-    request: Request<Body>,
+    mut request: Request<Body>,
     next: Next,
 ) -> Response {
     let started = std::time::Instant::now();
@@ -209,9 +209,13 @@ async fn security_and_trace(
         use tracing::Instrument;
         // Narrow allowlist: only anonymous discovery/listing output. Private
         // content, forms, carts, previews and account routes are never stored.
+        let bucket = crate::operations::variants::annotate(&app, &mut request).await;
+        let variant_cookie = app.config.variants.role_variants
+            && crate::operations::variants::only_session_cookie(&request)
+            && !bucket.ends_with(":anonymous");
         let candidate = app.config.cache.enabled
             && method == axum::http::Method::GET
-            && !request.headers().contains_key("cookie")
+            && (!request.headers().contains_key("cookie") || variant_cookie)
             && !request.headers().contains_key("authorization")
             && !request.headers().contains_key("range")
             && !request.headers().contains_key("if-none-match")
@@ -235,7 +239,9 @@ async fn security_and_trace(
             let generation = app
                 .cache_generation
                 .load(std::sync::atomic::Ordering::SeqCst);
-            let key = request.uri().to_string();
+            // Revalidate session role under the mutation lock before every hit.
+            let bucket = crate::operations::variants::annotate(&app, &mut request).await;
+            let key = format!("{}|{bucket}", request.uri());
             let cached = app
                 .page_cache
                 .lock()
@@ -689,18 +695,23 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
         })
         .collect())
 }
-async fn home(State(app): State<App>, Query(query): Query<ListQuery>) -> Result<Html<String>> {
-    render_home(app, query).await
+async fn home(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Result<Html<String>> {
+    render_home(app, query, headers).await
 }
 async fn localized_home(
     State(app): State<App>,
+    headers: HeaderMap,
     Path(locale): Path<String>,
     Query(mut query): Query<ListQuery>,
 ) -> Result<Html<String>> {
     query.lang = Some(locale);
-    render_home(app, query).await
+    render_home(app, query, headers).await
 }
-async fn render_home(app: App, query: ListQuery) -> Result<Html<String>> {
+async fn render_home(app: App, query: ListQuery, headers: HeaderMap) -> Result<Html<String>> {
     let (discovery, _) = crate::discovery::load(&app).await?;
     let locale = query.lang.as_deref().unwrap_or(&discovery.default_language);
     let language = discovery.language(locale)?;
@@ -721,6 +732,7 @@ async fn render_home(app: App, query: ListQuery) -> Result<Html<String>> {
         &discovery,
     )
     .await?;
+    crate::operations::variants::presentation(&headers, &mut ctx);
     let path = if query.q.is_some() {
         discovery.path(locale, "search")
     } else {
@@ -860,6 +872,7 @@ async fn render_post(
     )
     .await?;
     let path = discovery.path(&locale, &slug);
+    crate::operations::variants::presentation(&headers, &mut ctx);
     ctx.root["_discovery"] = crate::discovery::metadata_with_settings(
         &app,
         Some(&p),
@@ -2038,7 +2051,7 @@ async fn cache_preload(
             .load(std::sync::atomic::Ordering::SeqCst);
         let locale: String = row.get("published_locale");
         let slug: String = row.get("published_slug");
-        let key = discovery.path(&locale, &slug);
+        let key = format!("{}|unknown:anonymous", discovery.path(&locale, &slug));
         let response = render_post(
             app.clone(),
             HeaderMap::new(),
@@ -2116,6 +2129,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
                 }
                 p class="muted" {"Keep the recovery key separately. Verify an independent copy by restoring into a fresh instance. A pending attempt after restart may have been interrupted; inspect destination packages before retrying."}
             }
+            section class="panel" {h2 {"Presentation variants"}p {"Current-role cache buckets: " (if app.config.variants.role_variants {"enabled"} else {"disabled"}) " · " (app.config.variants.region_networks.len()) " native-peer region networks"}p {"Role and region labels customize presentation; protected-resource authorization remains separate. Extra cookies bypass shared cache, and forwarded-IP headers are ignored."}}
             section class="panel" {h2 {"Asset loading"}p {"Template-scoped CSS: " (if app.config.assets.scoped_theme_css {"enabled"} else {"disabled"}) " · Theme preload: " (if app.config.assets.preload_theme_css {"enabled"} else {"disabled"})}p {"Local compiled assets and render-reachable styles preserve responsive/conditional presentation. Image insertion records dimensions; choose early loading for an important lead image."}}
             section class="panel" {h2 {"Public response cache"}p {(if app.config.cache.enabled {"Enabled"}else{"Disabled"}) " · " (cache.0) " entries · " (cache.1) " bytes retained"}p {"Anonymous publications, listings, content projections and sitemaps only. Cookies, credentials and protected resources bypass shared storage. Browser page caching remains disabled so access changes take effect."}form method="post" action="/admin/operations/cache/purge" {(view::csrf(&s))button class="secondary" {"Purge public cache"}} form method="post" action="/admin/operations/cache/preload" {(view::csrf(&s))button class="secondary" disabled[!app.config.cache.enabled] {"Preload recent public pages"}}}
             section class="panel" {h2 {"Local submission guard"}p {(if app.config.spam.enabled {"Enabled"} else {"Disabled"}) " for public comments and forms."}p class="muted" {"When enabled, submissions need a short same-origin computation. Honeypots, link limits, moderation and existing rate limits work together. This does not identify humans or use shared reputation. Configure [spam] to adjust the policy."}}

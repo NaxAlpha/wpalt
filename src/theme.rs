@@ -784,7 +784,7 @@ fn binding(
         return Err(Error::invalid("Invalid binding path."));
     }
     let valid = match parts.as_slice() {
-        ["site", key] => ["title", "description"].contains(key),
+        ["site", key] => ["title", "description", "role", "region"].contains(key),
         ["post", key] => ["title", "body", "url", "kind", "id"].contains(key),
         ["params", key, tail @ ..] => params.get(*key).is_some_and(|kind| {
             tail.is_empty()
@@ -1143,7 +1143,7 @@ pub async fn context_with_discovery(
     .fetch_one(&app.db.pool)
     .await?;
     let mut ctx = Context {
-        root: json!({"site":{"title":settings.title,"description":settings.description},"navigation":serde_json::from_str::<Value>(&settings.navigation).unwrap_or(json!([])),"post":post.map(|p|post_value(p,draft,discovery)).unwrap_or(json!({})),"options":serde_json::from_str::<Value>(&options).map_err(|_|Error::invalid("Invalid shared options."))?}),
+        root: json!({"site":{"title":settings.title,"description":settings.description,"role":"anonymous","region":"unknown"},"navigation":serde_json::from_str::<Value>(&settings.navigation).unwrap_or(json!([])),"post":post.map(|p|post_value(p,draft,discovery)).unwrap_or(json!({})),"options":serde_json::from_str::<Value>(&options).map_err(|_|Error::invalid("Invalid shared options."))?}),
         collections: BTreeMap::from([("listing".into(), listing)]),
         relations: BTreeMap::new(),
         media: BTreeMap::new(),

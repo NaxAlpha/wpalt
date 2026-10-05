@@ -4183,3 +4183,125 @@ async fn local_video_worker_preserves_authority_and_recovers_processed_media() {
         fresh.close().await;
     }
 }
+
+/// Native peer/session-derived buckets preserve actual role and regional
+/// presentation, without letting forged forwarding or stale account state win.
+#[tokio::test]
+async fn role_region_cache_variants_revalidate_authority_and_ignore_spoofed_headers() {
+    use axum::extract::ConnectInfo;
+    use wpalt::operations::variants;
+    for pg in engines() {
+        let mut site = Site::new(pg, true).await;
+        let mut cfg = (*site.app.config).clone();
+        cfg.cache.enabled = true;
+        cfg.variants = variants::Config {
+            role_variants: true,
+            region_networks: vec![
+                variants::Region {
+                    network: "192.0.2.0/24".into(),
+                    region: "local-east".into(),
+                },
+                variants::Region {
+                    network: "2001:db8::/32".into(),
+                    region: "local-west".into(),
+                },
+            ],
+        };
+        site.app.config = std::sync::Arc::new(cfg);
+        let stored = wpalt::theme::load(&site.app, "paper", true).await.unwrap();
+        let mut package = stored.package;
+        for (id, bind) in [("region_label", "site.region"), ("role_label", "site.role")] {
+            package.templates.get_mut("home").unwrap().children.push(
+                serde_json::from_value(
+                    serde_json::json!({"id":id,"kind":"text","text":{"bind":bind}}),
+                )
+                .unwrap(),
+            );
+        }
+        wpalt::theme::save(&site.app, "paper", package, stored.version, true)
+            .await
+            .unwrap();
+        async fn visit(
+            site: &Site,
+            peer: &str,
+            cookie: Option<String>,
+        ) -> (StatusCode, axum::http::HeaderMap, String) {
+            let mut request = Request::builder()
+                .uri("/")
+                .header("x-wpalt-local-region", "forged")
+                .header("x-wpalt-local-role", "admin")
+                .header("x-forwarded-for", "192.0.2.55")
+                .body(Body::empty())
+                .unwrap();
+            request
+                .extensions_mut()
+                .insert(ConnectInfo(peer.parse::<std::net::SocketAddr>().unwrap()));
+            if let Some(cookie) = cookie {
+                request
+                    .headers_mut()
+                    .insert("cookie", cookie.parse().unwrap());
+            }
+            let response = wpalt::web::router(site.app.clone())
+                .oneshot(request)
+                .await
+                .unwrap();
+            let status = response.status();
+            let headers = response.headers().clone();
+            let body = String::from_utf8(
+                response
+                    .into_body()
+                    .collect()
+                    .await
+                    .unwrap()
+                    .to_bytes()
+                    .to_vec(),
+            )
+            .unwrap();
+            (status, headers, body)
+        }
+        let (_, east_headers, east) = visit(&site, "192.0.2.7:1234", None).await;
+        assert!(
+            east.contains("local-east") && east.contains("anonymous") && !east.contains("forged")
+        );
+        assert_eq!(east_headers["x-wpalt-cache"], "miss");
+        assert_eq!(
+            visit(&site, "192.0.2.9:1234", None).await.1["x-wpalt-cache"],
+            "hit"
+        );
+        let (_, west_headers, west) = visit(&site, "[2001:db8::1]:1234", None).await;
+        assert!(west.contains("local-west"));
+        assert_eq!(west_headers["x-wpalt-cache"], "miss");
+        let cookie = format!("wpalt_session={}", site.token);
+        let (_, headers, owner) = visit(&site, "192.0.2.7:1234", Some(cookie.clone())).await;
+        assert!(owner.contains(">admin</p>"));
+        assert_eq!(headers["x-wpalt-cache"], "miss");
+        assert_eq!(
+            visit(&site, "192.0.2.7:1234", Some(cookie.clone())).await.1["x-wpalt-cache"],
+            "hit"
+        );
+        let (_, headers, _) = visit(
+            &site,
+            "192.0.2.7:1234",
+            Some(format!("{cookie}; private_preference=1")),
+        )
+        .await;
+        assert!(
+            !headers.contains_key("x-wpalt-cache"),
+            "unknown personalized cookies still bypass storage"
+        );
+        {
+            let _guard = site.app.mutation().await;
+            sqlx::query("UPDATE users SET role='subscriber' WHERE id=$1")
+                .bind(&site.session().user.id)
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+        }
+        let (_, headers, subscriber) = visit(&site, "192.0.2.7:1234", Some(cookie)).await;
+        assert!(subscriber.contains(">subscriber</p>") && !subscriber.contains(">admin</p>"));
+        assert_eq!(headers["x-wpalt-cache"], "miss");
+        let (_, _, unknown) = visit(&site, "198.51.100.7:1234", None).await;
+        assert!(unknown.contains(">unknown</p>") && !unknown.contains("local-east"));
+        site.close().await;
+    }
+}

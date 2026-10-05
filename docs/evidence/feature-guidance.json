@@ -1433,6 +1433,37 @@
         "release and security review"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-CACHE-VARIANTS",
+      "area": "Current-session roles and local native-peer regions",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For"
+      ],
+      "applicable_versions": [
+        "wpalt single-owner native ConnectInfo peer",
+        "Current server-side constrained session roles"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Presentation buckets never authorize resources. Validate session role under the mutation lock before cache hits, key role/region/query separately, preserve private/no-store and other-cookie bypass. Ignore forwarded/role/region headers; use only native peer CIDR mappings. Document proxy and geolocation-data limitations."
+      ],
+      "tests": [
+        "role_region_cache_variants_revalidate_authority_and_ignore_spoofed_headers",
+        "anonymous_cache_never_reuses_sessions_and_invalidates_published_access_changes"
+      ],
+      "triggers": [
+        "proxy or distributed topology changes",
+        "role/entitlement personalization changes",
+        "guidance changes or release"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

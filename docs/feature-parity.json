@@ -1336,9 +1336,14 @@
       "capability": "Geolocation / role-aware cache variants",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Optional server-validated session-role buckets and owner-provided IPv4/IPv6 CIDR region mappings. Shared public rendering supports site.role/site.region, current-role revalidation, separate region/role/query keys and conservative extra-cookie/private bypass. No geographic dataset or forwarded-proxy trust is inferred.",
+      "evidence": [
+        "resilient-operations.md",
+        "../tests/acceptance.rs"
+      ]
     },
     {
       "id": "F082",
