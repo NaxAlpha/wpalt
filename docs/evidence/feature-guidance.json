@@ -1650,13 +1650,16 @@
       "basis": "external-and-internal",
       "sources": [
         "https://developer.wordpress.org/reference/functions/export_wp/",
-        "https://docs.rs/quick-xml/0.38.4/quick_xml/",
+        "https://developer.wordpress.org/cli/commands/export/",
+        "https://docs.rs/quick-xml/0.42.0/quick_xml/",
+        "https://rustsec.org/advisories/RUSTSEC-2026-0195.html",
+        "https://rustsec.org/advisories/RUSTSEC-2026-0194.html",
         "https://docs.rs/html5ever/0.39.0/html5ever/",
         "https://docs.rs/rustix/latest/rustix/fs/fn.openat.html"
       ],
       "applicable_versions": [
         "WXR 1.2",
-        "quick-xml 0.38.4 (Rust 1.88 compatible)",
+        "quick-xml 0.42.0 (upstream Rust floor 1.86; project floor 1.88)",
         "html5ever 0.39.0 / markup5ever_rcdom 0.39.0",
         "wpalt schema/archive 12"
       ],
@@ -1672,7 +1675,8 @@
       ],
       "tests": [
         "wordpress_preview_package_recovers_content_without_inventing_private_access_or_payments",
-        "scripts/migration_acceptance.py"
+        "scripts/migration_acceptance.py",
+        "scripts/wordpress_migration_reference.py (new gate, pending first CI execution)"
       ],
       "triggers": [
         "affected milestone/release",

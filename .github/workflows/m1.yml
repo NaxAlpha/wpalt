@@ -209,6 +209,24 @@ jobs:
         with:
           name: m7-matched-reference
           path: work/m7-matched-reference.json
+  migration-reference:
+    if: github.event_name == 'pull_request' && github.head_ref == 'milestone/m8-migration-extensibility'
+    needs: clean-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: wpalt-clean-linux-x86_64-${{ github.sha }}
+          path: work/distribution
+      - run: python3 scripts/release_build.py --directory work/distribution --source "$GITHUB_SHA" --extract work/verified-build
+      - run: python3 scripts/wordpress_migration_reference.py --binary "$PWD/work/verified-build/wpalt"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: m8-wordpress-reference
+          path: work/m8-wordpress-reference.json
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [application, compiler-floor, dependency-audit, clean-build, frontend, native-pitr]

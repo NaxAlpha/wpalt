@@ -166,13 +166,20 @@ fn walk(handle: &Handle, marks: &[Mark], depth: usize, count: &mut usize) -> Res
                     }
                     node("code_block", vec![text(content, vec![])])
                 }
-                "table" => node(
-                    "table",
-                    converted
-                        .into_iter()
-                        .filter(|n| n.kind == "table_row")
-                        .collect(),
-                ),
+                "table" => {
+                    // Native tables have no caption slot: preserve caption prose beside the table.
+                    let (rows, prose): (Vec<_>, Vec<_>) =
+                        converted.into_iter().partition(|n| n.kind == "table_row");
+                    let mut result = if prose.is_empty() {
+                        vec![]
+                    } else {
+                        blocks(prose)
+                    };
+                    if !rows.is_empty() {
+                        result.push(node("table", rows));
+                    }
+                    return Ok(result);
+                }
                 "tr" => node(
                     "table_row",
                     converted

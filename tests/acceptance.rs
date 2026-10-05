@@ -5631,6 +5631,21 @@ async fn wordpress_preview_package_recovers_content_without_inventing_private_ac
             .unwrap()
             .replace("</rss>", ""),
         format!("<rss>{}</rss>", "<x>".repeat(70)),
+        String::from_utf8(source.to_vec()).unwrap().replace(
+            "<wp:post_id>13</wp:post_id>",
+            "<wp:post_id>012</wp:post_id>",
+        ),
+        format!(
+            "<rss {}><channel/></rss>",
+            (0..300)
+                .map(|n| format!("xmlns:n{n}=\"urn:{n}\""))
+                .collect::<Vec<_>>()
+                .join(" ")
+        ),
+        String::from_utf8(source.to_vec()).unwrap().replace(
+            "<channel>",
+            "<channel duplicated=\"one\" duplicated=\"two\">",
+        ),
     ] {
         assert!(wordpress::assess(invalid.as_bytes()).is_err());
     }
@@ -5825,6 +5840,7 @@ async fn wordpress_preview_package_recovers_content_without_inventing_private_ac
         .unwrap();
         assert!(html.contains("<strong>quiet garden</strong>"));
         assert!(html.contains("<table>"));
+        assert!(html.contains("Seasonal planting notes"));
         assert!(html.contains("First note"));
         assert!(html.contains("let example = 1 &lt; 2;"));
         assert!(!html.contains("never execute"));

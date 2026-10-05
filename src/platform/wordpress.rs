@@ -3,7 +3,7 @@ use crate::{
     auth::digest,
     error::{Error, Result},
 };
-use quick_xml::{NsReader, events::Event, name::ResolveResult};
+use quick_xml::{NsReader, XmlVersion, events::Event, name::ResolveResult};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -40,16 +40,15 @@ pub struct Assessment {
 fn invalid() -> Error {
     Error::invalid("Invalid or unsupported WordPress WXR 1.2 XML export.")
 }
-fn name(namespace: ResolveResult<'_>, local: &[u8]) -> Result<String> {
-    let local = std::str::from_utf8(local).map_err(|_| invalid())?;
+fn name(namespace: ResolveResult<'_>, local: &str) -> Result<String> {
     let prefix = match namespace {
         ResolveResult::Unbound => "",
         ResolveResult::Unknown(_) => return Err(invalid()),
         ResolveResult::Bound(ns) => match ns.as_ref() {
-            b"http://wordpress.org/export/1.2/" => "wp:",
-            b"http://purl.org/rss/1.0/modules/content/" => "content:",
-            b"http://purl.org/dc/elements/1.1/" => "dc:",
-            b"http://wordpress.org/export/1.2/excerpt/" => "excerpt:",
+            "http://wordpress.org/export/1.2/" => "wp:",
+            "http://purl.org/rss/1.0/modules/content/" => "content:",
+            "http://purl.org/dc/elements/1.1/" => "dc:",
+            "http://wordpress.org/export/1.2/excerpt/" => "excerpt:",
             _ => "unsupported:",
         },
     };
@@ -62,6 +61,7 @@ pub fn assess(bytes: &[u8]) -> Result<Assessment> {
         return Err(invalid());
     }
     let mut reader = NsReader::from_reader(bytes);
+    reader.resolver_mut().set_max_namespace_bindings(64);
     let mut stack = Vec::<Element>::new();
     let mut root = None;
     let mut count = 0;
@@ -80,12 +80,12 @@ pub fn assess(bytes: &[u8]) -> Result<Assessment> {
                 };
                 for a in e.attributes() {
                     let a = a.map_err(|_| invalid())?;
-                    let key = std::str::from_utf8(a.key.as_ref()).map_err(|_| invalid())?;
+                    let key = a.key.as_ref();
                     if key.len() > 200 || a.value.len() > 2000 || n.attributes.len() >= 64 {
                         return Err(invalid());
                     }
                     let value = a
-                        .decode_and_unescape_value(reader.decoder())
+                        .normalized_value(XmlVersion::Explicit1_0)
                         .map_err(|_| invalid())?
                         .into_owned();
                     n.attributes.insert(key.into(), value);
@@ -97,12 +97,12 @@ pub fn assess(bytes: &[u8]) -> Result<Assessment> {
             }
             Event::End(_) => close(&mut stack, &mut root)?,
             Event::Text(e) => {
-                let text = e.xml_content().map_err(|_| invalid())?;
+                let text = e.xml_content(XmlVersion::Explicit1_0);
                 append(&mut stack, &text)?;
             }
-            Event::CData(e) => append(&mut stack, &e.decode().map_err(|_| invalid())?)?,
+            Event::CData(e) => append(&mut stack, &e.xml_content(XmlVersion::Explicit1_0))?,
             Event::GeneralRef(e) => {
-                let encoded = e.decode().map_err(|_| invalid())?;
+                let encoded = e.xml_content(XmlVersion::Explicit1_0);
                 let text = quick_xml::escape::unescape(&format!("&{encoded};"))
                     .map_err(|_| invalid())?
                     .into_owned();
@@ -111,12 +111,12 @@ pub fn assess(bytes: &[u8]) -> Result<Assessment> {
             Event::Decl(e) => {
                 if root.is_some()
                     || !stack.is_empty()
-                    || e.version().map_err(|_| invalid())?.as_ref() != b"1.0"
+                    || e.version().map_err(|_| invalid())?.as_ref() != "1.0"
                 {
                     return Err(invalid());
                 }
                 if let Some(enc) = e.encoding()
-                    && !enc.map_err(|_| invalid())?.eq_ignore_ascii_case(b"utf-8")
+                    && !enc.map_err(|_| invalid())?.eq_ignore_ascii_case("utf-8")
                 {
                     return Err(invalid());
                 }
@@ -156,13 +156,15 @@ pub fn assess(bytes: &[u8]) -> Result<Assessment> {
         return Err(invalid());
     }
     let mut ids = BTreeSet::new();
+    let mut source_urls = BTreeSet::new();
     let mut types = BTreeMap::<String, usize>::new();
     let mut warnings = Vec::new();
     let mut supported = 0;
     let mut previews = Vec::new();
     for item in &items {
         let id = item.value("wp:post_id");
-        if id.parse::<u64>().ok().filter(|v| *v > 0).is_none() || !ids.insert(id.to_owned()) {
+        let identity = id.parse::<u64>().ok().filter(|v| *v > 0);
+        if identity.is_none() || !ids.insert(identity.unwrap()) {
             return Err(Error::invalid(
                 "WordPress export contains missing or duplicate source post identities.",
             ));
@@ -191,6 +193,12 @@ pub fn assess(bytes: &[u8]) -> Result<Assessment> {
             {
                 return Err(invalid());
             }
+        }
+        let source_url = item.value("link");
+        if !source_url.is_empty() && !source_urls.insert(source_url.to_owned()) {
+            return Err(Error::invalid(
+                "WordPress export contains ambiguous duplicate source URLs.",
+            ));
         }
         let kind = item.value("wp:post_type");
         *types.entry(kind.into()).or_default() += 1;

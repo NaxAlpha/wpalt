@@ -835,4 +835,6 @@ body.admin .media-card video {
   object-fit: contain;
 }
 
-.admin .migration-review { overflow-wrap: anywhere; }
+.admin .migration-review {
+  overflow-wrap: anywhere;
+}
