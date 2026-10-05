@@ -6624,6 +6624,9 @@ async fn selected_plugin_clusters_recover_definitions_without_consent_access_or_
         )
         .await
         .unwrap();
+        assert_eq!(package.report["counts"]["posts"], 4);
+        assert_eq!(package.report["counts"]["comments"], 0);
+        assert_eq!(package.report["counts"]["redirects"], 0);
         assert_eq!(
             package.report["cluster_mapping"]["counts"],
             serde_json::json!({"contacts":1,"membership_policies":1,"courses":1,"lessons":2,"products":1})

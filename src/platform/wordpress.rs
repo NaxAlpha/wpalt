@@ -637,7 +637,7 @@ pub async fn prepare_with_adapters(
             "Export has no supported core content to import.",
         ));
     }
-    let counts = json!({"posts":posts.len(),"terms":terms.len(),"comments":comments.len(),"redirects":redirects.len(),"forms":forms.len()});
+    let mut counts = json!({"posts":posts.len(),"terms":terms.len(),"comments":comments.len(),"redirects":redirects.len(),"forms":forms.len()});
     for usage in tables
         .get_mut("business_usage")
         .and_then(Value::as_array_mut)
@@ -665,6 +665,15 @@ pub async fn prepare_with_adapters(
         .cluster_export
         .map(|raw| super::clusters::project(&app.config, raw, &assessment.origin, &owner, tables))
         .transpose()?;
+    for (key, table) in [
+        ("posts", "posts"),
+        ("terms", "terms"),
+        ("comments", "comments"),
+        ("redirects", "redirects"),
+        ("forms", "business_forms"),
+    ] {
+        counts[key] = tables[table].as_array().ok_or_else(invalid)?.len().into();
+    }
     snapshot["files"] = files.into();
     snapshot["created_at"] = 0.into();
     snapshot["audit_history"] = json!([]);
