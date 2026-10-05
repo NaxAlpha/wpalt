@@ -126,10 +126,13 @@ with tempfile.TemporaryDirectory(prefix='wpalt-benchmark-') as temporary:
                     for span in record.get('spans',[]):
                         rid=span.get('request_id')
                         if rid:query_counts[rid]=query_counts.get(rid,0)+1
+            assert query_counts, "Debug SQL telemetry must contain correlated native queries"
             for profile in results['profiles']:
                 if profile['database']==engine:
-                    counts=[query_counts.get(rid,0) for rid in profile.pop('request_ids')]
-                    assert all(count>0 for count in counts), 'Measured SQL telemetry must be request-correlated'
+                    request_ids=profile.pop('request_ids')
+                    assert all(request_ids), 'Responses must carry request identity'
+                    counts=[query_counts.get(rid,0) for rid in request_ids]
+                    # Eligible public cache hits can legitimately execute zero native SQL.
                     profile['native_correlated_sql_queries_per_request']={'min':min(counts),'max':max(counts)}
                     profile['coordination_sql_queries_per_request']=1 if engine=='postgres' and args.local_processes else 0
                     profile['sql_queries_per_request']={'min':min(counts)+profile['coordination_sql_queries_per_request'],'max':max(counts)+profile['coordination_sql_queries_per_request']}

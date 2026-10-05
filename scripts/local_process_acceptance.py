@@ -55,6 +55,12 @@ try:
   expected_name='wpalt:'+hashlib.sha256(os.fsencode(data.resolve())).hexdigest()[:56]
   names=sql(f"SELECT application_name FROM pg_stat_activity WHERE application_name='{expected_name}'").splitlines()
   assert len(names)>=2 and all(name==expected_name and len(name)==62 for name in names), 'Both database operation identities must exactly match the bounded site identity'
+  if os.uname().sysname=='Linux':
+   changed_binary=root/'same-version-different-bytes';shutil.copyfile(binary,changed_binary)
+   with changed_binary.open('ab') as f:f.write(b'wpalt M9 executable identity fixture')
+   changed_binary.chmod(0o700)
+   refusal=subprocess.run([str(changed_binary),'--config',str(configs[1]),'serve','--external-worker'],capture_output=True,text=True,env=env,timeout=30)
+   assert refusal.returncode!=0 and 'format-or-configuration-mismatch' in refusal.stderr, 'Same version/schema with different executable bytes must be refused by authority, not port binding'
   login=urllib.request.Request(origin+'/login',method='POST',headers={'Origin':origin,'Content-Type':'application/x-www-form-urlencoded'},data=urllib.parse.urlencode({'email':'owner@example.test','password':password}).encode())
   try:response=opener.open(login,timeout=15)
   except urllib.error.HTTPError as e:response=e
@@ -63,7 +69,7 @@ try:
   owner={'Cookie':cookie,'X-CSRF-Token':csrf}
   post={'title':'Process reference','slug':'process-reference','kind':'post','body':'Shared original body','action':'publish'}
   _,raw=request(0,'/api/admin/content','POST',post,owner);saved=json.loads(raw);id_=saved['id']
-  request(1,'/process-reference');headers,raw=request(1,'/process-reference');assert headers['X-Wpalt-Cache']=='hit' and b'Shared original body' in raw
+  request(1,'/process-reference');unchanged_state=(data/'.process-state.json').stat().st_mtime_ns;headers,raw=request(1,'/process-reference');cached_request_id=headers['X-Request-Id'];assert (data/'.process-state.json').stat().st_mtime_ns==unchanged_state,'Read-only cache hit must not rewrite unchanged durable authority';assert headers['X-Wpalt-Cache']=='hit' and b'Shared original body' in raw
   changed=dict(post,version=saved['version'],body='Shared revised body')
   _,raw=request(0,'/api/admin/content/'+id_,'POST',changed,owner);saved=json.loads(raw)
   headers,raw=request(1,'/process-reference');assert headers['X-Wpalt-Cache']=='miss' and b'Shared revised body' in raw and b'Shared original body' not in raw
@@ -76,6 +82,11 @@ try:
   with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:outcomes=list(pool.map(compete,[0,1]))
   assert sorted(status for status,_ in outcomes)==[200,409]
   saved=json.loads(next(raw for status,raw in outcomes if status==200))
+  # Withdraw a cached publication on A; B must immediately stop serving it.
+  request(1,'/process-reference');request(1,'/process-reference')
+  _,raw=request(0,'/api/admin/content/'+id_,'POST',dict(post,version=saved['version'],action='unpublish'),owner);saved=json.loads(raw)
+  _,raw=request(1,'/process-reference',status=404);assert b'Concurrent proposal' not in raw
+  _,raw=request(0,'/api/admin/content/'+id_,'POST',dict(post,version=saved['version']),owner);saved=json.loads(raw)
   # Shared spam token is issued on A and accepted on B, with replay denied on A.
   _,raw=request(0,'/api/spam/challenge','POST',{'resource':'comment:process-reference'});challenge=json.loads(raw)
   comment={'name':'Synthetic reader','email':'reader@example.test','body':'A useful synthetic comment','token':challenge['token'],'solution':'0','website':''}
@@ -107,7 +118,7 @@ try:
   pending=pool.submit(request,0,'/api/admin/content/'+id_,'POST',dict(post,version=saved['version'],body='Must not infer crash completion'),owner)
   deadline=time.monotonic()+8
   while time.monotonic()<deadline:
-   blocked=sql("SELECT COUNT(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND application_name LIKE 'wpalt:%' AND query LIKE '%posts%'")
+   blocked=sql(f"SELECT COUNT(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND application_name='{expected_name}' AND query LIKE '%posts%'")
    if blocked!='0' and (data/'.process-intent').exists():break
    time.sleep(.03)
   else:raise AssertionError('Crash fixture did not reach a blocked domain read')
@@ -124,12 +135,26 @@ try:
   run('local-resume','--execute',preview['plan'],ok=False);assert (data/'.process-intent').exists()
   run('local-resume','--execute',preview['plan'],'--acknowledge-external-effects');assert not (data/'.process-intent').exists()
   nodes=[start(0),start(1)];_,raw=request(1,'/process-reference');assert b'Must not infer crash completion' not in raw
+  # Logging out on B invalidates the same credential on A before another write.
+  logout=urllib.request.Request(f'http://127.0.0.1:{ports[1]}/logout',method='POST',headers={'Origin':origin,'Cookie':cookie,'Content-Type':'application/x-www-form-urlencoded'},data=urllib.parse.urlencode({'csrf':csrf}).encode())
+  try:response=opener.open(logout,timeout=15)
+  except urllib.error.HTTPError as e:response=e
+  with response:assert response.status==303
+  request(0,'/api/admin/content','POST',post,owner,status=401)
   for node in nodes:stop(node)
+  lifecycle=data/'.wpalt.lock';retained=root/'retained-lifecycle';lifecycle.rename(retained)
+  victim=root/'unrelated-owner-record';victim.write_bytes(b'unchanged');victim.chmod(0o600)
+  lifecycle.symlink_to(victim);run('job-history',ok=False);assert victim.read_bytes()==b'unchanged';lifecycle.unlink()
+  os.link(victim,lifecycle);run('job-history',ok=False);assert victim.read_bytes()==b'unchanged';lifecycle.unlink();retained.rename(lifecycle)
   state=json.loads((data/'.process-state.json').read_text());assert (data/'.process-state.json').stat().st_mode&0o077==0
   assert len(state['ceremonies']['entries'])==0
   for f in logfiles:f.flush()
   logs=''.join((root/f'node-{i}.log').read_text() for i in [0,1]);assert password not in logs and challenge['token'] not in logs
-  report={'format':'wpalt-m9-local-process-reference-v1','status':'passed','postgres_version':sql('SHOW server_version'),'processes':2,'elapsed_seconds':round(time.monotonic()-started,3),'assertions':['database rejects a second coordination directory','shared session and CSRF across nodes','cross-node cached publication invalidation','one winner for concurrent reviewed version','shared spam challenge and one-use replay protection','untrusted incomplete body times out without persistent site pause','login abuse budget spans alternating nodes','independent coordinated worker','offline lifecycle excludes running nodes','deterministic blocked-writer kill pauses other node','private security headers/correlated pause diagnostics','stale/no-ack resume fails','exact offline graph/external-effect reconciliation','restart preserves committed state and excludes blocked write','private server-side state and redacted logs'],'limits':['Same Unix host and exact shared site/configuration; serialized admission, not multi-host leases.','External effects require separate owner reconciliation; no exactly-once network claim.','Performance and remaining M9 workflows require their own evidence.']}
+  events=[json.loads(line) for line in logs.splitlines() if line.startswith('{')]
+  coordinated=[row['fields'] for row in events if row.get('fields',{}).get('event')=='coordinated_request_completed' and row['fields'].get('request_id')==cached_request_id]
+  native=[row['fields'] for row in events if row.get('fields',{}).get('event')=='request_completed' and row['fields'].get('request_id')==cached_request_id]
+  assert len(coordinated)==len(native)==1 and coordinated[0]['elapsed_us']>=coordinated[0]['admission_us']+coordinated[0]['finalize_us'] and coordinated[0]['elapsed_us']>=native[0]['elapsed_us'],'Queue/finalization performance must be correlated with native request identity'
+  report={'format' :'wpalt-m9-local-process-reference-v1','status':'passed','postgres_version':sql('SHOW server_version'),'processes':2,'elapsed_seconds':round(time.monotonic()-started,3),'assertions':['database rejects a second coordination directory','shared session and CSRF across nodes','withdrawn cached publication immediately refused on another node','logout revocation blocks cross-node writes','cross-node cached publication invalidation','one winner for concurrent reviewed version','shared spam challenge and one-use replay protection','untrusted incomplete body times out without persistent site pause','login abuse budget spans alternating nodes','independent coordinated worker','offline lifecycle excludes running nodes','deterministic blocked-writer kill pauses other node','private security headers/correlated pause diagnostics','stale/no-ack resume fails','exact offline graph/external-effect reconciliation','restart preserves committed state and excludes blocked write','private server-side state and redacted logs','unchanged read-only state avoids redundant durable writes','queue/finalization timing shares native request identity','lifecycle symlink/hardlink refusal preserves unrelated owner files',*(['same-version/schema executable mismatch refused before serving'] if os.uname().sysname=='Linux' else [])],'limits':['Same Unix host and exact shared site/configuration; serialized admission, not multi-host leases.','External effects require separate owner reconciliation; no exactly-once network claim.','Performance and remaining M9 workflows require their own evidence.']}
   out=Path(a.output);out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
 finally:
  if holder and holder.poll() is None:holder.kill();holder.wait(timeout=10)

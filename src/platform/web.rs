@@ -67,7 +67,7 @@ async fn render(
                     @if report["warnings"].as_array().is_some_and(|a|a.len()>100){p {"More warnings are present in the full assessment."}}
                 }
             }
-            section class="panel" {h2 {"Prepare a separate target"}p {"Core package creation currently uses the stopped-host CLI. Initialize an empty migration template, provide an independently copied media directory, review the exact preview plan, then create a new private package. Recover it into an empty target and verify the site before changing traffic."}p class="muted" {"M8 is still in development. Additional plugin adapters and external integration tooling remain in progress."}}
+            section class="panel" {h2 {"Prepare a separate target"}p {"Core package creation currently uses the stopped-host CLI. Initialize an empty migration template, provide an independently copied media directory, review the exact preview plan, then create a new private package. Recover it into an empty target and verify the site before changing traffic."}p class="muted" {"Supported adapters report their mappings and losses explicitly. Keep the source and recovery packages until the target content and access rules have been verified."}}
         },
     ))
 }

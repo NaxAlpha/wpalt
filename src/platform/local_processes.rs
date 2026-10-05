@@ -64,10 +64,43 @@ pub async fn verify_directory(db: &crate::db::Db, config: &Config, initialize: b
 
 const MAX_STATE: usize = 4 * 1024 * 1024;
 fn unavailable() -> Error {
+    unavailable_reason("private-storage-or-state-validation")
+}
+fn unavailable_reason(reason: &'static str) -> Error {
+    tracing::error!(event = "local_process_coordination_refused", reason);
     Error(
         StatusCode::SERVICE_UNAVAILABLE,
         "Local process coordination is unavailable or paused; stop all nodes and inspect the site before resuming.",
     )
+}
+
+fn executable_identity() -> Result<String> {
+    use sha2::{Digest, Sha256};
+    static IDENTITY: std::sync::OnceLock<std::result::Result<String, ()>> =
+        std::sync::OnceLock::new();
+    IDENTITY
+        .get_or_init(|| {
+            let path = std::env::current_exe().map_err(|_| ())?;
+            let mut file = File::open(path).map_err(|_| ())?;
+            let mut hash = Sha256::new();
+            let mut buffer = [0u8; 16384];
+            let mut total = 0usize;
+            loop {
+                let read = file.read(&mut buffer).map_err(|_| ())?;
+                if read == 0 {
+                    break;
+                }
+                total = total.checked_add(read).ok_or(())?;
+                if total > 512 * 1024 * 1024 {
+                    return Err(());
+                }
+                hash.update(&buffer[..read]);
+            }
+            Ok(format!("{:x}", hash.finalize()))
+        })
+        .as_ref()
+        .cloned()
+        .map_err(|_| unavailable_reason("executable-identity-unavailable"))
 }
 
 pub struct Coordinator {
@@ -137,6 +170,14 @@ impl Coordinator {
         value["listen"] = serde_json::Value::Null;
         value["debug"] = serde_json::Value::Null;
         value["runtime_version"] = env!("CARGO_PKG_VERSION").into();
+        value["executable_sha256"] = executable_identity()?.into();
+        let scripts = if c.business_enabled && c.engagement.enabled {
+            operations::consent_scripts::Scripts::compile(&c.consent_scripts)
+                .map_err(|_| unavailable_reason("consent-manifest-unavailable"))?
+        } else {
+            operations::consent_scripts::Scripts::default()
+        };
+        value["consent_script_manifest"] = scripts.manifest.into();
         value["database_schema"] = crate::db::SCHEMA_VERSION.into();
         value["data_dir"] =
             serde_json::to_value(std::fs::canonicalize(&c.data_dir).map_err(|_| unavailable())?)
@@ -158,7 +199,7 @@ impl Coordinator {
                 Err(_) => return Err(unavailable()),
             }
             if started.elapsed() >= std::time::Duration::from_secs(10) {
-                return Err(unavailable());
+                return Err(unavailable_reason("admission-timeout"));
             }
             tokio::time::sleep(std::time::Duration::from_millis(5)).await;
         }
@@ -175,13 +216,13 @@ impl Coordinator {
         }
         let state: State = serde_json::from_slice(&bytes).map_err(|_| unavailable())?;
         if state.format != "wpalt-local-process-state-v1" || state.fingerprint != self.fingerprint {
-            return Err(unavailable());
+            return Err(unavailable_reason("format-or-configuration-mismatch"));
         }
         Ok(state)
     }
     pub fn initialize(&self) -> Result<[u8; 32]> {
         if self.directory.join(".process-intent").exists() {
-            return Err(unavailable());
+            return Err(unavailable_reason("unreconciled-operation"));
         }
         if self.directory.join(".process-state.json").exists() {
             return Ok(self.read()?.spam_secret);
@@ -222,7 +263,7 @@ impl Coordinator {
     pub async fn check(&self) -> Result<()> {
         let _file = self.lock().await?;
         if self.directory.join(".process-intent").exists() {
-            return Err(unavailable());
+            return Err(unavailable_reason("unreconciled-operation"));
         }
         self.read()?;
         Ok(())
@@ -230,11 +271,11 @@ impl Coordinator {
     pub async fn begin(&self, app: &App) -> Result<Guard> {
         let file = self.lock().await?;
         if self.directory.join(".process-intent").exists() {
-            return Err(unavailable());
+            return Err(unavailable_reason("unreconciled-operation"));
         }
         let state = self.read()?;
         if state.spam_secret != *app.spam_secret {
-            return Err(unavailable());
+            return Err(unavailable_reason("runtime-security-key-mismatch"));
         }
         let previous = auth::digest(
             &serde_json::to_vec(&serde_json::to_value(&state).map_err(|_| unavailable())?)
@@ -246,8 +287,8 @@ impl Coordinator {
         *app.protection_limits.lock().await = state.protection;
         *app.spam_used.lock().await = state.spam;
         *app.passkey_ceremonies.lock().await = state.ceremonies;
-        let (schema, held): (i64, i64) = sqlx::query_as("SELECT s.version,r.held FROM schema_version s CROSS JOIN recovery_mode r WHERE s.id=1 AND r.id=1").fetch_one(&app.db.pool).await?;
-        if schema != crate::db::SCHEMA_VERSION {
+        let (schema, held, directory): (i64, i64, String) = sqlx::query_as("SELECT s.version,r.held,a.directory_digest FROM schema_version s CROSS JOIN recovery_mode r CROSS JOIN process_authority a WHERE s.id=1 AND r.id=1 AND a.id=1").fetch_one(&app.db.pool).await?;
+        if schema != crate::db::SCHEMA_VERSION || directory != app.db.directory_digest {
             return Err(unavailable());
         }
         app.clone_held.store(held == 1, Ordering::SeqCst);

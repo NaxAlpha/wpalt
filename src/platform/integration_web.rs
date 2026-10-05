@@ -88,7 +88,7 @@ async fn render(
                     }
                 }
             }
-            section class="panel" {h2 {"Connect an independent process"}p {"Use the versioned content API with the downloaded credential. Integrations run separately from the CMS and retain their own resource limits. Proposed drafts use normal content validation and owner review."}p class="muted" {"M8 is in development. Durable webhooks and broader migration adapters remain in progress."}}
+            section class="panel" {h2 {"Connect an independent process"}p {"Use the versioned content API with the downloaded credential. Integrations run separately from the CMS and retain their own resource limits. Proposed drafts use normal content validation and owner review."}p class="muted" {"Keep integration credentials private and narrowly scoped. Review proposed drafts before publication and revoke credentials when a tool no longer needs access."}}
         },
     ))
 }

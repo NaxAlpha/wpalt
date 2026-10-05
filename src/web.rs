@@ -155,23 +155,49 @@ async fn security_and_trace(
         }
         return security_and_trace_inner(State(app.clone()), request, next).await;
     }
+    let coordinated_started = std::time::Instant::now();
+    let method = request.method().clone();
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|p| p.as_str().to_owned())
+        .unwrap_or_else(|| "unmatched".into());
     let guard = match coordinator.begin(&app).await {
         Ok(g) => g,
         Err(e) => return coordinated_error(&app, e),
     };
+    let admission_us = coordinated_started.elapsed().as_micros() as u64;
     let response = security_and_trace_inner(State(app.clone()), request, next).await;
+    let request_id = response
+        .headers()
+        .get("x-request-id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("unavailable")
+        .to_owned();
+    let finalize_started = std::time::Instant::now();
     if (response.status().is_server_error() || response.status() == StatusCode::REQUEST_TIMEOUT)
         && guard.unresolved()
     {
+        tracing::error!(event="coordinated_request_paused",request_id=%request_id,node_id=%app.node_id,
+            method=%method,route=%route,status=response.status().as_u16(),admission_us,
+            elapsed_us=coordinated_started.elapsed().as_micros() as u64);
         return response;
     }
-    match guard.complete(&app).await {
+    let response = match guard.complete(&app).await {
         Ok(()) => response,
-        Err(e) => coordinated_error(&app, e),
-    }
+        Err(e) => coordinated_error_identified(&app, e, &request_id),
+    };
+    tracing::info!(event="coordinated_request_completed",request_id=%request_id,node_id=%app.node_id,
+        method=%method,route=%route,status=response.status().as_u16(),admission_us,
+        finalize_us=finalize_started.elapsed().as_micros() as u64,
+        elapsed_us=coordinated_started.elapsed().as_micros() as u64);
+    response
 }
 fn coordinated_error(app: &App, error: Error) -> Response {
     let id = uuid::Uuid::new_v4().to_string();
+    coordinated_error_identified(app, error, &id)
+}
+fn coordinated_error_identified(app: &App, error: Error, id: &str) -> Response {
     tracing::error!(event="local_process_admission_failed", request_id=%id, node_id=%app.node_id, status=error.0.as_u16());
     let mut response = error.into_response();
     app.security_headers.apply("/", response.headers_mut());
@@ -180,7 +206,7 @@ fn coordinated_error(app: &App, error: Error) -> Response {
         .insert("cache-control", HeaderValue::from_static("no-store"));
     response
         .headers_mut()
-        .insert("x-request-id", HeaderValue::from_str(&id).unwrap());
+        .insert("x-request-id", HeaderValue::from_str(id).unwrap());
     response
         .headers_mut()
         .insert("x-wpalt-node", HeaderValue::from_str(&app.node_id).unwrap());
@@ -562,6 +588,7 @@ async fn spam_challenge(
     Ok(Json(crate::operations::spam::issue(&app, &input.resource)?))
 }
 async fn health(State(app): State<App>) -> Result<Json<serde_json::Value>> {
+    crate::platform::local_processes::verify_directory(&app.db, &app.config, false).await?;
     let version: i64 = sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
         .fetch_one(&app.db.pool)
         .await?;

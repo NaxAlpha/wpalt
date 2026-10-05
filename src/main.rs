@@ -138,6 +138,13 @@ enum Command {
     },
     /// Review/apply the supported stopped-host schema upgrade after creating encrypted recovery.
     Upgrade {
+        /// Explicitly review verified physical PostgreSQL recovery into a fresh host directory.
+        #[arg(long, requires = "source_origin")]
+        rebind_directory: bool,
+        #[arg(long, requires = "rebind_directory")]
+        source_origin: Option<String>,
+        #[arg(long, requires = "rebind_directory")]
+        acknowledge_source_stopped: bool,
         #[arg(long, requires_all = ["recovery_output", "key_file"])]
         execute: Option<String>,
         #[arg(long, requires = "execute")]
@@ -742,9 +749,21 @@ fn lock(config: &Config, shared: bool) -> anyhow::Result<std::fs::File> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
+        options
+            .mode(0o600)
+            .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
     }
     let file = options.open(config.data_dir.join(".wpalt.lock"))?;
+    let metadata = file.metadata()?;
+    anyhow::ensure!(metadata.is_file(), "Lifecycle lock must be a regular file.");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        anyhow::ensure!(
+            metadata.mode() & 0o077 == 0 && metadata.nlink() == 1,
+            "Lifecycle lock must be private and have exactly one link."
+        );
+    }
     (if shared {
         FileExt::try_lock_shared(&file)
     } else {
@@ -1018,18 +1037,25 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
     if let Command::Upgrade {
+        rebind_directory,
+        source_origin,
+        acknowledge_source_stopped,
         execute,
         recovery_output,
         key_file,
     } = &cli.command
     {
-        let app = App::open_maintenance(config.clone()).await?;
+        let app = App::open_maintenance(config.clone(), *rebind_directory).await?;
         let report = wpalt::operations::upgrade::apply(
             &app,
             &config,
-            execute.as_deref(),
-            recovery_output.as_deref(),
-            key_file.as_deref(),
+            wpalt::operations::upgrade::Request {
+                execute: execute.as_deref(),
+                output: recovery_output.as_deref(),
+                key_file: key_file.as_deref(),
+                rebind_origin: source_origin.as_deref(),
+                acknowledge_source_stopped: *acknowledge_source_stopped,
+            },
         )
         .await?;
         println!("{}", serde_json::to_string_pretty(&report)?);

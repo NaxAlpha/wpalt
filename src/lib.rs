@@ -56,6 +56,7 @@ enum Startup {
     Migrate,
     Runtime,
     Maintenance,
+    RebindMaintenance,
 }
 
 impl App {
@@ -78,9 +79,20 @@ impl App {
         Self::open_checked(config, Startup::Runtime).await
     }
     /// Read the supported M8/M9 graph while stopped, without schema changes.
-    pub async fn open_maintenance(mut config: config::Config) -> anyhow::Result<Self> {
+    pub async fn open_maintenance(
+        mut config: config::Config,
+        rebind: bool,
+    ) -> anyhow::Result<Self> {
         config.local_processes = false;
-        Self::open_checked(config, Startup::Maintenance).await
+        Self::open_checked(
+            config,
+            if rebind {
+                Startup::RebindMaintenance
+            } else {
+                Startup::Maintenance
+            },
+        )
+        .await
     }
     async fn open_checked(config: config::Config, startup_mode: Startup) -> anyhow::Result<Self> {
         config.validate()?;
@@ -111,9 +123,11 @@ impl App {
         let workers = config.worker_concurrency;
         let requests = config.request_concurrency;
         let db = db::Db::open(&config).await?;
-        platform::local_processes::verify_directory(&db, &config, false)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.1))?;
+        if startup_mode != Startup::RebindMaintenance {
+            platform::local_processes::verify_directory(&db, &config, false)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+        }
         if startup_mode != Startup::Migrate {
             let present: i64 = if db.postgres {
                 sqlx::query_scalar(
@@ -133,13 +147,19 @@ impl App {
                 .await?;
             anyhow::ensure!(
                 version == db::SCHEMA_VERSION
-                    || (startup_mode == Startup::Maintenance && version == 14),
+                    || (matches!(
+                        startup_mode,
+                        Startup::Maintenance | Startup::RebindMaintenance
+                    ) && version == 14),
                 "runtime schema is incompatible; stop all nodes and use the documented offline upgrade/recovery path"
             );
         } else {
             db.migrate().await?;
         }
-        if startup_mode != Startup::Maintenance {
+        if !matches!(
+            startup_mode,
+            Startup::Maintenance | Startup::RebindMaintenance
+        ) {
             platform::local_processes::verify_directory(&db, &config, true)
                 .await
                 .map_err(|e| anyhow::anyhow!(e.1))?;

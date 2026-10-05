@@ -3,7 +3,7 @@
 The schema-14 fixture removes only M9 deployment authority from a current seed;
 this tests the native schema transition, not an independently compiled old executable.
 """
-import argparse, hashlib, json, os, secrets, shutil, sqlite3, subprocess, tempfile, urllib.parse
+import argparse, hashlib, json, os, socket, time, urllib.request, secrets, shutil, sqlite3, subprocess, tempfile, urllib.parse
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--binary',required=True);p.add_argument('--source-binary');p.add_argument('--psql',default=shutil.which('psql'));a=p.parse_args()
 binary=str(Path(a.binary).resolve());source_binary=str(Path(a.source_binary).resolve()) if a.source_binary else binary;env={k:v for k,v in os.environ.items() if not k.startswith('WPALT_')}
@@ -50,7 +50,36 @@ try:
    graph=json.loads(json.loads(recovered.read_text())['payload'])
    assert len(graph['tables']['posts'])==int(before) and len(graph['tables']['shop_products'])==int(products)
    assert graph['tables']['settings'][0]['description']=='Changed after review'
-   sql('UPDATE schema_version SET version=999 WHERE id=1');run('upgrade',ok=False);assert sql('SELECT version FROM schema_version')=='999'
+   unsupported_config=cfg
+   if postgres:
+    with socket.socket() as socket_:socket_.bind(('127.0.0.1',0));http_port=socket_.getsockname()[1]
+    source_origin=f'http://127.0.0.1:{http_port}'
+    cfg.write_text(cfg.read_text()+f'listen="127.0.0.1:{http_port}"\nbase_url="{source_origin}"\n')
+    rebound=root/'rebound.toml';rebound.write_text(f'database_url={json.dumps(url)}\ndata_dir={json.dumps(str(root/"rebound-directory"))}\nbase_url="{source_origin}"\n');rebound.chmod(0o600)
+    child=subprocess.Popen([binary,'--config',str(cfg),'serve','--external-worker'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env=env)
+    try:
+     for attempt in range(100):
+      assert child.poll() is None,'Source node failed before readiness'
+      try:
+       with urllib.request.urlopen(source_origin+'/health',timeout=1):break
+      except OSError:time.sleep(.05)
+     else:raise AssertionError('Source readiness timeout')
+     run('upgrade','--rebind-directory','--source-origin',source_origin,config=rebound,ok=False)
+    finally:
+     child.terminate();child.wait(timeout=15);assert child.returncode==0
+    run('job-history',config=rebound,ok=False)
+    rebind=json.loads(run('upgrade','--rebind-directory','--source-origin',source_origin,config=rebound).stdout)
+    rebind_point=root/'before-rebind.enc'
+    run('upgrade','--rebind-directory','--source-origin',source_origin,'--execute',rebind['plan'],'--recovery-output',rebind_point,'--key-file',key,config=rebound,ok=False)
+    assert not rebind_point.exists()
+    outcome=json.loads(run('upgrade','--rebind-directory','--source-origin',source_origin,'--execute',rebind['plan'],'--recovery-output',rebind_point,'--key-file',key,'--acknowledge-source-stopped',config=rebound).stdout)
+    assert outcome['held'] and sql('SELECT held FROM recovery_mode')=='1' and sql('SELECT COUNT(*) FROM sessions')=='0' and sql('SELECT COUNT(*) FROM integration_credentials')=='0'
+    run('shop','report',config=rebound,ok=False)
+    run('clone-activate','--review','Source node stopped; restored identities and credentials reviewed, matching media and domain graph verified, queues and external effects reconciled.',config=rebound)
+    assert sql('SELECT held FROM recovery_mode')=='0'
+    run('job-history',config=cfg,ok=False)
+    unsupported_config=rebound
+   sql('UPDATE schema_version SET version=999 WHERE id=1');run('upgrade',config=unsupported_config,ok=False);assert sql('SELECT version FROM schema_version')=='999'
  print('Source boundary:', 'independently verified M8 executable and fresh-target rollback' if a.source_binary else 'schema-equivalent fixture; independent old executable not run')
  print('PASS: data-bearing SQLite/PostgreSQL schema maintenance, runtime refusal, stale/existing recovery refusal, exact execution and fresh recovery')
 finally:

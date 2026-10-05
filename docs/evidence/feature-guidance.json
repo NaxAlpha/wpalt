@@ -2036,14 +2036,17 @@
         "Serialized passkey ceremonies remain in private bounded server storage, never cookies or portable packages; cross-node replay stays refused.",
         "Shared abuse/security/cache state persists under host ownership; only unchanged read-only state skips redundant sync.",
         "Interrupted native mutations require stopped-host native graph and external-effect reconciliation.",
-        "Private secret transfer is explicit, exact-plan bound and validated; supported schema migration follows verified encrypted recovery."
+        "Private secret transfer is explicit, exact-plan bound and validated; supported schema migration follows verified encrypted recovery.",
+        "Runtime identity binds exact executable bytes and derived consent manifest; coordinated timing retains the native request identity.",
+        "Physical PostgreSQL recovery retains directory authority until explicit stopped-source exact-plan rebind, verified encrypted graph, revoked transient grants and held account/queue review."
       ],
       "tests": [
         "scripts/local_process_acceptance.py",
         "scripts/browser_acceptance.cjs with WPALT_LOCAL_PROCESSES=1",
         "scripts/config_transfer_acceptance.py",
         "scripts/maintenance_acceptance.py",
-        "tests/acceptance.rs"
+        "tests/acceptance.rs",
+        "scripts/native_pitr_acceptance.py"
       ],
       "triggers": [
         "affected milestone/release",

@@ -8,6 +8,7 @@ pub const SCHEMA_VERSION: i64 = 15;
 pub struct Db {
     pub pool: AnyPool,
     pub application_name: String,
+    pub directory_digest: String,
     pub postgres: bool,
     pub business_enabled: bool,
     pub membership_enabled: bool,
@@ -40,6 +41,7 @@ impl Db {
             );
         let pool = AnyPoolOptions::new()
             .max_connections(config.database_connections)
+            .min_connections(1)
             .acquire_timeout(std::time::Duration::from_secs(10))
             .after_connect(move |conn, _| {
                 let connection_name = connection_name.clone();
@@ -71,6 +73,7 @@ impl Db {
         Ok(Self {
             pool,
             application_name,
+            directory_digest,
             postgres,
             business_enabled: config.business_enabled,
             membership_enabled: config.membership_enabled,
