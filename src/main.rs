@@ -80,6 +80,8 @@ enum Command {
     },
     /// Run the web server and durable publication scheduler.
     Serve,
+    /// Show effective module admission and domain ownership without opening a site.
+    Modules,
     /// Show validated effective configuration with credentials redacted.
     Config,
     /// Create an offline database-and-media snapshot in a new private file.
@@ -741,6 +743,13 @@ async fn main() -> anyhow::Result<()> {
         println!("{}", serde_json::to_string_pretty(&config.redacted())?);
         return Ok(());
     }
+    if matches!(cli.command, Command::Modules) {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&wpalt::platform::modules::report(&config))?
+        );
+        return Ok(());
+    }
     // Portable recovery tools operate on files/config only: no live server,
     // database, site lock, installation or vendor account is needed.
     match &cli.command {
@@ -1103,7 +1112,7 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             }
             println!("{}", serde_json::to_string_pretty(&prepared.report)?);
         }
-        Command::Config => unreachable!(),
+        Command::Config | Command::Modules => unreachable!(),
         Command::UpgradePrepare { output, key_file } => {
             let receipt = wpalt::operations::upgrade::prepare(&app, &output, &key_file)
                 .await

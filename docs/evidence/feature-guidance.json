@@ -1977,6 +1977,36 @@
         "native graph or authority change"
       ],
       "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
+    },
+    {
+      "feature_id": "M9-01",
+      "area": "Effective module admission and ownership inventory",
+      "scope": "Validated offline CLI inventory, not distributed authority or dynamic code loading",
+      "basis": "internal",
+      "sources": [
+        "docs/distributed-operations.md",
+        "src/platform/modules.rs"
+      ],
+      "applicable_versions": [
+        "wpalt-module-inventory-v1"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Parent module admission controls dependent module availability.",
+        "Inventory does not open a database, create site state or emit credentials.",
+        "Domain ownership is unique and dependency identities are known."
+      ],
+      "tests": [
+        "scripts/module_acceptance.py"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "module ownership or configuration admission change"
+      ],
+      "status": "Working CLI slice verified locally with strict Clippy; full M9 registry/cluster delivery remains pending."
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."
