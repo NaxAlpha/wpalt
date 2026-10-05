@@ -134,18 +134,18 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     portable=root/'portable.toml'
     portable.write_text(f'database_url = "postgres://invalid:invalid@127.0.0.1:1/unreachable"\ndata_dir = "{root/"never-created"}"\n')
     inspected=json.loads(run(portable,'recovery-inspect',str(snapshot)).stdout)
-    assert inspected['schema']==10
+    assert inspected['schema']==11
     assert not (root/'never-created').exists(),'Portable inspection must not create a site'
     key=root/'recovery.key';run(config,'recovery-key',str(key))
     encrypted=root/'encrypted.wpbackup'
     receipt=json.loads(run(config,'upgrade-prepare',str(encrypted),'--key-file',str(key)).stdout)
     import hashlib
-    assert receipt['format']=='wpalt-upgrade-receipt-v1' and receipt['schema']==10
+    assert receipt['format']=='wpalt-upgrade-receipt-v1' and receipt['schema']==11
     assert receipt['archive_sha256']==hashlib.sha256(encrypted.read_bytes()).hexdigest()
     assert receipt['archive_bytes']==encrypted.stat().st_size
     assert receipt['executable_sha256']==hashlib.sha256(binary.read_bytes()).hexdigest()
     run(config,'upgrade-prepare',str(encrypted),'--key-file',str(key),ok=False)
-    assert json.loads(run(portable,'recovery-inspect',str(encrypted),'--key-file',str(key)).stdout)['schema']==10
+    assert json.loads(run(portable,'recovery-inspect',str(encrypted),'--key-file',str(key)).stdout)['schema']==11
     wrong_key=root/'wrong.key';run(config,'recovery-key',str(wrong_key))
     run(portable,'recovery-inspect',str(encrypted),'--key-file',str(wrong_key),ok=False)
     run(target,'restore',str(snapshot));run(target,'restore',str(snapshot),ok=False)
