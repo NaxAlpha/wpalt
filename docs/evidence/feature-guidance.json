@@ -1940,6 +1940,42 @@
         "accessibility or CSP guidance update"
       ],
       "status": "Nine responsive public-theme measurements, two axe audits, keyboard journey and human desktop/mobile inspection pass locally; current-source full/database/package gates pending"
+    },
+    {
+      "feature_id": "M8-09",
+      "area": "Selected audience/access/learning/catalog migration definitions",
+      "scope": "Bounded explicit plugin supplement and safe native recovery",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://github.com/mailpoet/mailpoet/blob/trunk/doc/api_methods/GetSubscribers.md",
+        "https://www.paidmembershipspro.com/documentation/advanced/api/rest-api/",
+        "https://github.com/Automattic/sensei/blob/trunk/includes/class-sensei-course.php",
+        "https://woocommerce.github.io/code-reference/classes/WC-Product.html"
+      ],
+      "applicable_versions": [
+        "wpalt-plugin-clusters-v1",
+        "PMPro 3.8.7 reference target; other actual plugin versions recorded by reference CI"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Never infer consent, access or financial settlement from selected source definitions.",
+        "Hold WXR core publication/media when omitted PMPro restriction tables make access ambiguous.",
+        "Preserve selected ordered lessons and exact decimal minor-unit price without float rounding; reject ambiguous input before output."
+      ],
+      "tests": [
+        "tests/acceptance.rs::selected_plugin_clusters_recover_definitions_without_consent_access_or_settlement",
+        "scripts/migration_acceptance.py",
+        "scripts/wordpress_migration_reference.py"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "source plugin API/configuration change",
+        "native graph or authority change"
+      ],
+      "status": "Selected connected SQLite and CLI projection/recovery checks pass; actual source plugin/PostgreSQL and integrated final gates pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

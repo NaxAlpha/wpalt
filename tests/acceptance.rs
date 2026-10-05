@@ -6600,3 +6600,252 @@ async fn integration_events_commit_with_content_and_report_bounded_replay_gaps()
         site.close().await;
     }
 }
+
+#[tokio::test]
+async fn selected_plugin_clusters_recover_definitions_without_consent_access_or_settlement() {
+    use wpalt::{backup, platform::wordpress};
+    for postgres in engines() {
+        let template = Site::new(postgres, true).await;
+        let email: String = sqlx::query_scalar("SELECT email FROM users")
+            .fetch_one(&template.app.db.pool)
+            .await
+            .unwrap();
+        let source = include_bytes!("fixtures/wordpress-core.xml");
+        let cluster = include_bytes!("fixtures/wordpress-clusters.json");
+        let package = wordpress::prepare_with_adapters(
+            &template.app,
+            source,
+            &email,
+            None,
+            wordpress::AdapterOptions {
+                cluster_export: Some(cluster),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            package.report["cluster_mapping"]["counts"],
+            serde_json::json!({"contacts":1,"membership_policies":1,"courses":1,"lessons":2,"products":1})
+        );
+        assert_eq!(
+            package.report["cluster_mapping"]["unsupported"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            !package
+                .report
+                .to_string()
+                .contains("quarantined@example.test")
+        );
+        let mut target = Site::new(postgres, false).await;
+        backup::restore(&target.app, &package.bytes).await.unwrap();
+        for table in [
+            "audience_memberships",
+            "audience_consent_events",
+            "mail_jobs",
+            "member_grants",
+            "member_progress",
+            "shop_orders",
+            "shop_payments",
+        ] {
+            let count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap();
+            assert_eq!(count, 0, "No inferred operational authority: {table}");
+        }
+        let suppressed: i64 = sqlx::query_scalar("SELECT suppressed FROM audience_contacts")
+            .fetch_one(&target.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(suppressed, 1);
+        let policies: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM member_policies WHERE enabled=0")
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(policies, 2);
+        let course: String = sqlx::query_scalar("SELECT draft FROM member_courses")
+            .fetch_one(&target.app.db.pool)
+            .await
+            .unwrap();
+        let course: serde_json::Value = serde_json::from_str(&course).unwrap();
+        assert_eq!(course["lessons"][0]["title"], "First lesson");
+        assert_eq!(course["lessons"][1]["title"], "Next lesson");
+        let post_id = course["lessons"][0]["post_id"].as_str().unwrap();
+        assert!(
+            !wpalt::membership::allowed(&target.app, "post", post_id, None, 0)
+                .await
+                .unwrap()
+        );
+        let migrated_export = backup::capture(&target.app).await.unwrap();
+        // Publishing an individual imported lesson still cannot bypass its disabled resource policy.
+        sqlx::query("UPDATE posts SET status='published',published_slug=slug,published_title=title,published_body=body,published_document=document WHERE id=$1").bind(post_id).execute(&target.app.db.pool).await.unwrap();
+        let response = wpalt::web::router(target.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/sensei-lesson-4")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_ne!(response.status(), StatusCode::OK);
+        let (minor, active): (i64, i64) =
+            sqlx::query_as("SELECT price_minor,active FROM shop_variants")
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!((minor, active), (1234, 0));
+        // Recover the untouched package again into another independent empty instance.
+        let recovered = Site::new(postgres, false).await;
+        backup::restore(&recovered.app, &migrated_export)
+            .await
+            .unwrap();
+        let contacts: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM audience_contacts WHERE suppressed=1")
+                .fetch_one(&recovered.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(contacts, 1);
+        let live: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM posts WHERE status='published'")
+            .fetch_one(&recovered.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            live, 0,
+            "Unknown PMPro table restrictions cannot expose WXR core content"
+        );
+        recovered.close().await;
+        for alter in [
+            "foreign-origin",
+            "precision",
+            "duplicate-email",
+            "unknown-field",
+        ] {
+            let mut value: serde_json::Value = serde_json::from_slice(cluster).unwrap();
+            match alter {
+                "foreign-origin" => value["source_site"] = "https://foreign.example".into(),
+                "precision" => {
+                    value["woocommerce"]["products"][0]["regular_price"] = "12.345".into()
+                }
+                "duplicate-email" => {
+                    let mut duplicate = value["mailpoet"]["subscribers"][0].clone();
+                    duplicate["id"] = "9".into();
+                    value["mailpoet"]["subscribers"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(duplicate);
+                }
+                _ => value["pmpro"]["active_grants"] = serde_json::json!(["untrusted"]),
+            }
+            let raw = serde_json::to_vec(&value).unwrap();
+            assert!(
+                wordpress::prepare_with_adapters(
+                    &template.app,
+                    source,
+                    &email,
+                    None,
+                    wordpress::AdapterOptions {
+                        cluster_export: Some(&raw),
+                        ..Default::default()
+                    }
+                )
+                .await
+                .is_err(),
+                "Reject {alter}"
+            );
+        }
+        let unchanged: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM posts")
+            .fetch_one(&template.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(unchanged, 0);
+        // Owner review connects the imported catalog to ordinary native checkout.
+        let (token, session) = auth::login(&target.app, &email, PASSWORD).await.unwrap();
+        target.token = token;
+        target.session = Some(session);
+        use wpalt::commerce::catalog::{self, ProductInput, VariantInput};
+        let (product_id, variant_id): (String, String) = sqlx::query_as(
+            "SELECT p.id,v.id FROM shop_products p JOIN shop_variants v ON v.product_id=p.id",
+        )
+        .fetch_one(&target.app.db.pool)
+        .await
+        .unwrap();
+        catalog::save_product(
+            &target.app,
+            target.session(),
+            Some(&product_id),
+            1,
+            &ProductInput {
+                slug: "garden-kit".into(),
+                title: "Garden kit".into(),
+                description: "A physical kit.".into(),
+                kind: "physical".into(),
+                entitlement: "".into(),
+                access_seconds: 0,
+                download_id: "".into(),
+                published: true,
+            },
+        )
+        .await
+        .unwrap();
+        catalog::save_variant(
+            &target.app,
+            target.session(),
+            &product_id,
+            Some(&variant_id),
+            1,
+            &VariantInput {
+                title: "Garden kit".into(),
+                sku: "KIT-6".into(),
+                price_minor: 1234,
+                member_price_minor: -1,
+                member_key: "".into(),
+                stock_total: 4,
+                billing_interval: "".into(),
+                active: true,
+            },
+        )
+        .await
+        .unwrap();
+        let (_, buyer) = commerce_journeys::shopper(&target, "new-buyer@example.test").await;
+        let checkout = commerce_journeys::cart(&target, &buyer, &variant_id, "", 1).await;
+        let order = wpalt::commerce::orders::checkout(&target.app, &buyer, &checkout)
+            .await
+            .unwrap();
+        let payments: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM shop_payments")
+            .fetch_one(&target.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            payments, 0,
+            "Native checkout has no inferred source settlement"
+        );
+        commerce_journeys::pay(&target, &order, "explicit-owner-receipt-after-import").await;
+        let export = backup::capture(&target.app).await.unwrap();
+        let business_recovery = Site::new(postgres, false).await;
+        backup::restore(&business_recovery.app, &export)
+            .await
+            .unwrap();
+        let state: String = sqlx::query_scalar("SELECT payment_state FROM shop_orders WHERE id=$1")
+            .bind(&order)
+            .fetch_one(&business_recovery.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(state, "paid");
+        let sold: i64 = sqlx::query_scalar("SELECT sold FROM shop_variants WHERE id=$1")
+            .bind(&variant_id)
+            .fetch_one(&business_recovery.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(sold, 1);
+        business_recovery.close().await;
+        target.close().await;
+        template.close().await;
+    }
+}

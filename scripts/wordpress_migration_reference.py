@@ -168,6 +168,33 @@ echo json_encode(['posts'=>4,'export_items'=>count($exportable),'types'=>$types,
             assert db.execute("SELECT items FROM business_usage WHERE kind='forms'").fetchone()[0] == 1
             assert preview['wpforms_mapping']['source_forms'] == report['source_counts']['forms'] == 1
 
+        # Add selected free-plugin operational definitions after the core gate.
+        # Plugin-generated pages are outside the earlier exact core inventory.
+        wp('plugin', 'install', 'mailpoet', 'sensei-lms', 'woocommerce', '--activate')
+        wp('plugin', 'install', 'https://github.com/strangerstudios/paid-memberships-pro/archive/refs/tags/3.8.7.zip', '--activate')
+        wp('option','update','woocommerce_currency','USD')
+        fixture=Path(__file__).resolve().with_name('wordpress_cluster_reference.php')
+        run('docker','cp',str(fixture),site+':/var/www/html/wpalt-m8-cluster-seed.php')
+        report['cluster_source_counts']=json.loads(wp('eval-file','/var/www/html/wpalt-m8-cluster-seed.php'))
+        report['cluster_plugins']=json.loads(wp('plugin','list','--format=json'))
+        clusters=root/'clusters.json';run('docker','cp',site+':/var/www/html/wpalt-m8-clusters.json',str(clusters))
+        run('docker','exec',site,'rm','/var/www/html/wpalt-m8-clusters.json','/var/www/html/wpalt-m8-cluster-seed.php')
+        report['cluster_export_sha256']=hashlib.sha256(clusters.read_bytes()).hexdigest()
+        args=('wordpress-prepare',export,'--owner-email','owner@example.test','--cluster-export',clusters)
+        projected=json.loads(native(template,*args));assert projected['cluster_mapping']['counts']==report['cluster_source_counts']
+        projected_file=root/'clusters-native.json';native(template,*args,'--execute',projected['plan'],'--output',projected_file)
+        clustered=config('clustered');native(clustered,'restore',projected_file)
+        with sqlite3.connect(root/'clustered.db') as db:
+            assert db.execute('SELECT suppressed FROM audience_contacts').fetchone()[0]==1
+            assert db.execute('SELECT COUNT(*) FROM member_policies WHERE enabled=0').fetchone()[0]==2
+            course=json.loads(db.execute('SELECT draft FROM member_courses').fetchone()[0])
+            assert [l['title'] for l in course['lessons']]==['First reference lesson','Second reference lesson']
+            assert db.execute('SELECT price_minor,stock_total,active FROM shop_variants').fetchone()==(1234,4,0)
+            assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0]==6
+            assert db.execute("SELECT COUNT(*) FROM posts WHERE status='published'").fetchone()[0]==0
+            for name in ['audience_memberships','mail_jobs','member_grants','member_progress','shop_orders','shop_payments']:
+                assert db.execute('SELECT COUNT(*) FROM '+name).fetchone()[0]==0
+        report['cluster_projection']=projected['cluster_mapping']
         native(target, 'restore', package, ok=False)
         with sqlite3.connect(root/'template.db') as db:
             assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0] == 0

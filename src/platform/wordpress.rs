@@ -333,6 +333,7 @@ pub struct AdapterOptions<'a> {
     pub fields: Option<&'a super::acf::Mapping>,
     pub elementor_content: bool,
     pub wpforms_export: Option<&'a [u8]>,
+    pub cluster_export: Option<&'a [u8]>,
 }
 
 pub async fn prepare_with_adapters(
@@ -660,6 +661,10 @@ pub async fn prepare_with_adapters(
         redirects.into_values().collect::<Vec<_>>().into(),
     );
     tables.insert("media".into(), media.into());
+    let cluster_report = options
+        .cluster_export
+        .map(|raw| super::clusters::project(&app.config, raw, &assessment.origin, &owner, tables))
+        .transpose()?;
     snapshot["files"] = files.into();
     snapshot["created_at"] = 0.into();
     snapshot["audit_history"] = json!([]);
@@ -670,7 +675,7 @@ pub async fn prepare_with_adapters(
     .map_err(|_| invalid())?;
     crate::backup::inspect(&app.config, &bytes)?;
     let output_hash = digest(&bytes);
-    let report = json!({"format":"wpalt-wordpress-package-preview-v1","source_sha256":assessment.source_sha256,"source_site":assessment.origin,"site_settings":{"title":snapshot["tables"]["settings"][0]["title"],"description":snapshot["tables"]["settings"][0]["description"]},"target_origin":app.config.origin(),"owner_email":owner_email,"field_mapping":mapping.map(|m|m.report()),"elementor_content_projection":elementor_content,"wpforms_mapping":form_projection.as_ref().map(|p|&p.report),"output_sha256":output_hash,"counts":counts,"media_mapped":media_urls.len(),"warnings":warnings,"boundary":"Fresh-target package only; source/template unchanged, safely mapped public content stays published, ambiguous access stays draft, private/future/pending become drafts, no imported credentials/network/plugin execution. Only explicitly supplied local media is embedded. Retain raw WXR and review unsupported source independently."});
+    let report = json!({"format":"wpalt-wordpress-package-preview-v1","source_sha256":assessment.source_sha256,"source_site":assessment.origin,"site_settings":{"title":snapshot["tables"]["settings"][0]["title"],"description":snapshot["tables"]["settings"][0]["description"]},"target_origin":app.config.origin(),"owner_email":owner_email,"field_mapping":mapping.map(|m|m.report()),"elementor_content_projection":elementor_content,"cluster_mapping":cluster_report,"wpforms_mapping":form_projection.as_ref().map(|p|&p.report),"output_sha256":output_hash,"counts":counts,"media_mapped":media_urls.len(),"warnings":warnings,"boundary":"Fresh-target package only; source/template unchanged, safely mapped public content stays published, ambiguous access stays draft, private/future/pending become drafts, no imported credentials/network/plugin execution. Only explicitly supplied local media is embedded. Retain raw WXR and review unsupported source independently."});
     let plan = digest(
         serde_json::to_string(&report)
             .map_err(|_| invalid())?
@@ -684,7 +689,7 @@ pub async fn prepare_with_adapters(
         plan,
     })
 }
-fn stable_id(source: &str, kind: &str, id: &str) -> String {
+pub(super) fn stable_id(source: &str, kind: &str, id: &str) -> String {
     let hash = digest(format!("{source}\0{kind}\0{id}").as_bytes());
     let bytes: [u8; 16] = hex::decode(&hash[..32]).unwrap().try_into().unwrap();
     uuid::Uuid::from_bytes(bytes).to_string()

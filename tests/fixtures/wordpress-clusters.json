@@ -1,0 +1,8 @@
+{
+  "format": "wpalt-plugin-clusters-v1",
+  "source_site": "https://garden.example",
+  "mailpoet": {"version":"synthetic-test", "subscribers":[{"id":"1","email":"quarantined@example.test","name":"A reader","status":"subscribed"}]},
+  "pmpro": {"version":"synthetic-test", "levels":[{"id":"2","name":"Garden members"}]},
+  "sensei": {"version":"synthetic-test", "courses":[{"id":"3","title":"Garden basics","lessons":[{"id":"4","title":"First lesson","content":"<p>A private lesson.</p><script>unsafe()</script>"},{"id":"5","title":"Next lesson","content":"<p>Another lesson.</p>"}]}]},
+  "woocommerce": {"version":"synthetic-test", "currency":"USD", "products":[{"id":"6","name":"Garden kit","slug":"garden-kit","description":"A physical kit.","sku":"KIT-6","regular_price":"12.34","stock_quantity":4,"product_type":"simple","virtual_product":false,"downloadable":false,"backorders":"no"},{"id":"7","name":"Unsupported variation","slug":"variation","description":"","sku":"VAR-7","regular_price":"1.00","stock_quantity":1,"product_type":"variable","virtual_product":false,"downloadable":false,"backorders":"no"}]}
+}

@@ -103,4 +103,17 @@ with tempfile.TemporaryDirectory(prefix='wpalt-migration-') as tmp:
     form_source.write_text(json.dumps(data))
     run(template,*selected,'--execute',form_preview['plan'],'--output',root/'stale-forms.json',ok=False)
     assert not (root/'stale-forms.json').exists()
+    cluster_source=root/'clusters.json';cluster_source.write_bytes((repository/'tests/fixtures/wordpress-clusters.json').read_bytes())
+    selected=('wordpress-prepare',source,'--owner-email','owner@example.test','--cluster-export',cluster_source)
+    cluster_preview=json.loads(run(template,*selected).stdout)
+    package=root/'clusters-native.json';run(template,*selected,'--execute',cluster_preview['plan'],'--output',package)
+    clustered=config('clustered');run(clustered,'restore',package)
+    with sqlite3.connect(root/'clustered.db') as db:
+        assert db.execute('SELECT suppressed FROM audience_contacts').fetchone()[0]==1
+        assert db.execute('SELECT price_minor,active FROM shop_variants').fetchone()==(1234,0)
+        assert db.execute("SELECT COUNT(*) FROM posts WHERE status='published'").fetchone()[0]==0
+        assert db.execute('SELECT COUNT(*) FROM member_policies WHERE enabled=0').fetchone()[0]==2
+    value=json.loads(cluster_source.read_text());value['woocommerce']['products'][0]['regular_price']='13.00';cluster_source.write_text(json.dumps(value))
+    run(template,*selected,'--execute',cluster_preview['plan'],'--output',root/'stale-clusters.json',ok=False)
+    assert not (root/'stale-clusters.json').exists()
 print('PASS: offline namespace-aware WXR assessment, exact-source preview, private non-overwriting package, local media, untouched template, fresh core recovery and safe private/payment mappings')
