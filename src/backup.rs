@@ -1760,6 +1760,10 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             ));
         }
     }
+    // Portable recovery creates a new operational identity. Delivery checkpoints
+    // cannot silently continue against unrelated recovered content or authority.
+    sqlx::raw_sql("DELETE FROM integration_credentials; DELETE FROM integration_events; DELETE FROM integration_event_state;").execute(&mut *tx).await?;
+    crate::platform::events::initialize(&mut tx).await?;
     sqlx::query("DELETE FROM discovery_settings")
         .execute(&mut *tx)
         .await?;

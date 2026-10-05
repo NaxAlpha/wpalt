@@ -25,3 +25,18 @@ It checks the current source version/body before requesting a new unscheduled dr
 Boundaries: private regular input files, no final symlink following on Unix, two MiB response cap, 30-second transport timeout, bounded source/generated body and model name, 2,048 requested output tokens and explicit review-bound new-file creation. Set model/OS process limits independently. Sensitive article text is deliberately granted to the local model; its own logs/storage are the owner's responsibility. Non-Unix filesystem permissions differ. The local contract fixture proves process/API/privacy/failure/retry boundaries, **not actual model inference quality or performance**; actual installed-model reference evidence remains pending.
 
 Verification: `python3 scripts/integration_acceptance.py --binary PATH` from the repository exercises this independently operated process against the actual Rust executable and a synthetic loopback generation server, including read-only/write-scope distinction, stale plans/source, denied cloud endpoints, draft-only creation and duplicate retries. The standalone distribution carries this example as `local_ai_worker.py` with this guide; Python and Ollama remain optional owner-operated dependencies.
+
+
+## Independent webhook worker
+
+Unix/Python 3 `webhook_worker.py` is a second optional process. Put both worker scripts in the same directory (as supplied in the distribution). Create a private checkpoint directory (`mkdir -m 700 delivery-state`), a private content-read token file, and a private signing-key file with at least 32 random bytes. Run through your OS scheduler:
+
+```
+python3 webhook_worker.py --site http://127.0.0.1:8080 --token-file read-token.txt \
+  --destination https://receiver.example/events --signing-key-file signing-key.bin \
+  --checkpoint delivery-state/receiver.json
+```
+
+Each invocation handles at most 25 retained content metadata events. Invoke again when `has_more` is true. Receiver requirements: verify HMAC-SHA256 over the exact raw JSON bytes with constant-time comparison, deduplicate `X-Wpalt-Event-ID` durably, and return 2xx only after accepting the event. Private source bodies and CMS credentials are never forwarded. Delivery is at least once: crashes can replay receiver-accepted events. A failed transport or 409 gap/reset pauses progress. Perform initial content synchronization and explicit reconciliation after lost history or portable recovery; the initial empty cursor only replays currently retained records. Only a fresh checkpoint can accept `--start-at RECONCILED_CURSOR`. Endpoint changes require separately reconciled state. Do not delete checkpoints to hide a failure.
+
+The CMS emits content-save/scheduled-publication events transactionally and bounds its journal with `[integration_events] retained_events`. Business/commerce/member changes are outside this initial event contract. The full transport and physical/portable recovery boundaries are in the distribution's `migration-and-extensions.md`.

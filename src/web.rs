@@ -31,6 +31,7 @@ pub fn router(app: App) -> Router {
         .merge(crate::builder_web::routes())
         .merge(crate::platform::web::routes())
         .merge(crate::platform::integrations::routes())
+        .merge(crate::platform::events::routes())
         .merge(crate::platform::integration_web::routes())
         .merge(crate::operations::privacy::routes())
         .merge(business)

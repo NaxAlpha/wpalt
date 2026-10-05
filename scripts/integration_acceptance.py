@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Native owner credential -> external HTTP draft -> revocation/recovery journey."""
-import argparse, hashlib, json, secrets, socket, sqlite3, subprocess, sys, tempfile, threading, time
+import argparse, hashlib, hmac, json, secrets, socket, sqlite3, subprocess, sys, tempfile, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import urllib.error, urllib.request
 from pathlib import Path
@@ -110,11 +110,46 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
                 external('suggest','--source',id_,'--slug','refused-cloud','--ollama','https://external.example','--model','fixture','--output',root/'refused.json',ok=False)
                 assert not (root/'refused.json').exists()
             finally:model.shutdown();model.server_close();thread.join(timeout=5)
+            # Actual external webhook process: retry the same event after a failed
+            # destination response, verify signature, persist each delivered cursor.
+            webhook_key=secrets.token_bytes(32);key_file=root/'webhook.key';key_file.write_bytes(webhook_key);key_file.chmod(0o600)
+            deliveries=[];reject=[True]
+            class Receiver(BaseHTTPRequestHandler):
+                def log_message(self,*args):pass
+                def do_POST(self):
+                    raw=self.rfile.read(int(self.headers['Content-Length']))
+                    assert len(raw)<=4096 and not self.headers.get('Authorization')
+                    assert self.headers['X-Wpalt-Signature']=='sha256='+hmac.new(webhook_key,raw,hashlib.sha256).hexdigest()
+                    event=json.loads(raw);assert self.headers['X-Wpalt-Event-ID']==event['id']
+                    assert 'PRIVATE_EXTERNAL_DRAFT' not in raw.decode()
+                    deliveries.append(event['id'])
+                    status=503 if reject[0] else 204;reject[0]=False
+                    self.send_response(status);self.end_headers()
+            receiver=ThreadingHTTPServer(('127.0.0.1',0),Receiver)
+            receiver_thread=threading.Thread(target=receiver.serve_forever,daemon=True);receiver_thread.start()
+            checkpoint=root/'delivery.json'
+            webhook=worker.with_name('webhook_worker.py')
+            def deliver(ok=True):
+                result=subprocess.run([sys.executable,str(webhook),'--site',origin,'--token-file',str(read_file),'--destination',f'http://127.0.0.1:{receiver.server_port}/events','--signing-key-file',str(key_file),'--checkpoint',str(checkpoint)],text=True,capture_output=True,timeout=40)
+                assert (result.returncode==0)==ok,result.stderr
+                assert read_token not in result.stdout+result.stderr
+                return json.loads(result.stdout) if ok else None
+            try:
+                deliver(ok=False);assert not checkpoint.exists()
+                result=deliver();assert deliveries[0]==deliveries[1]
+                assert checkpoint.stat().st_mode&0o077==0
+                while result['has_more']:result=deliver()
+                before=len(deliveries);assert deliver()['delivered']==0;assert len(deliveries)==before
+                request('/api/v1/events?after=foreign:0:start',status=409)
+                cursor=json.loads(checkpoint.read_text())['next'];assert request('/api/v1/events?after='+cursor)['events']==[]
+            finally:receiver.shutdown();receiver.server_close();receiver_thread.join(timeout=5)
             run('integration','revoke',writer['id'],ok=False) # Stopped-host lock remains enforced.
         finally:stop(process)
         run('integration','revoke',writer['id'])
         process=start(logfile)
-        try:request('/api/v1/content',token=draft_token,status=403);request('/api/v1/content')
+        try:
+            request('/api/v1/content',token=draft_token,status=403);request('/api/v1/content')
+            assert request('/api/v1/events?after='+cursor)['events']==[]
         finally:stop(process)
         archive=root/'recovery.json';run('backup',archive)
         assert hashlib.sha256(read_token.encode()).hexdigest() not in archive.read_text()
@@ -127,6 +162,6 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
     text=log.read_text()
     assert all(value not in text for value in [password,read_token,draft_token,'PRIVATE_EXTERNAL_DRAFT'])
     with sqlite3.connect(root/'site.db') as db:
-        assert db.execute('SELECT version FROM schema_version').fetchone()[0]==13
+        assert db.execute('SELECT version FROM schema_version').fetchone()[0]==14
         assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0]==len(seen)+2
 print('PASS: native scoped credentials, bounded external pagination/drafts, conflict/publication/origin/cookie denial, stopped-host revocation, fresh recovery without delegated authority and redacted diagnostics')

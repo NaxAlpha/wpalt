@@ -362,6 +362,7 @@ pub async fn save(
         .bind(post.version - app.config.revision_retention)
         .execute(&mut *tx)
         .await?;
+    crate::platform::events::append(app, &mut tx, &post, &input.action).await?;
     tx.commit().await?;
     tracing::info!(event="content_saved", content_id=%post.id, version=post.version, action=%input.action);
     Ok(post)
@@ -432,6 +433,7 @@ pub async fn publish_due(app: &App) -> Result<usize> {
                 .bind(p.version - app.config.revision_retention)
                 .execute(&mut *tx)
                 .await?;
+            crate::platform::events::append(app, &mut tx, &p, "scheduled_publish").await?;
             n += 1;
         }
     }

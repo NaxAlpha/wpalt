@@ -1864,6 +1864,42 @@
         "native form schema or quota changes"
       ],
       "status": "Connected SQLite recovery and strict Clippy pass; current-head actual free-plugin and PostgreSQL gates pending"
+    },
+    {
+      "feature_id": "M8-07",
+      "area": "Transactional content replay and external webhook delivery",
+      "scope": "Content changes only; bounded journal and at-least-once delivery",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.rfc-editor.org/rfc/rfc2104",
+        "https://docs.python.org/3/library/fcntl.html",
+        "https://docs.python.org/3/library/os.html#os.fsync"
+      ],
+      "applicable_versions": [
+        "HMAC-SHA256 RFC2104",
+        "Python 3 Unix standard library",
+        "wpalt-content-event-v1 / wpalt-event-feed-v1",
+        "Database 14; portable domain graph 12"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Commit selected events with domain mutation; bound primary-key replay and report capacity gaps/source reset.",
+        "Keep webhook execution outside CMS authority; never forward bearer credentials, follow redirects or infer exactly-once delivery.",
+        "Advance a private atomic durable checkpoint only after successful signed delivery; deduplicate stable IDs on the receiver."
+      ],
+      "tests": [
+        "tests/acceptance.rs::integration_events_commit_with_content_and_report_bounded_replay_gaps",
+        "scripts/integration_acceptance.py"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "event schema/domain coverage change",
+        "transport/checkpoint/recovery change"
+      ],
+      "status": "Connected SQLite atomic failure/gap/paging/revocation and actual independent process signed retry/restart checks pass; current full PostgreSQL/package gates pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

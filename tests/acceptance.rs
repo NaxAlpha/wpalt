@@ -6442,3 +6442,161 @@ async fn scoped_integration_drafts_revoke_without_publication_or_recovery_author
         site.close().await;
     }
 }
+
+#[tokio::test]
+async fn integration_events_commit_with_content_and_report_bounded_replay_gaps() {
+    for postgres in engines() {
+        let mut site = Site::new(postgres, true).await;
+        std::sync::Arc::make_mut(&mut site.app.config)
+            .integration_events
+            .retained_events = 32;
+        let owner = site.session().clone();
+        let grant = wpalt::platform::integrations::issue(
+            &site.app,
+            &owner,
+            &owner.user.email,
+            "Event consumer",
+            false,
+            7,
+        )
+        .await
+        .unwrap();
+        let router = wpalt::web::router(site.app.clone());
+        async fn feed(router: axum::Router, token: &str, after: &str) -> axum::response::Response {
+            router
+                .oneshot(
+                    Request::builder()
+                        .uri(format!("/api/v1/events?after={after}"))
+                        .header("authorization", format!("Bearer {token}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap()
+        }
+        let response = feed(router.clone(), &grant.token, "").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let initial: serde_json::Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        assert_eq!(initial["events"], serde_json::json!([]));
+        let mut draft = input("event-draft", "save");
+        draft.body = "PRIVATE_EVENT_BODY".into();
+        let post = content::save(&site.app, &owner, None, draft.clone())
+            .await
+            .unwrap();
+        let response = feed(
+            router.clone(),
+            &grant.token,
+            initial["next"].as_str().unwrap(),
+        )
+        .await;
+        let page: serde_json::Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        assert_eq!(page["events"].as_array().unwrap().len(), 1);
+        assert_eq!(page["events"][0]["content_id"], post.id);
+        assert_eq!(page["events"][0]["version"], 1);
+        assert!(!page.to_string().contains("PRIVATE_EVENT_BODY"));
+        // A physical rollback can reuse a sequence. Its new random event anchor
+        // must invalidate the old cursor instead of skipping unrelated changes.
+        let original = page["events"][0].to_string();
+        let mut branch = page["events"][0].clone();
+        branch["id"] = format!(
+            "{}:1:{}",
+            initial["epoch"].as_str().unwrap(),
+            uuid::Uuid::new_v4()
+        )
+        .into();
+        sqlx::query("UPDATE integration_events SET payload=$1 WHERE sequence=1")
+            .bind(branch.to_string())
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            feed(router.clone(), &grant.token, page["next"].as_str().unwrap())
+                .await
+                .status(),
+            StatusCode::CONFLICT
+        );
+        sqlx::query("UPDATE integration_events SET payload=$1 WHERE sequence=1")
+            .bind(original)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        draft.version = 0;
+        assert!(
+            content::save(&site.app, &owner, Some(&post.id), draft.clone())
+                .await
+                .is_err()
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM integration_events")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+        // Fault after the domain writes: the entire transaction must roll back,
+        // including revisions and content, when journal persistence fails.
+        sqlx::query("DELETE FROM integration_event_state")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let mut failed = input("journal-failure", "save");
+        failed.body = "Not committed".into();
+        assert!(
+            content::save(&site.app, &owner, None, failed)
+                .await
+                .is_err()
+        );
+        let missing: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM posts WHERE slug='journal-failure'")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(missing, 0);
+        sqlx::query("INSERT INTO integration_event_state(id,epoch,sequence) VALUES(1,$1,1)")
+            .bind(initial["epoch"].as_str().unwrap())
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        for version in 1..=34 {
+            draft.version = version;
+            content::save(&site.app, &owner, Some(&post.id), draft.clone())
+                .await
+                .unwrap();
+        }
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM integration_events")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 32);
+        assert_eq!(
+            feed(router.clone(), &grant.token, page["next"].as_str().unwrap())
+                .await
+                .status(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            feed(router.clone(), &grant.token, "foreign:1:start")
+                .await
+                .status(),
+            StatusCode::CONFLICT
+        );
+        let response = feed(router.clone(), &grant.token, "").await;
+        let page: serde_json::Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        assert_eq!(page["events"].as_array().unwrap().len(), 25);
+        assert_eq!(page["has_more"], true);
+        wpalt::platform::integrations::revoke(&site.app, &owner, &grant.id)
+            .await
+            .unwrap();
+        assert_eq!(
+            feed(router, &grant.token, page["next"].as_str().unwrap())
+                .await
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+        site.close().await;
+    }
+}

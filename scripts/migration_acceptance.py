@@ -80,4 +80,27 @@ with tempfile.TemporaryDirectory(prefix='wpalt-migration-') as tmp:
         assert row[1]=='draft' and row[2]==''
     run(template,'wordpress-prepare',elem_source,'--owner-email','owner@example.test','--execute',elem_preview['plan'],'--output',root/'stale-elementor.json',ok=False)
     assert not (root/'stale-elementor.json').exists()
+    # WPForms is not in ordinary WXR: explicit source is exact-preview bound.
+    form_source=root/'forms.json'
+    data={'format':'wpalt-wpforms-source-v1','source_site':'https://garden.example','plugin_version':'2.0.2.1','forms':[{'source_id':'71','definition':{'id':'71','settings':{'form_title':'Contact','notifications':{'admin':{'email':'private@example.test'}}},'fields':{'9':{'id':'9','type':'email','label':'Email','required':'1'},'2':{'id':'2','type':'textarea','label':'Message'}}}}]}
+    form_source.write_text(json.dumps(data))
+    selected=('wordpress-prepare',source,'--owner-email','owner@example.test','--wpforms-export',form_source)
+    form_preview=json.loads(run(template,*selected).stdout)
+    assert form_preview['counts']['forms']==1
+    assert 'private@example.test' not in json.dumps(form_preview)
+    form_output=root/'forms-recovery.json'
+    run(template,*selected,'--execute',form_preview['plan'],'--output',form_output)
+    assert form_output.stat().st_mode&0o077==0
+    form_target=config('forms');run(form_target,'restore',form_output)
+    with sqlite3.connect(root/'forms.db') as db:
+        record=db.execute('SELECT draft,live,published_version,entry_count FROM business_forms').fetchone()
+        definition=json.loads(record[0]);assert [f['name'] for f in definition['fields']]==['wpforms_9','wpforms_2']
+        assert definition['fields'][0]['schema']['required']
+        assert not definition['notifications'] and not definition.get('subscription') and not definition.get('registration')
+        assert record[1:]==('',0,0)
+        assert db.execute("SELECT items FROM business_usage WHERE kind='forms'").fetchone()[0]==1
+    data['forms'][0]['definition']['settings']['form_title']='Changed contact'
+    form_source.write_text(json.dumps(data))
+    run(template,*selected,'--execute',form_preview['plan'],'--output',root/'stale-forms.json',ok=False)
+    assert not (root/'stale-forms.json').exists()
 print('PASS: offline namespace-aware WXR assessment, exact-source preview, private non-overwriting package, local media, untouched template, fresh core recovery and safe private/payment mappings')
