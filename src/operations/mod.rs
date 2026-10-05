@@ -22,3 +22,7 @@ pub mod variants;
 pub mod jobs;
 
 pub mod headers;
+
+pub mod consent_scripts;
+
+pub mod privacy;

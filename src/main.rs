@@ -76,6 +76,8 @@ enum Command {
     VideoTranscode { input: PathBuf, output: PathBuf },
     /// Read bounded private background-cycle history while the server is stopped.
     JobHistory,
+    /// Export bounded account-linked personal data into a NEW private file, while stopped.
+    PrivacyExport { user_id: String, output: PathBuf },
     /// Preview unused media and expired sessions; deletion requires the exact recent plan.
     Cleanup {
         #[arg(long)]
@@ -713,6 +715,7 @@ async fn main() -> anyhow::Result<()> {
         Command::RecoveryRun => Some("cli:recovery-run"),
         Command::UpgradePrepare { .. } => Some("cli:upgrade-prepare"),
         Command::VideoTranscode { .. } => Some("cli:video-transcode"),
+        Command::PrivacyExport { .. } => Some("cli:privacy-export"),
         Command::RecoveryPrune { .. } => Some("cli:recovery-prune"),
         Command::Cleanup {
             execute: Some(_), ..
@@ -848,6 +851,13 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
                 .map_err(|e| anyhow::anyhow!(e.1))?;
             backup::write_private(&output, &encoded)?;
             println!("Created a new private bounded MP4 file.");
+        }
+        Command::PrivacyExport { user_id, output } => {
+            let bytes = wpalt::operations::privacy::export(&app, &user_id)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            backup::write_private(&output, &bytes)?;
+            println!("Created a new private account-linked data export.");
         }
         Command::JobHistory => {
             let cycles = wpalt::operations::jobs::read(&app)

@@ -961,6 +961,19 @@ pub(crate) const TABLES: &[(&str, &[(&str, bool)])] = &[
             ("created_at", true),
         ],
     ),
+    (
+        "privacy_requests",
+        &[
+            ("id", false),
+            ("user_id", false),
+            ("kind", false),
+            ("state", false),
+            ("response", false),
+            ("version", true),
+            ("created_at", true),
+            ("resolved_at", true),
+        ],
+    ),
 ];
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1098,7 +1111,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let snapshot = Snapshot {
         audit_history,
         private_files,
-        schema: 10,
+        schema: 11,
         created_at: crate::now(),
         tables,
         files,
@@ -1106,7 +1119,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v10".into(),
+        format: "wpalt-backup-v11".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -1123,14 +1136,14 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v10"
+    if envelope.format != "wpalt-backup-v11"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 10
+    if snapshot.schema != 11
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -1168,6 +1181,44 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
         .iter()
         .map(|r| r["id"].as_str().unwrap())
         .collect();
+    let mut privacy_ids = HashSet::new();
+    let mut open_privacy = HashSet::new();
+    let mut privacy_counts = BTreeMap::<&str, usize>::new();
+    if snapshot.tables["privacy_requests"].len() > config.privacy.max_requests {
+        return Err(Error::invalid(
+            "Privacy request archive exceeds its budget.",
+        ));
+    }
+    for row in &snapshot.tables["privacy_requests"] {
+        let text = |key: &str| row[key].as_str().unwrap();
+        let number = |key: &str| row[key].as_i64().unwrap();
+        let count = privacy_counts.entry(text("user_id")).or_default();
+        *count += 1;
+        if *count > config.privacy.requests_per_account {
+            return Err(Error::invalid(
+                "Account privacy history exceeds its configured budget.",
+            ));
+        }
+        if uuid::Uuid::parse_str(text("id")).is_err()
+            || !privacy_ids.insert(text("id"))
+            || !user_ids.contains(text("user_id"))
+            || !["access", "erase"].contains(&text("kind"))
+            || !["requested", "fulfilled", "partial", "refused"].contains(&text("state"))
+            || text("response").len() > 2000
+            || number("version") < 1
+            || number("created_at") < 0
+            || number("resolved_at") < 0
+            || (text("state") == "requested"
+                && (number("resolved_at") != 0
+                    || !text("response").is_empty()
+                    || !open_privacy.insert((text("user_id"), text("kind")))))
+            || (text("state") != "requested"
+                && (text("response").trim().is_empty()
+                    || number("resolved_at") < number("created_at")))
+        {
+            return Err(Error::invalid("Invalid privacy request graph."));
+        }
+    }
     let mut passkey_ids = HashSet::new();
     let mut passkey_counts = BTreeMap::<&str, usize>::new();
     for row in &snapshot.tables["user_passkeys"] {
@@ -1820,18 +1871,20 @@ pub fn migrate_m6(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<
     if snapshot.schema != 9
         || snapshot.tables.contains_key("user_factors")
         || snapshot.tables.contains_key("user_passkeys")
+        || snapshot.tables.contains_key("privacy_requests")
     {
         return Err(Error::invalid(
             "Archive is not an unmigrated M6 recovery point.",
         ));
     }
-    snapshot.schema = 10;
+    snapshot.schema = 11;
+    snapshot.tables.insert("privacy_requests".into(), vec![]);
     snapshot.tables.insert("user_factors".into(), vec![]);
     snapshot.tables.insert("user_passkeys".into(), vec![]);
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Archive migration failed."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v10".into(),
+        format: "wpalt-backup-v11".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })

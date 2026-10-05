@@ -15,6 +15,8 @@ pub struct Config {
     pub debug: bool,
     pub postgres_archive: crate::operations::postgres_archive::Config,
     pub variants: crate::operations::variants::Config,
+    pub privacy: crate::operations::privacy::Config,
+    pub consent_scripts: crate::operations::consent_scripts::Config,
     pub headers: crate::operations::headers::Config,
     pub video: crate::operations::video::Config,
     pub assets: crate::operations::assets::Config,
@@ -51,6 +53,8 @@ impl Default for Config {
             debug: false,
             postgres_archive: Default::default(),
             variants: Default::default(),
+            privacy: Default::default(),
+            consent_scripts: Default::default(),
             headers: Default::default(),
             video: Default::default(),
             assets: Default::default(),
@@ -136,6 +140,8 @@ impl Config {
         self.video.validate()?;
         self.variants.validate()?;
         self.headers.validate()?;
+        self.consent_scripts.validate()?;
+        self.privacy.validate()?;
         self.postgres_archive.validate()?;
         self.cache.validate()?;
         self.recovery.validate()?;

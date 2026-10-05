@@ -23,6 +23,7 @@ use tokio::sync::{Mutex, Semaphore};
 #[derive(Clone)]
 pub struct App {
     pub config: Arc<config::Config>,
+    pub consent_scripts: Arc<operations::consent_scripts::Scripts>,
     pub security_headers: Arc<operations::headers::Policy>,
     pub db: db::Db,
     pub mutations: Arc<Mutex<()>>,
@@ -58,6 +59,11 @@ impl App {
     }
     pub async fn open(config: config::Config) -> anyhow::Result<Self> {
         config.validate()?;
+        let consent_scripts = if config.business_enabled && config.engagement.enabled {
+            operations::consent_scripts::Scripts::compile(&config.consent_scripts)?
+        } else {
+            operations::consent_scripts::Scripts::default()
+        };
         config.prepare_directories()?;
         let workers = config.worker_concurrency;
         let requests = config.request_concurrency;
@@ -68,6 +74,7 @@ impl App {
         })
         .await??;
         Ok(Self {
+            consent_scripts: Arc::new(consent_scripts),
             security_headers: Arc::new(operations::headers::Policy::compile(&config)),
             config: Arc::new(config),
             db,

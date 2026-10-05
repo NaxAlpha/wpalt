@@ -3550,6 +3550,10 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
             .as_object_mut()
             .unwrap()
             .remove("user_passkeys");
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("privacy_requests");
         let raw = serde_json::to_string(&payload).unwrap();
         old["payload"] = serde_json::json!(raw);
         old["sha256"] = serde_json::json!(auth::digest(raw.as_bytes()));
@@ -3562,7 +3566,7 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let migrated = backup::migrate_m6(&original.app.config, &legacy).unwrap();
         assert_eq!(
             backup::inspect(&original.app.config, &migrated).unwrap()["schema"],
-            10
+            11
         );
         let destination = tempfile::tempdir().unwrap();
         let key = encryption::generate_key();
@@ -4669,6 +4673,607 @@ async fn compiled_browser_security_controls_cover_cache_errors_and_secret_routes
         let mut invalid = (*site.app.config).clone();
         invalid.headers.hsts_seconds = 63072001;
         assert!(invalid.validate().is_err());
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn optional_scripts_require_current_declared_consent_and_never_leak_cached_bytes() {
+    use wpalt::operations::consent_scripts::{Config as ScriptConfig, Script, Scripts};
+    async fn visitor(
+        app: &App,
+        method: &str,
+        path: &str,
+        cookie: &str,
+        body: serde_json::Value,
+        gpc: bool,
+    ) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+        let mut request = Request::builder()
+            .method(method)
+            .uri(path)
+            .header("origin", app.config.origin())
+            .header("cookie", cookie)
+            .header("content-type", "application/json");
+        if gpc {
+            request = request.header("sec-gpc", "1");
+        }
+        let response = wpalt::web::router(app.clone())
+            .oneshot(request.body(Body::from(body.to_string())).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let headers = response.headers().clone();
+        (
+            status,
+            headers,
+            response
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .to_vec(),
+        )
+    }
+    for postgres in engines() {
+        let mut site = Site::new(postgres, true).await;
+        let file = site._directory.path().join("analytics.js");
+        let code = b"window.localAnalyticsExample = true;";
+        std::fs::write(&file, code).unwrap();
+        let mut config = ScriptConfig {
+            scripts: vec![Script {
+                id: "local-example".into(),
+                label: "Local example".into(),
+                purpose: "Count locally consented interactions.".into(),
+                path: file.clone(),
+                sha256: auth::digest(code),
+            }],
+        };
+        site.app.consent_scripts = std::sync::Arc::new(Scripts::compile(&config).unwrap());
+        sqlx::query("UPDATE engagement_settings SET enabled=1 WHERE id=1")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let manifest = site.app.consent_scripts.manifest.clone();
+        let url = format!("/api/engagement/scripts/{manifest}/local-example");
+        assert_eq!(
+            visitor(&site.app, "GET", &url, "", serde_json::json!({}), false)
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        let stale = visitor(
+            &site.app,
+            "POST",
+            "/api/engagement/consent",
+            "",
+            serde_json::json!({"allow":true,"policy":1,"manifest":"old"}),
+            false,
+        )
+        .await;
+        assert_eq!(stale.0, StatusCode::CONFLICT);
+        let granted = visitor(
+            &site.app,
+            "POST",
+            "/api/engagement/consent",
+            "",
+            serde_json::json!({"allow":true,"policy":1,"manifest":manifest}),
+            false,
+        )
+        .await;
+        assert_eq!(granted.0, StatusCode::OK);
+        let cookie = granted.1["set-cookie"]
+            .to_str()
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap();
+        let served = visitor(&site.app, "GET", &url, cookie, serde_json::json!({}), false).await;
+        assert_eq!(served.0, StatusCode::OK);
+        assert_eq!(served.2, code);
+        assert_eq!(served.1["cache-control"], "no-store");
+        assert_eq!(
+            visitor(&site.app, "GET", &url, cookie, serde_json::json!({}), true)
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        // The same source cannot be read with another visitor's absent grant, even after a hit.
+        assert_eq!(
+            visitor(&site.app, "GET", &url, "", serde_json::json!({}), false)
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        let archive = backup::capture(&site.app).await.unwrap();
+        let mut recovered = Site::new(postgres, false).await;
+        recovered.app.consent_scripts = std::sync::Arc::new(Scripts::compile(&config).unwrap());
+        backup::restore(&recovered.app, &archive).await.unwrap();
+        assert_eq!(
+            visitor(
+                &recovered.app,
+                "GET",
+                &url,
+                cookie,
+                serde_json::json!({}),
+                false
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        // A purpose-only change requires a new explicit manifest acceptance after restart.
+        config.scripts[0].purpose = "A newly declared local analytics purpose.".into();
+        site.app.consent_scripts = std::sync::Arc::new(Scripts::compile(&config).unwrap());
+        let new_url = format!(
+            "/api/engagement/scripts/{}/local-example",
+            site.app.consent_scripts.manifest
+        );
+        assert_eq!(
+            visitor(&site.app, "GET", &url, cookie, serde_json::json!({}), false)
+                .await
+                .0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            visitor(
+                &site.app,
+                "GET",
+                &new_url,
+                cookie,
+                serde_json::json!({}),
+                false
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        let headers = axum::http::HeaderMap::from_iter([(
+            axum::http::header::COOKIE,
+            cookie.parse().unwrap(),
+        )]);
+        assert_eq!(
+            wpalt::business::engagement::status(&site.app, &headers)
+                .await
+                .unwrap()["consented"],
+            false
+        );
+        assert!(
+            wpalt::business::promotions::visit(
+                &site.app,
+                &headers,
+                serde_json::from_value(
+                    serde_json::json!({"path":"/","device":"desktop","referrer":"direct"})
+                )
+                .unwrap()
+            )
+            .await
+            .unwrap()
+            .is_none()
+        );
+        let withdrew = visitor(
+            &recovered.app,
+            "POST",
+            "/api/engagement/consent",
+            cookie,
+            serde_json::json!({"allow":false,"policy":1}),
+            false,
+        )
+        .await;
+        assert_eq!(withdrew.0, StatusCode::OK);
+        assert_eq!(
+            visitor(
+                &recovered.app,
+                "GET",
+                &url,
+                cookie,
+                serde_json::json!({}),
+                false
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        std::fs::write(&file, b"changed without updating reviewed checksum").unwrap();
+        assert!(
+            Scripts::compile(&config).is_err(),
+            "Changed owner file fails closed at startup"
+        );
+        recovered.close().await;
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn personal_data_requests_preserve_identity_isolation_decisions_and_fresh_recovery() {
+    use serde_json::json;
+    fn form(fields: &[(&str, &str)]) -> Vec<u8> {
+        url::form_urlencoded::Serializer::new(String::new())
+            .extend_pairs(fields.iter().copied())
+            .finish()
+            .into_bytes()
+    }
+    for postgres in engines() {
+        let mut site = Site::new(postgres, true).await;
+        auth::add_user(
+            &site.app,
+            "reader@example.test",
+            "Private reader",
+            "subscriber",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (reader, session) = auth::login(&site.app, "reader@example.test", PASSWORD)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO member_profiles(user_id,biography) VALUES($1,$2)")
+            .bind(&session.user.id)
+            .bind("MY_PRIVATE_BIOGRAPHY")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("owner-private", "save"),
+        )
+        .await
+        .unwrap();
+        let proof = form(&[("csrf", &session.csrf), ("password", PASSWORD)]);
+        let denied = request(
+            &site.app,
+            "POST",
+            "/account/privacy/export",
+            Some(&reader),
+            "application/x-www-form-urlencoded",
+            form(&[("csrf", &session.csrf), ("password", "incorrect")]),
+        )
+        .await;
+        assert_eq!(denied.0, StatusCode::FORBIDDEN);
+        let data = request(
+            &site.app,
+            "POST",
+            "/account/privacy/export",
+            Some(&reader),
+            "application/x-www-form-urlencoded",
+            proof.clone(),
+        )
+        .await;
+        assert_eq!(data.0, StatusCode::OK);
+        assert_eq!(data.1["cache-control"], "no-store");
+        let exported: serde_json::Value = serde_json::from_slice(&data.2).unwrap();
+        assert_eq!(
+            exported["account_linked_records"]["users"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            exported["account_linked_records"]["member_profiles"][0]["biography"],
+            "MY_PRIVATE_BIOGRAPHY"
+        );
+        assert!(
+            exported["account_linked_records"]["posts"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        let raw = String::from_utf8(data.2).unwrap();
+        assert!(
+            !raw.contains("owner@example.test")
+                && !raw.contains("password_hash")
+                && !raw.contains("$argon2")
+                && !raw.contains(&reader)
+        );
+        let body = form(&[
+            ("csrf", &session.csrf),
+            ("password", PASSWORD),
+            ("kind", "erase"),
+        ]);
+        let (a, b) = tokio::join!(
+            request(
+                &site.app,
+                "POST",
+                "/account/privacy",
+                Some(&reader),
+                "application/x-www-form-urlencoded",
+                body.clone()
+            ),
+            request(
+                &site.app,
+                "POST",
+                "/account/privacy",
+                Some(&reader),
+                "application/x-www-form-urlencoded",
+                body
+            )
+        );
+        assert_eq!(a.0, StatusCode::SEE_OTHER);
+        assert_eq!(b.0, StatusCode::SEE_OTHER);
+        let id: String = sqlx::query_scalar("SELECT id FROM privacy_requests WHERE user_id=$1")
+            .bind(&session.user.id)
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM privacy_requests")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1, "Retry/race yields one open erasure request");
+        assert_eq!(
+            request(
+                &site.app,
+                "GET",
+                &format!("/admin/privacy/{id}"),
+                Some(&reader),
+                "",
+                vec![]
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        let decision = form(&[
+            ("csrf", &site.session().csrf),
+            ("version", "1"),
+            ("state", "partial"),
+            (
+                "response",
+                "Account profile reviewed; financial records retained for owner review. <script>never executable</script>",
+            ),
+        ]);
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &format!("/admin/privacy/{id}"),
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                decision.clone()
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &format!("/admin/privacy/{id}"),
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                decision
+            )
+            .await
+            .0,
+            StatusCode::CONFLICT
+        );
+        let history = request(
+            &site.app,
+            "GET",
+            "/account/privacy",
+            Some(&reader),
+            "",
+            vec![],
+        )
+        .await;
+        let html = String::from_utf8(history.2).unwrap();
+        assert!(html.contains("partial") && html.contains("&lt;script&gt;never executable"));
+        let archive = backup::capture(&site.app).await.unwrap();
+        let restored = Site::new(postgres, false).await;
+        backup::restore(&restored.app, &archive).await.unwrap();
+        let (restored_reader, restored_session) =
+            auth::login(&restored.app, "reader@example.test", PASSWORD)
+                .await
+                .unwrap();
+        let restored_data = request(
+            &restored.app,
+            "POST",
+            "/account/privacy/export",
+            Some(&restored_reader),
+            "application/x-www-form-urlencoded",
+            form(&[("csrf", &restored_session.csrf), ("password", PASSWORD)]),
+        )
+        .await;
+        assert_eq!(restored_data.0, StatusCode::OK);
+        let value: serde_json::Value = serde_json::from_slice(&restored_data.2).unwrap();
+        assert_eq!(
+            value["account_linked_records"]["privacy_requests"][0]["state"],
+            "partial"
+        );
+        // Validate the foreign subject before any target records are written.
+        let mut envelope: serde_json::Value = serde_json::from_slice(&archive).unwrap();
+        let mut payload: serde_json::Value =
+            serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        payload["tables"]["privacy_requests"][0]["user_id"] =
+            json!(uuid::Uuid::new_v4().to_string());
+        let raw = payload.to_string();
+        envelope["sha256"] = json!(auth::digest(raw.as_bytes()));
+        envelope["payload"] = json!(raw);
+        let empty = Site::new(postgres, false).await;
+        assert!(
+            backup::restore(&empty.app, &serde_json::to_vec(&envelope).unwrap())
+                .await
+                .is_err()
+        );
+        let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+            .fetch_one(&empty.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(users, 0);
+        // Fail explicitly instead of quietly returning a partial data archive.
+        let mut config = (*site.app.config).clone();
+        config.privacy.export_bytes = 64 * 1024;
+        site.app.config = std::sync::Arc::new(config);
+        sqlx::query("UPDATE member_profiles SET biography=$1 WHERE user_id=$2")
+            .bind("PRIVATE_LONG_DATA".repeat(5000))
+            .bind(&session.user.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/account/privacy/export",
+                Some(&reader),
+                "application/x-www-form-urlencoded",
+                proof
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        let new_request = form(&[
+            ("csrf", &session.csrf),
+            ("password", PASSWORD),
+            ("kind", "erase"),
+        ]);
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/account/privacy",
+                Some(&reader),
+                "application/x-www-form-urlencoded",
+                new_request
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        let erase_id: String = sqlx::query_scalar(
+            "SELECT id FROM privacy_requests WHERE user_id=$1 AND state='requested'",
+        )
+        .bind(&session.user.id)
+        .fetch_one(&site.app.db.pool)
+        .await
+        .unwrap();
+        let erase = form(&[
+            ("csrf", &site.session().csrf),
+            ("version", "1"),
+            ("confirm", "true"),
+            (
+                "response",
+                "Profile removed; independent backups require separate retention review.",
+            ),
+        ]);
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &format!("/admin/privacy/{erase_id}/erase-account"),
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                erase.clone()
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &format!("/admin/privacy/{erase_id}/erase-account"),
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                erase
+            )
+            .await
+            .0,
+            StatusCode::CONFLICT
+        );
+        assert!(
+            auth::login(&site.app, "reader@example.test", PASSWORD)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            request(
+                &site.app,
+                "GET",
+                "/account/privacy",
+                Some(&reader),
+                "",
+                vec![]
+            )
+            .await
+            .0,
+            StatusCode::UNAUTHORIZED
+        );
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM member_profiles WHERE user_id=$1")
+                .bind(&session.user.id)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 0);
+        let user = sqlx::query("SELECT email,name,role FROM users WHERE id=$1")
+            .bind(&session.user.id)
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(user.get::<String, _>("role"), "disabled");
+        assert!(
+            !user
+                .get::<String, _>("email")
+                .contains("reader@example.test")
+        );
+        // Site ownership cannot disappear during an erasure workflow.
+        let owner_request = form(&[
+            ("csrf", &site.session().csrf),
+            ("password", PASSWORD),
+            ("kind", "erase"),
+        ]);
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/account/privacy",
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                owner_request
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        let owner_id: String = sqlx::query_scalar(
+            "SELECT id FROM privacy_requests WHERE user_id=$1 AND state='requested'",
+        )
+        .bind(&site.session().user.id)
+        .fetch_one(&site.app.db.pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &format!("/admin/privacy/{owner_id}/erase-account"),
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                form(&[
+                    ("csrf", &site.session().csrf),
+                    ("version", "1"),
+                    ("confirm", "true"),
+                    ("response", "Must preserve the last owner.")
+                ])
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert!(
+            auth::login(&site.app, "owner@example.test", PASSWORD)
+                .await
+                .is_ok()
+        );
+        empty.close().await;
+        restored.close().await;
         site.close().await;
     }
 }

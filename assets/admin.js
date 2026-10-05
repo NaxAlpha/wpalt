@@ -96,3 +96,23 @@ for (const form of document.querySelectorAll('[data-local-video]')) {
     }
   });
 }
+
+// Privacy workflows keep review text on failed requests; never retain a password.
+for (const form of document.querySelectorAll('[data-privacy-submit]')) {
+  const submit = form.querySelector('button[type="submit"],button:not([type])');
+  const status = document.createElement('p');status.className='notice';status.hidden=true;status.setAttribute('role','status');status.setAttribute('aria-live','polite');form.append(status);
+  let busy=false;
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();if(busy)return;busy=true;submit.disabled=true;form.setAttribute('aria-busy','true');status.hidden=false;status.className='notice';status.setAttribute('role','status');status.textContent='Saving your request…';
+    const body=new URLSearchParams(new FormData(form));
+    for(const password of form.querySelectorAll('input[type=password]'))password.value='';
+    try{
+      const response=await fetch(form.action,{method:'POST',body,credentials:'same-origin',redirect:'manual',headers:{Accept:'application/json'}});
+      if(response.type==='opaqueredirect'){location.assign(location.pathname);return;}
+      let message='The request did not complete. Inspect the current record before retrying if the connection was interrupted.';
+      try{const result=await response.json();if(typeof result.error==='string')message=result.error;}catch{}
+      status.textContent=message;status.className='notice error';status.setAttribute('role','alert');
+    }catch{status.textContent='Connection interrupted. Review the current record before retrying; your handling notes remain here.';status.className='notice error';status.setAttribute('role','alert');}
+    finally{busy=false;submit.disabled=false;form.removeAttribute('aria-busy');}
+  });
+}

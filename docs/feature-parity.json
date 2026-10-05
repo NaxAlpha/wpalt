@@ -1810,12 +1810,13 @@
       "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Existing M4 local consent enforcement and GPC/DNT; arbitrary third-party script manager remains outstanding.",
+      "m7_coverage": "Local consent/GPC/DNT plus bounded checksum-pinned own-origin optional analytics scripts; full manifest grant binding, protected no-store delivery and withdrawal unload. Declared scripts share the analytics category; privileged owner code is not sandboxed and arbitrary third-party tag insertion is outside this safe local scope.",
       "evidence": [
         "m7-contract.md",
         "resilient-operations.md",
         "../tests/acceptance.rs",
-        "../scripts/operations_acceptance.cjs"
+        "../scripts/operations_acceptance.cjs",
+        "../scripts/consent_scripts_acceptance.cjs"
       ]
     },
     {
@@ -1827,7 +1828,7 @@
       "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Existing M4 consent/audience erase workflow; broader user-data request workflow remains outstanding.",
+      "m7_coverage": "Current local consent records plus password-proven account-linked JSON exports and durable owner-reviewed access/erasure requests with outcomes, pagination and fresh recovery. Anonymous/outside data needs independently verified handling; erasure is a documented owner action, never automatic financial deletion. Explicit account/profile removal revokes credentials, retains stable financial subjects and records partial completion; the last owner cannot be removed.",
       "evidence": [
         "m7-contract.md",
         "resilient-operations.md",

@@ -14,8 +14,10 @@ module.exports = async (owner, origin, output, password) => {
   await page.route(origin+"/__ui_fixture/axe.js",r=>r.fulfill({contentType:"text/javascript",body:fs.readFileSync(path.join(__dirname,"../frontend/node_modules/axe-core/axe.min.js"))}));
   await page.route(origin+"/__ui_fixture/operations-spacing.css",r=>r.fulfill({contentType:"text/css",body:"body * {line-height:1.5!important;letter-spacing:.12em!important;word-spacing:.16em!important}p{margin-bottom:2em!important}"}));
   const measure=async name=>{
+    await page.waitForLoadState("load");
     for(const width of [320,768,1440]) {
       await page.setViewportSize({width,height:1000});
+      await page.evaluate(()=>{scrollTo(0,0);return new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
       const m=await ui.geometry(page);assert.deepEqual(m.failures,[],`${name} at ${width}: ${m.failures.join("; ")}`);
       report.measurements.push({surface:name,state:"normal",...m});
       await page.screenshot({path:path.join(output,`operations-${name}-${width}.png`),fullPage:true});
@@ -24,6 +26,7 @@ module.exports = async (owner, origin, output, password) => {
       report.measurements.push({surface:name,state:"text-spacing",...spaced});await style.evaluate(n=>n.remove());
     }
     await ui.accessibility(page,origin,name,report);
+    await page.locator(".skip").focus();
     await page.keyboard.press("Tab");
     assert.notEqual(await page.evaluate(()=>document.activeElement.tagName),"BODY","Keyboard reaches a control");
   };
@@ -63,6 +66,42 @@ module.exports = async (owner, origin, output, password) => {
     report.journey.push("Owner inspects reference-aware cleanup and removes unused media");
     await page.goto(origin+"/admin/operations/audit");
     await measure("audit");
+    await page.goto(origin+'/account/privacy');
+    await measure('privacy-account');
+    // Same-page request form has no explicit action; select its button's enclosing form.
+    const ownRequest=page.getByRole('button',{name:'Send data request',exact:true}).locator('..');
+    await ownRequest.getByLabel('Request type').selectOption('erase');
+    await ownRequest.getByLabel('Current password',{exact:true}).fill(password);
+    await Promise.all([page.waitForNavigation({waitUntil:'load'}),ownRequest.getByRole('button',{name:'Send data request',exact:true}).click()]);
+    await page.getByRole('heading',{name:'erase · requested',exact:true}).waitFor();
+    await measure('privacy-request-pending');
+    const exportForm=page.locator('form[action="/account/privacy/export"]');
+    await exportForm.getByLabel('Current password',{exact:true}).fill(password);
+    const [download]=await Promise.all([page.waitForEvent('download'),exportForm.getByRole('button',{name:'Download my data',exact:true}).click()]);
+    const exported=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
+    assert.equal(exported.format,'wpalt-personal-data-v1');
+    assert.equal(exported.account_linked_records.users.length,1);
+    assert(!JSON.stringify(exported).includes('password_hash'));
+    await page.goto(origin+'/admin/privacy');
+    await measure('privacy-owner-queue');
+    await page.getByRole('link',{name:'Site owner · erase',exact:true}).click();
+    await measure('privacy-review');
+    const erasure=page.locator('form[action$="/erase-account"]');
+    await erasure.getByLabel('Removal and retention explanation',{exact:true}).fill('The last owner must remain available.');
+    await erasure.getByRole('checkbox').check();
+    await erasure.getByRole('button',{name:'Remove account identity and profile',exact:true}).click();
+    await erasure.getByRole('alert').filter({hasText:'The last site owner cannot be removed'}).waitFor();
+    assert.equal(await erasure.getByLabel('Removal and retention explanation',{exact:true}).inputValue(),'The last owner must remain available.');
+    assert.equal(await erasure.getByRole('button',{name:'Remove account identity and profile',exact:true}).isEnabled(),true);
+    await measure('privacy-last-owner-error');
+    await page.getByLabel('Decision',{exact:true}).selectOption('partial');
+    await page.getByLabel('Response for the requester',{exact:true}).fill('Local records reviewed. Independent recovery copies and financial records need separately recorded retention handling.');
+    await Promise.all([page.waitForNavigation({waitUntil:'load'}),page.getByRole('button',{name:'Record reviewed decision',exact:true}).click()]);
+    await page.goto(origin+'/account/privacy');
+    await page.getByRole('heading',{name:'erase · partial',exact:true}).waitFor();
+    await page.getByText('Local records reviewed. Independent recovery copies and financial records need separately recorded retention handling.',{exact:true}).waitFor();
+    await measure('privacy-request-resolved');
+    report.journey.push('Verified account download, durable erasure request, owner retention decision and requester response');
     await page.goto(origin + "/account/security");
     const register = page.locator('[data-passkey="register"]');
     await register.getByLabel("Current password", {exact:true}).fill(password);

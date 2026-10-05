@@ -11,3 +11,5 @@ Schema 10 stores factors, one-use recovery hashes and public passkey credentials
 Do not conflate successful local journeys with all of M7: native WAL recovery, remaining media workers/cleanup, abuse/privacy refinements and integrated milestone evidence remain visible in the contract and matrix until implemented and verified.
 
 2026-10-04 follow-up: archive v10 includes the recent 200 validated operational audit records. HTTP and privileged CLI intents/outcomes share a bounded journal; recent inspection spans rotation, deduplicates and orders timestamps. Unreleased v9 previews restore with their matching executable before upgrade/re-export, or reset disposable fixtures. No v9 parser was added to ordinary restore. The explicit M6 converter parses byte vectors directly rather than building a per-byte generic JSON tree.
+
+2026-10-05 follow-up: schema/archive v11 adds validated account data-request history. Earlier v10 previews use their matching binary for fresh restore before an additive database upgrade/re-export. Decision 0010 records local consent/data-request boundaries; no old runtime archive parser.

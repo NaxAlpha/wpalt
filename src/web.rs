@@ -29,6 +29,7 @@ pub fn router(app: App) -> Router {
     };
     Router::new()
         .merge(crate::builder_web::routes())
+        .merge(crate::operations::privacy::routes())
         .merge(business)
         .merge(crate::discovery::routes())
         .merge(crate::membership::web::routes(&app))
@@ -147,7 +148,8 @@ async fn security_and_trace(
         && (route.starts_with("/admin")
             || route.starts_with("/api/admin")
             || route.starts_with("/account/security")
-            || route.starts_with("/account/passkeys"));
+            || route.starts_with("/account/passkeys")
+            || route.starts_with("/account/privacy"));
     let permit = app.request_work.clone().try_acquire_owned();
     let protection = app
         .protection_limits
@@ -2110,6 +2112,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
             }
             section class="panel" {
                 h2 {"Background work"}
+                p {a class="button secondary" href="/admin/privacy" {"Review data requests"}}
                 p {"Latest 64 scheduler cycles retained locally. Unresolved cycles may be interrupted; history never replays payments or deliveries. The next scheduled poll uses each feature’s own retry rules."}
                 @if jobs.is_empty() {p class="muted" {"No scheduler cycles recorded yet."}}
                 @for job in jobs.iter().take(8) {
@@ -2445,7 +2448,7 @@ async fn factor_disable(
 }
 async fn account(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
     let s = auth::session(&app, &headers).await?;
-    Ok(html_page("Your account",&app.db.settings().await?,None,html!{h1 {"Your account"}p {"Signed in as " (&s.user.name)}p {"Role: " (&s.user.role)}p {a href="/account/security" {"Account security"}}@if s.user.role=="subscriber" {p {"This subscriber account does not grant access to site administration."}} @else {p {a href="/admin" {"Open site administration"}}}@if app.config.membership_enabled {p {a href="/members" {"Open my learning and communities"}}}form method="post" action="/logout" {(view::csrf(&s))button {"Sign out"}}}).into_response())
+    Ok(html_page("Your account",&app.db.settings().await?,None,html!{h1 {"Your account"}p {"Signed in as " (&s.user.name)}p {"Role: " (&s.user.role)}p {a href="/account/security" {"Account security"} " · " a href="/account/privacy" {"Data and privacy"}}@if s.user.role=="subscriber" {p {"This subscriber account does not grant access to site administration."}} @else {p {a href="/admin" {"Open site administration"}}}@if app.config.membership_enabled {p {a href="/members" {"Open my learning and communities"}}}form method="post" action="/logout" {(view::csrf(&s))button {"Sign out"}}}).into_response())
 }
 
 async fn form_embed_js(State(app): State<App>) -> Result<Response> {

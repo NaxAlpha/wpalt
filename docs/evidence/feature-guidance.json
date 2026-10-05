@@ -1531,6 +1531,81 @@
         "release and security review"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-CONSENT-SCRIPTS",
+      "area": "privacy/security",
+      "scope": "Manifest-bound own-origin optional analytics scripts; owner-reviewed privileged page code, not arbitrary third-party sandbox/legal certification",
+      "basis": "Browser CSP/cache guidance and engineering inference; GPC honored conservatively",
+      "sources": [
+        "https://www.w3.org/TR/CSP3/",
+        "https://www.w3.org/TR/gpc/",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control"
+      ],
+      "applicable_versions": [
+        "CSP3 working draft 2026-09-16",
+        "wpalt M7 preview",
+        "Chrome 154/Playwright 1.62.1"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Review and checksum-pin bounded local files before startup",
+        "Explicit disclosure and full manifest-bound grant; renewed consent for changed code/purpose",
+        "Reject unauthorized/GPC/stale grants; no-store source reads",
+        "Withdrawal erases analytics and unloads optional page code; no unsafe-inline/eval CSP weakening"
+      ],
+      "tests": [
+        "optional_scripts_require_current_declared_consent_and_never_leak_cached_bytes",
+        "scripts/consent_scripts_acceptance.cjs actual execution/withdrawal/GPC and responsive disclosure"
+      ],
+      "triggers": [
+        "Changed scripts/purposes or consent categories",
+        "Changed CSP/GPC/browser guidance",
+        "Affected release or dependency update"
+      ],
+      "status": "implemented; exact-source cumulative delivery verification pending"
+    },
+    {
+      "feature_id": "M7-DATA-REQUESTS",
+      "area": "privacy/security/recovery",
+      "scope": "Password-proven local-account data export and owner-reviewed access/erasure queue; anonymous and independent systems require separately verified handling",
+      "basis": "WordPress reference behavior plus explicit engineering policy; no legal certification or API parity claim",
+      "sources": [
+        "https://wordpress.org/documentation/article/wordpress-privacy/",
+        "https://developer.wordpress.org/plugins/privacy/adding-the-personal-data-eraser-to-your-plugin/",
+        "https://www.sqlite.org/partialindex.html",
+        "https://www.postgresql.org/docs/17/transaction-iso.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 11 / archive v11",
+        "SQLite and PostgreSQL 17",
+        "Chrome 154/Playwright 1.62.1"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Reauthenticate and revalidate current sessions; reject cross-account/admin access and credential exports",
+        "Bound private queue and current field-allowlisted exports; no silent truncation",
+        "Retain request outcomes through validated fresh recovery; reject foreign subjects before writes",
+        "Document manual handling, financial and independent recovery retention; no automatic erasure success",
+        "Explicit account/profile erasure disables authentication, preserves stable financial subjects, refuses last-owner removal and records only partial completion"
+      ],
+      "tests": [
+        "personal_data_requests_preserve_identity_isolation_decisions_and_fresh_recovery",
+        "scripts/operations_acceptance.cjs native JSON download, request, owner decision and responsive request screens",
+        "Last-owner browser failure preserves review notes and allows retry; actual offline export verifies private permissions/no overwrite"
+      ],
+      "triggers": [
+        "Changed schema/export fields or retention policies",
+        "Changed privacy/browser/database guidance",
+        "Affected release"
+      ],
+      "status": "implemented; exact-source cumulative delivery verification pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

@@ -44,6 +44,12 @@ async function freePort() {
     `database_url = "sqlite://${temporary}/site.db?mode=rwc"\ndata_dir = "${temporary}/data"\nlisten = "127.0.0.1:${port}"\nbase_url = "${origin}"\n`,
   );
   if (process.env.WPALT_SPAM_ONLY) fs.appendFileSync(config, "\n[spam]\nenabled = true\nproof_bits = 8\n");
+  if (process.env.WPALT_SCRIPTS_ONLY) {
+    const script=path.join(temporary,'optional-example.js');
+    const source='window.__wpaltOptionalExample=(window.__wpaltOptionalExample||0)+1;';
+    fs.writeFileSync(script,source);
+    fs.appendFileSync(config,`\n[[consent_scripts.scripts]]\nid = "example"\nlabel = "Local example"\npurpose = "Count consented visits on this server."\npath = ${JSON.stringify(script)}\nsha256 = "${crypto.createHash('sha256').update(source).digest('hex')}"\n`);
+  }
   if (process.env.WPALT_VIDEO_ONLY) {
     const ffmpeg = process.env.WPALT_TEST_FFMPEG || (process.platform === "darwin" ? "/opt/homebrew/bin/ffmpeg" : "/usr/bin/ffmpeg");
     const ffprobe = process.env.WPALT_TEST_FFPROBE || (process.platform === "darwin" ? "/opt/homebrew/bin/ffprobe" : "/usr/bin/ffprobe");
@@ -116,6 +122,14 @@ async function freePort() {
   if (process.env.WPALT_SPAM_ONLY) {
     await require("./spam_acceptance.cjs")(owner, origin, output);
     return;
+  }
+  if (process.env.WPALT_OPERATIONS_ONLY) {
+    await require('./operations_acceptance.cjs')(owner,origin,output,password);
+    assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);return;
+  }
+  if (process.env.WPALT_SCRIPTS_ONLY) {
+    await require('./consent_scripts_acceptance.cjs')(owner,publicContext,origin,output);
+    assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);return;
   }
   if (process.env.WPALT_VIDEO_ONLY) {
     await require("./video_acceptance.cjs")(owner, publicContext, origin, output, process.env.WPALT_VIDEO_FIXTURE);
