@@ -157,6 +157,7 @@ pub async fn save(
         return Err(Error::forbidden());
     }
     let _guard = app.mutation().await;
+    crate::auth::current_editor(app, session).await?;
     let settings = app.db.settings().await?;
     validate_input(&input, &settings)?;
     let structured = !input.document.is_empty() && !input.import_markdown;

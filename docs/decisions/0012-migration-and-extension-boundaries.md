@@ -1,0 +1,27 @@
+# 0012 — Explicit migration mappings and external extension boundaries
+
+2026-10-05. M8 implementation decision. Core migration is implemented; adapter and extension contracts below guide remaining work and are not a completion claim.
+
+## Migration execution
+
+Treat an upstream export as evidence about its declared subset, never as a complete database or proof of authorization, consent, settlement or operational ownership. WXR excludes options and attachment bytes. Keep raw exports independently; report unsupported records. Do not run PHP or deserialize PHP objects. Resolve namespace identities, enforce input/tree/work limits before conversion, and admit local media through descriptor-relative no-follow opens. Do not fetch attachment URLs during import.
+
+Produce a deterministic, validated native package from an explicitly selected empty owner template. Execution binds the reviewed source, mappings, template, target configuration and resulting graph through the exact preview plan. Create a new private file; never overwrite a checkpoint. Restore into an isolated fresh target. The source and template remain intact; rollback of this step means abandoning that target and retaining the source/checkpoint. Occupied targets reject retries instead of attempting an ambiguous live merge.
+
+Selected adapters must declare upstream versions, required source exports and exact mapped/unsupported fields. Field values require registrations and explicit native types; a scalar that looks like serialized data is not authorization to execute or expand it. Elementor mappings operate on supported widget/tree contracts and report missing widgets, styles, assets and dynamic bindings. Business adapters require explicit provenance and identity relationships; they cannot turn a contact into an opted-in subscriber, a source membership label into unrestricted access, or an order label into a settled financial ledger. Reject conflicting identities rather than picking a winner. F023/F024 remain tracked until their implementation and reference evidence exist.
+
+## Extension execution
+
+Independent extensions run as separately operated processes. The CMS does not load native dynamic libraries or arbitrary theme/plugin executable code into its address space. Optional local workers and AI services communicate through documented bounded contracts and explicit permissions. The ordinary local site must remain usable when those workers are absent, disabled or fail.
+
+Use owner-managed revocable credentials, current account authority and least-privilege scopes for external APIs. Browser session credentials and integration credentials must have separate admission rules; possessing a scoped integration key must not let a client enter the administrator UI. State-changing commands reuse domain validation, optimistic versions, audit history and mutation ordering. Revalidate authorization at the mutation boundary so a request authenticated before a winning revocation cannot publish afterward. Current single-host locking is not evidence of distributed authorization consistency; M9 must establish its database transaction rules.
+
+Version current contracts and document migrations rather than retaining pre-adoption aliases. Bound input sizes, page sizes, response expansion, queued work and retries. Do not expose arbitrary SQL, filesystem paths, process invocation or URL fetching. Local worker configuration is an owner-controlled trust boundary, with secret-redacted effective configuration and diagnostics. Sensitive inputs need an explicit owner grant; a worker response cannot implicitly execute instructions or change permissions.
+
+Durable webhook delivery must use a persisted event identity, authentication, bounded retry/backoff, inspectable terminal state and replay rules. A timeout leaves delivery uncertain: do not promise exactly-once transport. Prevent disabled integrations or recovered held clones from producing external side effects. Validate configured destinations and redirect behavior at the actual connection boundary rather than trusting an initial URL check. Keep network delivery out of content transactions.
+
+## Verification obligations
+
+Use a few connected journeys: real upstream export and reconciliation; corrupt/ambiguous mappings and unsafe paths; preview invalidation, fresh recovery and occupied retry; independent integration plus theme; scoped credential rejection/revocation while a command waits; uncertain webhook delivery/restart/replay; local worker failure and privacy; portable export/recovery of meaningful configuration and domain state. Test both databases where stateful. Record performance, resource footprints, frontend measurements and source identities. The synthetic core fixture does not substitute for the actual upstream reference gate or selected plugin reference workflows.
+
+Primary sources reviewed 2026-10-05: [WP-CLI export](https://developer.wordpress.org/cli/commands/export/), [WordPress export implementation](https://developer.wordpress.org/reference/functions/export_wp/), [ACF local registrations](https://www.advancedcustomfields.com/resources/local-json/), [ACF field references](https://www.advancedcustomfields.com/resources/update_field/), [Elementor data structure](https://developers.elementor.com/docs/data-structure/). The execution and authorization boundaries are wpalt engineering decisions, not claims made by those upstream sources.

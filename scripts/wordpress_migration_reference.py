@@ -106,6 +106,7 @@ echo json_encode(['posts'=>2,'comments'=>1,'category'=>'migration-stories']);
             return result.stdout
         offline, template, target = config('offline'), config('template'), config('target')
         assessment = json.loads(native(offline, 'wordpress-assess', export))
+        report['assessment'] = {key: assessment[key] for key in ('source_items', 'supported_core_items', 'types', 'warnings')}
         assert assessment['source_items'] == 2 and assessment['supported_core_items'] == 2
         assert not (root/'offline.db').exists()
         native(template, 'init', '--admin-email', 'owner@example.test', stdin=password+'\n')
@@ -116,7 +117,7 @@ echo json_encode(['posts'=>2,'comments'=>1,'category'=>'migration-stories']);
         with sqlite3.connect(root/'target.db') as db:
             assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0] == 2
             journal = db.execute("SELECT status,published_body,seo FROM posts WHERE slug='reference-journal'").fetchone()
-            assert journal[0] == 'published' and 'real export' in journal[1]
+            assert journal[0] == 'published' and 'real export' in journal[1], {'observed_status': journal[0], 'assessment': report['assessment']}
             assert json.loads(journal[2])['description'] == 'A real WordPress export migrated locally.'
             assert db.execute("SELECT status FROM posts WHERE slug='private-notes'").fetchone()[0] == 'draft'
             assert db.execute('SELECT COUNT(*) FROM comments').fetchone()[0] == 1
@@ -133,6 +134,10 @@ echo json_encode(['posts'=>2,'comments'=>1,'category'=>'migration-stories']);
         output.write_text(json.dumps(report, indent=2)+'\n')
         print('PASS: real WordPress/free Yoast export, isolated native recovery and source reconciliation')
     finally:
+        if report.get('status') != 'passed':
+            report['status'] = 'failed'
+            output = Path(args.output); output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(report, indent=2)+'\n')
         for container in (site, database):
             run('docker', 'rm', '-f', container, ok=False)
         run('docker', 'volume', 'rm', volume, ok=False)

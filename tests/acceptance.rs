@@ -679,6 +679,26 @@ async fn permissions_csrf_sessions_and_origin_protect_every_write_surface() {
             get(&site.app, "/admin/posts", Some(&etoken)).await.0,
             StatusCode::SEE_OTHER
         );
+        // A request can hold an authenticated Session while logout/revocation wins.
+        // The domain write must recheck it after acquiring its mutation boundary.
+        assert!(
+            content::save(
+                &site.app,
+                &editor,
+                None,
+                input("revoked-editor-write", "publish")
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM posts WHERE slug=$1")
+                .bind("revoked-editor-write")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap(),
+            0
+        );
         // Expired and explicitly revoked accounts cannot retain their old authority.
         sqlx::query("UPDATE sessions SET expires_at=0 WHERE token_hash=$1")
             .bind(&moderator.hash)
