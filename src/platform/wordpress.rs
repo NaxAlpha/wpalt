@@ -34,6 +34,8 @@ impl Element {
 pub struct Assessment {
     pub source_sha256: String,
     pub origin: String,
+    pub site_title: String,
+    pub site_description: String,
     pub items: Vec<Element>,
     pub report: Value,
 }
@@ -134,6 +136,18 @@ pub fn assess(bytes: &[u8]) -> Result<Assessment> {
         return Err(invalid());
     }
     let mut channel = root.children.remove(0);
+    for key in ["wp:wxr_version", "wp:base_site_url", "title", "description"] {
+        if channel.all(key).count() > 1 || channel.all(key).any(|n| !n.children.is_empty()) {
+            return Err(invalid());
+        }
+    }
+    let site_title = channel.value("title").to_owned();
+    let site_description = channel.value("description").to_owned();
+    if site_title.len() > 200 || site_description.len() > 1000 {
+        return Err(Error::invalid(
+            "Review source site title or description lengths before migration.",
+        ));
+    }
     if channel.value("wp:wxr_version") != "1.2" {
         return Err(invalid());
     }
@@ -222,6 +236,12 @@ pub fn assess(bytes: &[u8]) -> Result<Assessment> {
             .all("wp:postmeta")
             .map(|n| n.value("wp:meta_key"))
             .collect();
+        if meta
+            .iter()
+            .any(|key| ["_pingme", "_encloseme", "_trackbackme"].contains(key))
+        {
+            warnings.push(json!({"source_id":id,"code":"source_queue_not_replayed","reason":"WordPress ping/enclosure queue flags are not access rules and do not trigger outbound work during migration."}));
+        }
         if !meta.is_empty() {
             warnings.push(json!({"source_id":id,"code":"metadata_requires_adapter","keys":meta}));
         }
@@ -231,7 +251,7 @@ pub fn assess(bytes: &[u8]) -> Result<Assessment> {
         previews.push(json!({"source_id":id,"title":item.value("title"),"source_url":item.value("link"),"slug":item.value("wp:post_name"),"type":kind,"source_status":state,"supported_core_content":eligible,"comments":item.all("wp:comment").count(),"terms":item.all("category").count()}));
     }
     let source_sha256 = digest(bytes);
-    let report = json!({"format":"wpalt-wordpress-assessment-v1","source_sha256":source_sha256,"source_site":origin,"source_items":items.len(),"supported_core_items":supported,"types":types,"items":previews,"warnings":warnings,"boundaries":["WXR is not a complete database/plugin/payment export.","No network/media fetch, source mutation, PHP execution or imported account authentication.","Raw source must be independently retained; unsupported records remain in the source, never silently claimed imported."],"budgets":{"input_bytes":MAX_BYTES,"nodes":MAX_NODES,"depth":64,"items":MAX_ITEMS,"text_per_element":MAX_TEXT}});
+    let report = json!({"format":"wpalt-wordpress-assessment-v1","source_sha256":source_sha256,"source_site":origin,"source_title":site_title,"source_description":site_description,"source_items":items.len(),"supported_core_items":supported,"types":types,"items":previews,"warnings":warnings,"boundaries":["WXR is not a complete database/plugin/payment export.","No network/media fetch, source mutation, PHP execution or imported account authentication.","Raw source must be independently retained; unsupported records remain in the source, never silently claimed imported."],"budgets":{"input_bytes":MAX_BYTES,"nodes":MAX_NODES,"depth":64,"items":MAX_ITEMS,"text_per_element":MAX_TEXT}});
     tracing::info!(
         event = "wordpress_assessed",
         bytes = bytes.len(),
@@ -242,6 +262,8 @@ pub fn assess(bytes: &[u8]) -> Result<Assessment> {
     Ok(Assessment {
         source_sha256,
         origin,
+        site_title,
+        site_description,
         items,
         report,
     })
@@ -328,6 +350,15 @@ pub async fn prepare_with_media(
             "Use an ordinary empty template rather than a held recovery clone.",
         ));
     }
+    let settings = tables
+        .get_mut("settings")
+        .and_then(Value::as_array_mut)
+        .and_then(|rows| rows.first_mut())
+        .ok_or_else(invalid)?;
+    if !assessment.site_title.trim().is_empty() {
+        settings["title"] = assessment.site_title.clone().into();
+    }
+    settings["description"] = assessment.site_description.clone().into();
     let mut posts = Vec::new();
     let mut terms = BTreeMap::new();
     let mut assignments = Vec::new();
@@ -564,7 +595,7 @@ pub async fn prepare_with_media(
     .map_err(|_| invalid())?;
     crate::backup::inspect(&app.config, &bytes)?;
     let output_hash = digest(&bytes);
-    let report = json!({"format":"wpalt-wordpress-package-preview-v1","source_sha256":assessment.source_sha256,"source_site":assessment.origin,"target_origin":app.config.origin(),"owner_email":owner_email,"output_sha256":output_hash,"counts":counts,"media_mapped":media_urls.len(),"warnings":warnings,"boundary":"Fresh-target package only; source/template unchanged, safely mapped public content stays published, ambiguous access stays draft, private/future/pending become drafts, no imported credentials/network/plugin execution. Only explicitly supplied local media is embedded. Retain raw WXR and review unsupported source independently."});
+    let report = json!({"format":"wpalt-wordpress-package-preview-v1","source_sha256":assessment.source_sha256,"source_site":assessment.origin,"site_settings":{"title":snapshot["tables"]["settings"][0]["title"],"description":snapshot["tables"]["settings"][0]["description"]},"target_origin":app.config.origin(),"owner_email":owner_email,"output_sha256":output_hash,"counts":counts,"media_mapped":media_urls.len(),"warnings":warnings,"boundary":"Fresh-target package only; source/template unchanged, safely mapped public content stays published, ambiguous access stays draft, private/future/pending become drafts, no imported credentials/network/plugin execution. Only explicitly supplied local media is embedded. Retain raw WXR and review unsupported source independently."});
     let plan = digest(
         serde_json::to_string(&report)
             .map_err(|_| invalid())?
@@ -804,6 +835,9 @@ fn publicly_importable(item: &Element) -> bool {
                     "_thumbnail_id",
                     "_wp_page_template",
                     "_wp_old_slug",
+                    "_pingme",
+                    "_encloseme",
+                    "_trackbackme",
                 ]
                 .contains(&key)
         })

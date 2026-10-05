@@ -1651,6 +1651,7 @@
       "sources": [
         "https://developer.wordpress.org/reference/functions/export_wp/",
         "https://developer.wordpress.org/cli/commands/export/",
+        "https://developer.wordpress.org/reference/functions/_publish_post_hook/",
         "https://docs.rs/quick-xml/0.42.0/quick_xml/",
         "https://rustsec.org/advisories/RUSTSEC-2026-0195.html",
         "https://rustsec.org/advisories/RUSTSEC-2026-0194.html",

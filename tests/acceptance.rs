@@ -5621,6 +5621,13 @@ async fn wordpress_preview_package_recovers_content_without_inventing_private_ac
             .as_array()
             .unwrap()
             .iter()
+            .any(|w| w["code"] == "source_queue_not_replayed")
+    );
+    assert!(
+        assessment.report["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
             .any(|w| w["type"] == "shop_order")
     );
     // Namespace prefixes are aliases; namespace URIs determine interpretation.
@@ -5858,6 +5865,10 @@ async fn wordpress_preview_package_recovers_content_without_inventing_private_ac
                 .to_vec(),
         )
         .unwrap();
+        assert_eq!(
+            target.app.db.settings().await.unwrap().title,
+            "A reference garden"
+        );
         assert!(html.contains("<strong>quiet garden</strong>"));
         assert!(html.contains("<table>"));
         assert!(html.contains("Seasonal planting notes"));

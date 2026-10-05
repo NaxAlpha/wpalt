@@ -173,6 +173,7 @@ fn warning_label(code: &str) -> &str {
         "metadata_requires_adapter" => "Plugin metadata needs review",
         "review_shortcodes" => "Shortcode review required",
         "access_mapping_required" => "Access mapping required",
+        "source_queue_not_replayed" => "Source queue not replayed",
         _ => "Mapping review required",
     }
 }

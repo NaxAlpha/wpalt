@@ -221,12 +221,15 @@ jobs:
           name: wpalt-clean-linux-x86_64-${{ github.sha }}
           path: work/distribution
       - run: python3 scripts/release_build.py --directory work/distribution --source "$GITHUB_SHA" --extract work/verified-build
+      - run: python3 scripts/migration_benchmark.py --binary "$PWD/work/verified-build/wpalt"
       - run: python3 scripts/wordpress_migration_reference.py --binary "$PWD/work/verified-build/wpalt"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: m8-wordpress-reference
-          path: work/m8-wordpress-reference.json
+          path: |
+            work/m8-wordpress-reference.json
+            work/m8-migration-profile.json
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [application, compiler-floor, dependency-audit, clean-build, frontend, native-pitr]
