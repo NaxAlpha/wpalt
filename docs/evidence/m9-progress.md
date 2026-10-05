@@ -79,3 +79,7 @@ The final-source resource run retained a c10 home p95 miss (113.365 ms); correct
 Checkpoint c222143 clean Linux archive was independently downloaded against actual merge source ef768f98de12d3e69dc7f6d0d8542c20a6d3b290: archive 21b0821469c20cae7336208dae962a17e7c96cb16177ce39d56646075cfec089; executable 5b865184cd168d59bb33b4a2ee2134dfe644f9a4e9c07f721e1c13b6594a9c67, 34,547,560 bytes. Later contention-source gates remain active and this earlier artifact is not final readiness evidence.
 
 The complete catalog reconciliation and readable cumulative acceptance map are now linked separately. Owner scope/license/support decisions remain explicit; no full PHP/Elementor, arbitrary snippet or bulk fleet-write compatibility was silently claimed. PR #16 remains draft until required final verification and reconciliation.
+
+## Final verification and authorized deferral — 2026-10-06
+
+All seven applicable gates passed for source 43c7c27 in run 37335391726. Independently verified actual GitHub merge source 7b6eda50f37fb660e2890a82c601b620d2dc9e4e: archive SHA-256 ec7c5a1a7583c26778992ad37811f4d44d5a1bb4f50a7ce798a8cf0feff16a12; Linux executable f08a7cd268e0f3ed83da808fd27dab23bd6875d39a474dfe5cbc48996868ca33, 34,547,560 bytes. Current final deferral documentation receives its own required CI before merge. Owner explicitly authorized recording remaining gaps for later and readiness/merge; see the cross-milestone backlog and decision 0014. Actual-main release verification follows merge separately.

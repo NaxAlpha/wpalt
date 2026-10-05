@@ -288,3 +288,7 @@ Each identifier remains linked to the canonical matrix and original local/cloud 
 
 
 The machine-readable [matrix](../feature-parity.json) retains implementation/coverage/evidence for every entry. Optional external boundaries remain optional; they were not converted into local features or silently discarded. Current delivery verification is separate from owner acceptance of the scope decisions above.
+
+## Owner decision — 2026-10-06
+
+The owner explicitly directed all remaining missing features into later work and authorized making PR #16 ready and merging. The decision questions above are preserved historically and resolved for current delivery by this deferral. [The actionable cross-milestone backlog](../deferred-features.md) and [decision 0014](../decisions/0014-deferred-parity-release.md) retain the original broader goal without claiming full parity. License/support remain deferred adoption choices, not a merge hold.

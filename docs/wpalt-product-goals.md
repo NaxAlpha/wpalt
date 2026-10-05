@@ -171,3 +171,7 @@ A supporting PR before M3 establishes a precise design system, component/placeme
 ## 15. Integrated authoring — agreed 2026-10-02
 
 Deliver a Notion-inspired, calm direct block editor in M3.5, before M4. Slash commands, contextual formatting, supported media/tables, keyboard and drag organization, undo/redo and reliable recovery are part of a usable publishing system. One versioned document representation governs editing, publication, rendering and recovery; migrate meaningful Markdown and revision data explicitly. Language, SEO and typed fields remain integrated through progressive disclosure. Later modules extend this editor rather than building disconnected authoring tools. See m3-5-contract.md for boundaries and verification.
+
+## Owner-approved delivery boundary — 2026-10-06
+
+The owner explicitly directed remaining missing feature breadth across all milestones into [the deferred backlog](deferred-features.md), authorized readiness and merge of M9 PR #16, and retained the complete product goal for future staged work. [Decision 0014](decisions/0014-deferred-parity-release.md) records this alignment. The verified current native/local-process scope is accepted for delivery; it is not universal plugin parity, a public production-support policy or a license selection. Deferred scope/adoption choices do not block this authorized merge.

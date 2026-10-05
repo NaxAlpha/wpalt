@@ -229,3 +229,7 @@ Before M3, the user authorized a dedicated supporting frontend PR. Maintain a pr
 ## 19. Structured authoring verification — agreed 2026-10-02
 
 M3.5 follows the same working-step, optimization and integrated-delivery lifecycle. Use readable journeys for editing/selection and undo, sanitized paste, composition input, keyboard organization, interrupted save/recovery, publication isolation and actual database races. Verify migrations/revisions/backups on both engines. Measure realistic long documents and asset/request costs rather than creating a test per toolbar permutation. Choose an editor engine through a recorded decision; do not replace reliable selection/history behavior with a collection of ad hoc contenteditable handlers. Retain the precise frontend contract and human review.
+
+## Owner-approved delivery boundary — 2026-10-06
+
+The owner explicitly directed remaining missing feature breadth across all milestones into [the deferred backlog](deferred-features.md), authorized readiness and merge of M9 PR #16, and retained the complete product goal for future staged work. [Decision 0014](decisions/0014-deferred-parity-release.md) records this alignment. The verified current native/local-process scope is accepted for delivery; it is not universal plugin parity, a public production-support policy or a license selection. Deferred scope/adoption choices do not block this authorized merge.

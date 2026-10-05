@@ -35,3 +35,7 @@ Primary sources checked 2026-10-05: [PostgreSQL locking](https://www.postgresql.
 ## Local-process delivery boundary — user direction
 
 For this delivery, verify independent local processes rather than requiring multiple physical servers. Same-host coordination uses a single kernel-owned admission lock and durable unresolved-operation intent. Requests and worker cycles serialize; crash/cancellation pauses all nodes until offline owner reconciliation. No automatic failover or multi-host filesystem/lease safety is claimed. Configuration identity is shared except listen address/debug output. Server-side passkey/replay/abuse state stays private and shared; public cache generation follows the same admission boundary. A separate worker may be supervised or invoked once by an owner system scheduler. Multi-host execution remains a later deployment boundary; other capability/upgrade/whole-system requirements remain required.
+
+## Owner-approved delivery boundary — 2026-10-06
+
+The owner explicitly directed remaining missing feature breadth across all milestones into [the deferred backlog](deferred-features.md), authorized readiness and merge of M9 PR #16, and retained the complete product goal for future staged work. [Decision 0014](decisions/0014-deferred-parity-release.md) records this alignment. The verified current native/local-process scope is accepted for delivery; it is not universal plugin parity, a public production-support policy or a license selection. Deferred scope/adoption choices do not block this authorized merge.
