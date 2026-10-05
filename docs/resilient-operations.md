@@ -157,3 +157,22 @@ Operations shows the latest eight scheduler cycles and their stage outcomes; `wp
 Cancellation or host loss can leave a `running` intent without an outcome. The next cycle marks it `interrupted`; this does not prove that no stage committed. If final history persistence fails, an error diagnostic calls for inspecting site storage and individual feature state. Intent persistence failure blocks the entire cycle before domain work. Journal state never dispatches retries: existing publication, billing/payment and outbox state machines govern the next poll. Provider delivery interrupted after remote acceptance still has the documented ambiguous-delivery boundary. Native blocking file sync retains its separate I/O lock even when the async caller is cancelled, preventing a later cycle from racing an unfinished atomic publication.
 
 This host-local maintenance history survives restart; it is not a financial ledger, long-term archive or a recovery replay queue. Full logical packages retain domain/outbox state and privileged audit events, but do not transplant old host scheduler history into a fresh host. Preserve the private file separately for long-term diagnostics if needed.
+
+
+## Browser hardening controls
+
+`[headers]` controls compile once when the application starts; each response clones the prepared values, including cache hits and failures. Supported controls:
+
+```toml
+[headers]
+referrer = "strict-origin-when-cross-origin" # or same-origin / no-referrer
+hsts_seconds = 31536000                     # 0 disables an existing policy over HTTPS
+hsts_include_subdomains = false
+isolate_opener = true
+same_origin_resources = false              # true also restricts public hotlinking
+upgrade_insecure_requests = false          # effective only for configured HTTPS
+```
+
+HSTS is emitted only for a configured HTTPS `base_url`; forwarded-protocol headers do not activate it. TLS termination is operator-owned. Before including subdomains, ensure every affected subdomain supports HTTPS; a browser can retain an HSTS policy after configuration changes until it receives a new HTTPS policy or the previous lifetime expires. No automatic browser preload-list submission occurs. Opener isolation defaults to `same-origin` and is independently configurable for owner integrations. Sensitive account/admin/member/commerce surfaces use same-origin resource policy; public resources remain shareable unless the owner enables the stricter public policy. Token-bearing confirmation/registration/identity/gift routes always retain `no-referrer` regardless of the general choice.
+
+Strict same-origin script/style CSP, object/base restrictions, frame restrictions, `nosniff` and camera/microphone/geolocation denial remain mandatory. Preview documents permit only same-origin framing, disable scripts and prohibit live form submission. Public form embedding retains its existing same-origin frame contract. There is no arbitrary CSP string editor, inline/eval allowance or insecure wildcard switch. HSTS may range from 0 to two years; unsafe/unknown settings fail configuration validation. Operations exposes effective controls; `show-config` includes the same redacted structured configuration.

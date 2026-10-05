@@ -356,38 +356,7 @@ async fn security_and_trace(
         h.insert("cache-control", HeaderValue::from_static("no-store"));
     }
     h.insert("x-request-id", HeaderValue::from_str(&id).unwrap());
-    h.insert(
-        "x-content-type-options",
-        HeaderValue::from_static("nosniff"),
-    );
-    h.insert(
-        "referrer-policy",
-        HeaderValue::from_static("strict-origin-when-cross-origin"),
-    );
-    if route.starts_with("/audience/")
-        || route.starts_with("/registration/")
-        || route.starts_with("/members/gifts")
-        || route.starts_with("/members/identity")
-    {
-        h.insert("referrer-policy", HeaderValue::from_static("no-referrer"));
-    }
-    h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"));
-    if route == "/forms/{id}" {
-        h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"));
-    }
-    if route == "/admin/design/{id}/preview" || route == "/admin/preview/{id}" {
-        h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'"));
-    }
-    h.insert(
-        "permissions-policy",
-        HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
-    );
-    if app.config.secure_cookie() {
-        h.insert(
-            "strict-transport-security",
-            HeaderValue::from_static("max-age=31536000"),
-        );
-    }
+    app.security_headers.apply(&route, h);
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
         || route == "/login"
@@ -2140,6 +2109,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
                     }
                 }
             }
+            section class="panel" {h2 {"Browser security"}p {"Strict same-origin script/style policy, inactive script-free previews and denied camera/microphone/location access."}p {"HSTS on configured HTTPS: " (app.config.headers.hsts_seconds) " seconds · Include subdomains: " (app.config.headers.hsts_include_subdomains) " · Opener isolation: " (app.config.headers.isolate_opener)}p class="muted" {"Review TLS for every subdomain before enabling include-subdomains. Configuration is compiled at startup; inspect the redacted effective settings below."}}
             section class="panel" {h2 {"Presentation variants"}p {"Current-role cache buckets: " (if app.config.variants.role_variants {"enabled"} else {"disabled"}) " · " (app.config.variants.region_networks.len()) " native-peer region networks"}p {"Role and region labels customize presentation; protected-resource authorization remains separate. Extra cookies bypass shared cache, and forwarded-IP headers are ignored."}}
             section class="panel" {h2 {"Asset loading"}p {"Template-scoped CSS: " (if app.config.assets.scoped_theme_css {"enabled"} else {"disabled"}) " · Theme preload: " (if app.config.assets.preload_theme_css {"enabled"} else {"disabled"})}p {"Local compiled assets and render-reachable styles preserve responsive/conditional presentation. Image insertion records dimensions; choose early loading for an important lead image."}}
             section class="panel" {h2 {"Public response cache"}p {(if app.config.cache.enabled {"Enabled"}else{"Disabled"}) " · " (cache.0) " entries · " (cache.1) " bytes retained"}p {"Public publications, listings, content projections and sitemaps only. Extra cookies, credentials and protected resources bypass shared storage; optional current-role variants use separate buckets. Browser page caching remains disabled so access changes take effect."}form method="post" action="/admin/operations/cache/purge" {(view::csrf(&s))button class="secondary" {"Purge public cache"}} form method="post" action="/admin/operations/cache/preload" {(view::csrf(&s))button class="secondary" disabled[!app.config.cache.enabled] {"Preload recent public pages"}}}

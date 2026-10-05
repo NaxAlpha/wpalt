@@ -1724,9 +1724,15 @@
       "capability": "Security headers and hardening",
       "deployment": "L",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Startup-compiled typed HSTS/referrer/opener/public-resource controls, preserved strict same-origin CSP and inert previews, token-route no-referrer, nosniff and restricted browser capabilities on cache hits/errors. Owner-managed TLS; no arbitrary unsafe header text or automatic preload-list submission.",
+      "evidence": [
+        "resilient-operations.md",
+        "../tests/acceptance.rs",
+        "../scripts/browser_acceptance.cjs"
+      ]
     },
     {
       "id": "F105",

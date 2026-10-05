@@ -15,6 +15,7 @@ pub struct Config {
     pub debug: bool,
     pub postgres_archive: crate::operations::postgres_archive::Config,
     pub variants: crate::operations::variants::Config,
+    pub headers: crate::operations::headers::Config,
     pub video: crate::operations::video::Config,
     pub assets: crate::operations::assets::Config,
     pub media: crate::operations::media::Config,
@@ -50,6 +51,7 @@ impl Default for Config {
             debug: false,
             postgres_archive: Default::default(),
             variants: Default::default(),
+            headers: Default::default(),
             video: Default::default(),
             assets: Default::default(),
             media: Default::default(),
@@ -133,6 +135,7 @@ impl Config {
         self.media.validate()?;
         self.video.validate()?;
         self.variants.validate()?;
+        self.headers.validate()?;
         self.postgres_archive.validate()?;
         self.cache.validate()?;
         self.recovery.validate()?;

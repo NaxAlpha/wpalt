@@ -23,6 +23,7 @@ use tokio::sync::{Mutex, Semaphore};
 #[derive(Clone)]
 pub struct App {
     pub config: Arc<config::Config>,
+    pub security_headers: Arc<operations::headers::Policy>,
     pub db: db::Db,
     pub mutations: Arc<Mutex<()>>,
     pub cache_generation: Arc<std::sync::atomic::AtomicU64>,
@@ -67,6 +68,7 @@ impl App {
         })
         .await??;
         Ok(Self {
+            security_headers: Arc::new(operations::headers::Policy::compile(&config)),
             config: Arc::new(config),
             db,
             mutations: Arc::new(Mutex::new(())),

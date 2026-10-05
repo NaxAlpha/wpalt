@@ -1497,6 +1497,38 @@
         "release and logging security review"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-SECURITY-HEADERS",
+      "area": "Compiled browser hardening controls",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Opener-Policy"
+      ],
+      "applicable_versions": [
+        "Modern CSP/COOP/CORP/HSTS browser policies",
+        "wpalt single server or owner TLS reverse proxy"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Compile bounded typed controls at startup; preserve strict CSP, no-referrer secret routes and script-free previews on successes/cache/errors. Emit HSTS from configured HTTPS only, document subdomain/retained-policy hazards and never auto-submit preload lists. Preserve optional public sharing and explicit opener integration control."
+      ],
+      "tests": [
+        "compiled_browser_security_controls_cover_cache_errors_and_secret_routes",
+        "complete browser Studio/authoring/passkey workflow"
+      ],
+      "triggers": [
+        "TLS/proxy or iframe/popup integration changes",
+        "browser security guidance changes",
+        "release and security review"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

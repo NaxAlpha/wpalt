@@ -4503,3 +4503,103 @@ async fn local_layout_metadata_respects_media_authority_and_never_rewrites_publi
         site.close().await;
     }
 }
+
+#[tokio::test]
+async fn compiled_browser_security_controls_cover_cache_errors_and_secret_routes() {
+    use wpalt::operations::headers::{Policy, Referrer};
+    for pg in engines() {
+        let mut site = Site::new(pg, true).await;
+        let response = wpalt::web::router(site.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .header("x-forwarded-proto", "https")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert!(!response.headers().contains_key("strict-transport-security"));
+        assert_eq!(
+            response.headers()["cross-origin-opener-policy"],
+            "same-origin"
+        );
+        let mut cfg = (*site.app.config).clone();
+        cfg.base_url = "https://site.example.test".into();
+        cfg.cache.enabled = true;
+        cfg.headers.referrer = Referrer::SameOrigin;
+        cfg.headers.hsts_seconds = 60;
+        cfg.headers.hsts_include_subdomains = true;
+        cfg.headers.isolate_opener = false;
+        cfg.headers.upgrade_insecure_requests = true;
+        cfg.validate().unwrap();
+        site.app.security_headers = std::sync::Arc::new(Policy::compile(&cfg));
+        site.app.config = std::sync::Arc::new(cfg);
+        for expected in ["miss", "hit"] {
+            let (status, headers, _) = request(&site.app, "GET", "/", None, "", Vec::new()).await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(headers["x-wpalt-cache"], expected);
+            assert_eq!(
+                headers["strict-transport-security"],
+                "max-age=60; includeSubDomains"
+            );
+            assert_eq!(headers["referrer-policy"], "same-origin");
+            assert!(!headers.contains_key("cross-origin-opener-policy"));
+            assert!(
+                headers["content-security-policy"]
+                    .to_str()
+                    .unwrap()
+                    .contains("upgrade-insecure-requests")
+            );
+            assert_eq!(headers["x-content-type-options"], "nosniff");
+            assert!(!headers.contains_key("server") && !headers.contains_key("x-powered-by"));
+        }
+        let (status, headers, _) = request(
+            &site.app,
+            "POST",
+            "/admin/operations/cache/purge",
+            None,
+            "application/x-www-form-urlencoded",
+            b"csrf=forged".to_vec(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(headers["cross-origin-resource-policy"], "same-origin");
+        assert!(
+            headers["content-security-policy"]
+                .to_str()
+                .unwrap()
+                .contains("script-src 'self'")
+        );
+        let (_, headers, _) = request(
+            &site.app,
+            "GET",
+            "/audience/confirm/not-a-valid-token",
+            None,
+            "",
+            Vec::new(),
+        )
+        .await;
+        assert_eq!(headers["referrer-policy"], "no-referrer");
+        let (status, headers, _) = request(
+            &site.app,
+            "GET",
+            "/admin/design/paper/preview",
+            Some(&site.token),
+            "",
+            Vec::new(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let csp = headers["content-security-policy"].to_str().unwrap();
+        assert!(
+            csp.contains("script-src 'none'")
+                && csp.contains("form-action 'none'")
+                && csp.contains("frame-ancestors 'self'")
+        );
+        let mut invalid = (*site.app.config).clone();
+        invalid.headers.hsts_seconds = 63072001;
+        assert!(invalid.validate().is_err());
+        site.close().await;
+    }
+}

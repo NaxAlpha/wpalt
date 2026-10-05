@@ -21,7 +21,7 @@ Durable bounded background cycle history integrated into scheduler, owner Operat
 - Finish native video browser/release verification, bounded failure cases and operator process-isolation evidence; functional owner upload/CLI and real transcoding/recovery now implemented.
 - Role/native-peer region variants verified by all six gates. No cloud geolocation dataset claim.
 - Shared background-cycle history verified by all six gates.
-- Complete F104 configurable security-header hardening and integrated verification.
+- F104 startup-compiled security-header controls implemented locally. Current complete 77-case Rust suite, strict Clippy and cumulative actual Chrome Studio/authoring/Operations/passkey journey passed. Exact-source six-gate CI pending this checkpoint.
 - Broader user data-request workflows and optional script consent enforcement without unsafe arbitrary-code or cloud requirements.
 - URL-aware clone and selective recovery of validated dependency graphs, preserving financial/delivery identity and avoiding replay.
 - Matched WordPress/plugin workload reference measurements, current exact-build latency/memory/disk/job/failure evidence and query plans.

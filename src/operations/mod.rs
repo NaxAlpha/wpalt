@@ -20,3 +20,5 @@ pub mod video;
 pub mod variants;
 
 pub mod jobs;
+
+pub mod headers;
