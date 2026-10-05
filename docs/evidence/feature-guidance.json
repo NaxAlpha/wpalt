@@ -2054,6 +2054,51 @@
         "authority/storage/worker/configuration/upgrade change"
       ],
       "status": "Implementation checkpoint: local native/process/config/maintenance and cumulative browser evidence recorded; exact-source GitHub and final M9 capability/resource gates remain active. WebAuthn library source checked from checksum-verified Cargo package and its immutable upstream VCS identity; docs.rs fetching unavailable."
+    },
+    {
+      "feature_id": "M9-03",
+      "area": "Bounded local editorial, translation and fleet tools",
+      "scope": "F009/F011/F031/F034/F130 working slices; no universal language quality, ranking score or bulk fleet mutation claim",
+      "basis": "primary-source-and-internal-contract",
+      "sources": [
+        "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+        "https://developers.google.com/search/docs/crawling-indexing/links-crawlable",
+        "https://docs.ollama.com/api/generate",
+        "https://docs.ollama.com/capabilities/structured-outputs",
+        "https://github.com/NaxAlpha/wpalt/blob/7b530c06fd82374c69adbc0f2cbf678681413ea3/docs/m9-contract.md",
+        "https://ollama.com/library/qwen3:1.7b"
+      ],
+      "applicable_versions": [
+        "native schema 15",
+        "canonical document 1",
+        "Ollama 0.35.1",
+        "wpalt-fleet-v1",
+        "wpalt-content-audit-v1",
+        "wpalt-translation-plan-v1",
+        "Qwen3 1.7B / 8f68893c685c"
+      ],
+      "last_checked": "2026-10-06",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Editorial graph is bounded and publication-only; no ranking or universal language segmentation claim.",
+        "Translation duplicates unscheduled drafts or explicitly selected working fields, never silently replacing translated publication or access policies.",
+        "Local model title/body proposals require source-bound review, native validation and owner publication; actual model output needs factual/language review.",
+        "Independent fleet observation isolates outages and revoked grants with finite transport/work/input budgets, no redirects or credential/content disclosure."
+      ],
+      "tests": [
+        "tests/acceptance.rs content_audit and translation_duplication",
+        "scripts/fleet_acceptance.py",
+        "scripts/integration_acceptance.py",
+        "scripts/local_ai_reference.py --translation"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "search-engine or model protocol guidance changes",
+        "native publication/translation/integration credential changes"
+      ],
+      "status": "Native editorial/translation real-engine and independent fleet/worker transport checks pass locally. The 0.6B model failed meaningful translation; actual Qwen3 1.7B synthetic French facts/draft/privacy reference passes with human editing required. Exact-source CI and final M9 resource/capability gates remain active."
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

@@ -29,6 +29,8 @@ try:
    r=subprocess.run([binary,'--config',str(cfg),*map(str,args)],input=stdin,text=True,capture_output=True,env=env,timeout=45);assert (r.returncode==0)==ok,'Native CLI outcome differs from expected';return r
   run('init','--admin-email','owner@example.test',cfg=initial,stdin=password+'\n')
   run('seed-demo','--posts','10',cfg=initial)
+  run('shop','seed-demo',cfg=initial)
+  run('user-add','--email','competitor@example.test','--name','Synthetic competitor','--role','subscriber',cfg=initial,stdin=password+'\n')
   def request(index,path,method='GET',body=None,headers=None,status=200):
    h={'Origin':origin};h.update(headers or {});raw=None
    if body is not None:raw=json.dumps(body).encode();h['Content-Type']='application/json'
@@ -67,6 +69,59 @@ try:
   assert response.status==303;cookie=response.headers['Set-Cookie'].split(';')[0];response.close()
   _,html=request(1,'/admin',headers={'Cookie':cookie});csrf=re.search(rb'name="csrf" value="([^"]+)"',html).group(1).decode()
   owner={'Cookie':cookie,'X-CSRF-Token':csrf}
+  def form_request(index,path,values,cookie_value):
+   req=urllib.request.Request(f'http://127.0.0.1:{ports[index]}'+path,method='POST',headers={'Origin':origin,'Cookie':cookie_value,'Content-Type':'application/x-www-form-urlencoded'},data=urllib.parse.urlencode(values).encode())
+   try:res=opener.open(req,timeout=15)
+   except urllib.error.HTTPError as e:res=e
+   with res:return res.status,res.headers,res.read()
+  status,other_headers,_=form_request(1,'/login',{'email':'competitor@example.test','password':password},'');assert status==303
+  shopper_cookies=[cookie,other_headers['Set-Cookie'].split(';')[0]]
+  def hidden(raw):return dict(re.findall(r'name="([^"\s]+)" value="([^"<>]*)"',raw.decode()))
+  # Three repeated real-node competitions for each domain, not a mock-lock proof.
+  for kind in ['physical','booking']:
+   product_id,variant_id=sql(f"SELECT p.id||','||v.id FROM shop_products p JOIN shop_variants v ON v.product_id=p.id WHERE p.kind='{kind}'",url).split(',')
+   slot_id=sql(f"SELECT id FROM shop_slots WHERE variant_id='{variant_id}'",url) if kind=='booking' else ''
+   for iteration in range(3):
+    if kind=='physical':sql(f"UPDATE shop_variants SET stock_total=held+sold+1 WHERE id='{variant_id}'",url)
+    else:sql(f"UPDATE shop_slots SET capacity=held+booked+1 WHERE id='{slot_id}'",url)
+    checkouts=[]
+    for index in [0,1]:
+     _,raw=request(index,'/shop/products/'+product_id,headers={'Cookie':shopper_cookies[index]});fields=hidden(raw)
+     status,_,_=form_request(index,'/shop/cart',{'csrf':fields['csrf'],'version':fields['version'],'variant_id':variant_id,'slot_id':slot_id,'quantity':'1'},shopper_cookies[index]);assert status==303
+     _,raw=request(index,'/shop/cart',headers={'Cookie':shopper_cookies[index]})
+     checkout=re.search(rb'<form[^>]*action="/shop/checkout"[^>]*>(.*?)</form>',raw,re.S);assert checkout,'Both competitors must review terms while one unit/seat remains'
+     payload=hidden(checkout.group(1));payload.update(provider='offline',shipping_address='Synthetic test address' if kind=='physical' else '')
+     checkouts.append(payload)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+     futures=[pool.submit(form_request,index,'/shop/checkout',checkouts[index],shopper_cookies[index]) for index in [0,1]];outcomes=[future.result() for future in futures]
+    winners=[index for index,result in enumerate(outcomes) if result[0]==303];assert len(winners)==1 and all(result[0] in (303,409,422) for result in outcomes),'Last allocation must have exactly one authoritative winner'
+    winner=winners[0];order_path=outcomes[winner][1]['Location'];order_id=order_path.rsplit('/',1)[-1]
+    # Retrying the accepted request on the other node returns the same order.
+    status,replay_headers,_=form_request(1-winner,'/shop/checkout',checkouts[winner],shopper_cookies[winner]);assert status==303 and replay_headers['Location']==order_path
+    version=sql(f"SELECT version FROM shop_orders WHERE id='{order_id}'",url)
+    receipt={'csrf':csrf,'action':'paid','version':version,'reference':f'SYNTHETIC-{kind}-{iteration}'}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+     futures=[pool.submit(form_request,index,'/admin/shop/orders/'+order_id,receipt,cookie) for index in [0,1]];paid=[future.result()[0] for future in futures]
+    assert sorted(paid)==[303,409], 'Concurrent owner receipts must not duplicate money or allocation'
+    assert sql(f"SELECT payment_state FROM shop_orders WHERE id='{order_id}'",url)=='paid'
+    if kind=='physical':assert sql(f"SELECT held||','||sold||','||stock_total FROM shop_variants WHERE id='{variant_id}'",url)==f'0,{iteration+1},{iteration+1}'
+    else:assert sql(f"SELECT held||','||booked||','||capacity FROM shop_slots WHERE id='{slot_id}'",url)==f'0,{iteration+1},{iteration+1}'
+    for index in [0,1]:
+     _,raw=request(index,'/shop/products/'+product_id,headers={'Cookie':shopper_cookies[index]});fields=hidden(raw)
+     status,_,_=form_request(index,'/shop/cart',{'csrf':fields['csrf'],'version':fields['version'],'variant_id':variant_id,'slot_id':slot_id,'quantity':'0'},shopper_cookies[index]);assert status==303
+  # Independent anti-spam proofs permit retrying one accepted form request key.
+  status,created_headers,_=form_request(0,'/admin/forms',{'csrf':csrf,'title':'Cross-node response'},cookie);assert status==303
+  form_id=created_headers['Location'].rsplit('/',1)[-1]
+  _,raw=request(1,'/api/admin/forms/'+form_id,headers=owner);state=json.loads(raw)
+  request(0,'/api/admin/forms/'+form_id,'POST',{'csrf':csrf,'version':state['version'],'definition':state['definition'],'publish':True},owner)
+  for iteration in range(3):
+   submissions=[]
+   for index in [0,1]:
+    _,raw=request(index,'/api/spam/challenge','POST',{'resource':'form:'+form_id});challenge=json.loads(raw)
+    submissions.append({'version':state['version']+1,'key':str(__import__('uuid').uuid4()) if index==0 else submissions[0]['key'],'values':{'message':'Synthetic shared response '+str(iteration)},'spam':{'token':challenge['token'],'solution':'0','website':''}})
+   with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+    futures=[pool.submit(request,index,'/api/forms/'+form_id+'/entries','POST',submissions[index]) for index in [0,1]];accepted=[json.loads(f.result()[1]) for f in futures]
+   assert accepted[0]['entry']==accepted[1]['entry'] and sql(f"SELECT COUNT(*) FROM form_entries WHERE form_id='{form_id}'",url)==str(iteration+1)
   post={'title':'Process reference','slug':'process-reference','kind':'post','body':'Shared original body','action':'publish'}
   _,raw=request(0,'/api/admin/content','POST',post,owner);saved=json.loads(raw);id_=saved['id']
   request(1,'/process-reference');unchanged_state=(data/'.process-state.json').stat().st_mtime_ns;headers,raw=request(1,'/process-reference');cached_request_id=headers['X-Request-Id'];assert (data/'.process-state.json').stat().st_mtime_ns==unchanged_state,'Read-only cache hit must not rewrite unchanged durable authority';assert headers['X-Wpalt-Cache']=='hit' and b'Shared original body' in raw
@@ -142,6 +197,40 @@ try:
   with response:assert response.status==303
   request(0,'/api/admin/content','POST',post,owner,status=401)
   for node in nodes:stop(node)
+  # Crash three actual worker cycles, reconcile offline, then retry immediately.
+  # Private fixture timestamps advance due work without changing runtime config.
+  for iteration in range(4):
+   history_file=data/'background-jobs.json'
+   if history_file.exists():
+    history=json.loads(history_file.read_text());history[0]['started_at']=int(time.time())-3601;history_file.write_text(json.dumps(history))
+   holder=subprocess.Popen([a.psql,url,'-X','-qAt','-v','ON_ERROR_STOP=1'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+   holder.stdin.write("BEGIN; LOCK TABLE posts IN ACCESS EXCLUSIVE MODE; SELECT 'held';\n");holder.stdin.flush();assert holder.stdout.readline().strip()=='held'
+   worker_log=(root/f'worker-{iteration}.log').open('w');logfiles.append(worker_log)
+   worker=subprocess.Popen([binary,'--config',str(configs[0]),'worker','--once'],stdout=worker_log,stderr=worker_log,env=env);processes.append(worker)
+   deadline=time.monotonic()+10
+   while time.monotonic()<deadline:
+    assert worker.poll() is None, 'Worker exited before its controlled native stage'
+    blocked=sql(f"SELECT COUNT(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND application_name='{expected_name}' AND query LIKE '%posts%'")
+    if blocked!='0' and (data/'.process-intent').exists():break
+    time.sleep(.03)
+   else:raise AssertionError('Worker fixture did not reach a held native publication stage')
+   if iteration<3:
+    worker.kill();worker.wait(timeout=10)
+   else:
+    worker.terminate()
+    try:worker.wait(timeout=.15)
+    except subprocess.TimeoutExpired:pass
+    else:raise AssertionError('Graceful shutdown abandoned an active native worker stage')
+   holder.stdin.write('ROLLBACK;\n\\q\n');holder.stdin.flush();holder.wait(timeout=10);holder=None
+   if iteration<3:
+    assert (data/'.process-intent').exists()
+    preview=json.loads(run('local-resume').stdout);assert preview['paused']
+    run('local-resume','--execute',preview['plan'],'--acknowledge-external-effects')
+    run('worker','--once')
+    history=json.loads(history_file.read_text());assert history[0]['state']=='succeeded' and history[1]['state']=='interrupted','Reconciled worker must retry now, not retain a running cycle for one scheduler interval'
+   else:
+    worker.wait(timeout=15);assert worker.returncode==0 and not (data/'.process-intent').exists()
+    assert json.loads(history_file.read_text())[0]['state']=='succeeded'
   lifecycle=data/'.wpalt.lock';retained=root/'retained-lifecycle';lifecycle.rename(retained)
   victim=root/'unrelated-owner-record';victim.write_bytes(b'unchanged');victim.chmod(0o600)
   lifecycle.symlink_to(victim);run('job-history',ok=False);assert victim.read_bytes()==b'unchanged';lifecycle.unlink()
@@ -154,7 +243,7 @@ try:
   coordinated=[row['fields'] for row in events if row.get('fields',{}).get('event')=='coordinated_request_completed' and row['fields'].get('request_id')==cached_request_id]
   native=[row['fields'] for row in events if row.get('fields',{}).get('event')=='request_completed' and row['fields'].get('request_id')==cached_request_id]
   assert len(coordinated)==len(native)==1 and coordinated[0]['elapsed_us']>=coordinated[0]['admission_us']+coordinated[0]['finalize_us'] and coordinated[0]['elapsed_us']>=native[0]['elapsed_us'],'Queue/finalization performance must be correlated with native request identity'
-  report={'format' :'wpalt-m9-local-process-reference-v1','status':'passed','postgres_version':sql('SHOW server_version'),'processes':2,'elapsed_seconds':round(time.monotonic()-started,3),'assertions':['database rejects a second coordination directory','shared session and CSRF across nodes','withdrawn cached publication immediately refused on another node','logout revocation blocks cross-node writes','cross-node cached publication invalidation','one winner for concurrent reviewed version','shared spam challenge and one-use replay protection','untrusted incomplete body times out without persistent site pause','login abuse budget spans alternating nodes','independent coordinated worker','offline lifecycle excludes running nodes','deterministic blocked-writer kill pauses other node','private security headers/correlated pause diagnostics','stale/no-ack resume fails','exact offline graph/external-effect reconciliation','restart preserves committed state and excludes blocked write','private server-side state and redacted logs','unchanged read-only state avoids redundant durable writes','queue/finalization timing shares native request identity','lifecycle symlink/hardlink refusal preserves unrelated owner files',*(['same-version/schema executable mismatch refused before serving'] if os.uname().sysname=='Linux' else [])],'limits':['Same Unix host and exact shared site/configuration; serialized admission, not multi-host leases.','External effects require separate owner reconciliation; no exactly-once network claim.','Performance and remaining M9 workflows require their own evidence.']}
+  report={'format' :'wpalt-m9-local-process-reference-v1','status':'passed','postgres_version':sql('SHOW server_version'),'processes':2,'elapsed_seconds':round(time.monotonic()-started,3),'assertions':['database rejects a second coordination directory','shared session and CSRF across nodes','withdrawn cached publication immediately refused on another node','logout revocation blocks cross-node writes','cross-node cached publication invalidation','one winner for concurrent reviewed version','three cross-node last-stock competitions preserve one winner and one receipt','three cross-node last-seat competitions preserve one winner and one receipt','three concurrent form retries preserve one entry per reviewed request key','shared spam challenge and one-use replay protection','untrusted incomplete body times out without persistent site pause','login abuse budget spans alternating nodes','independent coordinated worker','three terminated native worker cycles require reconciliation and immediate safe retry','graceful worker shutdown drains its blocked stage and clears durable intent','offline lifecycle excludes running nodes','deterministic blocked-writer kill pauses other node','private security headers/correlated pause diagnostics','stale/no-ack resume fails','exact offline graph/external-effect reconciliation','restart preserves committed state and excludes blocked write','private server-side state and redacted logs','unchanged read-only state avoids redundant durable writes','queue/finalization timing shares native request identity','lifecycle symlink/hardlink refusal preserves unrelated owner files',*(['same-version/schema executable mismatch refused before serving'] if os.uname().sysname=='Linux' else [])],'limits':['Same Unix host and exact shared site/configuration; serialized admission, not multi-host leases.','External effects require separate owner reconciliation; no exactly-once network claim.','Performance and remaining M9 workflows require their own evidence.']}
   out=Path(a.output);out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
 finally:
  if holder and holder.poll() is None:holder.kill();holder.wait(timeout=10)

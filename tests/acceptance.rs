@@ -6852,3 +6852,250 @@ async fn selected_plugin_clusters_recover_definitions_without_consent_access_or_
         template.close().await;
     }
 }
+
+/// Editorial graph uses published public snapshots, not private drafts or rankings.
+#[tokio::test]
+async fn content_audit_connects_public_links_and_reports_language_sensitive_advice() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let session = site.session.as_ref().unwrap();
+        let target = content::save(&site.app, session, None, input("audit-target", "publish"))
+            .await
+            .unwrap();
+        let orphan = content::save(&site.app, session, None, input("audit-orphan", "publish"))
+            .await
+            .unwrap();
+        let draft = content::save(&site.app, session, None, input("audit-draft", "save"))
+            .await
+            .unwrap();
+        let mut source_input = input("audit-source", "publish");
+        source_input.body = "Garden notes. Useful information! [Read on](/audit-target?from=notes#detail) [Same target](/audit-target) [External](https://example.org/audit-orphan) [Self](#here)".into();
+        let source = content::save(&site.app, session, None, source_input)
+            .await
+            .unwrap();
+        // An unpublished edit must not invent a public link or alter editorial counts.
+        let mut edit = input("audit-source", "save");
+        edit.version = source.version;
+        edit.body = "Unpublished secret [draft link](/audit-orphan)".into();
+        content::save(&site.app, session, Some(&source.id), edit)
+            .await
+            .unwrap();
+        let report = wpalt::platform::content_audit::report(&site.app, "garden")
+            .await
+            .unwrap();
+        assert_eq!(report["items"].as_array().unwrap().len(), 3);
+        assert_eq!(report["edges"], serde_json::json!([[source.id, target.id]]));
+        let orphans = report["without_inbound_content_links"].as_array().unwrap();
+        assert!(orphans.contains(&serde_json::json!(orphan.id)));
+        assert!(!orphans.contains(&serde_json::json!(target.id)));
+        assert!(!report.to_string().contains("Unpublished secret"));
+        assert!(!report.to_string().contains(&draft.id));
+        let source_advice = report["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == source.id)
+            .unwrap();
+        assert_eq!(source_advice["keyword_occurrences"], 1);
+        assert!(source_advice["sentences_approximate"].as_u64().unwrap() >= 2);
+        assert!(
+            wpalt::platform::content_audit::report(&site.app, &"x".repeat(101))
+                .await
+                .is_err()
+        );
+        // Huge sites are refused before body loading, never reported as complete.
+        sqlx::query("UPDATE posts SET published_body=$1 WHERE id=$2")
+            .bind("x".repeat(8 * 1024 * 1024 + 1))
+            .bind(&orphan.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            wpalt::platform::content_audit::report(&site.app, "")
+                .await
+                .is_err()
+        );
+        site.close().await;
+    }
+}
+
+/// Translation operations preserve local text/publication and reject stale reviewed plans.
+#[tokio::test]
+async fn translation_duplication_and_selected_sync_preserve_reviewed_language_authority() {
+    use wpalt::platform::translations::{self, Request};
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        multilingual(&site).await;
+        let mut original = input("translation-source", "publish");
+        original.translation_group = "translation-family".into();
+        let source = content::save(&site.app, site.session(), None, original.clone())
+            .await
+            .unwrap();
+        let preview = translations::prepare(
+            &site.app,
+            Request {
+                source: &source.id,
+                locale: "fr",
+                slug: "translation-fr",
+                target: None,
+                fields: &[],
+                execute: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(preview["executed"], false);
+        assert_eq!(
+            get(&site.app, "/fr/translation-fr", None).await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert!(
+            translations::prepare(
+                &site.app,
+                Request {
+                    source: &source.id,
+                    locale: "fr",
+                    slug: "translation-fr",
+                    target: None,
+                    fields: &[],
+                    execute: Some("stale")
+                }
+            )
+            .await
+            .is_err()
+        );
+        let created = translations::prepare(
+            &site.app,
+            Request {
+                source: &source.id,
+                locale: "fr",
+                slug: "translation-fr",
+                target: None,
+                fields: &[],
+                execute: preview["plan"].as_str(),
+            },
+        )
+        .await
+        .unwrap();
+        let target_id = created["result"]["id"].as_str().unwrap();
+        let draft = content::get(&site.app, target_id).await.unwrap();
+        assert_eq!(draft.status, "draft");
+        assert_eq!(draft.translation_group, source.translation_group);
+        assert_eq!(draft.document, source.document);
+        assert_eq!(draft.seo, "{}");
+        // Publish the owner's actual translation; later sync must preserve that public snapshot.
+        let mut french = input("translation-fr", "publish");
+        french.locale = "fr".into();
+        french.translation_group = source.translation_group.clone();
+        french.version = draft.version;
+        french.body = "Un jardin calme.".into();
+        french.seo = r#"{"title":"Jardin français"}"#.into();
+        let french = content::save(&site.app, site.session(), Some(target_id), french)
+            .await
+            .unwrap();
+        original.version = source.version;
+        original.action = "save".into();
+        original.fields = r#"{"subtitle":"Updated source metadata","featured":false}"#.into();
+        let source = content::save(
+            &site.app,
+            site.session(),
+            Some(&source.id),
+            original.clone(),
+        )
+        .await
+        .unwrap();
+        let fields = vec!["featured".into()];
+        let preview = translations::prepare(
+            &site.app,
+            Request {
+                source: &source.id,
+                locale: "fr",
+                slug: "translation-fr",
+                target: Some(target_id),
+                fields: &fields,
+                execute: None,
+            },
+        )
+        .await
+        .unwrap();
+        // A source edit invalidates even a plan selecting an otherwise unchanged field.
+        original.version = source.version;
+        original.body = "Changed source draft".into();
+        let source = content::save(&site.app, site.session(), Some(&source.id), original)
+            .await
+            .unwrap();
+        assert!(
+            translations::prepare(
+                &site.app,
+                Request {
+                    source: &source.id,
+                    locale: "fr",
+                    slug: "translation-fr",
+                    target: Some(target_id),
+                    fields: &fields,
+                    execute: preview["plan"].as_str()
+                }
+            )
+            .await
+            .is_err()
+        );
+        let preview = translations::prepare(
+            &site.app,
+            Request {
+                source: &source.id,
+                locale: "fr",
+                slug: "translation-fr",
+                target: Some(target_id),
+                fields: &fields,
+                execute: None,
+            },
+        )
+        .await
+        .unwrap();
+        translations::prepare(
+            &site.app,
+            Request {
+                source: &source.id,
+                locale: "fr",
+                slug: "translation-fr",
+                target: Some(target_id),
+                fields: &fields,
+                execute: preview["plan"].as_str(),
+            },
+        )
+        .await
+        .unwrap();
+        let after = content::get(&site.app, target_id).await.unwrap();
+        assert_eq!(after.document, french.document);
+        assert_eq!(after.seo, french.seo);
+        assert_eq!(after.published_body, french.published_body);
+        assert_eq!(after.published_fields, french.published_fields);
+        assert_eq!(after.status, "published");
+        let fields: serde_json::Value = serde_json::from_str(&after.fields).unwrap();
+        assert_eq!(fields["featured"], false);
+        assert_eq!(fields["subtitle"], "From our garden");
+        assert_eq!(
+            get(&site.app, "/fr/translation-fr", None).await.0,
+            StatusCode::OK
+        );
+        sqlx::query("INSERT INTO member_policies(id,title) VALUES('translation-protected','Private translation')").execute(&site.app.db.pool).await.unwrap();
+        sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('post',$1,'translation-protected')").bind(&source.id).execute(&site.app.db.pool).await.unwrap();
+        assert!(
+            translations::prepare(
+                &site.app,
+                Request {
+                    source: &source.id,
+                    locale: "ar",
+                    slug: "translation-ar",
+                    target: None,
+                    fields: &[],
+                    execute: None
+                }
+            )
+            .await
+            .is_err(),
+            "Duplication must not silently lose private-source access rules"
+        );
+        site.close().await;
+    }
+}

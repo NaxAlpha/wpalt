@@ -33,12 +33,18 @@ async function scan(browser, origin, paths = ["/"], output) {
       const states=[await snapshot("before_consent")];
       const allow=page.getByRole("button",{name:"Allow local analytics",exact:true});
       if (await allow.count()) {
+        // Consent starts asynchronous offer targeting. Observe its result before
+        // inspecting/closing a dialog; networkidle alone can precede that request.
+        const offerResponse=page.waitForResponse(r=>r.url().endsWith("/api/engagement/offers"));
         const [response] = await Promise.all([page.waitForResponse(r=>r.url().endsWith("/api/engagement/consent")),allow.click()]);
         assert.equal(response.status(),200,"Cookie scan consent admission failed");
         await page.getByRole("button",{name:"Withdraw and erase my analytics",exact:true}).waitFor();
         await page.waitForLoadState("networkidle");
+        const targeted=await offerResponse;
+        assert.equal(targeted.status(),200,"Cookie scan offer targeting failed");
+        const targeting=await targeted.json();
         const closeOffer=page.getByRole("button",{name:"Close offer",exact:true});
-        if(await closeOffer.count())await closeOffer.click();
+        if(targeting.offer){await closeOffer.waitFor({state:"visible"});await closeOffer.click();}
         states.push(await snapshot("allowed_local_analytics"));
         const [withdrawal] = await Promise.all([page.waitForResponse(r=>r.url().endsWith("/api/engagement/consent")),page.getByRole("button",{name:"Withdraw and erase my analytics",exact:true}).click()]);
         assert.equal(withdrawal.status(),200,"Cookie scan withdrawal failed");

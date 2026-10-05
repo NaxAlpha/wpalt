@@ -31,6 +31,27 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Review stopped-site translation duplication or explicitly selected field sync.
+    TranslationPrepare {
+        source: String,
+        #[arg(long)]
+        locale: String,
+        #[arg(long)]
+        slug: String,
+        #[arg(long)]
+        target: Option<String>,
+        #[arg(long, value_delimiter = ',')]
+        fields: Vec<String>,
+        #[arg(long)]
+        execute: Option<String>,
+    },
+    /// Independently observe owner-selected sites from a private fleet manifest.
+    FleetInspect { manifest: PathBuf },
+    /// Stopped-site public content-link graph and advisory editorial measurements.
+    ContentAudit {
+        #[arg(long, default_value = "")]
+        keyword: String,
+    },
     /// Stopped-host least-privilege credentials for external integrations.
     Integration {
         #[command(subcommand)]
@@ -809,6 +830,15 @@ async fn main() -> anyhow::Result<()> {
         println!("{}", serde_json::to_string_pretty(&config.redacted())?);
         return Ok(());
     }
+    if let Command::FleetInspect { manifest } = &cli.command {
+        let report = wpalt::platform::fleet::inspect(manifest).await?;
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        anyhow::ensure!(
+            report["all_ready"] == true,
+            "Some fleet nodes are unavailable or unauthorized; inspect the observation."
+        );
+        return Ok(());
+    }
     if matches!(cli.command, Command::Modules) {
         println!(
             "{}",
@@ -1083,6 +1113,9 @@ async fn main() -> anyhow::Result<()> {
     );
     // Journal command classes without collecting argv, paths or secrets.
     let route = match &cli.command {
+        Command::TranslationPrepare {
+            execute: Some(_), ..
+        } => Some("cli:translation-prepare"),
         Command::Integration { .. } => Some("cli:integration"),
         Command::Init { .. } => Some("cli:init"),
         Command::Backup { .. } => Some("cli:backup"),
@@ -1284,7 +1317,8 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             }
             println!("{}", serde_json::to_string_pretty(&prepared.report)?);
         }
-        Command::Config
+        Command::FleetInspect { .. }
+        | Command::Config
         | Command::Modules
         | Command::ConfigExport { .. }
         | Command::ConfigImport { .. }
@@ -1377,6 +1411,32 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
                 .map_err(|e| anyhow::anyhow!(e.1))?;
             backup::write_private(&output, &bytes)?;
             println!("Created a new private account-linked data export.");
+        }
+        Command::TranslationPrepare {
+            source,
+            locale,
+            slug,
+            target,
+            fields,
+            execute,
+        } => {
+            let report = wpalt::platform::translations::prepare(
+                &app,
+                wpalt::platform::translations::Request {
+                    source: &source,
+                    locale: &locale,
+                    slug: &slug,
+                    target: target.as_deref(),
+                    fields: &fields,
+                    execute: execute.as_deref(),
+                },
+            )
+            .await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Command::ContentAudit { keyword } => {
+            let report = wpalt::platform::content_audit::report(&app, &keyword).await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Command::JobHistory => {
             let cycles = wpalt::operations::jobs::read(&app)
@@ -1558,15 +1618,17 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
                 "A separate worker requires local_processes=true"
             );
             let (stop, receiver) = tokio::sync::watch::channel(false);
+            let node_id = app.node_id.clone();
+            tracing::info!(event="worker_started",node_id=%node_id,once);
             let mut job = tokio::spawn(worker_loop(app, once, receiver));
-            if once {
-                job.await??;
-            } else {
-                tokio::select! {
-                    result = &mut job => { result??; },
-                    _ = shutdown() => { let _ = stop.send(true); drain_worker(job).await?; }
+            tokio::select! {
+                result = &mut job => { result??; },
+                _ = shutdown() => {
+                    tracing::info!(event="worker_stop_requested",node_id=%node_id,once);
+                    let _ = stop.send(true); drain_worker(job).await?;
                 }
             }
+            tracing::info!(event="worker_stopped",node_id=%node_id,once);
         }
         Command::Serve { external_worker } => {
             app.db.settings().await.map_err(|_| {

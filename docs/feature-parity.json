@@ -147,10 +147,15 @@
       "capability": "Translation duplication / synchronization",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "in-progress-M9-defined-local-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained."
+      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained.",
+      "m9_coverage": "Stopped-site exact-plan grouped draft duplication and explicitly selected field synchronization, preserving canonical translated document/publication/access; no unattended overwrite.",
+      "evidence": [
+        "discovery.md",
+        "../src/platform/translations.rs"
+      ]
     },
     {
       "id": "F010",
@@ -174,10 +179,15 @@
       "capability": "Automatic translation with local models",
       "deployment": "W",
       "milestone": "M3",
-      "status": "planned",
+      "status": "in-progress-M9-defined-local-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained."
+      "sequencing_reason": "Multilingual behavior belongs to the agreed M3 discovery platform; requirement retained.",
+      "m9_coverage": "Independent loopback model title/body proposals for short passages, native configured-language grouped unscheduled drafts and source-bound review. Actual language-quality evidence remains active; no universal accuracy claim.",
+      "evidence": [
+        "discovery.md",
+        "../examples/integrations/local_ai_worker.py"
+      ]
     },
     {
       "id": "F012",
@@ -497,9 +507,14 @@
       "capability": "Internal-link graph / orphan detection",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "in-progress-M9-defined-local-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m9_coverage": "Bounded complete public Markdown content-link graph with redirects, deduplicated non-self edges and inbound-link candidates; navigation/theme/dynamic graphs excluded.",
+      "evidence": [
+        "discovery.md",
+        "../src/platform/content_audit.rs"
+      ]
     },
     {
       "id": "F032",
@@ -535,9 +550,14 @@
       "capability": "Readability and keyword heuristics",
       "deployment": "L",
       "milestone": "M3",
-      "status": "planned",
+      "status": "in-progress-M9-defined-local-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m9_coverage": "Advisory published-text whitespace/sentence/paragraph/keyword counts; language-sensitive, no ranking grade, preferred length or density target.",
+      "evidence": [
+        "discovery.md",
+        "../src/platform/content_audit.rs"
+      ]
     },
     {
       "id": "F035",
@@ -2156,9 +2176,14 @@
       "capability": "Owner-hosted fleet controller",
       "deployment": "W",
       "milestone": "M9",
-      "status": "planned",
+      "status": "in-progress-M9-defined-local-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m9_coverage": "Independent read-only Rust CLI fleet observation across up to 32 delegated sites, isolated outages/revocation and finite secret-free transport. Bulk update/repair orchestration not included.",
+      "evidence": [
+        "distributed-operations.md",
+        "../src/platform/fleet.rs"
+      ]
     },
     {
       "id": "F131",

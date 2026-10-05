@@ -8,7 +8,7 @@
     if(!response.ok) throw new Error('Privacy request could not be completed.');return response.json();
   };
   const signal = navigator.globalPrivacyControl === true || (navigator.doNotTrack === '1' && host.dataset.respectDnt === 'true');
-  let active=false,recording=false,frames=0,started=0,timer;
+  let active=false,recording=false,frames=0,started=0,timer,privacyGeneration=0;
   const loadedScripts=new Set();
   const channel=typeof BroadcastChannel==='function'?new BroadcastChannel('wpalt:privacy'):null;
   if(channel)channel.onmessage=()=>{if(loadedScripts.size)location.reload();else stop();};
@@ -34,12 +34,13 @@
     });
     track('interaction',{frame:{width:Math.min(innerWidth,4096),height:Math.min(innerHeight,4096),scroll_y:quantize(scrollY),elapsed:Math.floor((performance.now()-started)/1000),rectangles,click:click?[quantize(click.clientX),quantize(click.clientY+scrollY)]:null}});
   };
-  function stop(){active=false;recording=false;clearInterval(timer);document.querySelector('#local-offer')?.remove();}
+  function stop(){privacyGeneration++;active=false;recording=false;clearInterval(timer);document.querySelector('#local-offer')?.remove();}
   function start(state){stop();active=state.consented;recording=state.recording;started=performance.now();if(active){loadScripts(state);track('pageview');offer();if(recording){snapshot();timer=setInterval(()=>snapshot(),15000);}}}
   async function offer(){
+    const generation=privacyGeneration;
     try {
       const result=await send('/api/engagement/offers',{path:location.pathname,...dimensions});
-      if(!active || !result.offer)return;
+      if(!active || generation!==privacyGeneration || !result.offer)return;
       const data=result.offer,dialog=element('dialog');dialog.id='local-offer';
       const heading=element('h2',data.title);heading.id='local-offer-title';dialog.setAttribute('aria-labelledby',heading.id);dialog.append(heading);
       const message=element('div');message.className='prose';message.innerHTML=data.html;dialog.append(message);

@@ -8,7 +8,7 @@ import argparse, hashlib, json, sqlite3, secrets, socket, subprocess, sys, tempf
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'examples/integrations'))
 from local_ai_worker import origin, request
-p=argparse.ArgumentParser();p.add_argument('--binary',default='target/debug/wpalt');p.add_argument('--ollama',required=True);p.add_argument('--model',required=True);p.add_argument('--output',default='work/m8-local-ai-reference.json');args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--binary',default='target/debug/wpalt');p.add_argument('--ollama',required=True);p.add_argument('--model',required=True);p.add_argument('--output',default='work/m8-local-ai-reference.json');p.add_argument('--translation',action='store_true');args=p.parse_args()
 binary=Path(args.binary).resolve();ai=origin(args.ollama,local=True)
 engine=request(ai+'/api/version');models=request(ai+'/api/tags')['models'];model=next(m for m in models if m['name']==args.model)
 with tempfile.TemporaryDirectory(prefix='wpalt-real-ai-') as temp:
@@ -26,6 +26,9 @@ with tempfile.TemporaryDirectory(prefix='wpalt-real-ai-') as temp:
     base=root/'base-theme.json';base.write_bytes((Path(__file__).resolve().parents[1]/'examples/themes/field-journal.json').read_bytes());base.chmod(0o600)
     native('theme','validate',base)
     native('seed-demo','--posts','1')
+    if args.translation:
+        with sqlite3.connect(root/'site.db') as db:
+            definition=json.loads(db.execute('SELECT definition FROM discovery_settings WHERE id=1').fetchone()[0]);definition['languages'].append({'code':'fr','label':'Français','direction':'ltr','navigation':[],'search_label':'Rechercher'});db.execute('UPDATE discovery_settings SET definition=?,version=version+1 WHERE id=1',(json.dumps(definition),))
     token_file=root/'worker.token';native('integration','create','--user-email','owner@example.test','--name','Actual local inference','--draft',token_file)
     token=token_file.read_text();worker=Path(__file__).resolve().parents[1]/'examples/integrations/local_ai_worker.py'
     def external(*argv):
@@ -44,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-real-ai-') as temp:
                 except OSError:time.sleep(.1)
             else:raise AssertionError('Native server not ready')
             source_body='The community garden opens on Saturday at 09:00. Admission is free. Visitors should bring a reusable bottle.'
-            source=request(site+'/api/v1/content',token,{'title':'Community garden notice','slug':'source-notice','kind':'post','body':source_body,'import_markdown':True,'action':'save','version':0,'publish_at':0})
+            source=request(site+'/api/v1/content',token,{'title':'Community garden notice','slug':'source-notice','kind':'post','body':source_body,'import_markdown':True,'action':'save','version':0,'publish_at':0,'translation_group':'ai_notice','locale':'en'})
             proposal=root/'proposal.json';start=time.perf_counter()
             preview=external('suggest','--source',source['id'],'--slug','reviewed-proposal','--ollama',ai,'--model',args.model,'--output',proposal)
             generation_seconds=time.perf_counter()-start;artifact=json.loads(proposal.read_text())
@@ -60,6 +63,16 @@ with tempfile.TemporaryDirectory(prefix='wpalt-real-ai-') as temp:
             # Only synthetic sample text; retained for human quality review, not
             # described as a proof of general factual accuracy or model quality.
             report={'format':'wpalt-local-ai-reference-v1','status':'in-progress','binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'engine':engine,'model':{'name':model['name'],'digest':model['digest'],'bytes':model['size'],'details':model.get('details')},'generation_seconds':generation_seconds,'layout_generation_seconds':layout_seconds,'layout_choices':layout_artifact['layout'],'theme_package_sha256':hashlib.sha256(theme_file.read_bytes()).hexdigest(),'metrics':artifact.get('model_metrics',{}),'source_body_sha256':hashlib.sha256(source_body.encode()).hexdigest(),'generated_body_sha256':hashlib.sha256(generated.encode()).hexdigest(),'source_bytes':len(source_body.encode()),'generated_bytes':len(generated.encode()),'synthetic_generated_sample':generated,'assertions':['actual installed model inference','private source-bound proposal','reviewed unscheduled draft','source unchanged','no public body or inferred access','actual bounded local layout inference and private native package export'],'boundary':'Single synthetic notice and one installed small model; bounded palette/font/width/listing choices on one independent base. No universal semantic quality, arbitrary theme generation, latency or CMS-only footprint claim.'}
+            if args.translation:
+                translated_proposal=root/'translation.json';translation_start=time.perf_counter()
+                reviewed=external('translate','--source',source['id'],'--slug','translated-notice','--locale','fr','--ollama',ai,'--model',args.model,'--output',translated_proposal)
+                translation_artifact=json.loads(translated_proposal.read_text());applied_translation=external('apply',translated_proposal,'--execute',reviewed['plan'])
+                translated=request(site+'/api/v1/content/'+applied_translation['draft_id'],token)['content']
+                assert translated['status']=='draft' and translated['locale']=='fr' and translated['translation_group']=='ai_notice' and not translated['published_body'] and translated['seo']=='{}'
+                assert request(site+'/api/v1/content/'+source['id'],token)['content']['body']==source_body
+                sample=translated['body'].lower();assert '09:00' in sample and ('gratuit' in sample or 'entrée est libre' in sample) and 'bouteille' in sample and 'samedi' in sample and 'jardin' in translated['title'].lower(), 'Synthetic French reference lost the time, free admission or bottle instruction; inspect actual model output before claiming translation evidence'
+                report['translation']={'seconds':time.perf_counter()-translation_start,'locale':'fr','title':translated['title'],'synthetic_generated_sample':translated['body'],'metrics':translation_artifact['model_metrics'],'draft_only':True,'source_unchanged':True,'boundary':'Actual installed model title/body proposal, not a general language-quality certificate. Owner review of facts, language, access rules and localized SEO is required.'}
+                report['assertions']+=['actual local title/body translation inference','configured-language grouped unscheduled draft','untranslated SEO excluded','translation source unchanged']
             output=Path(args.output);output.parent.mkdir(parents=True,exist_ok=True);output.write_text(json.dumps(report,indent=2)+'\n')
 
         finally:

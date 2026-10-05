@@ -121,7 +121,8 @@ where
     }
     if coordinator.is_some()
         && read(app).await?.first().is_some_and(|cycle| {
-            cycle.started_at > crate::now() - app.config.scheduler_seconds as i64
+            cycle.state != "running"
+                && cycle.started_at > crate::now() - app.config.scheduler_seconds as i64
         })
     {
         return coordinator

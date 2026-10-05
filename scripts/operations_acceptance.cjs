@@ -142,6 +142,8 @@ module.exports = async (owner, origin, output, password) => {
     assert.deepEqual(cookieReport.blocked_external_origins,[]);
     assert.ok(!JSON.stringify(cookieReport).includes(password),"Cookie report contains no credential values");
     report.cookie_scan=cookieReport;
+    await require('./consent_generation_acceptance.cjs')(owner.browser(),origin);
+    report.journey.push('Delayed offer from a withdrawn grant cannot reappear after regrant');
     report.status="passed";
   } finally {
     await cdp.send("WebAuthn.removeVirtualAuthenticator",{authenticatorId});
