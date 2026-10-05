@@ -32,6 +32,7 @@ module.exports=async(owner,publicContext,origin,output)=>{
    await page.screenshot({path:path.join(output,`independent-theme-home-${width}.png`),fullPage:true});
    await page.screenshot({path:path.join(output,`independent-theme-top-${width}.png`)});
    const spacing=await page.addStyleTag({url:origin+'/__ui_fixture/theme-spacing.css'});measured=await measure(page);assert.deepEqual(measured.failures,[]);report.measurements.push({surface:'home text spacing',...measured});await spacing.evaluate(n=>n.remove());
+   assert(await page.locator('.n-homeexcerpt').allTextContents().then(values=>values.some(v=>v.endsWith('…'))),'Listing SQL projection must preserve an explicit word-boundary truncation marker');
    const first=page.locator('.n-homelink').first();assert(await first.isVisible());assert(await page.locator('.n-homeexcerpt').first().textContent());const href=await first.getAttribute('href');await page.goto(origin+href);
    const article=await page.locator('.n-article').evaluate(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return {max_width:parseFloat(s.maxWidth),width:r.width,x:r.x};});
    assert.equal(article.max_width,760);assert(article.width<=760.5);assert(article.x>=0);assert(article.x+article.width<=width+.5);

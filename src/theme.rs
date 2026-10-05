@@ -469,7 +469,7 @@ impl Package {
             _ => "system-ui,sans-serif",
         };
         let mut out = format!(
-            "body.theme-site{{--bg:{};--ink:{};--accent:{};--panel:{};--muted:{};background:var(--bg);color:var(--ink);font-family:{font};font-size:16px;line-height:1.6}}.theme-site :is(input,button,select){{font-size:16px;min-height:44px;border-radius:6px}}.theme-site :is(a,input,button,select):focus-visible{{outline:3px solid var(--accent);outline-offset:3px}}a{{color:{}}}.theme-shell{{max-width:1200px;margin:auto;padding:24px}}.theme-node img{{max-width:100%;height:auto}}.theme-grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}}.theme-row{{display:flex;flex-wrap:wrap;gap:24px}}.theme-card{{padding:24px;background:{};border-radius:12px}}@media(max-width:700px){{.theme-grid{{grid-template-columns:1fr}}}}",
+            "body.theme-site{{--bg:{};--ink:{};--accent:{};--panel:{};--muted:{};background:var(--bg);color:var(--ink);font-family:{font};font-size:16px;line-height:1.6}}.theme-site :is(input,button,select){{font-size:16px;min-height:44px;border-radius:6px}}.theme-site :is(a,input,button,select):focus-visible{{outline:3px solid var(--accent);outline-offset:3px}}a{{color:{}}}.theme-shell{{max-width:1200px;margin:auto;padding:24px}}.theme-node{{min-width:0;overflow-wrap:anywhere}}.theme-node img{{max-width:100%;height:auto}}.theme-grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}}.theme-row{{display:flex;flex-wrap:wrap;gap:24px}}.theme-card{{padding:24px;background:{};border-radius:12px}}@media(max-width:700px){{.theme-grid{{grid-template-columns:1fr}}}}",
             self.tokens["background"],
             self.tokens["text"],
             self.tokens["accent"],
@@ -1417,16 +1417,7 @@ impl Context {
             };
             // Derive only from the already authorized projection. Bound Markdown
             // parsing before it starts; no extra database read or private lookup.
-            let mut chars = body.chars();
-            let raw: String = chars.by_ref().take(220).collect();
-            let mut excerpt = crate::view::excerpt(&raw);
-            if chars.next().is_some() {
-                if let Some((whole, _)) = excerpt.rsplit_once(char::is_whitespace) {
-                    excerpt = whole.trim_end().to_owned();
-                }
-                excerpt.push('…');
-            }
-            return excerpt.into();
+            return crate::view::bounded_excerpt(body, false).into();
         }
         let mut parts = path.split('.');
         let root = parts.next().unwrap_or("");

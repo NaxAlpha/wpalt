@@ -38,12 +38,13 @@ environment = ['-e', 'WORDPRESS_DB_HOST='+database, '-e', 'WORDPRESS_DB_USER=wpa
 
 def wp(*argv):
     return run('docker', 'run', '--rm', '--network', network, '--user', '33:33',
-               '-v', volume+':/var/www/html', *environment, images[1], 'wp', *argv).stdout.strip()
+               '-v', volume+':/var/www/html', *environment, images[1], 'php', '-d', 'memory_limit=512M', '/usr/local/bin/wp', *argv).stdout.strip()
 
 with tempfile.TemporaryDirectory(prefix='wpalt-m8-reference-') as temp:
     root = Path(temp)
     report = {'format': 'wpalt-m8-wordpress-reference-v1',
               'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
+              'reference_cli_php_memory_limit':'512M',
               'scope': 'Actual synthetic core WXR export with free Yoast, ACF, Elementor and WPForms installed; core posts/private page, terms/comment/SEO and fresh recovery. Explicit ACF scalars retain draft access; other adapters remain separate gates.'}
     try:
         for image in images:
@@ -180,9 +181,9 @@ echo json_encode(['posts'=>4,'export_items'=>count($exportable),'types'=>$types,
         clusters=root/'clusters.json';run('docker','cp',site+':/var/www/html/wpalt-m8-clusters.json',str(clusters))
         run('docker','exec',site,'rm','/var/www/html/wpalt-m8-clusters.json','/var/www/html/wpalt-m8-cluster-seed.php')
         report['cluster_export_sha256']=hashlib.sha256(clusters.read_bytes()).hexdigest()
-        args=('wordpress-prepare',export,'--owner-email','owner@example.test','--cluster-export',clusters)
-        projected=json.loads(native(template,*args));assert projected['cluster_mapping']['counts']==report['cluster_source_counts']
-        projected_file=root/'clusters-native.json';native(template,*args,'--execute',projected['plan'],'--output',projected_file)
+        cluster_args=('wordpress-prepare',export,'--owner-email','owner@example.test','--cluster-export',clusters)
+        projected=json.loads(native(template,*cluster_args));assert projected['cluster_mapping']['counts']==report['cluster_source_counts']
+        projected_file=root/'clusters-native.json';native(template,*cluster_args,'--execute',projected['plan'],'--output',projected_file)
         clustered=config('clustered');native(clustered,'restore',projected_file)
         with sqlite3.connect(root/'clustered.db') as db:
             assert db.execute('SELECT suppressed FROM audience_contacts').fetchone()[0]==1

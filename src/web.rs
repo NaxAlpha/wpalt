@@ -671,7 +671,7 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
             .push_bind(id)
             .push(")");
     }
-    sql.push(" ORDER BY published_at DESC,id DESC LIMIT 21) SELECT p.id,p.published_locale,p.published_slug AS slug,p.kind,p.published_title AS title,substr(p.published_body,1,220) AS summary,p.published_fields,p.published_at FROM candidates c JOIN posts p ON p.id=c.id ORDER BY c.published_at DESC,c.id DESC");
+    sql.push(" ORDER BY published_at DESC,id DESC LIMIT 21) SELECT p.id,p.published_locale,p.published_slug AS slug,p.kind,p.published_title AS title,substr(p.published_body,1,220) AS summary,CASE WHEN substr(p.published_body,221,1)<>'' THEN 1 ELSE 0 END AS summary_truncated,p.published_fields,p.published_at FROM candidates c JOIN posts p ON p.id=c.id ORDER BY c.published_at DESC,c.id DESC");
     let rows = app.db.fetch_builder(&mut sql).await?;
     Ok(rows
         .into_iter()
@@ -686,7 +686,10 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
                 .to_owned(),
             kind: r.get("kind"),
             title: r.get("title"),
-            summary: view::excerpt(&r.get::<String, _>("summary")),
+            summary: view::bounded_excerpt(
+                &r.get::<String, _>("summary"),
+                r.get::<i64, _>("summary_truncated") != 0,
+            ),
             fields: serde_json::from_str(&r.get::<String, _>("published_fields"))
                 .unwrap_or_default(),
             published_at: r.get("published_at"),

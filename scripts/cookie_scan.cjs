@@ -30,13 +30,15 @@ async function scan(browser, origin, paths = ["/"], output) {
       const states=[await snapshot("before_consent")];
       const allow=page.getByRole("button",{name:"Allow local analytics",exact:true});
       if (await allow.count()) {
-        await Promise.all([page.waitForResponse(r=>r.url().endsWith("/api/engagement/consent")&&r.status()===200),allow.click()]);
+        const [response] = await Promise.all([page.waitForResponse(r=>r.url().endsWith("/api/engagement/consent")),allow.click()]);
+        assert.equal(response.status(),200,"Cookie scan consent admission failed");
         await page.getByRole("button",{name:"Withdraw and erase my analytics",exact:true}).waitFor();
         await page.waitForLoadState("networkidle");
         const closeOffer=page.getByRole("button",{name:"Close offer",exact:true});
         if(await closeOffer.count())await closeOffer.click();
         states.push(await snapshot("allowed_local_analytics"));
-        await Promise.all([page.waitForResponse(r=>r.url().endsWith("/api/engagement/consent")&&r.status()===200),page.getByRole("button",{name:"Withdraw and erase my analytics",exact:true}).click()]);
+        const [withdrawal] = await Promise.all([page.waitForResponse(r=>r.url().endsWith("/api/engagement/consent")),page.getByRole("button",{name:"Withdraw and erase my analytics",exact:true}).click()]);
+        assert.equal(withdrawal.status(),200,"Cookie scan withdrawal failed");
         states.push(await snapshot("withdrawn"));
       }
       report.pages.push({path:p,states});
