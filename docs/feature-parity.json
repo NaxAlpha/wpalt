@@ -1770,7 +1770,7 @@
       "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Bounded privileged HTTP and host-owner CLI intent/outcome history, rotation-spanning inspection and last-200-record fresh recovery; shared background-job audit remains outstanding.",
+      "m7_coverage": "Bounded privileged HTTP and host-owner CLI intent/outcome history, rotation-spanning inspection and last-200-record fresh recovery; shared bounded scheduler-cycle intent/outcome history records per-stage failure, duration/count and unresolved interruption; domain retry state remains authoritative.",
       "evidence": [
         "m7-contract.md",
         "resilient-operations.md",

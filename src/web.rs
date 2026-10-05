@@ -1928,7 +1928,7 @@ async fn audit_history(State(app): State<App>, headers: HeaderMap) -> Result<Res
     Ok(html_page("Action history",&app.db.settings().await?,Some(&s),html!{
         (view::heading("Operations","Action history","Recent privileged actions. An intent without an outcome may have been interrupted."))
         p {a href="/admin/operations" {"Return to Operations"}}
-        div class="table-wrap" {table {thead {tr {th {"Time"}th {"Action"}th {"Phase"}th {"Status"}th {"Actor"}}}tbody {@for event in events {tr {td {(event.at)}td {(event.route)}td {(event.phase)}td {(event.status)}td {(event.actor)}}}}}}
+        div class="table-wrap" {table {thead {tr {th {"Time"}th {"Action"}th {"Phase"}th {"Status"}th {"Actor"}}}tbody {@for event in events {tr {td {(view::timestamp(event.at))}td {(event.route)}td {(event.phase)}td {(event.status)}td {(event.actor)}}}}}}
         p class="muted" {"Private rotating journal, bounded to two 1 MiB files. This history is operational evidence, not a tamper-proof ledger."}
     }).into_response())
 }
@@ -2104,6 +2104,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
     let s = admin_session(&app, &headers).await?;
     admin(&s)?;
     let recovery = crate::operations::recovery::status(&app).await?;
+    let jobs = crate::operations::jobs::read(&app).await?;
     let cache = app.page_cache.lock().await.statistics();
     Ok(html_page(
         "Operations",
@@ -2120,7 +2121,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
                 h2 {"Managed recovery"}
                 @if app.config.recovery.enabled {
                     p {"Encrypted copies every " (app.config.recovery.interval_seconds) " seconds. Retain " (app.config.recovery.retain) " packages per destination."}
-                    p {"Last attempt: " (recovery.last_attempt) ". Last complete set: " (recovery.last_complete) "."}
+                    p {"Last attempt: " (view::timestamp(recovery.last_attempt)) ". Last complete set: " (view::timestamp(recovery.last_complete)) "."}
                     @if !recovery.package.is_empty() {p class="muted" {(recovery.package)}}
                     @for copy in &recovery.copies {p {(copy.destination.display()) " · " strong {(copy.state)}}}
                     form method="post" action="/admin/recovery/run" {(view::csrf(&s))button {"Create encrypted recovery copies"}}
@@ -2129,9 +2130,19 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
                 }
                 p class="muted" {"Keep the recovery key separately. Verify an independent copy by restoring into a fresh instance. A pending attempt after restart may have been interrupted; inspect destination packages before retrying."}
             }
+            section class="panel" {
+                h2 {"Background work"}
+                p {"Latest 64 scheduler cycles retained locally. Unresolved cycles may be interrupted; history never replays payments or deliveries. The next scheduled poll uses each feature’s own retry rules."}
+                @if jobs.is_empty() {p class="muted" {"No scheduler cycles recorded yet."}}
+                @for job in jobs.iter().take(8) {
+                    details {summary {(view::timestamp(job.started_at)) " · " strong {(&job.state)} " · " (job.elapsed_ms) " ms"}
+                        @for stage in &job.stages {p {(&stage.name) " · " (if stage.succeeded {"completed"} else {"failed; inspect feature status"}) @if let Some(count) = stage.count {" · " (count) " processed"} " · " (stage.elapsed_ms) " ms"}}
+                    }
+                }
+            }
             section class="panel" {h2 {"Presentation variants"}p {"Current-role cache buckets: " (if app.config.variants.role_variants {"enabled"} else {"disabled"}) " · " (app.config.variants.region_networks.len()) " native-peer region networks"}p {"Role and region labels customize presentation; protected-resource authorization remains separate. Extra cookies bypass shared cache, and forwarded-IP headers are ignored."}}
             section class="panel" {h2 {"Asset loading"}p {"Template-scoped CSS: " (if app.config.assets.scoped_theme_css {"enabled"} else {"disabled"}) " · Theme preload: " (if app.config.assets.preload_theme_css {"enabled"} else {"disabled"})}p {"Local compiled assets and render-reachable styles preserve responsive/conditional presentation. Image insertion records dimensions; choose early loading for an important lead image."}}
-            section class="panel" {h2 {"Public response cache"}p {(if app.config.cache.enabled {"Enabled"}else{"Disabled"}) " · " (cache.0) " entries · " (cache.1) " bytes retained"}p {"Anonymous publications, listings, content projections and sitemaps only. Cookies, credentials and protected resources bypass shared storage. Browser page caching remains disabled so access changes take effect."}form method="post" action="/admin/operations/cache/purge" {(view::csrf(&s))button class="secondary" {"Purge public cache"}} form method="post" action="/admin/operations/cache/preload" {(view::csrf(&s))button class="secondary" disabled[!app.config.cache.enabled] {"Preload recent public pages"}}}
+            section class="panel" {h2 {"Public response cache"}p {(if app.config.cache.enabled {"Enabled"}else{"Disabled"}) " · " (cache.0) " entries · " (cache.1) " bytes retained"}p {"Public publications, listings, content projections and sitemaps only. Extra cookies, credentials and protected resources bypass shared storage; optional current-role variants use separate buckets. Browser page caching remains disabled so access changes take effect."}form method="post" action="/admin/operations/cache/purge" {(view::csrf(&s))button class="secondary" {"Purge public cache"}} form method="post" action="/admin/operations/cache/preload" {(view::csrf(&s))button class="secondary" disabled[!app.config.cache.enabled] {"Preload recent public pages"}}}
             section class="panel" {h2 {"Local submission guard"}p {(if app.config.spam.enabled {"Enabled"} else {"Disabled"}) " for public comments and forms."}p class="muted" {"When enabled, submissions need a short same-origin computation. Honeypots, link limits, moderation and existing rate limits work together. This does not identify humans or use shared reputation. Configure [spam] to adjust the policy."}}
             section class="panel" {h2 {"Stored-file integrity"}p {a href="/admin/operations/audit" {"Inspect privileged action history"}}
                 p {"Check database-recorded image and private attachment checksums without changing files. A bounded scan reports incomplete work; it does not certify malware-free content."}

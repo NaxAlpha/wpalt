@@ -4305,3 +4305,81 @@ async fn role_region_cache_variants_revalidate_authority_and_ignore_spoofed_head
         site.close().await;
     }
 }
+
+#[tokio::test]
+async fn background_history_reports_failure_interruption_and_blocks_unrecorded_dispatch() {
+    use wpalt::operations::jobs::{read, run_cycle, stage};
+    for postgres in engines() {
+        let site = Site::new(postgres, true).await;
+        run_cycle(&site.app, async {
+            vec![
+                stage("publication", async { Ok(3) }).await,
+                stage("mail", async {
+                    Err(wpalt::error::Error::invalid("secret-mail-token"))
+                })
+                .await,
+            ]
+        })
+        .await
+        .unwrap();
+        let history = read(&site.app).await.unwrap();
+        assert_eq!(history[0].state, "failed");
+        assert_eq!(history[0].stages[0].count, Some(3));
+        assert!(!history[0].stages[1].succeeded);
+        let path = site.app.config.data_dir.join("background-jobs.json");
+        assert!(
+            !tokio::fs::read_to_string(&path)
+                .await
+                .unwrap()
+                .contains("secret-mail-token")
+        );
+
+        // Kill a worker after durable intent but before any claimed outcome.
+        let entered = std::sync::Arc::new(tokio::sync::Notify::new());
+        let signal = entered.clone();
+        let app = site.app.clone();
+        let task = tokio::spawn(async move {
+            run_cycle(&app, async {
+                signal.notify_one();
+                std::future::pending::<Vec<wpalt::operations::jobs::Stage>>().await
+            })
+            .await
+        });
+        entered.notified().await;
+        assert_eq!(read(&site.app).await.unwrap()[0].state, "running");
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+        run_cycle(&site.app, async {
+            vec![stage("publication", async { Ok(0) }).await]
+        })
+        .await
+        .unwrap();
+        let history = read(&site.app).await.unwrap();
+        assert_eq!(history[0].state, "succeeded");
+        assert_eq!(history[1].state, "interrupted");
+        assert_eq!(history[1].finished_at, 0);
+        assert!(history[1].stages.is_empty());
+        for _ in 0..65 {
+            run_cycle(&site.app, async {
+                vec![stage("publication", async { Ok(0) }).await]
+            })
+            .await
+            .unwrap();
+        }
+        assert_eq!(read(&site.app).await.unwrap().len(), 64);
+        assert!(tokio::fs::metadata(&path).await.unwrap().len() <= 128 * 1024);
+        tokio::fs::remove_file(&path).await.unwrap();
+        tokio::fs::create_dir(&path).await.unwrap();
+        let dispatched = std::sync::atomic::AtomicBool::new(false);
+        assert!(
+            run_cycle(&site.app, async {
+                dispatched.store(true, std::sync::atomic::Ordering::SeqCst);
+                Vec::new()
+            })
+            .await
+            .is_err()
+        );
+        assert!(!dispatched.load(std::sync::atomic::Ordering::SeqCst));
+        site.close().await;
+    }
+}

@@ -117,3 +117,13 @@ pub fn excerpt(markdown: &str) -> String {
     }
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
+
+/// Display server timestamps with an explicit zone and a useful empty state.
+pub fn timestamp(seconds: i64) -> String {
+    if seconds == 0 {
+        return "Not recorded".into();
+    }
+    chrono::DateTime::from_timestamp(seconds, 0)
+        .map(|date| date.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+        .unwrap_or_else(|| "Invalid timestamp".into())
+}

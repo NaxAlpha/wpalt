@@ -18,3 +18,5 @@ pub mod upgrade;
 pub mod video;
 
 pub mod variants;
+
+pub mod jobs;

@@ -74,6 +74,8 @@ enum Command {
     },
     /// Convert a bounded owner-selected MP4/WebM source into a new private MP4.
     VideoTranscode { input: PathBuf, output: PathBuf },
+    /// Read bounded private background-cycle history while the server is stopped.
+    JobHistory,
     /// Preview unused media and expired sessions; deletion requires the exact recent plan.
     Cleanup {
         #[arg(long)]
@@ -847,6 +849,12 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             backup::write_private(&output, &encoded)?;
             println!("Created a new private bounded MP4 file.");
         }
+        Command::JobHistory => {
+            let cycles = wpalt::operations::jobs::read(&app)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            println!("{}", serde_json::to_string_pretty(&cycles)?);
+        }
         Command::Cleanup { execute, cutoff } => {
             if let Some(hash) = execute {
                 let cutoff = cutoff
@@ -1018,32 +1026,35 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
                 interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                 loop {
                     interval.tick().await;
-                    if wpalt::operations::recovery::tick(&scheduled).await.is_err() {
-                        tracing::error!(event = "recovery_tick_failed");
-                    }
-                    if content::publish_due(&scheduled).await.is_err() {
-                        tracing::error!(event = "scheduler_tick_failed");
-                    }
-                    if wpalt::business::campaigns::tick(&scheduled).await.is_err() {
-                        tracing::error!(event = "campaign_tick_failed");
-                    }
-                    if wpalt::commerce::tick(&scheduled).await.is_err() {
-                        tracing::error!(event = "commerce_tick_failed");
-                    }
-                    if wpalt::business::mail::tick(&scheduled).await.is_err() {
-                        tracing::error!(event = "mail_tick_failed");
-                    }
-                    if wpalt::business::engagement::cleanup(&scheduled)
-                        .await
-                        .is_err()
+                    use wpalt::operations::jobs::{run_cycle, stage, stage_unit};
+                    if run_cycle(&scheduled, async {
+                        vec![
+                            stage_unit("recovery", wpalt::operations::recovery::tick(&scheduled))
+                                .await,
+                            stage("publication", content::publish_due(&scheduled)).await,
+                            stage("campaigns", wpalt::business::campaigns::tick(&scheduled)).await,
+                            stage("commerce", wpalt::commerce::tick(&scheduled)).await,
+                            stage("mail", wpalt::business::mail::tick(&scheduled)).await,
+                            stage_unit(
+                                "engagement-retention",
+                                wpalt::business::engagement::cleanup(&scheduled),
+                            )
+                            .await,
+                            stage_unit(
+                                "quota-retention",
+                                wpalt::business::quotas::cleanup(&scheduled),
+                            )
+                            .await,
+                            stage_unit("maintenance", cleanup(&scheduled)).await,
+                        ]
+                    })
+                    .await
+                    .is_err()
                     {
-                        tracing::error!(event = "engagement_retention_failed");
-                    }
-                    if wpalt::business::quotas::cleanup(&scheduled).await.is_err() {
-                        tracing::error!(event = "business_retention_failed");
-                    }
-                    if let Err(_e) = cleanup(&scheduled).await {
-                        tracing::error!(event = "maintenance_tick_failed");
+                        tracing::error!(
+                            event = "background_history_failed",
+                            action = "inspect_site_storage"
+                        );
                     }
                 }
             });

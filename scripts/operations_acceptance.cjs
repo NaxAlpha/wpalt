@@ -42,6 +42,12 @@ module.exports = async (owner, origin, output, password) => {
     await anonymous.close();
     report.journey.push("Native AVIF decodes in browser and retains private source authority");
     await page.goto(origin+"/admin/operations");
+    await page.getByRole("heading",{name:"Background work",exact:true}).waitFor();
+    await page.waitForFunction(()=>document.querySelector("main").textContent.includes("succeeded"));
+    const background=page.locator("section").filter({has:page.getByRole("heading",{name:"Background work",exact:true})});
+    await background.locator("summary").first().click();
+    await background.getByText(/publication · completed/).first().waitFor();
+    report.journey.push("Owner reviews durable background-stage outcome and timing");
     await measure("operations");
     await Promise.all([page.waitForNavigation(),page.getByRole("button",{name:"Inspect stored-file integrity",exact:true}).click()]);
     await page.getByRole("heading",{name:"Stored-file inspection",exact:true}).waitFor();

@@ -1464,6 +1464,36 @@
         "guidance changes or release"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-BACKGROUND-HISTORY",
+      "area": "Durable bounded scheduler outcomes and interruptions",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html#method.abort",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "wpalt single owning process",
+        "Tokio async task cancellation and non-cancellable blocking I/O"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Persist intent before dispatch, bound history to 64 cycles/128 KiB, retain I/O ownership during non-cancellable blocking sync. Report unresolved/interrupted cycles and per-stage outcomes without raw error secrets. Never use journal entries to replay financial or delivery actions; domain state governs retries."
+      ],
+      "tests": [
+        "background_history_reports_failure_interruption_and_blocks_unrecorded_dispatch"
+      ],
+      "triggers": [
+        "scheduler or cancellation changes",
+        "financial/delivery retry changes",
+        "release and logging security review"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."
