@@ -97,7 +97,11 @@ try:
     assert run(str(binary),'--config',str(recovered),'shop','report',ok=False).returncode!=0,'Physical recovery must not silently replace directory authority'
     review=json.loads(run(str(binary),'--config',str(recovered),'upgrade','--rebind-directory','--source-origin',f'http://127.0.0.1:{source_http_port}').stdout)
     assert review['directory_rebind'] and not review['executed']
-    run(str(binary),'--config',str(recovered),'upgrade','--rebind-directory','--source-origin',f'http://127.0.0.1:{source_http_port}','--execute',review['plan'],'--recovery-output',str(root/'before-rebind.enc'),'--key-file',str(engine/'key'),'--acknowledge-source-stopped')
+    # Engine archive key belongs to container PostgreSQL (0600), deliberately
+    # unreadable by the host application. Use an independent host-owner logical
+    # recovery key; do not weaken private key permissions to bypass that boundary.
+    run(str(binary),'recovery-key',str(root/'rebind.key'))
+    run(str(binary),'--config',str(recovered),'upgrade','--rebind-directory','--source-origin',f'http://127.0.0.1:{source_http_port}','--execute',review['plan'],'--recovery-output',str(root/'before-rebind.enc'),'--key-file',str(root/'rebind.key'),'--acknowledge-source-stopped')
     assert sql(target,'SELECT held FROM recovery_mode WHERE id=1;')=='1'
     run(str(binary),'--config',str(recovered),'clone-activate','--review','Verified named-point engine recovery and matching media; original source removed, restored identities and queues inspected, no external payment or mail ownership duplicated.')
     assert json.loads(run(str(binary),'--config',str(recovered),'shop','report').stdout)['products']==products
