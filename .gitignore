@@ -11,3 +11,7 @@ __pycache__/
 .DS_Store
 
 /frontend/node_modules/
+
+# Generated checksummed dependency source; never commit it.
+/vendor/rav1e/
+/vendor/.encoder-*/

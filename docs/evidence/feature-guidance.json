@@ -1284,19 +1284,20 @@
         "ravif 0.12.0",
         "Rust 1.88 floor"
       ],
-      "last_checked": "2026-10-04",
-      "next_review": "2026-11-03",
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
       "review_interval_days": 30,
       "maintenance_owner": "wpalt maintainers",
       "requirements": [
         "Bound AVIF output pixels and encoder threads; do not silently discard animation.",
         "Authenticate each request before byte-cache reuse; separate retained storage budgets from transient worker allocations.",
-        "Verify every vendor-source byte against the registry checksum plus the narrow upstream pastey/lifetime maintenance transformations; remove the path patch when a reviewed registry release contains the fix."
+        "Download the pinned checksummed registry archive, apply exact maintenance transformations and verify every generated source byte before Cargo; never commit generated dependency source. Remove the path patch when a reviewed registry release contains the fix."
       ],
       "tests": [
         "native_image_derivatives_preserve_private_authority_and_validate_processing_limits",
         "scripts/operations_acceptance.cjs",
-        "scripts/verify_encoder_vendor.py"
+        "scripts/prepare_encoder.py",
+        "tests/pipeline/test_prepare_encoder.py"
       ],
       "triggers": [
         "encoder or browser changes",

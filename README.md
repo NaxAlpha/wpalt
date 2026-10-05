@@ -17,12 +17,15 @@ Rust 1.88 or newer is the declared build floor, verified by CI. Node/npm are fro
 ```sh
 npm ci --prefix frontend --ignore-scripts
 npm --prefix frontend run build
+python3 scripts/prepare_encoder.py
 cargo build --release --locked
 cp wpalt.example.toml wpalt.local.toml
 ./target/release/wpalt --config wpalt.local.toml init --admin-email you@example.com
 ./target/release/wpalt --config wpalt.local.toml seed-demo
 ./target/release/wpalt --config wpalt.local.toml serve
 ```
+
+Source builds require Python 3 and the [pinned encoder preparation step](docs/encoder-build.md) before Cargo. It downloads and verifies build-time dependency source; the running server requires no Python or build-time network access.
 
 Initialization reads the password from stdin. Use a private pipe/password manager; the first CLI does not mask interactive input. Visit the configured origin's `/login` (default `http://127.0.0.1:3000`). Review [operations and recovery](docs/operations.md) before exposing a site. Non-local deployments require an HTTPS origin behind a TLS reverse proxy.
 
