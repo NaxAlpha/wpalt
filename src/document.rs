@@ -100,6 +100,48 @@ impl Document {
     pub fn html(&self) -> String {
         render(&self.root)
     }
+    pub fn image_ids(&self) -> std::collections::BTreeSet<String> {
+        fn visit(n: &Node, ids: &mut std::collections::BTreeSet<String>) {
+            if n.kind == "image"
+                && let Some(id) = n.attrs["src"]
+                    .as_str()
+                    .and_then(|v| v.strip_prefix("/media/"))
+                && uuid::Uuid::parse_str(id).is_ok()
+            {
+                ids.insert(id.into());
+            }
+            for child in &n.content {
+                visit(child, ids);
+            }
+        }
+        let mut ids = std::collections::BTreeSet::new();
+        visit(&self.root, &mut ids);
+        ids
+    }
+    /// Enrich a transient render tree only. Historical publications remain unchanged.
+    pub fn apply_dimensions(
+        &mut self,
+        dimensions: &std::collections::BTreeMap<String, (u32, u32)>,
+    ) {
+        fn visit(n: &mut Node, dimensions: &std::collections::BTreeMap<String, (u32, u32)>) {
+            if n.kind == "image"
+                && !n.attrs["width"].is_number()
+                && let Some((width, height)) = n.attrs["src"]
+                    .as_str()
+                    .and_then(|v| v.strip_prefix("/media/"))
+                    .and_then(|id| dimensions.get(id))
+                && (1..=4096).contains(width)
+                && (1..=4096).contains(height)
+            {
+                n.attrs["width"] = (*width).into();
+                n.attrs["height"] = (*height).into();
+            }
+            for child in &mut n.content {
+                visit(child, dimensions);
+            }
+        }
+        visit(&mut self.root, dimensions);
+    }
     /// Draft inspection must not create live response collectors.
     pub fn preview_html(&self) -> String {
         fn project(n: &mut Node) {

@@ -278,12 +278,36 @@ async function freePort() {
   await page
     .getByLabel("Parameter title value", { exact: true })
     .fill("M2_REUSABLE_CARD");
+  await page.getByLabel("Template", { exact: true }).selectOption("home");
+  await page.getByLabel("Add child", { exact: true }).selectOption("image");
+  await page.locator(".outline button").last().click();
+  await page.getByLabel("Media value", { exact: true }).fill(mediaUrl.split("/").pop());
+  await page.getByLabel("Image loading priority", { exact: true }).selectOption("eager");
+  const studioLayoutReport = {measurements:[],accessibility:[]};
+  const studioUi = require("./ui_contracts.cjs");
+  await page.route(origin+"/__ui_fixture/axe.js",route=>route.fulfill({contentType:"text/javascript",body:fs.readFileSync(path.join(root,"frontend/node_modules/axe-core/axe.min.js"))}));
+  for (const width of [320,768,1440]) {
+    await page.setViewportSize({width,height:1000});
+    const measurement = await studioUi.geometry(page);
+    assert.deepEqual(measurement.failures,[],`Studio image properties at ${width}`);
+    studioLayoutReport.measurements.push(measurement);
+    await page.screenshot({path:path.join(output,`studio-image-priority-${width}.png`),fullPage:true});
+  }
+  await studioUi.accessibility(page,origin,"studio-image-priority",studioLayoutReport);
+  fs.writeFileSync(path.join(output,"studio-image-layout.json"),JSON.stringify(studioLayoutReport,null,2));
+  await page.setViewportSize({width:1600,height:1100});
+
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Draft saved." }).waitFor();
   const frame = page.frameLocator('iframe[title="Website draft preview"]');
   await frame
     .getByRole("heading", { name: "M2_REUSABLE_CARD", exact: true })
     .waitFor();
+  const layoutImage = frame.locator(`img[src="${mediaUrl}"]`);
+  await layoutImage.waitFor();
+  assert.equal(await layoutImage.getAttribute("loading"), "eager");
+  assert(Number(await layoutImage.getAttribute("width")) > 0);
+  assert(Number(await layoutImage.getAttribute("height")) > 0);
   await visitor.goto(origin);
   assert(!(await visitor.content()).includes("M2_REUSABLE_CARD"));
   await page
@@ -310,6 +334,11 @@ async function freePort() {
   await visitor
     .getByRole("heading", { name: "M2_REUSABLE_CARD", exact: true })
     .waitFor();
+  const publishedLayout = visitor.locator(`img[src="${mediaUrl}"]`);
+  await publishedLayout.waitFor();
+  assert.equal(await publishedLayout.getAttribute("loading"), "eager");
+  assert.equal(await publishedLayout.getAttribute("fetchpriority"), "high");
+  assert.equal(await visitor.locator(`link[rel="preload"][as="image"][href="${mediaUrl}"]`).count(), 1);
   // Invalid edits stay local and preserve the last valid saved draft.
   await page
     .getByLabel("Node identifier", { exact: true })

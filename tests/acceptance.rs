@@ -4383,3 +4383,123 @@ async fn background_history_reports_failure_interruption_and_blocks_unrecorded_d
         site.close().await;
     }
 }
+
+#[tokio::test]
+async fn local_layout_metadata_respects_media_authority_and_never_rewrites_publication() {
+    use serde_json::json;
+    use wpalt::theme;
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        assert_eq!(
+            upload(&site, "layout.png", &png(), "public").await,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            upload(&site, "private.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let public: String = sqlx::query_scalar("SELECT id FROM media WHERE visibility='public'")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let private: String = sqlx::query_scalar("SELECT id FROM media WHERE visibility='private'")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let mut package = theme::load(&site.app, "paper", true).await.unwrap().package;
+        package.templates.get_mut("home").unwrap().children.extend([
+            serde_json::from_value(
+                json!({"id":"lead_local","kind":"image","image":public,"loading":"eager"}),
+            )
+            .unwrap(),
+            serde_json::from_value(json!({"id":"private_local","kind":"image","image":private}))
+                .unwrap(),
+        ]);
+        theme::save(&site.app, "paper", package, 1, true)
+            .await
+            .unwrap();
+        let (_, home) = get(&site.app, "/", None).await;
+        assert!(home.contains("width=\"8\" height=\"8\" loading=\"eager\" fetchpriority=\"high\""));
+        assert!(home.contains(&format!("href=\"/media/{public}\" as=\"image\"")));
+        assert!(!home.contains(&format!("/media/{private}")));
+        let mut post = input("imported-local", "publish");
+        post.body = format!(
+            "![Imported local image](/media/{public})\n\n![External](https://external.invalid/image.png)"
+        );
+        let record = content::save(&site.app, site.session(), None, post)
+            .await
+            .unwrap();
+        let original: String =
+            sqlx::query_scalar("SELECT published_document FROM posts WHERE id=$1")
+                .bind(&record.id)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert!(!original.contains("\"width\""));
+        let (_, rendered) = get(&site.app, "/imported-local", None).await;
+        assert!(rendered.contains(&format!(
+            "src=\"/media/{public}\" alt=\"Imported local image\" width=\"8\" height=\"8\""
+        )));
+        assert!(rendered.contains("https://external.invalid/image.png"));
+        let unchanged: String =
+            sqlx::query_scalar("SELECT published_document FROM posts WHERE id=$1")
+                .bind(&record.id)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(original, unchanged);
+        // Reuse metadata without permitting a cached private reference to render.
+        let settings = site.app.db.settings().await.unwrap();
+        let live = theme::load(&site.app, "paper", false)
+            .await
+            .unwrap()
+            .package;
+        let context = theme::context(
+            &site.app,
+            &settings,
+            &live,
+            None,
+            Vec::new(),
+            false,
+            "home",
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(context.media_dimensions.get(&public), Some(&(8, 8)));
+        assert!(!context.media_dimensions.contains_key(&private));
+        site.app.media_cache.lock().await.clear();
+        let mut permits = Vec::new();
+        for _ in 0..site.app.config.worker_concurrency {
+            permits.push(site.app.media_work.try_acquire().unwrap());
+        }
+        let busy = theme::context(
+            &site.app,
+            &settings,
+            &live,
+            None,
+            Vec::new(),
+            false,
+            "home",
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(busy.media.contains_key(&public));
+        assert!(
+            busy.media_dimensions.is_empty(),
+            "optional layout metadata yields to a saturated worker pool"
+        );
+        drop(permits);
+        let _guard = site.app.mutation().await;
+        sqlx::query("UPDATE media SET visibility='private' WHERE id=$1")
+            .bind(&public)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        drop(_guard);
+        let (_, changed) = get(&site.app, "/", None).await;
+        assert!(!changed.contains(&format!("/media/{public}")));
+        site.close().await;
+    }
+}

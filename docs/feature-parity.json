@@ -1257,12 +1257,13 @@
       "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "New editor images record intrinsic dimensions; bounded lazy/eager choices survive publication and recovery; a single explicit local lead image is preloaded. Legacy/imported images without metadata and composition-only images retain lazy originals.",
+      "m7_coverage": "New editor images record dimensions and lazy/eager priority; bounded authorized header-only inspection enriches composition/imported-local images transiently with checksum-keyed metadata reuse and graceful worker-pressure fallback. Studio image priority and canonical document priority share at most one rendered local preload. Historical publications stay unchanged; external images are never inspected.",
       "evidence": [
         "resilient-operations.md",
         "../tests/acceptance.rs",
         "../tests/document.rs",
-        "../scripts/authoring_acceptance.cjs"
+        "../scripts/authoring_acceptance.cjs",
+        "../scripts/browser_acceptance.cjs"
       ]
     },
     {

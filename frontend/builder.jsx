@@ -1083,6 +1083,29 @@ function App() {
                     }
                   />
                 )}
+                {current.kind === "image" && (
+                  <label>
+                    Image loading priority
+                    <select
+                      aria-label="Image loading priority"
+                      value={current.loading || "lazy"}
+                      onChange={(event) =>
+                        update(
+                          (p) =>
+                            (at(p, selected).loading =
+                              event.currentTarget.value),
+                        )
+                      }
+                    >
+                      <option value="lazy">
+                        Lazy · when near the viewport
+                      </option>
+                      <option value="eager">
+                        Early · important lead image
+                      </option>
+                    </select>
+                  </label>
+                )}
                 <h4>Responsive layout</h4>
                 <label>
                   Layout

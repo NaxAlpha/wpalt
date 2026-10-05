@@ -1378,24 +1378,27 @@
       "basis": "external-and-internal",
       "sources": [
         "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/rel/preload",
-        "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/img"
+        "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/img",
+        "https://docs.rs/image/0.25.9/image/struct.ImageReader.html#method.into_dimensions"
       ],
       "applicable_versions": [
         "HTML preload/as=style and image",
         "img width/height/loading/fetchpriority",
         "wpalt authoring document 1 optional image metadata"
       ],
-      "last_checked": "2026-10-04",
-      "next_review": "2026-11-03",
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
       "review_interval_days": 30,
       "maintenance_owner": "wpalt maintainers",
       "requirements": [
-        "Match preload resource URL/destination with the actual consumer; preload only one selected local lead image, never imported external resources. Bound authoring dimensions and preserve explicit loading policy. Prune render-unreachable theme trees without guessing responsive/conditional visibility. Retain external-only style CSP."
+        "Match preload resource URL/destination with the actual consumer; preload only one selected local lead image, never imported external resources. Bound authoring dimensions and preserve explicit loading policy. Prune render-unreachable theme trees without guessing responsive/conditional visibility. Retain external-only style CSP.",
+        "Enrich only transient imported/local composition image layout; authorize source rows before metadata cache use, bound header input and decoder workers, omit optional metadata under pressure, never fetch external images. Document/composition share at most one rendered local eager preload."
       ],
       "tests": [
         "theme_styles_are_template_scoped_and_preserve_reachable_components",
         "image_dimensions_and_priority_are_bounded_and_external_preloads_are_excluded",
-        "authoring browser publication journey"
+        "authoring browser publication journey",
+        "local_layout_metadata_respects_media_authority_and_never_rewrites_publication"
       ],
       "triggers": [
         "browser loading/CSP change",

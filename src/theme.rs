@@ -42,6 +42,8 @@ pub struct Node {
     pub href: Value,
     #[serde(default)]
     pub image: Value,
+    #[serde(default = "image_loading", skip_serializing_if = "lazy_loading")]
+    pub loading: String,
     #[serde(default)]
     pub children: Vec<Node>,
     #[serde(default)]
@@ -56,6 +58,12 @@ pub struct Node {
     pub condition: Value,
     #[serde(default)]
     pub style: Style,
+}
+fn lazy_loading(value: &str) -> bool {
+    value == "lazy"
+}
+fn image_loading() -> String {
+    "lazy".into()
 }
 fn heading_level() -> u8 {
     2
@@ -247,6 +255,11 @@ impl Package {
             return Err(Error::invalid(
                 "A form block needs a literal published form ID.",
             ));
+        }
+        if !["lazy", "eager"].contains(&n.loading.as_str())
+            || (n.kind != "image" && n.loading != "lazy")
+        {
+            return Err(Error::invalid("Image loading must be lazy or eager."));
         }
         let s = &n.style;
         if !["", "grid", "row", "stack"].contains(&s.layout.as_str())
@@ -1063,6 +1076,7 @@ pub struct Context {
     pub collections: BTreeMap<String, Vec<Value>>,
     pub relations: BTreeMap<String, Value>,
     pub media: BTreeMap<String, String>,
+    pub media_dimensions: BTreeMap<String, (u32, u32)>,
     pub queries: usize,
     reference_ids: BTreeSet<String>,
 }
@@ -1147,6 +1161,7 @@ pub async fn context_with_discovery(
         collections: BTreeMap::from([("listing".into(), listing)]),
         relations: BTreeMap::new(),
         media: BTreeMap::new(),
+        media_dimensions: BTreeMap::new(),
         queries: 2,
         reference_ids: BTreeSet::new(),
     };
@@ -1316,6 +1331,30 @@ pub async fn context_with_discovery(
         }
     }
 
+    // Layout metadata is optional, bounded independently of typed references.
+    // Resolve only local image UUIDs; external imported URLs are never fetched.
+    let mut doc_media = BTreeSet::new();
+    for value in std::iter::once(&ctx.root["post"])
+        .chain(ctx.collections.values().flatten())
+        .chain(ctx.relations.values())
+    {
+        if let Some(raw) = value["document"].as_str()
+            && raw.contains("/media/")
+            && let Ok(doc) = crate::document::Document::parse(raw)
+        {
+            doc_media.extend(doc.image_ids().into_iter().take(128));
+            if doc_media.len() >= 128 {
+                break;
+            }
+        }
+    }
+    let known: BTreeSet<_> = media.iter().cloned().collect();
+    media.extend(
+        doc_media
+            .into_iter()
+            .filter(|id| !known.contains(id))
+            .take(128usize.saturating_sub(known.len())),
+    );
     ctx.reference_ids.extend(refs.keys().cloned());
     ctx.reference_ids.extend(media.iter().cloned());
     media.sort();
@@ -1325,18 +1364,21 @@ pub async fn context_with_discovery(
     }
     if !media.is_empty() {
         let mut q = QueryBuilder::<Any>::new(if draft {
-            "SELECT id,alt FROM media WHERE mime<>'video/mp4' AND id IN ("
+            "SELECT id,alt,filename,sha256 FROM media WHERE mime<>'video/mp4' AND id IN ("
         } else {
-            "SELECT id,alt FROM media WHERE mime<>'video/mp4' AND visibility='public' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='media' AND mr.resource_id=media.id) AND id IN ("
+            "SELECT id,alt,filename,sha256 FROM media WHERE mime<>'video/mp4' AND visibility='public' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='media' AND mr.resource_id=media.id) AND id IN ("
         });
         let mut list = q.separated(",");
         for id in &media {
             list.push_bind(id);
         }
         list.push_unseparated(")");
+        let mut sources = Vec::new();
         for row in app.db.fetch_builder(&mut q).await? {
+            sources.push((row.get("id"), row.get("filename"), row.get("sha256")));
             ctx.media.insert(row.get("id"), row.get("alt"));
         }
+        ctx.media_dimensions = crate::operations::media::dimensions(app, sources).await;
         ctx.queries += 1;
     }
     let bytes = serde_json::to_vec(&ctx.root)
@@ -1491,7 +1533,7 @@ fn render_node(
         "image" => {
             let id = text(&ctx.resolve(&n.image, item, params));
             if let Some(alt) = ctx.media.get(&id) {
-                html! {img class=(class) src=(format!("/media/{id}")) alt=(if label.is_empty(){alt.as_str()}else{&label}) loading="lazy";}
+                html! {img class=(class) src=(format!("/media/{id}")) alt=(if label.is_empty(){alt.as_str()}else{&label}) width=[ctx.media_dimensions.get(&id).map(|d|d.0)] height=[ctx.media_dimensions.get(&id).map(|d|d.1)] loading=(&n.loading) fetchpriority=(if n.loading=="eager" {"high"} else {"auto"}) decoding="async";}
             } else {
                 Markup::default()
             }
@@ -1506,14 +1548,16 @@ fn render_node(
                     ctx.resolve(&json!({"bind":format!("{prefix}.document")}), item, params)
                 });
             if let Some(doc) = canonical.as_ref().and_then(Value::as_str) {
-                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|d|if draft {d.preview_html()} else {d.html()}).unwrap_or_default()))}}
+                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|mut d| {d.apply_dimensions(&ctx.media_dimensions);if draft {d.preview_html()} else {d.html()}}).unwrap_or_default()))}}
             } else if !n.text.is_null() {
                 html! {div class=(class){(maud::PreEscaped(content::markdown(&label)))}}
             } else if let Some(doc) = item.get("document").and_then(Value::as_str) {
-                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|d|if draft {d.preview_html()} else {d.html()}).unwrap_or_default()))}}
+                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|mut d| {d.apply_dimensions(&ctx.media_dimensions);if draft {d.preview_html()} else {d.html()}}).unwrap_or_default()))}}
             } else {
-                post.map(|p| crate::view::public_body(p, draft))
-                    .unwrap_or_default()
+                post.map(|p| {
+                    crate::view::public_body_with_dimensions(p, draft, &ctx.media_dimensions)
+                })
+                .unwrap_or_default()
             }
         }
         "navigation" => {
@@ -1611,7 +1655,7 @@ fn render_node(
         }
         "gallery" | "carousel" => {
             let items = ctx.resolve(&n.image, item, params);
-            html! {div class=(format!("{class} {}",if n.kind=="carousel"{"theme-carousel"}else{"theme-grid"})){@if let Some(ids)=items.as_array(){@for id in ids.iter().take(n.limit){@if let Some(alt)=id.as_str().and_then(|id|ctx.media.get(id)){img src=(format!("/media/{}",id.as_str().unwrap())) alt=(alt) loading="lazy";}}}}}
+            html! {div class=(format!("{class} {}",if n.kind=="carousel"{"theme-carousel"}else{"theme-grid"})){@if let Some(ids)=items.as_array(){@for id in ids.iter().take(n.limit){@if let Some(alt)=id.as_str().and_then(|id|ctx.media.get(id)){img src=(format!("/media/{}",id.as_str().unwrap())) alt=(alt) width=[id.as_str().and_then(|id|ctx.media_dimensions.get(id)).map(|d|d.0)] height=[id.as_str().and_then(|id|ctx.media_dimensions.get(id)).map(|d|d.1)] loading="lazy" decoding="async";}}}}}
         }
         _ => html! {section class=(class){(children)}},
     })
@@ -1665,7 +1709,19 @@ pub fn document(
             .ok()
         })
         .and_then(|doc| doc.priority_image())
-        .filter(|src| body.0.contains(&format!("src=\"{src}\"")));
+        .filter(|src| body.0.contains(&format!("src=\"{src}\"")))
+        .or_else(|| {
+            body.0.split("<img ").skip(1).find_map(|part| {
+                let tag = part.split_once('>')?.0;
+                if !tag.contains("loading=\"eager\"") {
+                    return None;
+                }
+                let id = tag.split_once("src=\"/media/")?.1.split_once('"')?.0;
+                uuid::Uuid::parse_str(id)
+                    .ok()
+                    .map(|_| format!("/media/{id}"))
+            })
+        });
 
     tracing::debug!(event="theme_render",theme_id=%stored.id,nodes=budget,resolution_queries=ctx.queries,preview=draft);
     fn has_tabs(p: &Package, n: &Node) -> bool {

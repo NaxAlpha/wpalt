@@ -8,16 +8,20 @@
 - `ebdbfca9709e8d88484656ea8909198d3fe3e7a9`: all six gates passed in [run 37248611052](https://github.com/NaxAlpha/wpalt/actions/runs/37248611052). Complete local 73-case Rust run and cumulative actual Chrome browser journeys passed. Includes scoped CSS/editor image loading and optional bounded native video processing. Linux browser verification confirms the cleanup target-size repair; no baseline relaxation.
 - `63a4fb8`: local current-role/native-peer region presentation cache variants pushed. Targeted authority/spoofing and preload/invalidation tests, strict Clippy, formatting and 44 guidance records passed locally. Exact-source real PostgreSQL/cumulative CI pending.
 
+- `63a4fb8947f84b120ff44920443cede4170cf273`: all six CI gates passed in [run 37249221832](https://github.com/NaxAlpha/wpalt/actions/runs/37249221832), including real role/region tests on SQLite/PostgreSQL.
+- `91629a1c66e29a350451c48b201aa8221a5b3df9`: all six CI gates passed in [run 37250019747](https://github.com/NaxAlpha/wpalt/actions/runs/37250019747), including durable job interruption/storage failure and cumulative Linux browser checks.
+
 ## Current local work
 
-Durable bounded background cycle history integrated into scheduler, owner Operations and offline CLI. Complete local Rust suite passed 75 cases without exclusions (57 acceptance, 14 business, three document, one credential race). After readable UTC/optional-count presentation refinement, targeted background test, strict Clippy and actual Chrome Operations journey passed again. Operations and populated history, integrity, cleanup and passkeys measured at 320/768/1440 with text spacing and accessibility. Desktop screenshot inspected; open sections remain calm and aligned. History is evidence only; financial/outbox domain state governs retries. Blocking sync retains I/O ownership through async cancellation. Exact-source cumulative PostgreSQL/Linux-browser CI still pending.
+Durable bounded background cycle history integrated into scheduler, owner Operations and offline CLI. Complete local Rust suite passed 75 cases without exclusions (57 acceptance, 14 business, three document, one credential race). After readable UTC/optional-count presentation refinement, targeted background test, strict Clippy and actual Chrome Operations journey passed again. Operations and populated history, integrity, cleanup and passkeys measured at 320/768/1440 with text spacing and accessibility. Desktop screenshot inspected; open sections remain calm and aligned. History is evidence only; financial/outbox domain state governs retries. Blocking sync retains I/O ownership through async cancellation. The pushed checkpoint now has all six cumulative CI gates green.
 
 ## Outstanding M7 contract work
 
-- Finish image dimension/loading integration for composition images and imported content; verify full authoring browser journey and publication after local source changes.
+- Composition/imported-local image metadata and Studio priority control implemented. 58 application cases, targeted worker-pressure/immutability/authority case and cumulative actual Chrome Studio/authoring journey passed. Image-property geometry at all three widths and accessibility passed; Studio screenshot inspected. Real PostgreSQL/Linux-browser CI pending this checkpoint.
 - Finish native video browser/release verification, bounded failure cases and operator process-isolation evidence; functional owner upload/CLI and real transcoding/recovery now implemented.
-- Role/native-peer region variants implemented and locally verified; exact-source real database/browser gates still required. No cloud geolocation dataset claim.
-- Complete verification of shared background-cycle history with bounded I/O and observable interruption/retry behavior.
+- Role/native-peer region variants verified by all six gates. No cloud geolocation dataset claim.
+- Shared background-cycle history verified by all six gates.
+- Complete F104 configurable security-header hardening and integrated verification.
 - Broader user data-request workflows and optional script consent enforcement without unsafe arbitrary-code or cloud requirements.
 - URL-aware clone and selective recovery of validated dependency graphs, preserving financial/delivery identity and avoiding replay.
 - Matched WordPress/plugin workload reference measurements, current exact-build latency/memory/disk/job/failure evidence and query plans.

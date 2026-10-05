@@ -60,6 +60,13 @@ pub fn csrf(s: &Session) -> Markup {
     html! {input type="hidden" name="csrf" value=(s.csrf);}
 }
 pub fn public_body(post: &Post, preview: bool) -> Markup {
+    public_body_with_dimensions(post, preview, &std::collections::BTreeMap::new())
+}
+pub fn public_body_with_dimensions(
+    post: &Post,
+    preview: bool,
+    dimensions: &std::collections::BTreeMap<String, (u32, u32)>,
+) -> Markup {
     let title = if preview {
         &post.title
     } else {
@@ -77,7 +84,10 @@ pub fn public_body(post: &Post, preview: bool) -> Markup {
     };
     let fields: serde_json::Value = serde_json::from_str(fields).unwrap_or_default();
     let rendered = crate::document::Document::parse(document)
-        .map(|d| if preview { d.preview_html() } else { d.html() })
+        .map(|mut d| {
+            d.apply_dimensions(dimensions);
+            if preview { d.preview_html() } else { d.html() }
+        })
         .unwrap_or_default();
     html! { article class="article" {
         @if preview {p class="notice" {"Private preview — unpublished changes. " a href=(format!("/admin/posts/{}",post.id)) {"Back to editor"}}}

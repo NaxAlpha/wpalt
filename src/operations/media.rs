@@ -134,3 +134,115 @@ impl Config {
         }
     }
 }
+
+/// Header-only local layout inspection: at most 128 × 64 KiB, no remote fetch or
+/// pixel decode. Cache contains metadata, never an authorization decision.
+pub async fn dimensions(
+    app: &crate::App,
+    sources: Vec<(String, String, String)>,
+) -> std::collections::BTreeMap<String, (u32, u32)> {
+    use axum::{
+        body::{Bytes, to_bytes},
+        http::HeaderMap,
+    };
+    use std::collections::BTreeMap;
+    let start = std::time::Instant::now();
+    let storage = app.config.media.storage();
+    let mut resolved = BTreeMap::new();
+    let mut pending = Vec::new();
+    for (id, filename, sha) in sources.into_iter().take(128) {
+        if !crate::backup::safe_filename(&filename) || sha.len() != 64 {
+            continue;
+        }
+        let key = format!("dimensions:{id}:{sha}");
+        let hit = if storage.enabled {
+            app.media_cache.lock().await.get(&key, 0, &storage)
+        } else {
+            None
+        };
+        if let Some(response) = hit
+            && let Ok(bytes) = to_bytes(response.into_body(), 8).await
+            && let Ok(bytes) = <[u8; 8]>::try_from(bytes.as_ref())
+        {
+            let width = u32::from_le_bytes(bytes[..4].try_into().unwrap());
+            let height = u32::from_le_bytes(bytes[4..].try_into().unwrap());
+            resolved.insert(id, (width, height));
+        } else {
+            pending.push((id, filename, key));
+        }
+    }
+    if pending.is_empty() {
+        tracing::debug!(
+            event = "media_layout_cache",
+            images = resolved.len(),
+            elapsed_us = start.elapsed().as_micros() as u64
+        );
+        return resolved;
+    }
+    let Ok(permit) = app.media_work.clone().try_acquire_owned() else {
+        tracing::debug!(
+            event = "media_layout_deferred",
+            reason = "worker_busy",
+            images = resolved.len()
+        );
+        return resolved;
+    };
+    let directory = app.config.data_dir.join("media");
+    let inspected = tokio::task::spawn_blocking(move || {
+        use std::io::Read;
+        let _permit = permit;
+        let mut inspected = Vec::new();
+        for (id, filename, key) in pending {
+            let path = directory.join(filename);
+            if !std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_file()) {
+                continue;
+            }
+            let Ok(file) = std::fs::File::open(&path) else {
+                continue;
+            };
+            let mut bytes = Vec::new();
+            if file.take(64 * 1024).read_to_end(&mut bytes).is_err() {
+                continue;
+            }
+            let Ok(mut reader) = image::ImageReader::new(Cursor::new(bytes)).with_guessed_format()
+            else {
+                continue;
+            };
+            let mut limits = image::Limits::default();
+            limits.max_image_width = Some(4096);
+            limits.max_image_height = Some(4096);
+            limits.max_alloc = Some(2 * 1024 * 1024);
+            reader.limits(limits);
+            if let Ok((width, height)) = reader.into_dimensions()
+                && (1..=4096).contains(&width)
+                && (1..=4096).contains(&height)
+            {
+                inspected.push((id, key, width, height));
+            }
+        }
+        inspected
+    })
+    .await
+    .unwrap_or_default();
+    for (id, key, width, height) in inspected {
+        resolved.insert(id, (width, height));
+        if storage.enabled {
+            let mut bytes = Vec::with_capacity(8);
+            bytes.extend(width.to_le_bytes());
+            bytes.extend(height.to_le_bytes());
+            app.media_cache.lock().await.insert(
+                key,
+                0,
+                Bytes::from(bytes),
+                HeaderMap::new(),
+                &storage,
+            );
+        }
+    }
+    tracing::debug!(
+        event = "media_layout_inspected",
+        images = resolved.len(),
+        elapsed_us = start.elapsed().as_micros() as u64
+    );
+    resolved
+}
