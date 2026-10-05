@@ -6,3 +6,4 @@ pub mod integration_web;
 pub mod integrations;
 pub mod web;
 pub mod wordpress;
+pub mod wpforms;

@@ -58,6 +58,9 @@ enum Command {
         /// Explicitly project Elementor 0.4 heading/text content; retain draft and review losses.
         #[arg(long)]
         elementor_content: bool,
+        /// Separately exported WPForms definitions; imports selected controls as unpublished drafts.
+        #[arg(long)]
+        wpforms_export: Option<PathBuf>,
         #[arg(long)]
         owner_email: String,
         #[arg(long, requires = "output")]
@@ -1035,6 +1038,7 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             media_dir,
             field_mapping,
             elementor_content,
+            wpforms_export,
             owner_email,
             execute,
             output,
@@ -1050,13 +1054,25 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             } else {
                 None
             };
+            let forms = if let Some(path) = wpforms_export {
+                Some(
+                    backup::read_bounded(&path, wpalt::platform::wpforms::MAX_BYTES)
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e.1))?,
+                )
+            } else {
+                None
+            };
             let prepared = wpalt::platform::wordpress::prepare_with_adapters(
                 &app,
                 &bytes,
                 &owner_email,
                 media_dir.as_deref(),
-                mapping.as_ref(),
-                elementor_content,
+                wpalt::platform::wordpress::AdapterOptions {
+                    fields: mapping.as_ref(),
+                    elementor_content,
+                    wpforms_export: forms.as_deref(),
+                },
             )
             .await
             .map_err(|e| anyhow::anyhow!(e.1))?;

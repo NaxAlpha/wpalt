@@ -315,7 +315,24 @@ pub async fn prepare_with_mapping(
     media_dir: Option<&std::path::Path>,
     mapping: Option<&super::acf::Mapping>,
 ) -> Result<crate::backup::selection::Prepared> {
-    prepare_with_adapters(app, bytes, owner_email, media_dir, mapping, false).await
+    prepare_with_adapters(
+        app,
+        bytes,
+        owner_email,
+        media_dir,
+        AdapterOptions {
+            fields: mapping,
+            ..Default::default()
+        },
+    )
+    .await
+}
+
+#[derive(Default)]
+pub struct AdapterOptions<'a> {
+    pub fields: Option<&'a super::acf::Mapping>,
+    pub elementor_content: bool,
+    pub wpforms_export: Option<&'a [u8]>,
 }
 
 pub async fn prepare_with_adapters(
@@ -323,9 +340,10 @@ pub async fn prepare_with_adapters(
     bytes: &[u8],
     owner_email: &str,
     media_dir: Option<&std::path::Path>,
-    mapping: Option<&super::acf::Mapping>,
-    elementor_content: bool,
+    options: AdapterOptions<'_>,
 ) -> Result<crate::backup::selection::Prepared> {
+    let mapping = options.fields;
+    let elementor_content = options.elementor_content;
     if let Some(mapping) = mapping {
         mapping.validate()?;
     }
@@ -387,6 +405,37 @@ pub async fn prepare_with_adapters(
         settings["field_schema"] = mapping
             .schema(settings["field_schema"].as_str().ok_or_else(invalid)?)?
             .into();
+    }
+    let form_projection = if let Some(raw) = options.wpforms_export {
+        let common = serde_json::from_str(settings["field_schema"].as_str().ok_or_else(invalid)?)
+            .map_err(|_| invalid())?;
+        let projected = super::wpforms::project(raw, &common)?;
+        if projected.source_site
+            != url::Url::parse(&assessment.origin)
+                .map_err(|_| invalid())?
+                .origin()
+                .ascii_serialization()
+        {
+            return Err(Error::invalid(
+                "Form export and WordPress source origins must match.",
+            ));
+        }
+        Some(projected)
+    } else {
+        None
+    };
+    let mut forms = Vec::new();
+    if let Some(projected) = &form_projection {
+        for form in &projected.forms {
+            if let Some(definition) = &form.definition {
+                forms.push(json!({"id":stable_id(&projected.source_sha256,"wpforms",&form.source_id),"owner_id":owner,"draft":serde_json::to_string(definition).map_err(|_| invalid())?,"live":"","version":1,"published_version":0,"updated_at":0,"entry_count":0}));
+            }
+        }
+        if !app.config.business_enabled || forms.len() as i64 > app.config.business_limits.forms {
+            return Err(Error::invalid(
+                "Enable business forms and configure sufficient form capacity before importing.",
+            ));
+        }
     }
     let mut posts = Vec::new();
     let mut terms = BTreeMap::new();
@@ -587,7 +636,17 @@ pub async fn prepare_with_adapters(
             "Export has no supported core content to import.",
         ));
     }
-    let counts = json!({"posts":posts.len(),"terms":terms.len(),"comments":comments.len(),"redirects":redirects.len()});
+    let counts = json!({"posts":posts.len(),"terms":terms.len(),"comments":comments.len(),"redirects":redirects.len(),"forms":forms.len()});
+    for usage in tables
+        .get_mut("business_usage")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(invalid)?
+    {
+        if usage["kind"] == "forms" {
+            usage["items"] = forms.len().into();
+        }
+    }
+    tables.insert("business_forms".into(), forms.into());
     tables.insert("posts".into(), posts.into());
     tables.insert(
         "terms".into(),
@@ -611,7 +670,7 @@ pub async fn prepare_with_adapters(
     .map_err(|_| invalid())?;
     crate::backup::inspect(&app.config, &bytes)?;
     let output_hash = digest(&bytes);
-    let report = json!({"format":"wpalt-wordpress-package-preview-v1","source_sha256":assessment.source_sha256,"source_site":assessment.origin,"site_settings":{"title":snapshot["tables"]["settings"][0]["title"],"description":snapshot["tables"]["settings"][0]["description"]},"target_origin":app.config.origin(),"owner_email":owner_email,"field_mapping":mapping.map(|m|m.report()),"elementor_content_projection":elementor_content,"output_sha256":output_hash,"counts":counts,"media_mapped":media_urls.len(),"warnings":warnings,"boundary":"Fresh-target package only; source/template unchanged, safely mapped public content stays published, ambiguous access stays draft, private/future/pending become drafts, no imported credentials/network/plugin execution. Only explicitly supplied local media is embedded. Retain raw WXR and review unsupported source independently."});
+    let report = json!({"format":"wpalt-wordpress-package-preview-v1","source_sha256":assessment.source_sha256,"source_site":assessment.origin,"site_settings":{"title":snapshot["tables"]["settings"][0]["title"],"description":snapshot["tables"]["settings"][0]["description"]},"target_origin":app.config.origin(),"owner_email":owner_email,"field_mapping":mapping.map(|m|m.report()),"elementor_content_projection":elementor_content,"wpforms_mapping":form_projection.as_ref().map(|p|&p.report),"output_sha256":output_hash,"counts":counts,"media_mapped":media_urls.len(),"warnings":warnings,"boundary":"Fresh-target package only; source/template unchanged, safely mapped public content stays published, ambiguous access stays draft, private/future/pending become drafts, no imported credentials/network/plugin execution. Only explicitly supplied local media is embedded. Retain raw WXR and review unsupported source independently."});
     let plan = digest(
         serde_json::to_string(&report)
             .map_err(|_| invalid())?

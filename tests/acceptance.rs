@@ -5901,8 +5901,10 @@ async fn wordpress_preview_package_recovers_content_without_inventing_private_ac
             builder_source.as_bytes(),
             &email,
             None,
-            None,
-            true,
+            wordpress::AdapterOptions {
+                elementor_content: true,
+                ..Default::default()
+            },
         )
         .await
         .unwrap();
@@ -5945,6 +5947,93 @@ async fn wordpress_preview_package_recovers_content_without_inventing_private_ac
         assert_eq!(row.get::<String, _>("status"), "draft");
         assert_eq!(row.get::<String, _>("published_body"), "");
         builder_target.close().await;
+        // Separately exported free-plugin definitions preserve presentation order,
+        // but cannot bring publication, notifications or consent into the target.
+        let forms_source = br#"{"format":"wpalt-wpforms-source-v1","source_site":"https://garden.example","plugin_version":"2.0.2.1","forms":[{"source_id":"71","definition":{"id":"71","settings":{"form_title":"Contact","notifications":{"admin":{"email":"private@example.test"}}},"fields":{"9":{"id":"9","type":"email","label":"Your email","required":"1"},"2":{"id":"2","type":"textarea","label":"Message"}}}}]}"#;
+        let form_package = wordpress::prepare_with_adapters(
+            &template.app,
+            source,
+            &email,
+            None,
+            wordpress::AdapterOptions {
+                wpforms_export: Some(forms_source),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(form_package.report["counts"]["forms"], 1);
+        assert_ne!(form_package.plan, unselected.plan);
+        assert!(
+            !form_package
+                .report
+                .to_string()
+                .contains("private@example.test")
+        );
+        let form_target = Site::new(postgres, false).await;
+        backup::restore(&form_target.app, &form_package.bytes)
+            .await
+            .unwrap();
+        let form =
+            sqlx::query("SELECT draft,live,published_version,entry_count FROM business_forms")
+                .fetch_one(&form_target.app.db.pool)
+                .await
+                .unwrap();
+        let definition: wpalt::business::forms::FormDefinition =
+            serde_json::from_str(&form.get::<String, _>("draft")).unwrap();
+        assert_eq!(definition.fields[0].name, "wpforms_9");
+        assert_eq!(definition.fields[1].name, "wpforms_2");
+        assert!(definition.fields[0].schema.required);
+        assert!(definition.notifications.is_empty());
+        assert!(definition.subscription.is_none());
+        assert!(definition.registration.is_none());
+        assert_eq!(form.get::<String, _>("live"), "");
+        assert_eq!(form.get::<i64, _>("published_version"), 0);
+        assert_eq!(form.get::<i64, _>("entry_count"), 0);
+        let usage: i64 = sqlx::query_scalar("SELECT items FROM business_usage WHERE kind='forms'")
+            .fetch_one(&form_target.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(usage, 1);
+        form_target.close().await;
+        let unsupported = String::from_utf8(forms_source.to_vec())
+            .unwrap()
+            .replace("textarea", "payment");
+        let unsupported = wordpress::prepare_with_adapters(
+            &template.app,
+            source,
+            &email,
+            None,
+            wordpress::AdapterOptions {
+                wpforms_export: Some(unsupported.as_bytes()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(unsupported.report["counts"]["forms"], 0);
+        assert_eq!(
+            unsupported.report["wpforms_mapping"]["forms"][0]["supported"],
+            false
+        );
+        let foreign = String::from_utf8(forms_source.to_vec())
+            .unwrap()
+            .replace("garden.example", "foreign.example");
+        assert!(
+            wordpress::prepare_with_adapters(
+                &template.app,
+                source,
+                &email,
+                None,
+                wordpress::AdapterOptions {
+                    wpforms_export: Some(foreign.as_bytes()),
+                    ..Default::default()
+                }
+            )
+            .await
+            .is_err()
+        );
+
         let unsafe_path = String::from_utf8(source.to_vec()).unwrap().replace(
             "2025/garden.png</wp:meta_value>",
             "../outside.png</wp:meta_value>",

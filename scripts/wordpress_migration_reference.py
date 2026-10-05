@@ -44,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-m8-reference-') as temp:
     root = Path(temp)
     report = {'format': 'wpalt-m8-wordpress-reference-v1',
               'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
-              'scope': 'Actual synthetic core WXR export with free Yoast, ACF and Elementor installed; core posts/private page, terms/comment/SEO and fresh recovery. Explicit ACF scalars retain draft access; other adapters remain separate gates.'}
+              'scope': 'Actual synthetic core WXR export with free Yoast, ACF, Elementor and WPForms installed; core posts/private page, terms/comment/SEO and fresh recovery. Explicit ACF scalars retain draft access; other adapters remain separate gates.'}
     try:
         for image in images:
             run('docker', 'pull', image)
@@ -78,7 +78,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-m8-reference-') as temp:
            '--admin_password='+password, '--admin_email=owner@example.test', '--skip-email')
         report['wordpress_version'] = wp('core', 'version')
         assert report['wordpress_version'] == '7.1.2'
-        wp('plugin', 'install', 'wordpress-seo', 'advanced-custom-fields', 'elementor', '--activate')
+        wp('plugin', 'install', 'wordpress-seo', 'advanced-custom-fields', 'elementor', 'wpforms-lite', '--activate')
         report['plugins'] = json.loads(wp('plugin', 'list', '--format=json'))
         seed = root/'seed.php'
         seed.write_text(r'''<?php
@@ -99,13 +99,23 @@ $page=wp_insert_post(['post_type'=>'page','post_title'=>'Private notes','post_na
 $term=wp_insert_term('Migration stories','category',['slug'=>'migration-stories']); wp_set_post_terms($post,[$term['term_id']],'category');
 update_post_meta($post,'_yoast_wpseo_metadesc','A real WordPress export migrated locally.');
 wp_insert_comment(['comment_post_ID'=>$post,'comment_author'=>'Reference visitor','comment_content'=>'Useful story.','comment_approved'=>1]);
+$form_data=['fields'=>['9'=>['id'=>'9','type'=>'email','label'=>'Your email','required'=>'1'],'2'=>['id'=>'2','type'=>'textarea','label'=>'Message']],'settings'=>['form_title'=>'Reference contact']];
+$form_id=wpforms()->obj('form')->add('Reference contact',['post_content'=>wpforms_encode($form_data)],['builder'=>false]);
+if(!$form_id || get_post_type($form_id)!=='wpforms') throw new Exception('WPForms synthetic form creation failed');
+$form_definition=json_decode(get_post($form_id)->post_content,true);
+if(count($form_definition['fields'])!==2) throw new Exception('WPForms synthetic fields missing');
+file_put_contents('/var/www/html/wpalt-m8-forms.json',json_encode(['format'=>'wpalt-wpforms-source-v1','source_site'=>get_option('siteurl'),'plugin_version'=>WPFORMS_VERSION,'forms'=>[['source_id'=>(string)$form_id,'definition'=>$form_definition]]]));
 $exportable=get_posts(['post_type'=>array_values(get_post_types(['can_export'=>true])),'post_status'=>['publish','draft','pending','private','future','inherit'],'numberposts'=>-1]);
 $types=[];foreach($exportable as $record){$types[$record->post_type]=($types[$record->post_type]??0)+1;}
-echo json_encode(['posts'=>4,'export_items'=>count($exportable),'types'=>$types,'comments'=>1,'category'=>'migration-stories']);
+echo json_encode(['posts'=>4,'export_items'=>count($exportable),'types'=>$types,'comments'=>1,'category'=>'migration-stories','forms'=>1]);
 ''')
         run('docker', 'cp', str(seed), site+':/var/www/html/wpalt-m8-seed.php')
         report['source_counts'] = json.loads(wp('eval-file', '/var/www/html/wpalt-m8-seed.php'))
         run('docker', 'exec', site, 'rm', '/var/www/html/wpalt-m8-seed.php')
+        forms = root/'forms.json'
+        run('docker', 'cp', site+':/var/www/html/wpalt-m8-forms.json', str(forms))
+        run('docker', 'exec', site, 'rm', '/var/www/html/wpalt-m8-forms.json')
+        report['form_export_sha256'] = hashlib.sha256(forms.read_bytes()).hexdigest()
         export = root/'source.xml'; export.write_text(wp('export', '--stdout', '--quiet'))
         report['export_sha256'] = hashlib.sha256(export.read_bytes()).hexdigest()
         def config(name):
@@ -128,9 +138,9 @@ echo json_encode(['posts'=>4,'export_items'=>count($exportable),'types'=>$types,
             {'source_name':'garden_teaser','source_key':'field_m8_teaser','target_name':'teaser','kind':'string'},
             {'source_name':'reading_count','source_key':'field_m8_count','target_name':'reading_count','kind':'number'},
             {'source_name':'show_marker','source_key':'field_m8_marker','target_name':'show_marker','kind':'boolean'}]}))
-        preview = json.loads(native(template, 'wordpress-prepare', export, '--owner-email', 'owner@example.test', '--field-mapping', mapping, '--elementor-content'))
+        preview = json.loads(native(template, 'wordpress-prepare', export, '--owner-email', 'owner@example.test', '--field-mapping', mapping, '--elementor-content', '--wpforms-export', forms))
         package = root/'migration.json'
-        native(template, 'wordpress-prepare', export, '--owner-email', 'owner@example.test', '--field-mapping', mapping, '--elementor-content', '--execute', preview['plan'], '--output', package)
+        native(template, 'wordpress-prepare', export, '--owner-email', 'owner@example.test', '--field-mapping', mapping, '--elementor-content', '--wpforms-export', forms, '--execute', preview['plan'], '--output', package)
         native(target, 'restore', package)
         with sqlite3.connect(root/'target.db') as db:
             assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0] == 4
@@ -149,12 +159,21 @@ echo json_encode(['posts'=>4,'export_items'=>count($exportable),'types'=>$types,
             assert db.execute('SELECT COUNT(*) FROM comments').fetchone()[0] == 1
             assert db.execute("SELECT COUNT(*) FROM terms WHERE slug='migration-stories'").fetchone()[0] == 1
             assert db.execute('SELECT COUNT(*) FROM shop_orders').fetchone()[0] == 0
+            form = db.execute('SELECT draft,live,published_version,entry_count FROM business_forms').fetchone()
+            definition = json.loads(form[0])
+            assert [f['name'] for f in definition['fields']] == ['wpforms_9','wpforms_2']
+            assert definition['fields'][0]['schema']['required']
+            assert not definition['notifications'] and not definition.get('subscription') and not definition.get('registration')
+            assert form[1:] == ('',0,0)
+            assert db.execute("SELECT items FROM business_usage WHERE kind='forms'").fetchone()[0] == 1
+            assert preview['wpforms_mapping']['source_forms'] == report['source_counts']['forms'] == 1
+
         native(target, 'restore', package, ok=False)
         with sqlite3.connect(root/'template.db') as db:
             assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0] == 0
         report['assertions'] = ['real export accepted offline', 'exact preview execution', 'template unchanged',
                                 'counts and relationships recovered', 'private page retained as draft',
-                                'literal SEO preserved', 'registered ACF scalars recovered as draft', 'Elementor plugin-saved content projected as draft', 'no invented orders', 'occupied retry denied']
+                                'literal SEO preserved', 'registered ACF scalars recovered as draft', 'Elementor plugin-saved content projected as draft', 'free WPForms plugin-created definition recovered as unpublished draft with actions disabled', 'no invented orders', 'occupied retry denied']
         report['status'] = 'passed'
         output = Path(args.output); output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(report, indent=2)+'\n')
