@@ -315,6 +315,17 @@ pub async fn prepare_with_mapping(
     media_dir: Option<&std::path::Path>,
     mapping: Option<&super::acf::Mapping>,
 ) -> Result<crate::backup::selection::Prepared> {
+    prepare_with_adapters(app, bytes, owner_email, media_dir, mapping, false).await
+}
+
+pub async fn prepare_with_adapters(
+    app: &crate::App,
+    bytes: &[u8],
+    owner_email: &str,
+    media_dir: Option<&std::path::Path>,
+    mapping: Option<&super::acf::Mapping>,
+    elementor_content: bool,
+) -> Result<crate::backup::selection::Prepared> {
     if let Some(mapping) = mapping {
         mapping.validate()?;
     }
@@ -431,45 +442,27 @@ pub async fn prepare_with_mapping(
             ));
         }
         let html = item.value("content:encoded");
-        // Guard recursive HTML conversion independently from the XML envelope.
-        // Conservative markup admission can reject malformed/unclosed legacy HTML.
-        if html.len() > 128 * 1024 {
-            return Err(Error::invalid(
-                "Imported HTML exceeds the bounded conversion budget.",
-            ));
-        }
-        let mut depth = 0usize;
-        let mut tags = 0usize;
-        for chunk in html.split('<').skip(1) {
-            let tag = chunk.split('>').next().unwrap_or("").trim();
-            if tag.starts_with('!') || tag.starts_with('?') {
-                continue;
-            }
-            tags += 1;
-            if tag.starts_with('/') {
-                depth = depth.saturating_sub(1);
-            } else if !tag.ends_with('/')
-                && ![
-                    "img", "br", "hr", "input", "meta", "link", "source", "area", "base", "col",
-                    "embed", "param", "track", "wbr",
-                ]
-                .contains(
-                    &tag.split_whitespace()
-                        .next()
-                        .unwrap_or("")
-                        .to_ascii_lowercase()
-                        .as_str(),
-                )
-            {
-                depth += 1;
-            }
-            if depth > 64 || tags > 8192 || html.len() > 128 * 1024 {
+        let data: Vec<_> = item
+            .all("wp:postmeta")
+            .filter(|meta| meta.value("wp:meta_key") == "_elementor_data")
+            .map(|meta| meta.value("wp:meta_value"))
+            .collect();
+        let mut document = if elementor_content && !data.is_empty() {
+            if data.len() != 1 || data[0].len() > super::elementor::MAX_BYTES {
                 return Err(Error::invalid(
-                    "Imported HTML exceeds the bounded conversion budget.",
+                    "Elementor source data must be bounded and unambiguous.",
                 ));
             }
-        }
-        let mut document = super::html::import(html)?;
+            let content: Value = serde_json::from_str(data[0]).map_err(|_| invalid())?;
+            let source = json!({"title":title,"type":kind,"version":"0.4","page_settings":[],"content":content});
+            let projected =
+                super::elementor::project(&serde_json::to_vec(&source).map_err(|_| invalid())?)?;
+            warnings.push(json!({"source_id":source_id,"code":"elementor_content_projection", "data_sha256":digest(data[0].as_bytes()),"report":projected.report,
+                "boundary":"Explicit projection of WXR _elementor_data under the selected 0.4 structure. Source settings/assets remain unsupported; retain source."}));
+            projected.document
+        } else {
+            super::html::import(html)?
+        };
         map_document(&mut document.root, &media_urls, &links, &mut warnings);
         let document = crate::document::Document::parse(&document.encode())?;
         let body = document.markdown();
@@ -618,7 +611,7 @@ pub async fn prepare_with_mapping(
     .map_err(|_| invalid())?;
     crate::backup::inspect(&app.config, &bytes)?;
     let output_hash = digest(&bytes);
-    let report = json!({"format":"wpalt-wordpress-package-preview-v1","source_sha256":assessment.source_sha256,"source_site":assessment.origin,"site_settings":{"title":snapshot["tables"]["settings"][0]["title"],"description":snapshot["tables"]["settings"][0]["description"]},"target_origin":app.config.origin(),"owner_email":owner_email,"field_mapping":mapping.map(|m|m.report()),"output_sha256":output_hash,"counts":counts,"media_mapped":media_urls.len(),"warnings":warnings,"boundary":"Fresh-target package only; source/template unchanged, safely mapped public content stays published, ambiguous access stays draft, private/future/pending become drafts, no imported credentials/network/plugin execution. Only explicitly supplied local media is embedded. Retain raw WXR and review unsupported source independently."});
+    let report = json!({"format":"wpalt-wordpress-package-preview-v1","source_sha256":assessment.source_sha256,"source_site":assessment.origin,"site_settings":{"title":snapshot["tables"]["settings"][0]["title"],"description":snapshot["tables"]["settings"][0]["description"]},"target_origin":app.config.origin(),"owner_email":owner_email,"field_mapping":mapping.map(|m|m.report()),"elementor_content_projection":elementor_content,"output_sha256":output_hash,"counts":counts,"media_mapped":media_urls.len(),"warnings":warnings,"boundary":"Fresh-target package only; source/template unchanged, safely mapped public content stays published, ambiguous access stays draft, private/future/pending become drafts, no imported credentials/network/plugin execution. Only explicitly supplied local media is embedded. Retain raw WXR and review unsupported source independently."});
     let plan = digest(
         serde_json::to_string(&report)
             .map_err(|_| invalid())?

@@ -1715,14 +1715,50 @@
       "tests": [
         "wordpress_preview_package_recovers_content_without_inventing_private_access_or_payments",
         "scripts/migration_acceptance.py",
-        "scripts/wordpress_migration_reference.py (actual ACF extension pending CI)"
+        "scripts/wordpress_migration_reference.py (actual ACF 6.8.10 passed at 4419a0e)"
       ],
       "triggers": [
         "affected milestone/release",
         "upstream ACF storage/registration change",
         "native field/editor numeric contract change"
       ],
-      "status": "implemented selected scalar slice; actual upstream reference pending"
+      "status": "implemented selected scalar slice; actual ACF 6.8.10 reference passed at 4419a0e"
+    },
+    {
+      "feature_id": "M8-03",
+      "area": "Explicit Elementor content projection",
+      "scope": "Selected draft content; full F024 incomplete",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developers.elementor.com/docs/data-structure/general-structure/",
+        "https://developers.elementor.com/docs/data-structure/widget-element/",
+        "https://github.com/elementor/elementor/blob/main/core/base/document.php"
+      ],
+      "applicable_versions": [
+        "Elementor export structure 0.4; installed free plugin version recorded by reference CI",
+        "wpalt-elementor-draft-v1",
+        "wpalt schema/archive 12"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Bound bytes, depth, unique elements and HTML before conversion.",
+        "Preserve supported heading/text order and report exact unsupported elements/settings without executable source.",
+        "Bind private new-file execution and explicit WXR projection selection to the reviewed plan; retain draft access."
+      ],
+      "tests": [
+        "tests/elementor.rs",
+        "scripts/migration_acceptance.py",
+        "scripts/wordpress_migration_reference.py (expanded Elementor reference pending)"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream data structure/version change",
+        "HTML parser security advisory"
+      ],
+      "status": "selected content projection implemented; upstream reference pending; F024 incomplete"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

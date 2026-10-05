@@ -31,6 +31,14 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Project bounded Elementor 0.4 content offline, with explicit losses.
+    ElementorProject {
+        input: PathBuf,
+        #[arg(long, requires = "output")]
+        execute: Option<String>,
+        #[arg(long, requires = "execute")]
+        output: Option<PathBuf>,
+    },
     /// Assess a WordPress WXR 1.2 export offline without database or network access.
     #[command(name = "wordpress-assess")]
     WordPressAssess { input: PathBuf },
@@ -42,6 +50,9 @@ enum Command {
         media_dir: Option<PathBuf>,
         #[arg(long)]
         field_mapping: Option<PathBuf>,
+        /// Explicitly project Elementor 0.4 heading/text content; retain draft and review losses.
+        #[arg(long)]
+        elementor_content: bool,
         #[arg(long)]
         owner_email: String,
         #[arg(long, requires = "output")]
@@ -698,6 +709,36 @@ async fn main() -> anyhow::Result<()> {
     // Portable recovery tools operate on files/config only: no live server,
     // database, site lock, installation or vendor account is needed.
     match &cli.command {
+        Command::ElementorProject {
+            input,
+            execute,
+            output,
+        } => {
+            let bytes = backup::read_bounded(input, wpalt::platform::elementor::MAX_BYTES)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            let projection =
+                wpalt::platform::elementor::project(&bytes).map_err(|e| anyhow::anyhow!(e.1))?;
+            let package = serde_json::json!({"format":"wpalt-elementor-draft-v1",
+                "document":serde_json::from_str::<serde_json::Value>(&projection.document.encode())?,
+                "report":projection.report});
+            let encoded = serde_json::to_vec(&package)?;
+            let plan = auth::digest(&encoded);
+            if let Some(reviewed) = execute {
+                anyhow::ensure!(
+                    reviewed == &plan,
+                    "Source or projection changed; review the current plan."
+                );
+                backup::write_private(output.as_ref().expect("clap requires output"), &encoded)?;
+            }
+            println!(
+                "{}",
+                serde_json::to_string_pretty(
+                    &serde_json::json!({"plan":plan,"report":package["report"],"output_created":execute.is_some()})
+                )?
+            );
+            return Ok(());
+        }
         Command::WordPressAssess { input } => {
             let bytes = backup::read_bounded(input, wpalt::platform::wordpress::MAX_BYTES)
                 .await
@@ -906,6 +947,7 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             input,
             media_dir,
             field_mapping,
+            elementor_content,
             owner_email,
             execute,
             output,
@@ -921,12 +963,13 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             } else {
                 None
             };
-            let prepared = wpalt::platform::wordpress::prepare_with_mapping(
+            let prepared = wpalt::platform::wordpress::prepare_with_adapters(
                 &app,
                 &bytes,
                 &owner_email,
                 media_dir.as_deref(),
                 mapping.as_ref(),
+                elementor_content,
             )
             .await
             .map_err(|e| anyhow::anyhow!(e.1))?;
@@ -974,7 +1017,8 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             .map_err(|e| anyhow::anyhow!(e.1))?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
-        Command::WordPressAssess { .. }
+        Command::ElementorProject { .. }
+        | Command::WordPressAssess { .. }
         | Command::WalStore { .. }
         | Command::WalRestore { .. }
         | Command::RecoveryInspect { .. }

@@ -50,6 +50,61 @@ fn blocks(children: Vec<Node>) -> Vec<Node> {
     out
 }
 pub fn import(source: &str) -> Result<Document> {
+    if source.len() > 128 * 1024 {
+        return Err(Error::invalid(
+            "Imported HTML exceeds the bounded conversion budget.",
+        ));
+    }
+    // Conservative balanced markup admission: mismatched closing tags cannot
+    // cancel unrelated nesting, and HTML ignores self-closing non-void tags.
+    let mut stack = Vec::new();
+    let mut tags = 0usize;
+    for chunk in source.split('<').skip(1) {
+        let (tag, _) = chunk
+            .split_once('>')
+            .ok_or_else(|| Error::invalid("Imported markup needs balanced tags."))?;
+        let tag = tag.trim();
+        if tag.starts_with('!') || tag.starts_with('?') {
+            continue;
+        }
+        tags += 1;
+        let closing = tag.starts_with('/');
+        let name = tag
+            .trim_start_matches('/')
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .trim_end_matches('/')
+            .to_ascii_lowercase();
+        if name.is_empty() || !name.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-') {
+            return Err(Error::invalid("Imported markup needs balanced tags."));
+        }
+        let void = [
+            "img", "br", "hr", "input", "meta", "link", "source", "area", "base", "col", "embed",
+            "param", "track", "wbr",
+        ]
+        .contains(&name.as_str());
+        if closing {
+            if void || stack.pop().as_deref() != Some(name.as_str()) {
+                return Err(Error::invalid("Imported markup needs balanced tags."));
+            }
+        } else if !void {
+            if tag.ends_with('/') {
+                return Err(Error::invalid(
+                    "Imported non-void HTML tags require explicit closing tags.",
+                ));
+            }
+            stack.push(name);
+        }
+        if stack.len() > 48 || tags > 8192 {
+            return Err(Error::invalid(
+                "Imported HTML exceeds the bounded conversion budget.",
+            ));
+        }
+    }
+    if !stack.is_empty() {
+        return Err(Error::invalid("Imported markup needs balanced tags."));
+    }
     let clean = ammonia::clean(source);
     let dom = html5ever::parse_document(RcDom::default(), Default::default()).one(clean);
     let mut count = 0;

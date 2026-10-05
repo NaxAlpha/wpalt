@@ -51,4 +51,33 @@ with tempfile.TemporaryDirectory(prefix='wpalt-migration-') as tmp:
     changed_map=root/'changed-map.json';selected_fields=json.loads(mapping.read_text());selected_fields['fields'][0]['target_name']='another_teaser';changed_map.write_text(json.dumps(selected_fields))
     run(template,'wordpress-prepare',acf_source,'--owner-email','owner@example.test','--field-mapping',changed_map,'--execute',mapped_preview['plan'],'--output',root/'stale-mapped.json',ok=False)
     assert not (root/'stale-mapped.json').exists()
+    # Explicit Elementor projection preserves text and reports omitted design/widgets.
+    elementor={'title':'Landing page','type':'page','version':'0.4','page_settings':{'background_color':'#fff'},'content':[
+        {'id':'title1','elType':'widget','widgetType':'heading','settings':{'title':'Projected headline','header_size':'h2'},'elements':[]},
+        {'id':'copy1','elType':'widget','widgetType':'text-editor','settings':{'editor':'<p>Projected body.</p>'},'elements':[]},
+        {'id':'unsupported1','elType':'widget','widgetType':'posts','settings':{},'elements':[]}]}
+    elementor_file=root/'elementor.json';elementor_file.write_text(json.dumps(elementor))
+    projection=json.loads(run(offline,'elementor-project',elementor_file).stdout)
+    draft_file=root/'elementor-draft.json'
+    run(offline,'elementor-project',elementor_file,'--execute','stale','--output',draft_file,ok=False)
+    assert not draft_file.exists()
+    run(offline,'elementor-project',elementor_file,'--execute',projection['plan'],'--output',draft_file)
+    assert draft_file.stat().st_mode&0o077==0
+    draft=json.loads(draft_file.read_text());assert draft['document']['root']['content'][0]['type']=='heading'
+    assert any(w['code']=='unsupported_element' for w in draft['report']['warnings'])
+    run(offline,'elementor-project',elementor_file,'--execute',projection['plan'],'--output',draft_file,ok=False)
+    assert not (root/'offline.db').exists() and not (root/'offline').exists()
+    data=json.dumps(elementor['content'])
+    elem_source=root/'elementor.xml';elem_source.write_text(source.read_text().replace('<wp:comment>', '<wp:postmeta><wp:meta_key>_elementor_data</wp:meta_key><wp:meta_value><![CDATA['+data+']]></wp:meta_value></wp:postmeta><wp:comment>'))
+    selected=('wordpress-prepare',elem_source,'--owner-email','owner@example.test','--elementor-content')
+    elem_preview=json.loads(run(template,*selected).stdout)
+    assert any(w['code']=='elementor_content_projection' for w in elem_preview['warnings'])
+    elem_output=root/'elementor-recovery.json';run(template,*selected,'--execute',elem_preview['plan'],'--output',elem_output)
+    elem_target=config('elementor');run(elem_target,'restore',elem_output)
+    with sqlite3.connect(root/'elementor.db') as db:
+        row=db.execute("SELECT body,status,published_body FROM posts WHERE slug='garden'").fetchone()
+        assert 'Projected headline' in row[0] and 'Projected body.' in row[0]
+        assert row[1]=='draft' and row[2]==''
+    run(template,'wordpress-prepare',elem_source,'--owner-email','owner@example.test','--execute',elem_preview['plan'],'--output',root/'stale-elementor.json',ok=False)
+    assert not (root/'stale-elementor.json').exists()
 print('PASS: offline namespace-aware WXR assessment, exact-source preview, private non-overwriting package, local media, untouched template, fresh core recovery and safe private/payment mappings')

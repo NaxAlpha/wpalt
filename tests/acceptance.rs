@@ -5889,6 +5889,62 @@ async fn wordpress_preview_package_recovers_content_without_inventing_private_ac
         assert_eq!(exact_values["reading_count"], "9007199254740993");
         assert_ne!(exact.plan, mapped.plan);
         mapped_target.close().await;
+        // The optional builder projection is draft-only and selection-bound.
+        let elements = serde_json::json!([
+            {"id":"projected1","elType":"widget","widgetType":"heading","settings":{"title":"A projected title","header_size":"h2"},"elements":[]},
+            {"id":"projected2","elType":"widget","widgetType":"text-editor","settings":{"editor":"<p>Builder-owned content.</p>"},"elements":[]},
+            {"id":"omitted1","elType":"widget","widgetType":"posts","settings":{},"elements":[]}]);
+        let builder_source = String::from_utf8(source.to_vec()).unwrap().replace("<wp:comment>",
+            &format!("<wp:postmeta><wp:meta_key>_elementor_data</wp:meta_key><wp:meta_value><![CDATA[{elements}]]></wp:meta_value></wp:postmeta><wp:comment>"));
+        let projected = wordpress::prepare_with_adapters(
+            &template.app,
+            builder_source.as_bytes(),
+            &email,
+            None,
+            None,
+            true,
+        )
+        .await
+        .unwrap();
+        let unselected = wordpress::prepare_with_mapping(
+            &template.app,
+            builder_source.as_bytes(),
+            &email,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert_ne!(projected.plan, unselected.plan);
+        let report = projected.report["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|w| w["code"] == "elementor_content_projection")
+            .unwrap();
+        assert_eq!(report["report"]["elements"], 3);
+        assert!(
+            report["report"]["warnings"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|w| w["element"] == "omitted1")
+        );
+        let builder_target = Site::new(postgres, false).await;
+        backup::restore(&builder_target.app, &projected.bytes)
+            .await
+            .unwrap();
+        let row = sqlx::query("SELECT body,status,published_body FROM posts WHERE slug='garden'")
+            .fetch_one(&builder_target.app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            row.get::<String, _>("body")
+                .contains("Builder-owned content.")
+        );
+        assert_eq!(row.get::<String, _>("status"), "draft");
+        assert_eq!(row.get::<String, _>("published_body"), "");
+        builder_target.close().await;
         let unsafe_path = String::from_utf8(source.to_vec()).unwrap().replace(
             "2025/garden.png</wp:meta_value>",
             "../outside.png</wp:meta_value>",
