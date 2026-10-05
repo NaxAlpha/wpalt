@@ -165,7 +165,8 @@ async fn eligible_session(app: &App, headers: &HeaderMap) -> Result<Option<Strin
     let Some(hash) = engagement::token(headers) else {
         return Ok(None);
     };
-    let found:Option<String>=sqlx::query_scalar("SELECT s.hash FROM engagement_sessions s JOIN engagement_settings e ON e.id=1 WHERE s.hash=$1 AND s.policy=e.version AND s.expires_at>$2 AND e.enabled=1").bind(&hash).bind(now()).fetch_optional(&app.db.pool).await?;
+    let valid = engagement::status(app, headers).await?["consented"] == true;
+    let found = valid.then_some(hash);
     Ok(found)
 }
 #[derive(Deserialize)]
@@ -192,20 +193,25 @@ pub async fn visit(
         ));
     }
     let mut tx = app.db.pool.begin().await?;
-    let live: Option<i64> = sqlx::query_scalar(
-        "UPDATE engagement_settings SET enabled=enabled WHERE id=1 AND enabled=1 RETURNING version",
+    let live = sqlx::query(
+        "UPDATE engagement_settings SET enabled=enabled WHERE id=1 AND enabled=1 RETURNING version,purpose",
     )
     .fetch_optional(&mut *tx)
     .await?;
     let Some(policy) = live else {
         return Ok(None);
     };
+    let purpose = app
+        .consent_scripts
+        .purpose(&policy.get::<String, _>("purpose"));
+    let policy = policy.get::<i64, _>("version");
     let valid: Option<String> = sqlx::query_scalar(
-        "SELECT hash FROM engagement_sessions WHERE hash=$1 AND policy=$2 AND expires_at>$3",
+        "SELECT hash FROM engagement_sessions WHERE hash=$1 AND policy=$2 AND expires_at>$3 AND purpose=$4",
     )
     .bind(&hash)
     .bind(policy)
     .bind(now())
+    .bind(&purpose)
     .fetch_optional(&mut *tx)
     .await?;
     if valid.is_none() {
@@ -260,18 +266,23 @@ pub async fn claim(app: &App, headers: &HeaderMap, promotion: &str) -> Result<se
         .await?
         .ok_or_else(Error::forbidden)?;
     let mut tx = app.db.pool.begin().await?;
-    let policy: Option<i64> = sqlx::query_scalar(
-        "UPDATE engagement_settings SET enabled=enabled WHERE id=1 AND enabled=1 RETURNING version",
+    let policy = sqlx::query(
+        "UPDATE engagement_settings SET enabled=enabled WHERE id=1 AND enabled=1 RETURNING version,purpose",
     )
     .fetch_optional(&mut *tx)
     .await?;
     let policy = policy.ok_or_else(Error::forbidden)?;
+    let purpose = app
+        .consent_scripts
+        .purpose(&policy.get::<String, _>("purpose"));
+    let policy = policy.get::<i64, _>("version");
     let valid: Option<String> = sqlx::query_scalar(
-        "SELECT hash FROM engagement_sessions WHERE hash=$1 AND policy=$2 AND expires_at>$3",
+        "SELECT hash FROM engagement_sessions WHERE hash=$1 AND policy=$2 AND expires_at>$3 AND purpose=$4",
     )
     .bind(&hash)
     .bind(policy)
     .bind(now())
+    .bind(&purpose)
     .fetch_optional(&mut *tx)
     .await?;
     valid.ok_or_else(Error::forbidden)?;

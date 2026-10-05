@@ -86,3 +86,33 @@ secret_key = ""
 webhook_secret = ""
 api_url = "" # Empty = https://api.stripe.com/v1. Explicit HTTPS overrides only.
 ca_cert_file = "" # Optional private CA for owner/test infrastructure, <=32 KiB PEM.
+
+# Scheduled authenticated encrypted recovery. Destinations must already exist;
+# mounted independent storage is owner-managed. Do not put the key in them.
+[recovery]
+# Deduplicate encrypted chunks; keep sibling wpalt-objects with every retained package.
+incremental = false
+enabled = false
+key_file = "/secure/wpalt-recovery.key"
+destinations = ["/mnt/independent/wpalt-backups"]
+interval_seconds = 86400
+retain = 14
+
+# Bounded anonymous listing/sitemap cache. Cookie/authenticated/private routes bypass.
+[cache]
+# Compression negotiation is applied to both fresh and cached responses.
+gzip = true
+# Mutable preview asset URLs: zero revalidates on every use; maximum 3600.
+asset_cache_seconds = 0
+enabled = false
+max_bytes = 8388608
+max_entries = 128
+ttl_seconds = 60
+
+# Local peer rules: no X-Forwarded-For trust; configure at the outer proxy too.
+[protection]
+enabled = false
+denied_prefixes = []
+denied_peers = []
+requests_per_window = 300
+window_seconds = 60

@@ -13,6 +13,18 @@ pub struct Config {
     pub listen: SocketAddr,
     pub base_url: String,
     pub debug: bool,
+    pub postgres_archive: crate::operations::postgres_archive::Config,
+    pub variants: crate::operations::variants::Config,
+    pub privacy: crate::operations::privacy::Config,
+    pub consent_scripts: crate::operations::consent_scripts::Config,
+    pub headers: crate::operations::headers::Config,
+    pub video: crate::operations::video::Config,
+    pub assets: crate::operations::assets::Config,
+    pub media: crate::operations::media::Config,
+    pub spam: crate::operations::spam::Config,
+    pub protection: crate::operations::protection::Config,
+    pub cache: crate::operations::cache::Config,
+    pub recovery: crate::operations::recovery::Config,
     pub business_enabled: bool,
     pub membership_enabled: bool,
     pub membership_max_records: i64,
@@ -39,6 +51,18 @@ impl Default for Config {
             listen: "127.0.0.1:3000".parse().unwrap(),
             base_url: "http://127.0.0.1:3000".into(),
             debug: false,
+            postgres_archive: Default::default(),
+            variants: Default::default(),
+            privacy: Default::default(),
+            consent_scripts: Default::default(),
+            headers: Default::default(),
+            video: Default::default(),
+            assets: Default::default(),
+            media: Default::default(),
+            spam: Default::default(),
+            protection: Default::default(),
+            cache: Default::default(),
+            recovery: Default::default(),
             business_enabled: true,
             membership_enabled: true,
             membership_max_records: 1_000_000,
@@ -110,6 +134,17 @@ impl Config {
         Ok(c)
     }
     pub fn validate(&self) -> anyhow::Result<()> {
+        self.protection.validate()?;
+        self.spam.validate()?;
+        self.media.validate()?;
+        self.video.validate()?;
+        self.variants.validate()?;
+        self.headers.validate()?;
+        self.consent_scripts.validate()?;
+        self.privacy.validate()?;
+        self.postgres_archive.validate()?;
+        self.cache.validate()?;
+        self.recovery.validate()?;
         self.commerce.validate()?;
         ensure!(
             !self.commerce.stripe.enabled || self.base_url.starts_with("https://"),

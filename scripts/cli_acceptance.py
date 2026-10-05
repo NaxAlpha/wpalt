@@ -130,6 +130,42 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     assert json.loads(run(config,'shop','report').stdout)['awaiting_payment']==0,'Maintenance cannot invent offline orders or payments'
     snapshot=root/'snapshot.json';run(config,'backup',str(snapshot));assert snapshot.exists()
     if os.name=='posix':assert snapshot.stat().st_mode & 0o077==0,'Backup permissions expose private data'
+    # Portable validation must not connect to PostgreSQL or create local site state.
+    portable=root/'portable.toml'
+    portable.write_text(f'database_url = "postgres://invalid:invalid@127.0.0.1:1/unreachable"\ndata_dir = "{root/"never-created"}"\n')
+    inspected=json.loads(run(portable,'recovery-inspect',str(snapshot)).stdout)
+    assert inspected['schema']==12
+    selected=json.loads(run(portable,'recovery-select',str(snapshot),'--post',lesson).stdout)
+    selection_file=root/'selection.json'
+    run(portable,'recovery-select',str(snapshot),'--post',lesson,'--execute','wrong-plan','--output',str(selection_file),ok=False)
+    assert not selection_file.exists()
+    run(portable,'recovery-select',str(snapshot),'--post',lesson,'--execute',selected['plan'],'--output',str(selection_file))
+    assert selection_file.stat().st_mode & 0o077==0
+    run(portable,'recovery-select',str(snapshot),'--post',lesson,'--execute',selected['plan'],'--output',str(selection_file),ok=False)
+    # A held clone can be inspected/recovered without inheriting live side effects.
+    clone_cfg=config_for('clone')
+    clone_file=root/'clone.json'
+    clone_preview=json.loads(run(clone_cfg,'recovery-clone',str(snapshot),'--source-origin','https://old.example.test').stdout)
+    run(clone_cfg,'recovery-clone',str(snapshot),'--source-origin','https://old.example.test','--execute',clone_preview['plan'],'--output',str(clone_file))
+    run(clone_cfg,'restore',str(clone_file))
+    run(clone_cfg,'shop','maintenance',ok=False)
+    run(clone_cfg,'clone-activate','--review','Too short',ok=False)
+    run(clone_cfg,'clone-activate','--review','Reviewed source shutdown, delivery queues, external payment ownership, callback URLs and credentials in this isolated synthetic fixture.')
+    run(clone_cfg,'shop','maintenance')
+    assert clone_file.stat().st_mode & 0o077==0
+    assert not (root/'never-created').exists(),'Portable inspection must not create a site'
+    key=root/'recovery.key';run(config,'recovery-key',str(key))
+    encrypted=root/'encrypted.wpbackup'
+    receipt=json.loads(run(config,'upgrade-prepare',str(encrypted),'--key-file',str(key)).stdout)
+    import hashlib
+    assert receipt['format']=='wpalt-upgrade-receipt-v1' and receipt['schema']==12
+    assert receipt['archive_sha256']==hashlib.sha256(encrypted.read_bytes()).hexdigest()
+    assert receipt['archive_bytes']==encrypted.stat().st_size
+    assert receipt['executable_sha256']==hashlib.sha256(binary.read_bytes()).hexdigest()
+    run(config,'upgrade-prepare',str(encrypted),'--key-file',str(key),ok=False)
+    assert json.loads(run(portable,'recovery-inspect',str(encrypted),'--key-file',str(key)).stdout)['schema']==12
+    wrong_key=root/'wrong.key';run(config,'recovery-key',str(wrong_key))
+    run(portable,'recovery-inspect',str(encrypted),'--key-file',str(wrong_key),ok=False)
     run(target,'restore',str(snapshot));run(target,'restore',str(snapshot),ok=False)
     recovered_report=json.loads(run(target,'shop','report').stdout)
     assert recovered_report['products']==5 and recovered_report['awaiting_payment']==0
@@ -145,7 +181,26 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
             with urllib.request.urlopen(origin+'/scheduled-restart') as r:assert b'DURABLE_SCHEDULE' in r.read()
             with urllib.request.urlopen(origin+'/journal-1') as r:assert r.status==200
         finally:stop(process)
+    journal=(root/'source'/'privileged-audit.jsonl').read_text()
+    assert secret not in journal and csrf not in journal and str(root) not in journal
+    events=[json.loads(line) for line in journal.splitlines()]
+    cli_events=[event for event in events if event['actor']=='host-owner']
+    assert any(event['route']=='cli:upgrade-prepare' and event['phase']=='outcome' and event['status']==200 for event in cli_events)
+    assert any(event['route']=='cli:upgrade-prepare' and event['phase']=='outcome' and event['status']==500 for event in cli_events)
+    for event in cli_events:
+        if event['phase']=='outcome':
+            assert any(intent['request_id']==event['request_id'] and intent['phase']=='intent' for intent in cli_events)
+    # A full/unsafe audit path prevents a privileged CLI mutation before dispatch.
+    journal_path=root/'source'/'privileged-audit.jsonl'
+    saved_journal=root/'saved-audit.jsonl';journal_path.rename(saved_journal);journal_path.mkdir()
+    with sqlite3.connect(root/'source.db') as database:
+        before=database.execute('SELECT tax_bps,shipping_minor FROM shop_settings').fetchone()
+    denied=run(config,'shop','rules','--tax-bps','500','--shipping-minor','99',ok=False)
+    assert 'Cannot persist audit history' in denied.stderr
+    with sqlite3.connect(root/'source.db') as database:
+        assert database.execute('SELECT tax_bps,shipping_minor FROM shop_settings').fetchone()==before
+    journal_path.rmdir();saved_journal.rename(journal_path)
     logs=log.read_text();assert secret not in logs;assert csrf not in logs
     for cookie in jar:assert cookie.value not in logs
     assert 'request_completed' in logs and 'elapsed_us' in logs and 'login_succeeded' in logs
-    print('PASS: configuration precedence, initialization, process lock, real login, persisted scheduler/restart, RSS XML, portable theme import/export/publication, commerce imports/demo/maintenance, private backup, fresh graph restore and redacted debug logs.')
+    print('PASS: configuration precedence, initialization, process lock, real login, persisted scheduler/restart, RSS XML, portable theme import/export/publication, commerce imports/demo/maintenance, private backup, preview-bound editorial selection, held clone/activation, fresh graph restore and redacted debug logs.')

@@ -25,6 +25,10 @@ pub fn routes() -> Router<App> {
         )
         .route("/admin/engagement", get(reports).post(settings))
         .route("/api/engagement/status", get(status))
+        .route(
+            "/api/engagement/scripts/{manifest}/{id}",
+            get(crate::operations::consent_scripts::serve),
+        )
         .route("/api/engagement/consent", post(consent))
         .route("/api/engagement/events", post(capture))
         .route("/assets/engagement.js", get(bundle))
@@ -46,6 +50,8 @@ async fn status(State(app): State<App>, headers: HeaderMap) -> Result<Json<Value
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Consent {
+    #[serde(default)]
+    manifest: String,
     allow: bool,
     #[serde(default)]
     recording: bool,
@@ -56,6 +62,10 @@ async fn consent(
     headers: HeaderMap,
     Json(input): Json<Consent>,
 ) -> Result<Response> {
+    let _guard = app.mutation().await;
+    if input.allow && input.manifest != app.consent_scripts.manifest {
+        return Err(Error::conflict());
+    }
     let value =
         engagement::consent(&app, &headers, input.allow, input.recording, input.policy).await?;
     let mut response = Json(json!({"consented":value.is_some()})).into_response();

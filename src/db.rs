@@ -85,7 +85,10 @@ impl Db {
                     || version == Some(6)
                     || version == Some(7)
                     || version == Some(8)
-                    || version == Some(9),
+                    || version == Some(9)
+                    || version == Some(10)
+                    || version == Some(11)
+                    || version == Some(12),
                 "unsupported schema version; use the documented migration/reset path"
             );
         }
@@ -100,6 +103,12 @@ impl Db {
         }
         let mut tx = self.pool.begin().await?;
         sqlx::raw_sql(SCHEMA).execute(&mut *tx).await?;
+        sqlx::raw_sql(crate::operations::passkeys::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::operations::factor::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
         sqlx::raw_sql(crate::business::store::SCHEMA)
             .execute(&mut *tx)
             .await?;
@@ -189,7 +198,14 @@ impl Db {
             currency == self.commerce_currency,
             "Commerce currency differs from stored catalog; use matching configuration or an explicit migration"
         );
-        sqlx::query("UPDATE schema_version SET version=9 WHERE id=1")
+        sqlx::raw_sql("CREATE INDEX IF NOT EXISTS privacy_posts_author ON posts(author_id,id); CREATE INDEX IF NOT EXISTS privacy_grants_user ON member_grants(user_id,id); CREATE INDEX IF NOT EXISTS privacy_assignments_user ON member_assignments(user_id,id); CREATE INDEX IF NOT EXISTS privacy_certificates_user ON member_certificates(user_id,id); CREATE INDEX IF NOT EXISTS privacy_discussions_user ON member_discussions(user_id,id); CREATE INDEX IF NOT EXISTS privacy_attempts_user ON member_attempts(user_id,id); CREATE INDEX IF NOT EXISTS privacy_referrals_user ON member_referrals(user_id,id); CREATE INDEX IF NOT EXISTS privacy_gifts_claimed ON member_gifts(claimed_by,id); CREATE INDEX IF NOT EXISTS privacy_payouts_user ON shop_payouts(user_id,id); CREATE INDEX IF NOT EXISTS privacy_lines_order ON shop_order_lines(order_id,id); CREATE INDEX IF NOT EXISTS privacy_payments_order ON shop_payments(order_id,id); CREATE INDEX IF NOT EXISTS privacy_refunds_order ON shop_refunds(order_id,id); CREATE INDEX IF NOT EXISTS privacy_commissions_referral ON member_commissions(referral_id,id);").execute(&mut *tx).await?;
+        sqlx::raw_sql(crate::operations::privacy::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::raw_sql(crate::operations::clone_hold::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE schema_version SET version=12 WHERE id=1")
             .execute(&mut *tx)
             .await?;
         if self.postgres {

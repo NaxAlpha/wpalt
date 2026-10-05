@@ -6,7 +6,7 @@ use crate::{
 };
 use axum::{
     Extension, Json, Router,
-    body::Body,
+    body::{Body, HttpBody},
     extract::{ConnectInfo, DefaultBodyLimit, Form, MatchedPath, Multipart, Path, Query, State},
     http::{HeaderMap, HeaderValue, Request, StatusCode},
     middleware::{self, Next},
@@ -21,6 +21,7 @@ use std::{io::Cursor, net::SocketAddr};
 pub fn router(app: App) -> Router {
     let limit = app.config.max_upload_bytes + 64 * 1024;
     let timeout = app.config.request_timeout_seconds;
+    let gzip = app.config.cache.gzip;
     let business = if app.config.business_enabled {
         crate::business::web::routes(&app)
     } else {
@@ -28,6 +29,7 @@ pub fn router(app: App) -> Router {
     };
     Router::new()
         .merge(crate::builder_web::routes())
+        .merge(crate::operations::privacy::routes())
         .merge(business)
         .merge(crate::discovery::routes())
         .merge(crate::membership::web::routes(&app))
@@ -35,7 +37,34 @@ pub fn router(app: App) -> Router {
         .route("/", get(home))
         .route("/search", get(home))
         .route("/health", get(health))
+        .route(
+            "/api/spam/challenge",
+            post(spam_challenge).layer(DefaultBodyLimit::max(1024)),
+        )
+        .route("/assets/spam.js", get(spam_js))
         .route("/account", get(account))
+        .route(
+            "/account/passkeys/start",
+            post(passkey_register_start).layer(DefaultBodyLimit::max(128 * 1024)),
+        )
+        .route(
+            "/account/passkeys/finish",
+            post(passkey_register_finish).layer(DefaultBodyLimit::max(128 * 1024)),
+        )
+        .route("/account/passkeys/remove", post(passkey_remove))
+        .route(
+            "/passkeys/login/start",
+            post(passkey_login_start).layer(DefaultBodyLimit::max(128 * 1024)),
+        )
+        .route(
+            "/passkeys/login/finish",
+            post(passkey_login_finish).layer(DefaultBodyLimit::max(128 * 1024)),
+        )
+        .route("/assets/auth.js", get(auth_js))
+        .route("/account/security", get(factor_page))
+        .route("/account/security/begin", post(factor_begin))
+        .route("/account/security/confirm", post(factor_confirm))
+        .route("/account/security/disable", post(factor_disable))
         .route("/login", get(login_page).post(login))
         .route("/logout", post(logout))
         .route("/feed.xml", get(feed))
@@ -54,8 +83,14 @@ pub fn router(app: App) -> Router {
         )
         .route("/admin/preview/{id}", get(preview))
         .route("/admin/media", get(media_list).post(upload))
+        .route("/admin/media/video", post(upload_video))
         .route("/admin/media/{id}", post(update_media))
         .route("/media/{id}", get(media_file))
+        .route("/media/{id}/resize/{width}", get(media_derivative))
+        .route(
+            "/media/{id}/resize/{width}/{format}",
+            get(media_derivative_format),
+        )
         .route("/admin/comments", get(comments))
         .route("/admin/comments/{id}", post(moderate))
         .route("/admin/settings", get(settings_page).post(save_settings))
@@ -63,6 +98,13 @@ pub fn router(app: App) -> Router {
         .route("/admin/users/{id}", post(update_user))
         .route("/admin/operations", get(operations))
         .route("/admin/backup", post(download_backup))
+        .route("/admin/recovery/run", post(run_recovery))
+        .route("/admin/operations/integrity", post(integrity_scan))
+        .route("/admin/operations/cleanup", post(cleanup_preview))
+        .route("/admin/operations/cleanup/execute", post(cleanup_execute))
+        .route("/admin/operations/cache/purge", post(cache_purge))
+        .route("/admin/operations/cache/preload", post(cache_preload))
+        .route("/admin/operations/audit", get(audit_history))
         .route("/admin/export", get(export_content))
         .route("/api/content", get(public_api))
         .route("/api/admin/media", get(media_picker))
@@ -75,7 +117,6 @@ pub fn router(app: App) -> Router {
         .route("/{slug}/comments", post(comment))
         .fallback(|| async { Error::not_found() })
         .layer(DefaultBodyLimit::max(limit))
-        .layer(tower_http::compression::CompressionLayer::new().gzip(true))
         .layer(tower_http::timeout::TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             std::time::Duration::from_secs(timeout),
@@ -84,11 +125,12 @@ pub fn router(app: App) -> Router {
             app.clone(),
             security_and_trace,
         ))
+        .layer(tower_http::compression::CompressionLayer::new().gzip(gzip))
         .with_state(app)
 }
 async fn security_and_trace(
     State(app): State<App>,
-    request: Request<Body>,
+    mut request: Request<Body>,
     next: Next,
 ) -> Response {
     let started = std::time::Instant::now();
@@ -101,8 +143,68 @@ async fn security_and_trace(
         .map(|p| p.as_str().to_owned())
         .unwrap_or_else(|| "unmatched".into());
     let span = tracing::info_span!("request",request_id=%id,method=%method,route=%route);
+    let privileged_write = method != axum::http::Method::GET
+        && method != axum::http::Method::HEAD
+        && (route.starts_with("/admin")
+            || route.starts_with("/api/admin")
+            || route.starts_with("/account/security")
+            || route.starts_with("/account/passkeys")
+            || route.starts_with("/account/privacy"));
     let permit = app.request_work.clone().try_acquire_owned();
-    let mut response = if permit.is_err() {
+    let protection = app
+        .protection_limits
+        .lock()
+        .await
+        .check(&app.config.protection, &request);
+    let admitted = permit.is_ok() && protection.is_ok();
+    let actor = if privileged_write && admitted {
+        auth::session(&app, request.headers())
+            .await
+            .ok()
+            .map(|s| s.user.id)
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let mut audit_started = false;
+    let audit_failure = if privileged_write && admitted {
+        let intent = crate::operations::audit::Event {
+            at: now(),
+            request_id: id.clone(),
+            actor: actor.clone(),
+            route: route.clone(),
+            phase: "intent".into(),
+            status: 0,
+        };
+        match crate::operations::audit::append(&app, intent).await {
+            Ok(()) => {
+                audit_started = true;
+                None
+            }
+            Err(_) => Some(Error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Cannot persist privileged action history. Check site storage before retrying.",
+            )),
+        }
+    } else {
+        None
+    };
+    let clone_blocked = app.clone_held.load(std::sync::atomic::Ordering::SeqCst)
+        && ((method != axum::http::Method::GET
+            && method != axum::http::Method::HEAD
+            && route != "/login"
+            && route != "/logout")
+            || requested_path.starts_with("/members/identity/")
+            || requested_path.starts_with("/api/engagement/scripts/")
+            || requested_path == "/shop/cart");
+    let mut response = if clone_blocked {
+        Error(StatusCode::SERVICE_UNAVAILABLE,"This recovered clone is read-only. Review source shutdown, queues, external payment ownership and credentials, then activate it using the stopped-host CLI.").into_response()
+    } else if let Some(error) = audit_failure {
+        error.into_response()
+    } else if let Err(error) = protection {
+        tracing::warn!(event="local_request_blocked", route=%route, status=error.0.as_u16());
+        error.into_response()
+    } else if permit.is_err() {
         Error(
             StatusCode::SERVICE_UNAVAILABLE,
             "Server is busy. Try again shortly.",
@@ -117,7 +219,80 @@ async fn security_and_trace(
         Error::forbidden().into_response()
     } else {
         use tracing::Instrument;
-        next.run(request).instrument(span).await
+        // Narrow allowlist: only anonymous discovery/listing output. Private
+        // content, forms, carts, previews and account routes are never stored.
+        let bucket = crate::operations::variants::annotate(&app, &mut request).await;
+        let variant_cookie = app.config.variants.role_variants
+            && crate::operations::variants::only_session_cookie(&request)
+            && !bucket.ends_with(":anonymous");
+        let candidate = app.config.cache.enabled
+            && method == axum::http::Method::GET
+            && (!request.headers().contains_key("cookie") || variant_cookie)
+            && !request.headers().contains_key("authorization")
+            && !request.headers().contains_key("range")
+            && !request.headers().contains_key("if-none-match")
+            && !request.headers().contains_key("if-modified-since")
+            && !request.headers().contains_key("cache-control")
+            && matches!(
+                route.as_str(),
+                "/" | "/search"
+                    | "/sitemap.xml"
+                    | "/sitemap-index.xml"
+                    | "/{locale}/"
+                    | "/{locale}/search"
+                    | "/{slug}"
+                    | "/{locale}/{slug}"
+                    | "/api/content"
+            )
+            && request.uri().to_string().len() <= 2048;
+        if candidate {
+            // This is a read lock: do not increment the mutation generation.
+            let _read_guard = app.mutations.lock().await;
+            let generation = app
+                .cache_generation
+                .load(std::sync::atomic::Ordering::SeqCst);
+            // Revalidate session role under the mutation lock before every hit.
+            let bucket = crate::operations::variants::annotate(&app, &mut request).await;
+            let key = format!("{}|{bucket}", request.uri());
+            let cached = app
+                .page_cache
+                .lock()
+                .await
+                .get(&key, generation, &app.config.cache);
+            if let Some(response) = cached {
+                response
+            } else {
+                let response = next.run(request).instrument(span).await;
+                let cacheable = response
+                    .body()
+                    .size_hint()
+                    .upper()
+                    .is_some_and(|n| n <= app.config.cache.max_bytes as u64)
+                    && response.status() == StatusCode::OK
+                    && !response.headers().contains_key("set-cookie")
+                    && response
+                        .headers()
+                        .get("cache-control")
+                        .and_then(|h| h.to_str().ok())
+                        .is_none_or(|h| !h.contains("no-store") && !h.contains("private"));
+                if cacheable {
+                    let (parts, body) = response.into_parts();
+                    match axum::body::to_bytes(body, app.config.cache.max_bytes).await {
+                        Ok(bytes) => {
+                            app.page_cache.lock().await.insert(key, generation, bytes.clone(), parts.headers.clone(), &app.config.cache);
+                            let mut response = Response::from_parts(parts, Body::from(bytes));
+                            response.headers_mut().insert("x-wpalt-cache", HeaderValue::from_static("miss"));
+                            response
+                        }
+                        Err(_) => Error(StatusCode::SERVICE_UNAVAILABLE, "Public response exceeds the cache budget; disable caching or increase max_bytes.").into_response(),
+                    }
+                } else {
+                    response
+                }
+            }
+        } else {
+            next.run(request).instrument(span).await
+        }
     };
     if response.status() == StatusCode::NOT_FOUND
         && (method == axum::http::Method::GET || method == axum::http::Method::HEAD)
@@ -134,11 +309,42 @@ async fn security_and_trace(
     {
         response = Redirect::to("/login").into_response();
     }
+    if audit_started {
+        let outcome = crate::operations::audit::Event {
+            at: now(),
+            request_id: id.clone(),
+            actor,
+            route: route.clone(),
+            phase: "response".into(),
+            status: response.status().as_u16(),
+        };
+        if crate::operations::audit::append(&app, outcome)
+            .await
+            .is_err()
+        {
+            // The action may have committed. Never replace its successful response
+            // with an error that encourages blindly replaying a financial mutation.
+            tracing::error!(event="audit_outcome_write_failed", request_id=%id, route=%route);
+            response.headers_mut().insert(
+                "x-wpalt-audit",
+                HeaderValue::from_static("outcome-write-failed"),
+            );
+        }
+    }
     let h = response.headers_mut();
+    if route.starts_with("/assets/") {
+        let policy = if app.config.cache.asset_cache_seconds == 0 {
+            "no-cache".to_owned()
+        } else {
+            format!("public, max-age={}", app.config.cache.asset_cache_seconds)
+        };
+        h.insert("cache-control", HeaderValue::from_str(&policy).unwrap());
+    }
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
         || route == "/login"
-        || route == "/account"
+        || route.starts_with("/account")
+        || route.starts_with("/passkeys")
         || route.starts_with("/members")
         || route.starts_with("/api/members")
         || route.starts_with("/shop")
@@ -162,42 +368,12 @@ async fn security_and_trace(
         h.insert("cache-control", HeaderValue::from_static("no-store"));
     }
     h.insert("x-request-id", HeaderValue::from_str(&id).unwrap());
-    h.insert(
-        "x-content-type-options",
-        HeaderValue::from_static("nosniff"),
-    );
-    h.insert(
-        "referrer-policy",
-        HeaderValue::from_static("strict-origin-when-cross-origin"),
-    );
-    if route.starts_with("/audience/")
-        || route.starts_with("/registration/")
-        || route.starts_with("/members/gifts")
-        || route.starts_with("/members/identity")
-    {
-        h.insert("referrer-policy", HeaderValue::from_static("no-referrer"));
-    }
-    h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"));
-    if route == "/forms/{id}" {
-        h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"));
-    }
-    if route == "/admin/design/{id}/preview" || route == "/admin/preview/{id}" {
-        h.insert("content-security-policy",HeaderValue::from_static("default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'"));
-    }
-    h.insert(
-        "permissions-policy",
-        HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
-    );
-    if app.config.secure_cookie() {
-        h.insert(
-            "strict-transport-security",
-            HeaderValue::from_static("max-age=31536000"),
-        );
-    }
+    app.security_headers.apply(&route, h);
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
         || route == "/login"
-        || route == "/account"
+        || route.starts_with("/account")
+        || route.starts_with("/passkeys")
         || route.starts_with("/members")
         || route.starts_with("/api/members")
         || route.starts_with("/shop")
@@ -296,6 +472,23 @@ async fn editor_js() -> impl IntoResponse {
         include_str!("../assets/generated/editor.js"),
     )
 }
+async fn spam_js() -> impl IntoResponse {
+    (
+        [("content-type", "text/javascript; charset=utf-8")],
+        include_str!("../assets/generated/spam.js"),
+    )
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SpamResource {
+    resource: String,
+}
+async fn spam_challenge(
+    State(app): State<App>,
+    Json(input): Json<SpamResource>,
+) -> Result<Json<crate::operations::spam::Challenge>> {
+    Ok(Json(crate::operations::spam::issue(&app, &input.resource)?))
+}
 async fn health(State(app): State<App>) -> Result<Json<serde_json::Value>> {
     let initialized: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM settings")
         .fetch_one(&app.db.pool)
@@ -329,9 +522,12 @@ async fn login_page(State(app): State<App>, headers: HeaderMap) -> Result<Respon
 struct Login {
     email: String,
     password: String,
+    #[serde(default)]
+    code: String,
 }
 async fn login(State(app): State<App>, Form(input): Form<Login>) -> Result<Response> {
-    let (token, session) = auth::login(&app, &input.email, &input.password).await?;
+    let (token, session) =
+        auth::login_with_code(&app, &input.email, &input.password, &input.code).await?;
     let mut response = Redirect::to(if session.user.role == "subscriber" {
         "/account"
     } else {
@@ -353,9 +549,9 @@ async fn logout(
     headers: HeaderMap,
     Form(input): Form<Csrf>,
 ) -> Result<Response> {
-    let s = admin_session(&app, &headers).await?;
+    let s = auth::session(&app, &headers).await?;
     auth::csrf(&s, &input.csrf)?;
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     sqlx::query("DELETE FROM sessions WHERE token_hash=$1")
         .bind(s.hash)
         .execute(&app.db.pool)
@@ -480,18 +676,23 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
         })
         .collect())
 }
-async fn home(State(app): State<App>, Query(query): Query<ListQuery>) -> Result<Html<String>> {
-    render_home(app, query).await
+async fn home(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Result<Html<String>> {
+    render_home(app, query, headers).await
 }
 async fn localized_home(
     State(app): State<App>,
+    headers: HeaderMap,
     Path(locale): Path<String>,
     Query(mut query): Query<ListQuery>,
 ) -> Result<Html<String>> {
     query.lang = Some(locale);
-    render_home(app, query).await
+    render_home(app, query, headers).await
 }
-async fn render_home(app: App, query: ListQuery) -> Result<Html<String>> {
+async fn render_home(app: App, query: ListQuery, headers: HeaderMap) -> Result<Html<String>> {
     let (discovery, _) = crate::discovery::load(&app).await?;
     let locale = query.lang.as_deref().unwrap_or(&discovery.default_language);
     let language = discovery.language(locale)?;
@@ -512,6 +713,7 @@ async fn render_home(app: App, query: ListQuery) -> Result<Html<String>> {
         &discovery,
     )
     .await?;
+    crate::operations::variants::presentation(&headers, &mut ctx);
     let path = if query.q.is_some() {
         discovery.path(locale, "search")
     } else {
@@ -651,6 +853,7 @@ async fn render_post(
     )
     .await?;
     let path = discovery.path(&locale, &slug);
+    crate::operations::variants::presentation(&headers, &mut ctx);
     ctx.root["_discovery"] = crate::discovery::metadata_with_settings(
         &app,
         Some(&p),
@@ -665,8 +868,10 @@ async fn render_post(
     let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))            section class="comments" {p class="muted" {@for t in terms {a href=(format!("{}?{}={}",discovery.path(&locale,""),t.get::<String,_>("kind"),t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
                     h2 {"Conversation"}
                     @for c in comments {article class="comment" {strong {(c.get::<String,_>("name"))}p {(c.get::<String,_>("body"))}}}
-                    @if protected == 0 {form method="post" action=(format!("/{slug}/comments")) {label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}
+                    @if protected == 0 {form method="post" action=(format!("/{slug}/comments")) data-spam-resource=[app.config.spam.enabled.then(||format!("comment:{slug}"))] {
+                        @if app.config.spam.enabled {input type="hidden" name="website" value="";p role="status" aria-live="polite" {}}label {"Your name" input name="name" required maxlength="100";}label {"Comment" textarea name="body" required maxlength="4000" {}}
                         p class="muted" {"Comments are reviewed before publication."}button {"Submit for review"}}}
+                    @if app.config.spam.enabled {script defer src="/assets/spam.js"{}}
                 }
     };
     let mut response = Html(crate::theme::document(
@@ -680,6 +885,9 @@ async fn render_post(
     )?)
     .into_response();
     if protected > 0 {
+        response
+            .headers_mut()
+            .insert("cache-control", HeaderValue::from_static("no-store"));
         response.headers_mut().insert(
             "x-robots-tag",
             HeaderValue::from_static("noindex, nofollow"),
@@ -1054,7 +1262,7 @@ async fn media_picker(
         return Err(Error::invalid("Invalid media cursor."));
     }
     let rows = sqlx::query(
-        "SELECT id,original_name,alt,visibility FROM media WHERE id>$1 ORDER BY id LIMIT 41",
+        "SELECT id,original_name,alt,visibility FROM media WHERE mime<>'video/mp4' AND id>$1 ORDER BY id LIMIT 41",
     )
     .bind(after)
     .fetch_all(&app.db.pool)
@@ -1070,7 +1278,7 @@ async fn media_picker(
 async fn media_list(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {
     let s = admin_session(&app, &headers).await?;
     editor(&s)?;
-    let rows=sqlx::query("SELECT id,original_name,visibility,alt,size FROM media ORDER BY created_at DESC,id DESC LIMIT 100").fetch_all(&app.db.pool).await?;
+    let rows=sqlx::query("SELECT id,original_name,mime,visibility,alt,size FROM media ORDER BY created_at DESC,id DESC LIMIT 100").fetch_all(&app.db.pool).await?;
     Ok(html_page(
         "Media",
         &app.db.settings().await?,
@@ -1078,11 +1286,81 @@ async fn media_list(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
         html! {
             (view::heading("Assets","Media library","Upload images, describe them and choose who can access them. SVG and executable uploads are not accepted."))
             section class="panel" {form method="post" action="/admin/media" enctype="multipart/form-data" {(view::csrf(&s))div class="field-row" {label {"Image" input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/gif" required;}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" {"Public"}option value="private" {"Editors only"}}}}label {"Alternative text" input name="alt" maxlength="500";}button {"Upload image"}}}
-            div class="cards" {@for r in rows {@let id=r.get::<String,_>("id");section class="panel media-card" {img src=(format!("/media/{id}")) alt=(r.get::<String,_>("alt"));h3 {(r.get::<String,_>("original_name"))}p class="muted" {(r.get::<i64,_>("size")/1024) " KiB"}code {(format!("![description](/media/{id})"))}
+            @if s.is_admin(){section class="panel" {h2 {"Local video processing"}p {"Optional owner-installed FFmpeg. MP4/WebM, two minutes maximum, source up to 1920×1080. Produces a bounded 720p MP4; subtitles and metadata are excluded."}form method="post" action="/admin/media/video" enctype="multipart/form-data" data-local-video="true" {(view::csrf(&s))label {"Video source" input type="file" name="file" accept="video/mp4,video/webm" required disabled[!app.config.video.enabled];}label {"Video visibility" select name="visibility" {option value="private" {"Editors only"}option value="public" {"Public"}}}button disabled[!app.config.video.enabled] {"Process local video"}p data-video-status="true" role="status" aria-live="polite" hidden {}} @if !app.config.video.enabled{p class="muted" {"Disabled. Configure absolute ffmpeg/ffprobe paths and enable [video] to use the local worker."}}}}
+            div class="cards" {@for r in rows {@let id=r.get::<String,_>("id");section class="panel media-card" {@if r.get::<String,_>("mime")=="video/mp4" {video controls muted preload="metadata" aria-label=(r.get::<String,_>("original_name")) {source src=(format!("/media/{id}")) type="video/mp4";}} @else {img src=(format!("/media/{id}")) alt=(r.get::<String,_>("alt")) loading="lazy";}h3 {(r.get::<String,_>("original_name"))}p class="muted" {(r.get::<i64,_>("size")/1024) " KiB"}@if r.get::<String,_>("mime")=="video/mp4"{p {a href=(format!("/media/{id}")) {"Open processed video"}}} @else {code {(format!("![description](/media/{id})"))}details {summary {"Optimized image sizes"}p class="muted" {"Original access controls apply to every size. GIF animations retain their original file."}p {a href=(format!("/media/{id}/resize/320")) {"320px WebP"} " · " a href=(format!("/media/{id}/resize/640")) {"640px WebP"} " · " a href=(format!("/media/{id}/resize/1280/avif")) {"1280px AVIF"}}}}
                 form method="post" action=(format!("/admin/media/{id}")) {(view::csrf(&s))label {"Alternative text" input name="alt" value=(r.get::<String,_>("alt")) maxlength="500";}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" selected[r.get::<String,_>("visibility")=="public"] {"Public"}option value="private" selected[r.get::<String,_>("visibility")=="private"] {"Editors only"}}}button class="secondary" {"Save details"}}
             }}}
         },
     ))
+}
+async fn upload_video(
+    State(app): State<App>,
+    headers: HeaderMap,
+    mut form: Multipart,
+) -> Result<Redirect> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    let mut csrf = String::new();
+    let mut name = String::new();
+    let mut file = None;
+    let mut visibility = "private".to_string();
+    while let Some(field) = form
+        .next_field()
+        .await
+        .map_err(|_| Error::invalid("Invalid video upload."))?
+    {
+        match field.name().unwrap_or("") {
+            "csrf" => {
+                csrf = field
+                    .text()
+                    .await
+                    .map_err(|_| Error::invalid("Invalid video form."))?
+            }
+            "visibility" => {
+                visibility = field
+                    .text()
+                    .await
+                    .map_err(|_| Error::invalid("Invalid visibility."))?
+            }
+            "file" => {
+                if file.is_some() {
+                    return Err(Error::invalid("Upload one video."));
+                }
+                name = field.file_name().unwrap_or("video").to_string();
+                file = Some(
+                    field
+                        .bytes()
+                        .await
+                        .map_err(|_| Error::invalid("Video exceeds request limit."))?,
+                );
+            }
+            _ => return Err(Error::invalid("Unknown video upload field.")),
+        }
+    }
+    auth::csrf(&s, &csrf)?;
+    if name.len() > 255 || !["public", "private"].contains(&visibility.as_str()) {
+        return Err(Error::invalid("Invalid video details."));
+    }
+    let output = crate::operations::video::transcode(
+        &app,
+        &file.ok_or_else(|| Error::invalid("Choose a video."))?,
+    )
+    .await?;
+    let _guard = app.mutation().await;
+    let current = admin_session(&app, &headers).await?;
+    admin(&current)?;
+    auth::csrf(&current, &csrf)?;
+    let id = uuid::Uuid::new_v4().to_string();
+    let filename = format!("{id}.mp4");
+    let path = app.config.data_dir.join("media").join(&filename);
+    backup::write_private(&path, &output)
+        .map_err(|_| Error::invalid("Cannot publish private video output."))?;
+    let result=sqlx::query("INSERT INTO media(id,filename,original_name,mime,alt,visibility,size,sha256,created_at) VALUES($1,$2,$3,'video/mp4','',$4,$5,$6,$7)").bind(id).bind(filename).bind(name).bind(visibility).bind(output.len() as i64).bind(auth::digest(&output)).bind(now()).execute(&app.db.pool).await;
+    if let Err(e) = result {
+        let _ = tokio::fs::remove_file(path).await;
+        return Err(e.into());
+    }
+    Ok(Redirect::to("/admin/media"))
 }
 async fn upload(
     State(app): State<App>,
@@ -1178,7 +1456,10 @@ async fn upload(
     let id = uuid::Uuid::new_v4().to_string();
     let filename = format!("{id}.{ext}");
     let hash = auth::digest(&bytes);
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
+    let current = admin_session(&app, &headers).await?;
+    editor(&current)?;
+    auth::csrf(&current, &csrf)?;
     let path = app.config.data_dir.join("media").join(&filename);
     tokio::fs::write(&path, &bytes).await?;
     let result=sqlx::query("INSERT INTO media(id,filename,original_name,mime,alt,visibility,size,sha256,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)").bind(id).bind(filename).bind(name).bind(mime).bind(alt).bind(visibility).bind(bytes.len() as i64).bind(hash).bind(now()).execute(&app.db.pool).await;
@@ -1206,7 +1487,10 @@ async fn update_media(
     if input.alt.len() > 500 || !["public", "private"].contains(&input.visibility.as_str()) {
         return Err(Error::invalid("Invalid media details."));
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
+    let current = admin_session(&app, &headers).await?;
+    editor(&current)?;
+    auth::csrf(&current, &input.csrf)?;
     let result = sqlx::query("UPDATE media SET alt=$1,visibility=$2 WHERE id=$3")
         .bind(input.alt)
         .bind(input.visibility)
@@ -1217,6 +1501,85 @@ async fn update_media(
         return Err(Error::not_found());
     }
     Ok(Redirect::to("/admin/media"))
+}
+async fn media_derivative(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path((id, width)): Path<(String, u32)>,
+) -> Result<Response> {
+    media_derivative_format(State(app), headers, Path((id, width, "webp".into()))).await
+}
+async fn media_derivative_format(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path((id, width, format)): Path<(String, u32, String)>,
+) -> Result<Response> {
+    if ![320, 640, 1280, 1920].contains(&width) || !["webp", "avif"].contains(&format.as_str()) {
+        return Err(Error::invalid("Unsupported image derivative."));
+    }
+    if format == "avif" && width > 1280 {
+        return Err(Error::invalid("AVIF supports widths 320,640 and1280."));
+    }
+    let read_permit = app.media_reads.clone().try_acquire_owned().map_err(|_| {
+        Error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Image reads are busy. Try again shortly.",
+        )
+    })?;
+    // Same policy and current role checks as original delivery, including private
+    // editor-only images and paid entitlement revocation. Never expose a filesystem path.
+    let original = media_file(State(app.clone()), headers, Path(id)).await?;
+    let bytes = axum::body::to_bytes(original.into_body(), 32 * 1024 * 1024)
+        .await
+        .map_err(|_| Error::invalid("Cannot read bounded source image."))?;
+    let key_format = format.clone();
+    let (bytes, key) = tokio::task::spawn_blocking(move || {
+        let _permit = read_permit;
+        let key = format!("image:{}:{width}:{key_format}", auth::digest(&bytes));
+        (bytes, key)
+    })
+    .await
+    .map_err(|_| Error::invalid("Image read worker interrupted."))?;
+    let storage = app.config.media.storage();
+    if storage.enabled
+        && let Some(response) = app.media_cache.lock().await.get(&key, 0, &storage)
+    {
+        return Ok(response);
+    }
+    let permit = app.media_work.clone().try_acquire_owned().map_err(|_| {
+        Error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Image processing is busy. Try again shortly.",
+        )
+    })?;
+    let encoding = format.clone();
+    let output = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        crate::operations::media::derivative_format(&bytes, width, &encoding)
+    })
+    .await
+    .map_err(|_| Error::invalid("Image worker interrupted."))??;
+    let mut output_headers = HeaderMap::new();
+    output_headers.insert(
+        "content-type",
+        HeaderValue::from_static(if format == "avif" {
+            "image/avif"
+        } else {
+            "image/webp"
+        }),
+    );
+    output_headers.insert("cache-control", HeaderValue::from_static("no-store"));
+    let output = axum::body::Bytes::from(output);
+    if storage.enabled {
+        app.media_cache.lock().await.insert(
+            key,
+            0,
+            output.clone(),
+            output_headers.clone(),
+            &storage,
+        );
+    }
+    Ok((output_headers, output).into_response())
 }
 async fn media_file(
     State(app): State<App>,
@@ -1254,7 +1617,15 @@ async fn media_file(
         return Err(Error::not_found());
     }
     let mime: String = row.get("mime");
-    if !["image/png", "image/jpeg", "image/webp", "image/gif"].contains(&mime.as_str()) {
+    if ![
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif",
+        "video/mp4",
+    ]
+    .contains(&mime.as_str())
+    {
         return Err(Error::invalid("Unsupported stored media type."));
     }
     use tokio::io::AsyncReadExt;
@@ -1295,6 +1666,12 @@ async fn media_file(
 struct CommentInput {
     name: String,
     body: String,
+    #[serde(default)]
+    token: String,
+    #[serde(default)]
+    solution: String,
+    #[serde(default)]
+    website: String,
 }
 async fn comment(
     State(app): State<App>,
@@ -1311,11 +1688,22 @@ async fn comment(
             "Use a name up to 100 characters and a comment up to 4000 characters.",
         ));
     }
+    crate::operations::spam::verify(
+        &app,
+        &format!("comment:{slug}"),
+        &crate::operations::spam::Proof {
+            token: input.token,
+            solution: input.solution,
+            website: input.website,
+        },
+        &input.body,
+    )
+    .await?;
     let client = connection
         .map(|c| c.0.0.ip().to_string())
         .unwrap_or_else(|| "local-test".into());
     let key = auth::digest(client.as_bytes());
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let mut tx = app.db.pool.begin().await?;
     let id: String =
         sqlx::query_scalar("SELECT id FROM posts WHERE published_slug=$1 AND status='published'")
@@ -1384,7 +1772,7 @@ async fn moderate(
     if !["approved", "rejected", "pending"].contains(&input.status.as_str()) {
         return Err(Error::invalid("Invalid moderation decision."));
     }
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let result = sqlx::query("UPDATE comments SET status=$1 WHERE id=$2")
         .bind(input.status)
         .bind(id)
@@ -1447,7 +1835,7 @@ async fn save_settings(
     };
     content::validate_settings(&settings)?;
     crate::theme::load(&app, &settings.theme, false).await?;
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     sqlx::query("UPDATE settings SET title=$1,description=$2,theme=$3,navigation=$4 WHERE id=1")
         .bind(settings.title)
         .bind(settings.description)
@@ -1514,20 +1902,247 @@ async fn add_user(
     })?;
     Ok(Redirect::to("/admin/users"))
 }
+fn wants_html(headers: &HeaderMap) -> bool {
+    headers
+        .get("accept")
+        .and_then(|h| h.to_str().ok())
+        .is_some_and(|h| h.contains("text/html"))
+}
+async fn audit_history(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    let events = crate::operations::audit::read(&app).await?;
+    if !wants_html(&headers) {
+        return Ok(Json(events).into_response());
+    }
+    Ok(html_page("Action history",&app.db.settings().await?,Some(&s),html!{
+        (view::heading("Operations","Action history","Recent privileged actions. An intent without an outcome may have been interrupted."))
+        p {a href="/admin/operations" {"Return to Operations"}}
+        div class="table-wrap" {table {thead {tr {th {"Time"}th {"Action"}th {"Phase"}th {"Status"}th {"Actor"}}}tbody {@for event in events {tr {td {(view::timestamp(event.at))}td {(event.route)}td {(event.phase)}td {(event.status)}td {(event.actor)}}}}}}
+        p class="muted" {"Private rotating journal, bounded to two 1 MiB files. This history is operational evidence, not a tamper-proof ledger."}
+    }).into_response())
+}
+#[derive(Deserialize)]
+struct IntegrityInput {
+    csrf: String,
+    #[serde(default)]
+    after_image: String,
+    #[serde(default)]
+    after_attachment: String,
+}
+#[derive(Deserialize)]
+struct CleanupInput {
+    csrf: String,
+    #[serde(default)]
+    hash: String,
+    #[serde(default)]
+    cutoff: i64,
+}
+async fn cleanup_preview(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<CleanupInput>,
+) -> Result<Response> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    auth::csrf(&s, &input.csrf)?;
+    let plan = crate::operations::cleanup::preview(&app).await?;
+    if !wants_html(&headers) {
+        return Ok(Json(plan).into_response());
+    }
+    Ok(html_page(
+        "Cleanup preview",
+        &app.db.settings().await?,
+        Some(&s),
+        html! {
+            (view::heading("Operations","Cleanup preview","Inspect unused media before permanent removal. Drafts, publications, revisions and module records retain referenced images."))
+            p { (plan.retained) " referenced files retained · " (plan.candidates.len()) " unused files · " (plan.expired_sessions) " expired sessions" }
+            p class="notice" {"Download a verified recovery copy first. Files linked only from external websites or unpublished files on your computer cannot be detected. This preview expires after ten minutes; any changed candidate set requires a new preview."}
+            ul {@for item in &plan.candidates {li {code {(item.filename)} " · " (item.bytes) " bytes · " (if item.registered {"library image"} else {"unregistered file / interrupted deletion"})}}}
+            form method="post" action="/admin/operations/cleanup/execute" {
+                (view::csrf(&s)) input type="hidden" name="hash" value=(plan.hash); input type="hidden" name="cutoff" value=(plan.cutoff);
+                button class="danger" {"Permanently remove listed files and expired sessions"}
+            }
+            p {a class="button secondary" href="/admin/operations" {"Return to Operations"}}
+        },
+    ).into_response())
+}
+async fn cleanup_execute(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<CleanupInput>,
+) -> Result<Response> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    auth::csrf(&s, &input.csrf)?;
+    let result = crate::operations::cleanup::execute(&app, &input.hash, input.cutoff).await?;
+    if !wants_html(&headers) {
+        return Ok(Json(result).into_response());
+    }
+    Ok(html_page(
+        "Cleanup result",
+        &app.db.settings().await?,
+        Some(&s),
+        html! {
+            (view::heading("Operations","Cleanup result","Review completed removal and retryable storage failures."))
+            p {(result.removed_files) " files removed · " (result.removed_bytes) " bytes · " (result.removed_sessions) " expired sessions removed"}
+            @if !result.pending_files.is_empty() {p class="notice" {"Some files could not be unlinked. Their library entries have been removed; inspect storage permissions and preview again to retry."}ul {@for name in result.pending_files {li {code {(name)}}}}}
+            p {a class="button secondary" href="/admin/operations" {"Return to Operations"}}
+        },
+    ).into_response())
+}
+async fn integrity_scan(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<IntegrityInput>,
+) -> Result<Response> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    auth::csrf(&s, &input.csrf)?;
+    let report =
+        crate::operations::integrity::scan_page(&app, &input.after_image, &input.after_attachment)
+            .await?;
+    if !wants_html(&headers) {
+        return Ok(Json(report).into_response());
+    }
+    Ok(html_page("Stored-file inspection",&app.db.settings().await?,Some(&s),html!{
+        (view::heading("Operations","Stored-file inspection","Validate recorded checksums and flag embedded executable patterns for owner review."))
+        p {"Checked " (report.checked) " files · " (report.failed.len()) " integrity findings · " (report.pattern_warnings.len()) " pattern warnings"}
+        @if report.limited {p class="notice" {"The bounded scan has more files to inspect."}form method="post" action="/admin/operations/integrity" {(view::csrf(&s))input type="hidden" name="after_image" value=(report.next_image);input type="hidden" name="after_attachment" value=(report.next_attachment);button {"Continue inspection"}}}
+        @for finding in report.failed.iter().chain(report.pattern_warnings.iter()) {section class="panel" {h2 {(finding.kind) " · " (finding.id)}p {(finding.reason)}}}
+        p {"Patterns can be false positives and are not current malware intelligence. No files were modified."}
+        p {a href="/admin/operations" {"Return to Operations"}}
+    }).into_response())
+}
+async fn cache_preload(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<Csrf>,
+) -> Result<Redirect> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    auth::csrf(&s, &input.csrf)?;
+    if !app.config.cache.enabled {
+        return Err(Error::invalid("Enable public caching before preloading."));
+    }
+    let _permit = app
+        .media_work
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| Error::invalid("Maintenance workers are busy."))?;
+    // Explicit bounded owner action: anonymous/public rows only, no network fetch,
+    // no authentication variants and no persistent cache after process restart.
+    let rows=sqlx::query("SELECT published_slug,published_locale FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources r WHERE r.kind='post' AND r.resource_id=posts.id) ORDER BY published_at DESC,id DESC LIMIT 20").fetch_all(&app.db.pool).await?;
+    for row in rows {
+        let _read = app.mutations.lock().await;
+        let (discovery, _) = crate::discovery::load(&app).await?;
+        let generation = app
+            .cache_generation
+            .load(std::sync::atomic::Ordering::SeqCst);
+        let locale: String = row.get("published_locale");
+        let slug: String = row.get("published_slug");
+        let key = format!("{}|unknown:anonymous", discovery.path(&locale, &slug));
+        let response = render_post(
+            app.clone(),
+            HeaderMap::new(),
+            locale,
+            slug,
+            discovery.clone(),
+        )
+        .await?;
+        if response.status() != StatusCode::OK || response.headers().contains_key("cache-control") {
+            continue;
+        }
+        let (parts, body) = response.into_parts();
+        let bytes = axum::body::to_bytes(body, app.config.cache.max_bytes)
+            .await
+            .map_err(|_| Error::invalid("Preload response exceeds cache budget."))?;
+        app.page_cache.lock().await.insert(
+            key,
+            generation,
+            bytes,
+            parts.headers,
+            &app.config.cache,
+        );
+    }
+    Ok(Redirect::to("/admin/operations"))
+}
+async fn cache_purge(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<Csrf>,
+) -> Result<Redirect> {
+    let session = admin_session(&app, &headers).await?;
+    admin(&session)?;
+    auth::csrf(&session, &input.csrf)?;
+    let _guard = app.mutation().await;
+    app.page_cache.lock().await.clear();
+    Ok(Redirect::to("/admin/operations"))
+}
+async fn run_recovery(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<Csrf>,
+) -> Result<Redirect> {
+    let session = admin_session(&app, &headers).await?;
+    admin(&session)?;
+    auth::csrf(&session, &input.csrf)?;
+    crate::operations::recovery::run(&app).await?;
+    Ok(Redirect::to("/admin/operations"))
+}
 async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {
     let s = admin_session(&app, &headers).await?;
     admin(&s)?;
+    let recovery = crate::operations::recovery::status(&app).await?;
+    let jobs = crate::operations::jobs::read(&app).await?;
+    let cache = app.page_cache.lock().await.statistics();
     Ok(html_page(
         "Operations",
         &app.db.settings().await?,
         Some(&s),
         html! {
             (view::heading("Operations","Operations","Manual snapshots, portable content and useful diagnostics without cloud dependencies."))
-            div class="split" {section class="panel" {h2 {"Back up & move"}p class="muted" {"Download a consistent database-and-media snapshot. It includes password hashes and private content; keep it secure. M1 snapshots are not encrypted."}
+            @if app.clone_held.load(std::sync::atomic::Ordering::SeqCst) {
+                section class="panel" {h2 {"Read-only recovered clone"}p {"Background work and HTTP writes are paused. Review source shutdown, message queues, external payment ownership, identity callbacks and credentials before stopped-host activation. Presentation previews remain available; source sessions and passkeys were removed."}}
+            }
+            div class="split" {section class="panel" {h2 {"Back up & move"}p class="muted" {"Download a consistent database-and-media snapshot. It includes password hashes and private content; keep it secure. This download is unencrypted."}
                 form method="post" action="/admin/backup" {(view::csrf(&s))button {"Download full backup"}}
                 p class="muted" {"Restore with the CLI into an empty database/data directory while the server is stopped. Keep an independent copy to recover from losing this host."}
                 a href="/admin/export" {"Export portable content JSON →"}
             }section class="panel" {h2 {"Runtime"}p {"Database: " strong {(if app.db.postgres{"PostgreSQL"}else{"SQLite · WAL"})}}p {"Version: " (env!("CARGO_PKG_VERSION"))}p {"Scheduler: " (app.config.scheduler_seconds) " seconds"}p {"Debug: " (app.config.debug)}p {a href="/health" {"Readiness endpoint →"}}}}
+            section class="panel" {
+                h2 {"Managed recovery"}
+                @if app.config.recovery.enabled {
+                    p {"Encrypted copies every " (app.config.recovery.interval_seconds) " seconds. Retain " (app.config.recovery.retain) " packages per destination."}
+                    p {"Last attempt: " (view::timestamp(recovery.last_attempt)) ". Last complete set: " (view::timestamp(recovery.last_complete)) "."}
+                    @if !recovery.package.is_empty() {p class="muted" {(recovery.package)}}
+                    @for copy in &recovery.copies {p {(copy.destination.display()) " · " strong {(copy.state)}}}
+                    form method="post" action="/admin/recovery/run" {(view::csrf(&s))button {"Create encrypted recovery copies"}}
+                } @else {
+                    p {"Configure a private recovery key, existing destinations, interval and retention in [recovery] to enable scheduled encrypted copies."}
+                }
+                p class="muted" {"Keep the recovery key separately. Verify an independent copy by restoring into a fresh instance. A pending attempt after restart may have been interrupted; inspect destination packages before retrying."}
+            }
+            section class="panel" {
+                h2 {"Background work"}
+                p {a class="button secondary" href="/admin/privacy" {"Review data requests"}}
+                p {"Latest 64 scheduler cycles retained locally. Unresolved cycles may be interrupted; history never replays payments or deliveries. The next scheduled poll uses each feature’s own retry rules."}
+                @if jobs.is_empty() {p class="muted" {"No scheduler cycles recorded yet."}}
+                @for job in jobs.iter().take(8) {
+                    details {summary {(view::timestamp(job.started_at)) " · " strong {(&job.state)} " · " (job.elapsed_ms) " ms"}
+                        @for stage in &job.stages {p {(&stage.name) " · " (if stage.succeeded {"completed"} else {"failed; inspect feature status"}) @if let Some(count) = stage.count {" · " (count) " processed"} " · " (stage.elapsed_ms) " ms"}}
+                    }
+                }
+            }
+            section class="panel" {h2 {"Browser security"}p {"Strict same-origin script/style policy, inactive script-free previews and denied camera/microphone/location access."}p {"HSTS on configured HTTPS: " (app.config.headers.hsts_seconds) " seconds · Include subdomains: " (app.config.headers.hsts_include_subdomains) " · Opener isolation: " (app.config.headers.isolate_opener)}p class="muted" {"Review TLS for every subdomain before enabling include-subdomains. Configuration is compiled at startup; inspect the redacted effective settings below."}}
+            section class="panel" {h2 {"Presentation variants"}p {"Current-role cache buckets: " (if app.config.variants.role_variants {"enabled"} else {"disabled"}) " · " (app.config.variants.region_networks.len()) " native-peer region networks"}p {"Role and region labels customize presentation; protected-resource authorization remains separate. Extra cookies bypass shared cache, and forwarded-IP headers are ignored."}}
+            section class="panel" {h2 {"Asset loading"}p {"Template-scoped CSS: " (if app.config.assets.scoped_theme_css {"enabled"} else {"disabled"}) " · Theme preload: " (if app.config.assets.preload_theme_css {"enabled"} else {"disabled"})}p {"Local compiled assets and render-reachable styles preserve responsive/conditional presentation. Image insertion records dimensions; choose early loading for an important lead image."}}
+            section class="panel" {h2 {"Public response cache"}p {(if app.config.cache.enabled {"Enabled"}else{"Disabled"}) " · " (cache.0) " entries · " (cache.1) " bytes retained"}p {"Public publications, listings, content projections and sitemaps only. Extra cookies, credentials and protected resources bypass shared storage; optional current-role variants use separate buckets. Browser page caching remains disabled so access changes take effect."}form method="post" action="/admin/operations/cache/purge" {(view::csrf(&s))button class="secondary" {"Purge public cache"}} form method="post" action="/admin/operations/cache/preload" {(view::csrf(&s))button class="secondary" disabled[!app.config.cache.enabled] {"Preload recent public pages"}}}
+            section class="panel" {h2 {"Local submission guard"}p {(if app.config.spam.enabled {"Enabled"} else {"Disabled"}) " for public comments and forms."}p class="muted" {"When enabled, submissions need a short same-origin computation. Honeypots, link limits, moderation and existing rate limits work together. This does not identify humans or use shared reputation. Configure [spam] to adjust the policy."}}
+            section class="panel" {h2 {"Stored-file integrity"}p {a href="/admin/operations/audit" {"Inspect privileged action history"}}
+                p {"Check database-recorded image and private attachment checksums without changing files. A bounded scan reports incomplete work; it does not certify malware-free content."}
+                form method="post" action="/admin/operations/integrity" {(view::csrf(&s))button class="secondary" {"Inspect stored-file integrity"}} form method="post" action="/admin/operations/cleanup" {(view::csrf(&s))button class="secondary" {"Preview unused media cleanup"}}
+            }
             details class="panel" {summary {"Effective configuration · secrets redacted"}pre class="inline-code" {(serde_json::to_string_pretty(&app.config.redacted()).unwrap())}}
         },
     ))
@@ -1617,9 +2232,236 @@ async fn update_user(
     Ok(Redirect::to("/admin/users"))
 }
 
+#[derive(Deserialize)]
+struct FactorInput {
+    csrf: String,
+    #[serde(default)]
+    password: String,
+    #[serde(default)]
+    code: String,
+}
+#[derive(Deserialize)]
+struct PasskeyStart {
+    #[serde(default)]
+    csrf: String,
+    #[serde(default)]
+    password: String,
+    #[serde(default)]
+    code: String,
+    #[serde(default)]
+    email: String,
+}
+#[derive(Deserialize)]
+struct PasskeyRegistrationInput {
+    csrf: String,
+    id: String,
+    credential: webauthn_rs::prelude::RegisterPublicKeyCredential,
+}
+#[derive(Deserialize)]
+struct PasskeyRemove {
+    csrf: String,
+    credential_id: String,
+    password: String,
+    #[serde(default)]
+    code: String,
+}
+async fn passkey_register_start(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Json(input): Json<PasskeyStart>,
+) -> Result<Json<crate::operations::passkeys::Challenge>> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    Ok(Json(
+        crate::operations::passkeys::register_start(&app, &s, &input.password, &input.code).await?,
+    ))
+}
+async fn passkey_register_finish(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Json(input): Json<PasskeyRegistrationInput>,
+) -> Result<Json<serde_json::Value>> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    crate::operations::passkeys::register_finish(
+        &app,
+        &s,
+        crate::operations::passkeys::Registration {
+            id: input.id,
+            credential: input.credential,
+        },
+    )
+    .await?;
+    Ok(Json(serde_json::json!({"redirect":"/account/security"})))
+}
+async fn passkey_login_start(
+    State(app): State<App>,
+    Json(input): Json<PasskeyStart>,
+) -> Result<Json<crate::operations::passkeys::Challenge>> {
+    Ok(Json(
+        crate::operations::passkeys::authenticate_start(&app, &input.email).await?,
+    ))
+}
+async fn passkey_login_finish(
+    State(app): State<App>,
+    Json(input): Json<crate::operations::passkeys::Authentication>,
+) -> Result<Response> {
+    let (token, s) = crate::operations::passkeys::authenticate_finish(&app, input).await?;
+    let mut response = Json(
+        serde_json::json!({"redirect":if s.user.role=="subscriber"{"/account"}else{"/admin"}}),
+    )
+    .into_response();
+    response.headers_mut().insert(
+        "set-cookie",
+        HeaderValue::from_str(&auth::cookie(&app, &token)).unwrap(),
+    );
+    Ok(response)
+}
+async fn passkey_remove(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<PasskeyRemove>,
+) -> Result<Redirect> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    let hash =
+        crate::operations::factor::authorize_change(&app, &s, &input.password, &input.code).await?;
+    let _guard = app.mutation().await;
+    crate::operations::factor::current_credential(&app, &s, &hash).await?;
+    let mut tx = app.db.pool.begin().await?;
+    if sqlx::query("DELETE FROM user_passkeys WHERE credential_id=$1 AND user_id=$2")
+        .bind(input.credential_id)
+        .bind(&s.user.id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected()
+        != 1
+    {
+        return Err(Error::not_found());
+    }
+    sqlx::query("DELETE FROM sessions WHERE user_id=$1 AND token_hash<>$2")
+        .bind(&s.user.id)
+        .bind(&s.hash)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(Redirect::to("/account/security"))
+}
+async fn auth_js() -> impl IntoResponse {
+    (
+        [
+            ("content-type", "text/javascript; charset=utf-8"),
+            ("cache-control", "no-cache"),
+        ],
+        include_str!("../assets/generated/auth.js"),
+    )
+}
+fn security_page(
+    title: &str,
+    settings: &Settings,
+    session: &Session,
+    body: Markup,
+) -> Html<String> {
+    if session.user.role == "subscriber" {
+        Html(view::member_layout(title, settings, body))
+    } else {
+        html_page(title, settings, Some(session), body)
+    }
+}
+async fn factor_page(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {
+    let session = auth::session(&app, &headers).await?;
+    let enabled: Option<String> =
+        sqlx::query_scalar("SELECT secret FROM user_factors WHERE user_id=$1")
+            .bind(&session.user.id)
+            .fetch_optional(&app.db.pool)
+            .await?;
+    let passkey_rows = sqlx::query(
+        "SELECT credential_id FROM user_passkeys WHERE user_id=$1 ORDER BY credential_id LIMIT 8",
+    )
+    .bind(&session.user.id)
+    .fetch_all(&app.db.pool)
+    .await?;
+    Ok(security_page(
+        "Account security",
+        &app.db.settings().await?,
+        &session,
+        html! {
+            (view::heading("Account","Account security","Protect local sign-in with an authenticator you control."))
+            @if enabled.is_some_and(|s|!s.is_empty()) {
+                p {"Authenticator enabled. Sign in with password plus a fresh six-digit code or one-use recovery code."}
+                form class="panel" method="post" action="/account/security/disable" {(view::csrf(&session))label {"Current password" input type="password" name="password" required autocomplete="current-password";}label {"Authenticator or recovery code" input name="code" required autocomplete="one-time-code" maxlength="24";}button class="secondary" {"Disable authenticator & revoke other sessions"}}
+            } @else {
+                form class="panel" method="post" action="/account/security/begin" {(view::csrf(&session))label {"Current password" input type="password" name="password" required autocomplete="current-password";}button {"Set up authenticator"}}
+            }
+            section class="panel" {h2 {"Passkeys"}p {"Register a device with user verification. Passkeys can sign in independently; no vendor account is required by wpalt."}
+            form data-passkey="register" {(view::csrf(&session))label {"Current password" input type="password" name="password" required autocomplete="current-password";}label {"Authenticator or recovery code · if enabled" input name="code" autocomplete="one-time-code" maxlength="24";}button {"Register a passkey"}p role="status" aria-live="polite" {}}
+            @for key in &passkey_rows {
+                form method="post" action="/account/passkeys/remove" {(view::csrf(&session))input type="hidden" name="credential_id" value=(key.get::<String,_>("credential_id"));p {"Registered passkey " (key.get::<String,_>("credential_id").chars().take(12).collect::<String>())}label {"Current password" input type="password" name="password" required autocomplete="current-password";}label {"Authenticator or recovery code · if enabled" input name="code" autocomplete="one-time-code" maxlength="24";}button class="secondary" {"Remove passkey & revoke sessions"}}
+            }
+        }
+        script defer src="/assets/auth.js" {}
+        p {a href="/account" {"Return to account"}}
+        },
+    ))
+}
+async fn factor_begin(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<FactorInput>,
+) -> Result<Html<String>> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    let origin = url::Url::parse(&app.config.base_url).map_err(|_| Error::forbidden())?;
+    if !app.config.secure_cookie()
+        && !matches!(origin.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"))
+    {
+        return Err(Error::invalid(
+            "Authenticator enrollment requires HTTPS outside localhost.",
+        ));
+    }
+    let uri = crate::operations::factor::begin(&app, &s, &input.password).await?;
+    Ok(security_page(
+        "Confirm authenticator",
+        &app.db.settings().await?,
+        &s,
+        html! {
+            h1 {"Confirm authenticator"}p {"Add this setup URI to your authenticator. Keep it private; it expires in ten minutes."}
+            pre class="inline-code" {(uri)}
+            form class="panel" method="post" action="/account/security/confirm" {(view::csrf(&s))label {"Six-digit code" input name="code" required inputmode="numeric" autocomplete="one-time-code" minlength="6" maxlength="6";}button {"Enable authenticator"}}
+        },
+    ))
+}
+async fn factor_confirm(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<FactorInput>,
+) -> Result<Html<String>> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    let codes = crate::operations::factor::confirm(&app, &s, &input.code).await?;
+    Ok(security_page(
+        "Recovery codes",
+        &app.db.settings().await?,
+        &s,
+        html! {
+            h1 {"Save recovery codes"}p {"Authenticator enabled. Each code works once. Keep these codes offline; they are shown only now."}
+            pre class="inline-code" {(codes.join("\n"))}p {a href="/account/security" {"Return to account security"}}
+        },
+    ))
+}
+async fn factor_disable(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Form(input): Form<FactorInput>,
+) -> Result<Redirect> {
+    let s = auth::session(&app, &headers).await?;
+    auth::csrf(&s, &input.csrf)?;
+    crate::operations::factor::disable(&app, &s, &input.password, &input.code).await?;
+    Ok(Redirect::to("/account/security"))
+}
 async fn account(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
     let s = auth::session(&app, &headers).await?;
-    Ok(html_page("Your account",&app.db.settings().await?,None,html!{h1 {"Your account"}p {"Signed in as " (&s.user.name)}p {"Role: " (&s.user.role)}p {"This subscriber account does not grant access to site administration."}@if app.config.membership_enabled {p {a href="/members" {"Open my learning and communities"}}}form method="post" action="/logout" {(view::csrf(&s))button {"Sign out"}}}).into_response())
+    Ok(html_page("Your account",&app.db.settings().await?,None,html!{h1 {"Your account"}p {"Signed in as " (&s.user.name)}p {"Role: " (&s.user.role)}p {a href="/account/security" {"Account security"} " · " a href="/account/privacy" {"Data and privacy"}}@if s.user.role=="subscriber" {p {"This subscriber account does not grant access to site administration."}} @else {p {a href="/admin" {"Open site administration"}}}@if app.config.membership_enabled {p {a href="/members" {"Open my learning and communities"}}}form method="post" action="/logout" {(view::csrf(&s))button {"Sign out"}}}).into_response())
 }
 
 async fn form_embed_js(State(app): State<App>) -> Result<Response> {

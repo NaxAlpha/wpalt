@@ -21,6 +21,7 @@ function command(config, args, input) {
     encoding: "utf8",
   });
   assert.equal(r.status, 0, r.stderr);
+  return r.stdout;
 }
 async function submit(page, button) {
   await Promise.all([
@@ -37,18 +38,44 @@ async function freePort() {
 }
 (async () => {
   const port = await freePort(),
-    origin = `http://127.0.0.1:${port}`;
+    origin = `http://localhost:${port}`;
   const config = path.join(temporary, "site.toml");
   fs.writeFileSync(
     config,
     `database_url = "sqlite://${temporary}/site.db?mode=rwc"\ndata_dir = "${temporary}/data"\nlisten = "127.0.0.1:${port}"\nbase_url = "${origin}"\n`,
   );
+  if (process.env.WPALT_SPAM_ONLY) fs.appendFileSync(config, "\n[spam]\nenabled = true\nproof_bits = 8\n");
+  if (process.env.WPALT_SCRIPTS_ONLY) {
+    const script=path.join(temporary,'optional-example.js');
+    const source='window.__wpaltOptionalExample=(window.__wpaltOptionalExample||0)+1;';
+    fs.writeFileSync(script,source);
+    fs.appendFileSync(config,`\n[[consent_scripts.scripts]]\nid = "example"\nlabel = "Local example"\npurpose = "Count consented visits on this server."\npath = ${JSON.stringify(script)}\nsha256 = "${crypto.createHash('sha256').update(source).digest('hex')}"\n`);
+  }
+  if (process.env.WPALT_VIDEO_ONLY) {
+    const ffmpeg = process.env.WPALT_TEST_FFMPEG || (process.platform === "darwin" ? "/opt/homebrew/bin/ffmpeg" : "/usr/bin/ffmpeg");
+    const ffprobe = process.env.WPALT_TEST_FFPROBE || (process.platform === "darwin" ? "/opt/homebrew/bin/ffprobe" : "/usr/bin/ffprobe");
+    assert(fs.existsSync(ffmpeg) && fs.existsSync(ffprobe),"Enabled video browser fixture requires owner-installed tools");
+    fs.appendFileSync(config,`\n[video]\nenabled = true\nffmpeg = ${JSON.stringify(ffmpeg)}\nffprobe = ${JSON.stringify(ffprobe)}\n`);
+    const fixture = path.join(temporary,"silent-fixture.mp4");
+    const generated = spawnSync(ffmpeg,["-v","error","-f","lavfi","-i","color=c=green:s=64x48:r=10:d=1","-an","-c:v","libx264","-threads","1","-pix_fmt","yuv420p",fixture],{encoding:"utf8"});
+    assert.equal(generated.status,0,"Generate bounded local silent browser fixture");
+    process.env.WPALT_VIDEO_TOOL_VERSION = spawnSync(ffmpeg,["-version"],{encoding:"utf8"}).stdout.split("\n")[0];
+    process.env.WPALT_VIDEO_FIXTURE = fixture;
+  }
   command(
     config,
     ["init", "--admin-email", "owner@example.test"],
     password + "\n",
   );
   command(config, ["seed-demo"]);
+  if (process.env.WPALT_CLONE_ONLY) {
+    const archive=path.join(temporary,'source.json'),cloned=path.join(temporary,'held.json');
+    command(config,['backup',archive]);
+    const preview=JSON.parse(command(config,['recovery-clone',archive,'--source-origin','https://old.example.test']));
+    command(config,['recovery-clone',archive,'--source-origin','https://old.example.test','--execute',preview.plan,'--output',cloned]);
+    fs.writeFileSync(config,`database_url = "sqlite://${temporary}/clone.db?mode=rwc"\ndata_dir = "${temporary}/clone-data"\nlisten = "127.0.0.1:${port}"\nbase_url = "${origin}"\n`);
+    command(config,['restore',cloned]);
+  }
   logFd = fs.openSync(path.join(temporary, "server.log"), "w");
   server = spawn(binary, ["--config", config, "serve"], {
     stdio: ["ignore", logFd, logFd],
@@ -101,6 +128,31 @@ async function freePort() {
     page.getByRole("button", { name: "Sign in", exact: true }),
   );
   await page.waitForURL(origin + "/admin");
+  if (process.env.WPALT_SPAM_ONLY) {
+    await require("./spam_acceptance.cjs")(owner, origin, output);
+    return;
+  }
+  if (process.env.WPALT_CLONE_ONLY) {
+    await require('./clone_acceptance.cjs')(owner,origin,output);
+    assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);return;
+  }
+  if (process.env.WPALT_OPERATIONS_ONLY) {
+    await require('./operations_acceptance.cjs')(owner,origin,output,password);
+    assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);return;
+  }
+  if (process.env.WPALT_SCRIPTS_ONLY) {
+    await require('./consent_scripts_acceptance.cjs')(owner,publicContext,origin,output);
+    assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);return;
+  }
+  if (process.env.WPALT_VIDEO_ONLY) {
+    await require("./video_acceptance.cjs")(owner, publicContext, origin, output, process.env.WPALT_VIDEO_FIXTURE);
+    assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);
+    return;
+  }
+  if (process.env.WPALT_OPERATIONS_ONLY) {
+    await require("./operations_acceptance.cjs")(owner, origin, output, password);
+    return;
+  }
   if (process.env.WPALT_COMMERCE_ONLY) {
     await require("./commerce_acceptance.cjs")(owner, origin, output);
     return;
@@ -269,12 +321,36 @@ async function freePort() {
   await page
     .getByLabel("Parameter title value", { exact: true })
     .fill("M2_REUSABLE_CARD");
+  await page.getByLabel("Template", { exact: true }).selectOption("home");
+  await page.getByLabel("Add child", { exact: true }).selectOption("image");
+  await page.locator(".outline button").last().click();
+  await page.getByLabel("Media value", { exact: true }).fill(mediaUrl.split("/").pop());
+  await page.getByLabel("Image loading priority", { exact: true }).selectOption("eager");
+  const studioLayoutReport = {measurements:[],accessibility:[]};
+  const studioUi = require("./ui_contracts.cjs");
+  await page.route(origin+"/__ui_fixture/axe.js",route=>route.fulfill({contentType:"text/javascript",body:fs.readFileSync(path.join(root,"frontend/node_modules/axe-core/axe.min.js"))}));
+  for (const width of [320,768,1440]) {
+    await page.setViewportSize({width,height:1000});
+    const measurement = await studioUi.geometry(page);
+    assert.deepEqual(measurement.failures,[],`Studio image properties at ${width}`);
+    studioLayoutReport.measurements.push(measurement);
+    await page.screenshot({path:path.join(output,`studio-image-priority-${width}.png`),fullPage:true});
+  }
+  await studioUi.accessibility(page,origin,"studio-image-priority",studioLayoutReport);
+  fs.writeFileSync(path.join(output,"studio-image-layout.json"),JSON.stringify(studioLayoutReport,null,2));
+  await page.setViewportSize({width:1600,height:1100});
+
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Draft saved." }).waitFor();
   const frame = page.frameLocator('iframe[title="Website draft preview"]');
   await frame
     .getByRole("heading", { name: "M2_REUSABLE_CARD", exact: true })
     .waitFor();
+  const layoutImage = frame.locator(`img[src="${mediaUrl}"]`);
+  await layoutImage.waitFor();
+  assert.equal(await layoutImage.getAttribute("loading"), "eager");
+  assert(Number(await layoutImage.getAttribute("width")) > 0);
+  assert(Number(await layoutImage.getAttribute("height")) > 0);
   await visitor.goto(origin);
   assert(!(await visitor.content()).includes("M2_REUSABLE_CARD"));
   await page
@@ -301,6 +377,11 @@ async function freePort() {
   await visitor
     .getByRole("heading", { name: "M2_REUSABLE_CARD", exact: true })
     .waitFor();
+  const publishedLayout = visitor.locator(`img[src="${mediaUrl}"]`);
+  await publishedLayout.waitFor();
+  assert.equal(await publishedLayout.getAttribute("loading"), "eager");
+  assert.equal(await publishedLayout.getAttribute("fetchpriority"), "high");
+  assert.equal(await visitor.locator(`link[rel="preload"][as="image"][href="${mediaUrl}"]`).count(), 1);
   // Invalid edits stay local and preserve the last valid saved draft.
   await page
     .getByLabel("Node identifier", { exact: true })
@@ -578,6 +659,7 @@ async function freePort() {
   await require("./authoring_acceptance.cjs")(owner, origin, output, mediaUrl);
   await require("./membership_acceptance.cjs")(owner, origin, output);
   await require("./commerce_acceptance.cjs")(owner, origin, output);
+  await require("./operations_acceptance.cjs")(owner, origin, output, password);
   assert.deepEqual(errors, [], "Browser JavaScript errors");
   assert.deepEqual(remote, [], "Unexpected external runtime requests");
   fs.writeFileSync(

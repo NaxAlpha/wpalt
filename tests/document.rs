@@ -87,3 +87,28 @@ fn document_trust_boundary_rejects_unsafe_links_geometry_and_unbounded_work() {
     assert!(html.contains("alt=\"description\""));
     assert!(!html.contains("<script>"));
 }
+
+#[test]
+fn image_dimensions_and_priority_are_bounded_and_external_preloads_are_excluded() {
+    let id = uuid::Uuid::new_v4();
+    let mut value = json!({"version":1,"root":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"image","attrs":{"src":format!("/media/{id}"),"alt":"Lead image","width":640,"height":480,"loading":"eager"}}]}]}});
+    let doc = Document::parse(&value.to_string()).unwrap();
+    assert!(
+        doc.html().contains("width=\"640\" height=\"480\"")
+            && doc.html().contains("fetchpriority=\"high\"")
+    );
+    assert_eq!(doc.priority_image(), Some(format!("/media/{id}")));
+    value["root"]["content"][0]["content"][0]["attrs"]["src"] =
+        "https://external.example/image.png".into();
+    assert!(
+        Document::parse(&value.to_string())
+            .unwrap()
+            .priority_image()
+            .is_none()
+    );
+    value["root"]["content"][0]["content"][0]["attrs"]["height"] = 0.into();
+    assert!(Document::parse(&value.to_string()).is_err());
+    value["root"]["content"][0]["content"][0]["attrs"]["height"] = 480.into();
+    value["root"]["content"][0]["content"][0]["attrs"]["loading"] = "execute".into();
+    assert!(Document::parse(&value.to_string()).is_err());
+}

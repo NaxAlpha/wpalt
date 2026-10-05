@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = {'wpalt', 'BUILD.json', 'INSTALL.md', 'wpalt.example.toml', 'operations.md',
-         'theme-authoring.md', 'membership-learning.md', 'm5-contract.md', 'commerce-reservations.md', 'm6-contract.md', 'THIRD_PARTY_NOTICES.md'}
+         'theme-authoring.md', 'membership-learning.md', 'm5-contract.md', 'commerce-reservations.md', 'm6-contract.md', 'resilient-operations.md', 'm7-contract.md', 'THIRD_PARTY_NOTICES.md'}
 
 
 def command(*args):
@@ -62,7 +62,7 @@ def verify(directory, source):
             raise ValueError('Business asset mismatch: ' + name)
     for name, path in [('wpalt.example.toml','wpalt.example.toml'),('operations.md','docs/operations.md'),
                        ('theme-authoring.md','docs/theme-authoring.md'),('membership-learning.md','docs/membership-learning.md'),
-                       ('m5-contract.md','docs/m5-contract.md'),('commerce-reservations.md','docs/commerce-reservations.md'),('m6-contract.md','docs/m6-contract.md'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:
+                       ('m5-contract.md','docs/m5-contract.md'),('commerce-reservations.md','docs/commerce-reservations.md'),('m6-contract.md','docs/m6-contract.md'),('resilient-operations.md','docs/resilient-operations.md'),('m7-contract.md','docs/m7-contract.md'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:
         if files[name] != source_bytes(path):
             raise ValueError('Packaged guide mismatch: ' + name)
     timestamp = int(command('git', 'show', '-s', '--format=%ct', source))
@@ -81,7 +81,7 @@ def publish(directory, archive, plan):
     tag = plan['tag']
     notes = directory / 'RELEASE.md'
     notes.write_text(f"# Development build {tag}\n\nSource `{plan['source_commit']}`.\n\n"
-                     f"All application, compiler-floor, dependency-audit, frontend and clean-build gates passed. "
+                     f"All application, compiler-floor, dependency-audit, frontend, native-PITR and clean-build gates passed. "
                      f"The Linux executable was built without restored dependency/build caches and tested through install/recovery and cumulative browser journeys.\n\n"
                      f"Archive SHA-256: `{plan['archive_sha256']}`. Binary SHA-256: `{plan['binary_sha256']}`.\n\n"
                      "Pre-adoption development prerelease; Linux x86_64/glibc (Ubuntu 24.04), not a production support promise. "

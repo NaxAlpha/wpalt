@@ -130,7 +130,7 @@ pub async fn consent(
         ));
     }
     let value = auth::random_token();
-    sqlx::query("INSERT INTO engagement_sessions(hash,policy,purpose,recording,expires_at,created_at) VALUES($1,$2,$3,$4,$5,$6)").bind(auth::digest(value.as_bytes())).bind(policy).bind(row.get::<String,_>("purpose")).bind(i64::from(recording && row.get::<i64,_>("recording")!=0)).bind(now()+app.config.engagement.retention_days*86400).bind(now()).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO engagement_sessions(hash,policy,purpose,recording,expires_at,created_at) VALUES($1,$2,$3,$4,$5,$6)").bind(auth::digest(value.as_bytes())).bind(policy).bind(app.consent_scripts.purpose(&row.get::<String,_>("purpose"))).bind(i64::from(recording && row.get::<i64,_>("recording")!=0)).bind(now()+app.config.engagement.retention_days*86400).bind(now()).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(Some(value))
 }
@@ -145,7 +145,7 @@ pub async fn status(app: &App, headers: &HeaderMap) -> Result<Value> {
         && !privacy_signal(app, headers);
     let session = if active {
         if let Some(hash) = token(headers) {
-            sqlx::query("SELECT recording FROM engagement_sessions WHERE hash=$1 AND expires_at>$2 AND policy=$3").bind(hash).bind(now()).bind(row.get::<i64,_>("version")).fetch_optional(&app.db.pool).await?
+            sqlx::query("SELECT recording FROM engagement_sessions WHERE hash=$1 AND expires_at>$2 AND policy=$3 AND purpose=$4").bind(hash).bind(now()).bind(row.get::<i64,_>("version")).bind(app.consent_scripts.purpose(&row.get::<String,_>("purpose"))).fetch_optional(&app.db.pool).await?
         } else {
             None
         }
@@ -153,7 +153,7 @@ pub async fn status(app: &App, headers: &HeaderMap) -> Result<Value> {
         None
     };
     Ok(
-        json!({"enabled":active,"purpose":row.get::<String,_>("purpose"),"policy":row.get::<i64,_>("version"),"recording_available":active && row.get::<i64,_>("recording")==1,"consented":session.is_some(),"recording":session.is_some_and(|r|r.get::<i64,_>("recording")==1)}),
+        json!({"enabled":active,"purpose":row.get::<String,_>("purpose"),"manifest":app.consent_scripts.manifest,"scripts":app.consent_scripts.declarations(),"policy":row.get::<i64,_>("version"),"recording_available":active && row.get::<i64,_>("recording")==1,"consented":session.is_some(),"recording":session.is_some_and(|r|r.get::<i64,_>("recording")==1)}),
     )
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -307,14 +307,18 @@ async fn capture_inner(
         frame.validate()?;
     }
     let mut tx = app.db.pool.begin().await?;
-    let policy: Option<i64> = sqlx::query_scalar(
-        "UPDATE engagement_settings SET enabled=enabled WHERE id=1 AND enabled=1 RETURNING version",
+    let policy = sqlx::query(
+        "UPDATE engagement_settings SET enabled=enabled WHERE id=1 AND enabled=1 RETURNING version,purpose",
     )
     .fetch_optional(&mut *tx)
     .await?;
     let Some(policy) = policy else {
         return Ok(false);
     };
+    let purpose = app
+        .consent_scripts
+        .purpose(&policy.get::<String, _>("purpose"));
+    let policy = policy.get::<i64, _>("version");
     let event: Option<String> =
         sqlx::query_scalar("SELECT name FROM engagement_event_names WHERE name=$1")
             .bind(&input.name)
@@ -324,11 +328,12 @@ async fn capture_inner(
         return Err(Error::invalid("This event name is not registered."));
     }
     let allowed: Option<String> = sqlx::query_scalar(
-        "SELECT hash FROM engagement_sessions WHERE hash=$1 AND policy=$2 AND expires_at>$3",
+        "SELECT hash FROM engagement_sessions WHERE hash=$1 AND policy=$2 AND expires_at>$3 AND purpose=$4",
     )
     .bind(&hash)
     .bind(policy)
     .bind(now())
+    .bind(&purpose)
     .fetch_optional(&mut *tx)
     .await?;
     if allowed.is_none() {

@@ -70,3 +70,49 @@ for (const input of document.querySelectorAll('[data-epoch-for]')) {
   if(Number(hidden.value)>0){const date=new Date(Number(hidden.value)*1000);input.value=`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;}
   input.addEventListener('input',()=>{hidden.value=input.value?String(Math.floor(new Date(input.value).getTime()/1000)):'0';});
 }
+
+
+// Keep selected local source/visibility on failure and prevent duplicate native jobs.
+for (const form of document.querySelectorAll('[data-local-video]')) {
+  const button = form.querySelector('button'), status = form.querySelector('[data-video-status]');
+  let busy = false;
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (busy) return;
+    busy = true;button.disabled = true;form.setAttribute('aria-busy','true');
+    status.hidden = false;status.className = 'notice';status.setAttribute('role','status');
+    status.textContent = 'Processing locally… Keep this page open. Your source is retained if processing fails.';
+    try {
+      const response = await fetch(form.action,{method:'POST',body:new FormData(form),credentials:'same-origin',redirect:'manual',headers:{Accept:'application/json'}});
+      if (response.type === 'opaqueredirect') {location.assign('/admin/media');return;}
+      let message = 'Processing did not complete. Inspect the media library before retrying if the connection was lost.';
+      try {const result = await response.json();if(typeof result.error === 'string')message = result.error;} catch {}
+      status.textContent = message;status.className = 'notice error';status.setAttribute('role','alert');
+    } catch {
+      status.textContent = 'Connection interrupted. Inspect the media library before retrying; processing may have completed.';
+      status.className = 'notice error';status.setAttribute('role','alert');
+    } finally {
+      busy = false;button.disabled = false;form.removeAttribute('aria-busy');
+    }
+  });
+}
+
+// Privacy workflows keep review text on failed requests; never retain a password.
+for (const form of document.querySelectorAll('[data-privacy-submit]')) {
+  const submit = form.querySelector('button[type="submit"],button:not([type])');
+  const status = document.createElement('p');status.className='notice';status.hidden=true;status.setAttribute('role','status');status.setAttribute('aria-live','polite');form.append(status);
+  let busy=false;
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();if(busy)return;busy=true;submit.disabled=true;form.setAttribute('aria-busy','true');status.hidden=false;status.className='notice';status.setAttribute('role','status');status.textContent='Saving your request…';
+    const body=new URLSearchParams(new FormData(form));
+    for(const password of form.querySelectorAll('input[type=password]'))password.value='';
+    try{
+      const response=await fetch(form.action,{method:'POST',body,credentials:'same-origin',redirect:'manual',headers:{Accept:'application/json'}});
+      if(response.type==='opaqueredirect'){location.assign(location.pathname);return;}
+      let message='The request did not complete. Inspect the current record before retrying if the connection was interrupted.';
+      try{const result=await response.json();if(typeof result.error==='string')message=result.error;}catch{}
+      status.textContent=message;status.className='notice error';status.setAttribute('role','alert');
+    }catch{status.textContent='Connection interrupted. Review the current record before retrying; your handling notes remain here.';status.className='notice error';status.setAttribute('role','alert');}
+    finally{busy=false;submit.disabled=false;form.removeAttribute('aria-busy');}
+  });
+}

@@ -37,7 +37,7 @@ fn layout_inner(
                     @if s.is_admin() && settings.commerce_enabled {a href="/admin/shop" {"Commerce"}}
                     @if s.can_moderate() {a href="/admin/comments" {"Comments"}}
                     @if s.is_admin() {a href="/admin/builder" {"Design studio"} a href="/admin/discovery" {"Discovery"} a href="/admin/settings" {"Site settings"} a href="/admin/operations" {"Operations"}}
-                    a href="/" {"View website ↗"}
+                    a href="/account/security" {"Account security"}a href="/" {"View website ↗"}
                 }
                 div class="account" {strong {(s.user.name)} span {(s.user.role)}
                     form method="post" action="/logout" {input type="hidden" name="csrf" value=(s.csrf);button class="quiet" {"Sign out"}}
@@ -60,6 +60,13 @@ pub fn csrf(s: &Session) -> Markup {
     html! {input type="hidden" name="csrf" value=(s.csrf);}
 }
 pub fn public_body(post: &Post, preview: bool) -> Markup {
+    public_body_with_dimensions(post, preview, &std::collections::BTreeMap::new())
+}
+pub fn public_body_with_dimensions(
+    post: &Post,
+    preview: bool,
+    dimensions: &std::collections::BTreeMap<String, (u32, u32)>,
+) -> Markup {
     let title = if preview {
         &post.title
     } else {
@@ -77,7 +84,10 @@ pub fn public_body(post: &Post, preview: bool) -> Markup {
     };
     let fields: serde_json::Value = serde_json::from_str(fields).unwrap_or_default();
     let rendered = crate::document::Document::parse(document)
-        .map(|d| if preview { d.preview_html() } else { d.html() })
+        .map(|mut d| {
+            d.apply_dimensions(dimensions);
+            if preview { d.preview_html() } else { d.html() }
+        })
         .unwrap_or_default();
     html! { article class="article" {
         @if preview {p class="notice" {"Private preview — unpublished changes. " a href=(format!("/admin/posts/{}",post.id)) {"Back to editor"}}}
@@ -94,8 +104,11 @@ pub fn login(settings: &Settings, identity: bool) -> String {
         html! {section class="login-card panel" {p class="eyebrow" {"Owner-controlled publishing"}h1 {"Welcome back."}p {"Sign in to your account."}
             form method="post" action="/login" {label {"Email" input type="email" name="email" autocomplete="username" required;}
                 label {"Password" input type="password" name="password" autocomplete="current-password" required maxlength="256";}
+                label {"Authenticator or recovery code · if enabled" input name="code" autocomplete="one-time-code" maxlength="24";}
                 button {"Sign in"}}
-            @if identity {p {a href="/members/identity/start" {"Sign in with your identity provider"}}}
+            form data-passkey="login" {label {"Passkey account" input type="email" name="email" required autocomplete="username" maxlength="254";}button class="secondary" {"Use a passkey"}p role="status" aria-live="polite" {}}
+                script defer src="/assets/auth.js" {}
+                @if identity {p {a href="/members/identity/start" {"Sign in with your identity provider"}}}
             p class="muted" {"No external account required."}
         }},
     )
@@ -113,4 +126,14 @@ pub fn excerpt(markdown: &str) -> String {
         }
     }
     text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Display server timestamps with an explicit zone and a useful empty state.
+pub fn timestamp(seconds: i64) -> String {
+    if seconds == 0 {
+        return "Not recorded".into();
+    }
+    chrono::DateTime::from_timestamp(seconds, 0)
+        .map(|date| date.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+        .unwrap_or_else(|| "Invalid timestamp".into())
 }

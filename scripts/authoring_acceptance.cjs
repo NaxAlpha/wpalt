@@ -146,13 +146,17 @@ module.exports = async function (context, origin, output, mediaUrl) {
   await page
     .getByLabel("Image description", { exact: true })
     .fill("A green image in the story");
+  await page.getByLabel("Loading priority",{exact:true}).selectOption("eager");
   await click("Insert image");
+  await editor.getByRole("img",{name:"A green image in the story"}).waitFor();
   assert.equal(
     await editor
       .getByRole("img", { name: "A green image in the story" })
       .getAttribute("src"),
     mediaUrl,
   );
+  assert.equal(await editor.getByRole("img",{name:"A green image in the story"}).getAttribute("loading"),"eager");
+  assert(Number(await editor.getByRole("img",{name:"A green image in the story"}).getAttribute("width"))>0);
   await editor.press(end);
   await editor.press("Enter");
   await click("Blocks");
@@ -221,6 +225,7 @@ module.exports = async function (context, origin, output, mediaUrl) {
       publicHtml.includes("SAFE_PASTE") &&
       publicHtml.includes(mediaUrl),
   );
+  assert(publicHtml.includes('loading="eager"') && publicHtml.includes('fetchpriority="high"') && publicHtml.includes('as="image"'),"Published lead image retains intrinsic dimensions and priority hint");
   await editor.waitFor();
   assert((await editor.innerText()).includes("Café 日本語"));
   const measures = [];

@@ -42,6 +42,8 @@ pub struct Node {
     pub href: Value,
     #[serde(default)]
     pub image: Value,
+    #[serde(default = "image_loading", skip_serializing_if = "lazy_loading")]
+    pub loading: String,
     #[serde(default)]
     pub children: Vec<Node>,
     #[serde(default)]
@@ -56,6 +58,12 @@ pub struct Node {
     pub condition: Value,
     #[serde(default)]
     pub style: Style,
+}
+fn lazy_loading(value: &str) -> bool {
+    value == "lazy"
+}
+fn image_loading() -> String {
+    "lazy".into()
 }
 fn heading_level() -> u8 {
     2
@@ -248,6 +256,11 @@ impl Package {
                 "A form block needs a literal published form ID.",
             ));
         }
+        if !["lazy", "eager"].contains(&n.loading.as_str())
+            || (n.kind != "image" && n.loading != "lazy")
+        {
+            return Err(Error::invalid("Image loading must be lazy or eager."));
+        }
         let s = &n.style;
         if !["", "grid", "row", "stack"].contains(&s.layout.as_str())
             || s.columns > 6
@@ -278,39 +291,40 @@ impl Package {
                 "Link destinations must be text URLs or bindings.",
             ));
         }
-        if n.image.is_object() {
-            if let Some(kind) = binding_kind(&n.image, r, model, params) {
-                let expected = if n.kind == "image" {
-                    "media"
-                } else {
-                    "gallery"
-                };
-                if kind != expected {
-                    return Err(Error::invalid(
-                        "Image/gallery binding has the wrong declared field type.",
-                    ));
-                }
-            }
-        }
-        if n.kind == "repeater" {
-            if let Some(kind) = binding_kind(&json!({"bind":n.source}), r, model, params) {
-                if !["repeater", "flexible", "gallery"].contains(&kind.as_str()) {
-                    return Err(Error::invalid("Repeaters must bind a declared list field."));
-                }
-            }
-        }
-
-        if let Some(id) = n.image.as_str() {
-            if !id.is_empty() && uuid::Uuid::parse_str(id).is_err() {
+        if n.image.is_object()
+            && let Some(kind) = binding_kind(&n.image, r, model, params)
+        {
+            let expected = if n.kind == "image" {
+                "media"
+            } else {
+                "gallery"
+            };
+            if kind != expected {
                 return Err(Error::invalid(
-                    "Literal media must reference an uploaded media UUID.",
+                    "Image/gallery binding has the wrong declared field type.",
                 ));
             }
         }
-        if let Some(url) = n.href.as_str() {
-            if !url.is_empty() && !content::safe_nav_url(url) {
-                return Err(Error::invalid("Unsafe theme link URL."));
-            }
+        if n.kind == "repeater"
+            && let Some(kind) = binding_kind(&json!({"bind":n.source}), r, model, params)
+            && !["repeater", "flexible", "gallery"].contains(&kind.as_str())
+        {
+            return Err(Error::invalid("Repeaters must bind a declared list field."));
+        }
+
+        if let Some(id) = n.image.as_str()
+            && !id.is_empty()
+            && uuid::Uuid::parse_str(id).is_err()
+        {
+            return Err(Error::invalid(
+                "Literal media must reference an uploaded media UUID.",
+            ));
+        }
+        if let Some(url) = n.href.as_str()
+            && !url.is_empty()
+            && !content::safe_nav_url(url)
+        {
+            return Err(Error::invalid("Unsafe theme link URL."));
         }
         if n.kind == "component" {
             let c = self
@@ -437,6 +451,18 @@ impl Package {
         Ok(original)
     }
     pub fn css(&self) -> String {
+        self.css_scope(None)
+    }
+    /// A deterministic render-reachable stylesheet. Preserve conditional branches
+    /// and responsive rules; discard unrelated templates/components, not guessed
+    /// browser states. The stylesheet is served locally under strict CSP.
+    pub fn css_for(&self, template: &str) -> Result<String> {
+        if !self.templates.contains_key(template) {
+            return Err(Error::not_found());
+        }
+        Ok(self.css_scope(Some(template)))
+    }
+    fn css_scope(&self, template: Option<&str>) -> String {
         let font = match self.tokens["font"].as_str() {
             "serif" => "Georgia,serif",
             "mono" => "ui-monospace,monospace",
@@ -489,13 +515,35 @@ impl Package {
                 add(c, out)
             }
         }
-        for n in self
-            .templates
-            .values()
-            .chain([&self.header, &self.footer])
-            .chain(self.components.values().map(|c| &c.root))
-        {
-            add(n, &mut out)
+        fn reachable<'a>(
+            p: &'a Package,
+            n: &'a Node,
+            seen: &mut BTreeSet<String>,
+            roots: &mut Vec<&'a Node>,
+        ) {
+            if n.kind == "component" && seen.insert(n.component.clone()) {
+                let root = &p.components[&n.component].root;
+                roots.push(root);
+                reachable(p, root, seen, roots);
+            }
+            for child in &n.children {
+                reachable(p, child, seen, roots);
+            }
+        }
+        let mut roots = vec![&self.header, &self.footer];
+        if let Some(template) = template {
+            roots.push(&self.templates[template]);
+            let mut seen = BTreeSet::new();
+            let initial = roots.clone();
+            for root in initial {
+                reachable(self, root, &mut seen, &mut roots);
+            }
+        } else {
+            roots.extend(self.templates.values());
+            roots.extend(self.components.values().map(|c| &c.root));
+        }
+        for n in roots {
+            add(n, &mut out);
         }
         out
     }
@@ -749,7 +797,7 @@ fn binding(
         return Err(Error::invalid("Invalid binding path."));
     }
     let valid = match parts.as_slice() {
-        ["site", key] => ["title", "description"].contains(key),
+        ["site", key] => ["title", "description", "role", "region"].contains(key),
         ["post", key] => ["title", "body", "url", "kind", "id"].contains(key),
         ["params", key, tail @ ..] => params.get(*key).is_some_and(|kind| {
             tail.is_empty()
@@ -840,10 +888,10 @@ async fn validate_literal_references(app: &App, package: &Package) -> Result<()>
         if n.kind == "form" {
             forms.insert(n.text.as_str().unwrap_or("").to_owned());
         }
-        if let Some(id) = n.image.as_str() {
-            if uuid::Uuid::parse_str(id).is_ok() {
-                media.insert(id.into());
-            }
+        if let Some(id) = n.image.as_str()
+            && uuid::Uuid::parse_str(id).is_ok()
+        {
+            media.insert(id.into());
         }
         if n.kind == "component" {
             for (key, value) in &n.arguments {
@@ -917,7 +965,7 @@ pub async fn save(
     version: i64,
     publish: bool,
 ) -> Result<i64> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     if !crate::schema::identifier(id) {
         return Err(Error::invalid("Invalid theme identifier."));
     }
@@ -965,7 +1013,7 @@ pub async fn save(
     Ok(version + 1)
 }
 pub async fn activate(app: &App, id: &str) -> Result<()> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let stored = load(app, id, false).await?;
     if stored.published_version < 1 {
         return Err(Error::invalid("Publish the theme before activating it."));
@@ -1028,6 +1076,7 @@ pub struct Context {
     pub collections: BTreeMap<String, Vec<Value>>,
     pub relations: BTreeMap<String, Value>,
     pub media: BTreeMap<String, String>,
+    pub media_dimensions: BTreeMap<String, (u32, u32)>,
     pub queries: usize,
     reference_ids: BTreeSet<String>,
 }
@@ -1108,13 +1157,16 @@ pub async fn context_with_discovery(
     .fetch_one(&app.db.pool)
     .await?;
     let mut ctx = Context {
-        root: json!({"site":{"title":settings.title,"description":settings.description},"navigation":serde_json::from_str::<Value>(&settings.navigation).unwrap_or(json!([])),"post":post.map(|p|post_value(p,draft,discovery)).unwrap_or(json!({})),"options":serde_json::from_str::<Value>(&options).map_err(|_|Error::invalid("Invalid shared options."))?}),
+        root: json!({"site":{"title":settings.title,"description":settings.description,"role":"anonymous","region":"unknown"},"navigation":serde_json::from_str::<Value>(&settings.navigation).unwrap_or(json!([])),"post":post.map(|p|post_value(p,draft,discovery)).unwrap_or(json!({})),"options":serde_json::from_str::<Value>(&options).map_err(|_|Error::invalid("Invalid shared options."))?}),
         collections: BTreeMap::from([("listing".into(), listing)]),
         relations: BTreeMap::new(),
         media: BTreeMap::new(),
+        media_dimensions: BTreeMap::new(),
         queries: 2,
         reference_ids: BTreeSet::new(),
     };
+    ctx.root["_asset_scope"] = app.config.assets.scoped_theme_css.into();
+    ctx.root["_asset_preload"] = app.config.assets.preload_theme_css.into();
     ctx.root["language"] = locale.into();
     ctx.root["direction"] = language_config.direction.clone().into();
     if !language_config.navigation.is_empty() {
@@ -1184,21 +1236,21 @@ pub async fn context_with_discovery(
     for n in nodes {
         if n.kind == "component" {
             for (key, value) in &n.arguments {
-                if let Some(id) = value.as_str() {
-                    if uuid::Uuid::parse_str(id).is_ok() {
-                        match package.components[&n.component].parameters[key].as_str() {
-                            "media" => media.push(id.into()),
-                            "relationship" => literal_relations.push(id.to_owned()),
-                            _ => {}
-                        }
+                if let Some(id) = value.as_str()
+                    && uuid::Uuid::parse_str(id).is_ok()
+                {
+                    match package.components[&n.component].parameters[key].as_str() {
+                        "media" => media.push(id.into()),
+                        "relationship" => literal_relations.push(id.to_owned()),
+                        _ => {}
                     }
                 }
             }
         }
-        if let Some(id) = n.image.as_str() {
-            if uuid::Uuid::parse_str(id).is_ok() {
-                media.push(id.to_owned())
-            }
+        if let Some(id) = n.image.as_str()
+            && uuid::Uuid::parse_str(id).is_ok()
+        {
+            media.push(id.to_owned())
         }
     }
     registry.references(
@@ -1279,6 +1331,30 @@ pub async fn context_with_discovery(
         }
     }
 
+    // Layout metadata is optional, bounded independently of typed references.
+    // Resolve only local image UUIDs; external imported URLs are never fetched.
+    let mut doc_media = BTreeSet::new();
+    for value in std::iter::once(&ctx.root["post"])
+        .chain(ctx.collections.values().flatten())
+        .chain(ctx.relations.values())
+    {
+        if let Some(raw) = value["document"].as_str()
+            && raw.contains("/media/")
+            && let Ok(doc) = crate::document::Document::parse(raw)
+        {
+            doc_media.extend(doc.image_ids().into_iter().take(128));
+            if doc_media.len() >= 128 {
+                break;
+            }
+        }
+    }
+    let known: BTreeSet<_> = media.iter().cloned().collect();
+    media.extend(
+        doc_media
+            .into_iter()
+            .filter(|id| !known.contains(id))
+            .take(128usize.saturating_sub(known.len())),
+    );
     ctx.reference_ids.extend(refs.keys().cloned());
     ctx.reference_ids.extend(media.iter().cloned());
     media.sort();
@@ -1288,18 +1364,21 @@ pub async fn context_with_discovery(
     }
     if !media.is_empty() {
         let mut q = QueryBuilder::<Any>::new(if draft {
-            "SELECT id,alt FROM media WHERE id IN ("
+            "SELECT id,alt,filename,sha256 FROM media WHERE mime<>'video/mp4' AND id IN ("
         } else {
-            "SELECT id,alt FROM media WHERE visibility='public' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='media' AND mr.resource_id=media.id) AND id IN ("
+            "SELECT id,alt,filename,sha256 FROM media WHERE mime<>'video/mp4' AND visibility='public' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='media' AND mr.resource_id=media.id) AND id IN ("
         });
         let mut list = q.separated(",");
         for id in &media {
             list.push_bind(id);
         }
         list.push_unseparated(")");
+        let mut sources = Vec::new();
         for row in app.db.fetch_builder(&mut q).await? {
+            sources.push((row.get("id"), row.get("filename"), row.get("sha256")));
             ctx.media.insert(row.get("id"), row.get("alt"));
         }
+        ctx.media_dimensions = crate::operations::media::dimensions(app, sources).await;
         ctx.queries += 1;
     }
     let bytes = serde_json::to_vec(&ctx.root)
@@ -1329,10 +1408,10 @@ impl Context {
             _ => &self.root[root],
         };
         for key in parts {
-            if let Some(id) = value.as_str() {
-                if let Some(related) = self.relations.get(id) {
-                    value = related
-                }
+            if let Some(id) = value.as_str()
+                && let Some(related) = self.relations.get(id)
+            {
+                value = related
             }
             value = value.get(key).unwrap_or(&Value::Null);
         }
@@ -1454,7 +1533,7 @@ fn render_node(
         "image" => {
             let id = text(&ctx.resolve(&n.image, item, params));
             if let Some(alt) = ctx.media.get(&id) {
-                html! {img class=(class) src=(format!("/media/{id}")) alt=(if label.is_empty(){alt.as_str()}else{&label}) loading="lazy";}
+                html! {img class=(class) src=(format!("/media/{id}")) alt=(if label.is_empty(){alt.as_str()}else{&label}) width=[ctx.media_dimensions.get(&id).map(|d|d.0)] height=[ctx.media_dimensions.get(&id).map(|d|d.1)] loading=(&n.loading) fetchpriority=(if n.loading=="eager" {"high"} else {"auto"}) decoding="async";}
             } else {
                 Markup::default()
             }
@@ -1469,14 +1548,16 @@ fn render_node(
                     ctx.resolve(&json!({"bind":format!("{prefix}.document")}), item, params)
                 });
             if let Some(doc) = canonical.as_ref().and_then(Value::as_str) {
-                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|d|if draft {d.preview_html()} else {d.html()}).unwrap_or_default()))}}
+                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|mut d| {d.apply_dimensions(&ctx.media_dimensions);if draft {d.preview_html()} else {d.html()}}).unwrap_or_default()))}}
             } else if !n.text.is_null() {
                 html! {div class=(class){(maud::PreEscaped(content::markdown(&label)))}}
             } else if let Some(doc) = item.get("document").and_then(Value::as_str) {
-                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|d|if draft {d.preview_html()} else {d.html()}).unwrap_or_default()))}}
+                html! {div class=(class){(maud::PreEscaped(crate::document::Document::parse(doc).map(|mut d| {d.apply_dimensions(&ctx.media_dimensions);if draft {d.preview_html()} else {d.html()}}).unwrap_or_default()))}}
             } else {
-                post.map(|p| crate::view::public_body(p, draft))
-                    .unwrap_or_default()
+                post.map(|p| {
+                    crate::view::public_body_with_dimensions(p, draft, &ctx.media_dimensions)
+                })
+                .unwrap_or_default()
             }
         }
         "navigation" => {
@@ -1574,7 +1655,7 @@ fn render_node(
         }
         "gallery" | "carousel" => {
             let items = ctx.resolve(&n.image, item, params);
-            html! {div class=(format!("{class} {}",if n.kind=="carousel"{"theme-carousel"}else{"theme-grid"})){@if let Some(ids)=items.as_array(){@for id in ids.iter().take(n.limit){@if let Some(alt)=id.as_str().and_then(|id|ctx.media.get(id)){img src=(format!("/media/{}",id.as_str().unwrap())) alt=(alt) loading="lazy";}}}}}
+            html! {div class=(format!("{class} {}",if n.kind=="carousel"{"theme-carousel"}else{"theme-grid"})){@if let Some(ids)=items.as_array(){@for id in ids.iter().take(n.limit){@if let Some(alt)=id.as_str().and_then(|id|ctx.media.get(id)){img src=(format!("/media/{}",id.as_str().unwrap())) alt=(alt) width=[id.as_str().and_then(|id|ctx.media_dimensions.get(id)).map(|d|d.0)] height=[id.as_str().and_then(|id|ctx.media_dimensions.get(id)).map(|d|d.1)] loading="lazy" decoding="async";}}}}}
         }
         _ => html! {section class=(class){(children)}},
     })
@@ -1604,6 +1685,44 @@ pub fn document(
             stored.id, stored.published_version
         )
     };
+    let style = if ctx.root["_asset_scope"].as_bool().unwrap_or(true) {
+        let selected = if p.templates.contains_key(template) {
+            template
+        } else {
+            "content"
+        };
+        format!(
+            "{style}{}template={selected}",
+            if draft { "&" } else { "?" }
+        )
+    } else {
+        style
+    };
+    let preload = ctx.root["_asset_preload"].as_bool().unwrap_or(true);
+    let priority_image = post
+        .and_then(|post| {
+            crate::document::Document::parse(if draft {
+                &post.document
+            } else {
+                &post.published_document
+            })
+            .ok()
+        })
+        .and_then(|doc| doc.priority_image())
+        .filter(|src| body.0.contains(&format!("src=\"{src}\"")))
+        .or_else(|| {
+            body.0.split("<img ").skip(1).find_map(|part| {
+                let tag = part.split_once('>')?.0;
+                if !tag.contains("loading=\"eager\"") {
+                    return None;
+                }
+                let id = tag.split_once("src=\"/media/")?.1.split_once('"')?.0;
+                uuid::Uuid::parse_str(id)
+                    .ok()
+                    .map(|_| format!("/media/{id}"))
+            })
+        });
+
     tracing::debug!(event="theme_render",theme_id=%stored.id,nodes=budget,resolution_queries=ctx.queries,preview=draft);
     fn has_tabs(p: &Package, n: &Node) -> bool {
         n.kind == "tabs"
@@ -1613,7 +1732,7 @@ pub fn document(
     let scripts = [&p.header, &p.footer, root]
         .into_iter()
         .any(|n| has_tabs(p, n));
-    let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" class="theme-shell"{(body)(extra)}(footer)(crate::business::engagement::markup(settings,draft))(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
+    let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";@if let Some(src)=priority_image{link rel="preload" href=(src) as="image";}@if preload{link rel="preload" href=(&style) as="style";}link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" class="theme-shell"{(body)(extra)}(footer)(crate::business::engagement::markup(settings,draft))(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
     if output.len() > 2 * 1024 * 1024 {
         return Err(Error::invalid("Rendered document exceeds 2 MiB."));
     }

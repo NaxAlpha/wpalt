@@ -46,10 +46,12 @@ impl Notification {
                     "Route conditions must refer to a declared field.",
                 ));
             }
-            if let Condition::Equal { value, .. } = condition {
-                if !value.is_boolean() && !value.is_number() && !value.is_string() {
-                    return Err(Error::invalid("Route comparison must be a scalar."));
-                }
+            if let Condition::Equal { value, .. } = condition
+                && !value.is_boolean()
+                && !value.is_number()
+                && !value.is_string()
+            {
+                return Err(Error::invalid("Route comparison must be a scalar."));
             }
         }
         Ok(())

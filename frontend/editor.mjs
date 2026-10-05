@@ -126,7 +126,14 @@ const nodes = {
     inline: true,
     group: "inline",
     draggable: true,
-    attrs: { src: {}, alt: { default: "" }, title: { default: null } },
+    attrs: {
+      src: {},
+      alt: { default: "" },
+      title: { default: null },
+      width: { default: null },
+      height: { default: null },
+      loading: { default: "lazy" },
+    },
     parseDOM: [
       {
         tag: "img[src]",
@@ -139,7 +146,14 @@ const nodes = {
             : false,
       },
     ],
-    toDOM: (n) => ["img", { ...n.attrs, loading: "lazy" }],
+    toDOM: (n) => [
+      "img",
+      {
+        ...n.attrs,
+        decoding: "async",
+        fetchpriority: n.attrs.loading === "eager" ? "high" : "auto",
+      },
+    ],
   },
 };
 // OrderedMap permits the list helper's schema extension without a second schema.
@@ -860,6 +874,21 @@ function initialize(form, host, index) {
     openDialog("Insert image", (f) => {
       const src = field(f, "Media URL", "/media/");
       const alt = field(f, "Image description");
+      const priorityLabel = document.createElement("label");
+      priorityLabel.textContent = "Loading priority";
+      const priority = document.createElement("select");
+      priority.setAttribute("aria-label", "Loading priority");
+      for (const [value, label] of [
+        ["lazy", "Lazy — ordinary article image"],
+        ["eager", "Early — important first image"],
+      ]) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        priority.append(option);
+      }
+      priorityLabel.append(priority);
+      f.append(priorityLabel);
       const info = document.createElement("p");
       info.textContent =
         "Choose an uploaded image below, or enter its /media/ID URL. Private images remain protected.";
@@ -933,15 +962,55 @@ function initialize(form, host, index) {
       const error = document.createElement("p");
       error.setAttribute("role", "alert");
       f.append(error);
-      button(
+      const insert = button(
         "Insert image",
-        () => {
+        async () => {
           if (
             !/^\/media\/[0-9a-f-]{36}$/.test(src.value) ||
             !alt.value.trim()
           ) {
             error.textContent =
               "Choose an uploaded media URL and a useful description.";
+            return;
+          }
+          if (insert.disabled) return;
+          insert.disabled = true;
+          const chosen = src.value;
+          let dimensions;
+          try {
+            error.textContent = "Checking image dimensions…";
+            const image = new Image();
+            image.src = chosen;
+            let timer;
+            try {
+              await Promise.race([
+                image.decode(),
+                new Promise((_, reject) => {
+                  timer = setTimeout(() => reject(Error()), 10000);
+                }),
+              ]);
+            } finally {
+              clearTimeout(timer);
+            }
+            if (
+              !image.naturalWidth ||
+              image.naturalWidth > 4096 ||
+              !image.naturalHeight ||
+              image.naturalHeight > 4096
+            )
+              throw Error();
+            dimensions = {
+              width: image.naturalWidth,
+              height: image.naturalHeight,
+            };
+          } catch {
+            insert.disabled = false;
+            error.textContent =
+              "Image could not be read. Check access and try again.";
+            return;
+          }
+          if (!f.isConnected || chosen !== src.value) {
+            insert.disabled = false;
             return;
           }
           dialog.close();
@@ -954,6 +1023,8 @@ function initialize(form, host, index) {
                     src: src.value,
                     alt: alt.value,
                     title: null,
+                    ...dimensions,
+                    loading: priority.value,
                   }),
                 )
                 .scrollIntoView(),

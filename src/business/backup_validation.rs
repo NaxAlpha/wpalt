@@ -182,7 +182,7 @@ pub fn validate(tables: &Tables) -> Result<()> {
             || ![0, 1].contains(&number(row, "recording"))
             || !(0..=500).contains(&number(row, "events"))
             || !(0..=60).contains(&number(row, "frames"))
-            || text(row, "purpose").len() > 1000
+            || text(row, "purpose").len() > 1100
         {
             return Err(fail());
         }

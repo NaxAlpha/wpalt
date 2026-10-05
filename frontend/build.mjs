@@ -108,3 +108,21 @@ await build({
   outfile: "../assets/generated/forms.js",
   legalComments: "eof",
 });
+
+await build({
+  entryPoints: ["auth.mjs"],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: ["es2020"],
+  outfile: "../assets/generated/auth.js",
+});
+
+await build({
+  entryPoints: ["spam.mjs"],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: ["es2020"],
+  outfile: "../assets/generated/spam.js",
+});

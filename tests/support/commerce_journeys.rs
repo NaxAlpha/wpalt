@@ -1,13 +1,13 @@
 //! M6 readable financial and reservation journeys on the real supported database engines.
 use super::*;
 use wpalt::commerce::{billing, booking, catalog, orders};
-async fn shopper(site: &Site, email: &str) -> (String, Session) {
+pub(super) async fn shopper(site: &Site, email: &str) -> (String, Session) {
     auth::add_user(&site.app, email, "Shopper", "subscriber", PASSWORD)
         .await
         .unwrap();
     auth::login(&site.app, email, PASSWORD).await.unwrap()
 }
-async fn product(
+pub(super) async fn product(
     site: &Site,
     kind: &str,
     price: i64,
@@ -58,7 +58,7 @@ async fn product(
     .unwrap();
     (p, v)
 }
-async fn cart(
+pub(super) async fn cart(
     site: &Site,
     s: &Session,
     variant: &str,
@@ -93,7 +93,7 @@ async fn state(site: &Site, id: &str) -> String {
         .await
         .unwrap()
 }
-async fn pay(site: &Site, id: &str, reference: &str) {
+pub(super) async fn pay(site: &Site, id: &str, reference: &str) {
     orders::record_offline(
         &site.app,
         site.session(),
@@ -1669,7 +1669,7 @@ async fn commerce_upgrade_preserves_existing_site_and_rejects_route_and_currency
                 .fetch_one(&upgraded.db.pool)
                 .await
                 .unwrap(),
-            9
+            12
         );
         let (token, owner) = auth::login(&upgraded, "owner@example.test", PASSWORD)
             .await

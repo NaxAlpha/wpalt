@@ -16,7 +16,7 @@ async fn publish(site: &Site, slug: &str, body: &str) -> String {
         .unwrap()
         .id
 }
-fn lesson(post: String, title: &str) -> Lesson {
+pub(super) fn lesson(post: String, title: &str) -> Lesson {
     Lesson {
         id: uuid::Uuid::new_v4().to_string(),
         title: title.into(),

@@ -248,7 +248,7 @@ async fn public(
         .map_err(|_| Error::invalid("Stored form requires repair."))?;
     let settings = app.db.settings().await?;
     if embed.embedded {
-        return Ok(Html(html!{(maud::DOCTYPE)html lang="en"{head{meta charset="utf-8";meta name="viewport" content="width=device-width, initial-scale=1";title {(definition.form.title)}link rel="stylesheet" href="/assets/app.css";}body class=(format!("{} embedded-form",settings.theme)){main{h1 {(definition.form.title)}div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw){p{"Loading form…"}noscript{"Enable JavaScript to complete this form."}}}script defer src="/assets/forms.js"{}script defer src="/assets/form-embed.js"{}}}}.into_string()));
+        return Ok(Html(html!{(maud::DOCTYPE)html lang="en"{head{meta charset="utf-8";meta name="viewport" content="width=device-width, initial-scale=1";title {(definition.form.title)}link rel="stylesheet" href="/assets/app.css";}body class=(format!("{} embedded-form",settings.theme)){main{h1 {(definition.form.title)}div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) data-spam=(if app.config.spam.enabled {"true"} else {"false"}){p{"Loading form…"}noscript{"Enable JavaScript to complete this form."}}}script defer src="/assets/forms.js"{}script defer src="/assets/form-embed.js"{}}}}.into_string()));
     }
     Ok(Html(view::layout(
         &definition.form.title,
@@ -257,7 +257,7 @@ async fn public(
         html! {
             h1 {(definition.form.title)}
             (super::engagement::markup(&settings,false))
-            div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) {p {"Loading form…"}noscript {"Enable JavaScript to complete this form."}}
+            div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) data-spam=(if app.config.spam.enabled {"true"} else {"false"}) {p {"Loading form…"}noscript {"Enable JavaScript to complete this form."}}
             script defer src="/assets/forms.js" {}
         },
     )))
@@ -268,6 +268,8 @@ struct Submission {
     version: i64,
     key: String,
     values: Value,
+    #[serde(default)]
+    spam: crate::operations::spam::Proof,
 }
 async fn submit(
     State(app): State<App>,
@@ -275,6 +277,13 @@ async fn submit(
     Path(id): Path<String>,
     Json(input): Json<Submission>,
 ) -> Result<Json<Value>> {
+    crate::operations::spam::verify(
+        &app,
+        &format!("form:{id}"),
+        &input.spam,
+        &input.values.to_string(),
+    )
+    .await?;
     let entry = store::submit(&app, &id, input.version, &input.key, &input.values).await?;
     if super::engagement::conversion(
         &app,

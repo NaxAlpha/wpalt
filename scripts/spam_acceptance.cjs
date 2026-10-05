@@ -1,0 +1,37 @@
+// Real browser computes local work; no third-party challenge or runtime account.
+const assert = require("node:assert/strict");
+const path = require("node:path");
+module.exports = async (owner, origin, output) => {
+  const visitor = await owner.browser().newContext();
+  const page = await visitor.newPage();
+  const foreign = [];
+  page.on("request", (request) => { if (new URL(request.url()).origin !== origin) foreign.push(request.url()); });
+  await page.goto(origin + "/journal-1");
+  await page.getByLabel("Your name").fill("Local visitor");
+  await page.getByLabel("Comment", { exact:true }).fill("A local submission without an outside challenge service.");
+  await Promise.all([page.waitForURL("**/journal-1/comments"),page.getByRole("button",{name:"Submit for review"}).click()]);
+  await page.getByText("Your comment is awaiting review.",{exact:true}).waitFor();
+  const admin=await owner.newPage();
+  await admin.goto(origin + "/admin/comments");
+  await admin.getByText("A local submission without an outside challenge service.",{exact:true}).waitFor();
+  const denied=await visitor.request.post(origin+"/journal-1/comments",{form:{name:"Unverified",body:"Should never enter moderation"}});
+  assert.equal(denied.status(),403);
+  assert.deepEqual(foreign,[]);
+  await admin.screenshot({path:path.join(output,"spam-moderation.png"),fullPage:true});
+  await admin.goto(origin + "/admin/forms");
+  await admin.getByLabel("Title", {exact:true}).fill("Local guarded form");
+  await Promise.all([admin.waitForURL(/\/admin\/forms\/[^/]+$/), admin.getByRole("button",{name:"Create form",exact:true}).click()]);
+  const id=new URL(admin.url()).pathname.split("/").at(-1);
+  await admin.getByLabel("Form title",{exact:true}).waitFor();
+  await admin.getByLabel("Label",{exact:true}).nth(0).fill("Message");
+  await admin.getByRole("button",{name:"Publish form",exact:true}).click();
+  await admin.getByRole("status").filter({hasText:"Published. Visitors"}).waitFor();
+  await page.goto(origin + `/forms/${id}`);
+  await page.getByLabel("Message",{exact:true}).fill("A guarded form response");
+  await page.getByRole("button",{name:"Send response",exact:true}).click();
+  await page.getByRole("status").filter({hasText:"response has been received"}).waitFor();
+  await admin.goto(origin + `/admin/forms/${id}/entries`);
+  assert.equal(await admin.getByRole("link",{name:/^Response /}).count(),1);
+  assert.deepEqual(foreign,[]);
+  await admin.close();await visitor.close();
+};

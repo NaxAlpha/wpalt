@@ -2640,3 +2640,2951 @@ mod membership_journeys;
 
 #[path = "support/commerce_journeys.rs"]
 mod commerce_journeys;
+
+#[tokio::test]
+async fn encrypted_recovery_survives_original_loss_and_reports_failed_independent_copies() {
+    use wpalt::operations::{encryption, recovery};
+    for pg in engines() {
+        let mut original = Site::new(pg, true).await;
+        let story = content::save(
+            &original.app,
+            original.session(),
+            None,
+            input("encrypted-story", "publish"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            upload(&original, "green.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let (_, buyer) =
+            commerce_journeys::shopper(&original, "recovery-learner@example.test").await;
+        let (_, variant) = commerce_journeys::product(&original, "membership", 1200, -1, "").await;
+        let checkout = commerce_journeys::cart(&original, &buyer, &variant, "", 1).await;
+        let order = wpalt::commerce::orders::checkout(&original.app, &buyer, &checkout)
+            .await
+            .unwrap();
+        commerce_journeys::pay(&original, &order, "independent-recovery-payment").await;
+        let policy = wpalt::membership::policy(&original.app, "Recovered academy", "academy", "")
+            .await
+            .unwrap();
+        let lesson = membership_journeys::lesson(story.id, "Recovered lesson");
+        let course = wpalt::membership::Course {
+            title: "Independent recovery academy".into(),
+            policy_id: policy,
+            sequential: true,
+            lessons: vec![lesson.clone()],
+        };
+        let course_id = wpalt::membership::create_course(&original.app, &course)
+            .await
+            .unwrap();
+        let edition = wpalt::membership::save_course(&original.app, &course_id, 1, &course, true)
+            .await
+            .unwrap();
+        let attempt_key = uuid::Uuid::new_v4().to_string();
+        assert!(
+            wpalt::membership::assess(
+                &original.app,
+                &buyer,
+                &course_id,
+                &lesson.id,
+                wpalt::membership::AttemptInput {
+                    version: edition,
+                    key: &attempt_key,
+                    answers: &[],
+                    assignment: ""
+                }
+            )
+            .await
+            .unwrap()
+            .completed
+        );
+        let independent = tempfile::tempdir().unwrap();
+        let key_store = tempfile::tempdir().unwrap();
+        let key = encryption::generate_key();
+        let key_path = key_store.path().join("recovery.key");
+        backup::write_private(&key_path, hex::encode(key).as_bytes()).unwrap();
+        let mut config = (*original.app.config).clone();
+        config.recovery = recovery::Config {
+            enabled: true,
+            incremental: false,
+            key_file: key_path,
+            destinations: vec![independent.path().to_owned()],
+            interval_seconds: 60,
+            retain: 1,
+        };
+        original.app.config = std::sync::Arc::new(config);
+        let history_id = uuid::Uuid::new_v4().to_string();
+        wpalt::operations::audit::append(
+            &original.app,
+            wpalt::operations::audit::Event {
+                at: wpalt::now(),
+                request_id: history_id.clone(),
+                actor: "host-owner".into(),
+                route: "cli:recovery-check".into(),
+                phase: "outcome".into(),
+                status: 200,
+            },
+        )
+        .await
+        .unwrap();
+        let first = recovery::run(&original.app).await.unwrap();
+        assert_eq!(first.copies[0].state, "verified");
+        let second = recovery::run(&original.app).await.unwrap();
+        assert_ne!(first.package, second.package);
+        assert!(
+            !independent.path().join(first.package).exists(),
+            "retention follows a verified replacement"
+        );
+        let package = std::fs::read(independent.path().join(&second.package)).unwrap();
+        assert!(
+            !package
+                .windows(PASSWORD.len())
+                .any(|w| w == PASSWORD.as_bytes())
+        );
+        assert!(
+            encryption::open(&encryption::generate_key(), &package, 256 * 1024 * 1024).is_err()
+        );
+        let mut tampered = package.clone();
+        *tampered.last_mut().unwrap() ^= 1;
+        assert!(encryption::open(&key, &tampered, 256 * 1024 * 1024).is_err());
+        assert!(encryption::open(&key, &package[..package.len() - 1], 256 * 1024 * 1024).is_err());
+        assert!(encryption::open(&key, &package, 1).is_err());
+        // A missing mount must not be recreated on the origin disk and reported
+        // as an independent successful copy.
+        let mut config = (*original.app.config).clone();
+        let missing = independent.path().join("missing-mount");
+        config.recovery.destinations.push(missing.clone());
+        original.app.config = std::sync::Arc::new(config);
+        let partial = recovery::run(&original.app).await.unwrap();
+        assert_eq!(partial.copies[0].state, "verified");
+        assert_eq!(partial.copies[1].state, "failed");
+        assert!(!missing.exists());
+        assert_eq!(
+            recovery::status(&original.app).await.unwrap().copies[1].state,
+            "failed"
+        );
+        // The original site/database becomes unavailable. Recovery uses only the
+        // independently stored package and separately held key.
+        original.close().await;
+        let fresh = Site::new(pg, false).await;
+        let plaintext =
+            encryption::open(&key, &package, fresh.app.config.max_backup_bytes).unwrap();
+        backup::restore(&fresh.app, &plaintext).await.unwrap();
+        let (_, owner) = auth::login(&fresh.app, "owner@example.test", PASSWORD)
+            .await
+            .unwrap();
+        assert_eq!(owner.user.role, "admin");
+        let (_, buyer) = auth::login(&fresh.app, "recovery-learner@example.test", PASSWORD)
+            .await
+            .unwrap();
+        assert!(
+            wpalt::membership::learner_state(&fresh.app, &buyer, &course_id)
+                .await
+                .unwrap()
+                .2[0]
+                .completed
+        );
+        assert!(
+            wpalt::operations::audit::read(&fresh.app)
+                .await
+                .unwrap()
+                .iter()
+                .any(|event| event.request_id == history_id),
+            "original loss must not discard recent operational evidence"
+        );
+        let payment: String =
+            sqlx::query_scalar("SELECT payment_state FROM shop_orders WHERE id=$1")
+                .bind(&order)
+                .fetch_one(&fresh.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(payment, "paid");
+        let receipts: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM shop_payments WHERE order_id=$1")
+                .bind(&order)
+                .fetch_one(&fresh.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            receipts, 1,
+            "restoring learning/access must not replay a payment"
+        );
+
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM posts WHERE published_slug='encrypted-story'"
+            )
+            .fetch_one(&fresh.app.db.pool)
+            .await
+            .unwrap(),
+            1
+        );
+        let filename: String =
+            sqlx::query_scalar("SELECT filename FROM media WHERE visibility='private'")
+                .fetch_one(&fresh.app.db.pool)
+                .await
+                .unwrap();
+        assert!(
+            fresh
+                .app
+                .config
+                .data_dir
+                .join("media")
+                .join(filename)
+                .is_file()
+        );
+
+        assert!(
+            backup::restore(&fresh.app, &plaintext).await.is_err(),
+            "never overwrite an existing site"
+        );
+        fresh.close().await;
+    }
+}
+
+#[tokio::test]
+async fn anonymous_cache_never_reuses_sessions_and_invalidates_published_access_changes() {
+    for pg in engines() {
+        let mut site = Site::new(pg, true).await;
+        let mut config = (*site.app.config).clone();
+        config.cache.enabled = true;
+        site.app.config = std::sync::Arc::new(config);
+        let published = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("cached-public-story", "publish"),
+        )
+        .await
+        .unwrap();
+        let router = wpalt::web::router(site.app.clone());
+        let request = || {
+            Request::builder()
+                .uri("/sitemap.xml")
+                .body(Body::empty())
+                .unwrap()
+        };
+        let first = router.clone().oneshot(request()).await.unwrap();
+        assert_eq!(first.headers()["x-wpalt-cache"], "miss");
+        assert!(
+            String::from_utf8(
+                axum::body::to_bytes(first.into_body(), 1_000_000)
+                    .await
+                    .unwrap()
+                    .to_vec()
+            )
+            .unwrap()
+            .contains("cached-public-story")
+        );
+        let public_page = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/cached-public-story")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(public_page.headers()["x-wpalt-cache"], "miss");
+        let page_hit = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/cached-public-story")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(page_hit.headers()["x-wpalt-cache"], "hit");
+        let second = router.clone().oneshot(request()).await.unwrap();
+        assert_eq!(second.headers()["x-wpalt-cache"], "hit");
+        let cookie = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/sitemap.xml")
+                    .header("cookie", format!("wpalt_session={}", site.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert!(!cookie.headers().contains_key("x-wpalt-cache"));
+        let preload = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/operations/cache/preload")
+                    .header("origin", site.app.config.origin())
+                    .header("cookie", format!("wpalt_session={}", site.token))
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(format!("csrf={}", site.session().csrf)))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(preload.status(), StatusCode::SEE_OTHER);
+        let gzip = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/cached-public-story")
+                    .header("accept-encoding", "gzip")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(gzip.headers()["x-wpalt-cache"], "hit");
+        assert_eq!(gzip.headers()["content-encoding"], "gzip");
+        let encoded = axum::body::to_bytes(gzip.into_body(), 1_000_000)
+            .await
+            .unwrap();
+        use std::io::Read;
+        let mut decoded = String::new();
+        flate2::read::GzDecoder::new(encoded.as_ref())
+            .read_to_string(&mut decoded)
+            .unwrap();
+        assert!(decoded.contains("cached-public-story"));
+        let identity = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/cached-public-story")
+                    .header("accept-encoding", "gzip;q=0")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(identity.headers()["x-wpalt-cache"], "hit");
+        assert!(!identity.headers().contains_key("content-encoding"));
+        assert_eq!(
+            axum::body::to_bytes(identity.into_body(), 1_000_000)
+                .await
+                .unwrap()
+                .as_ref(),
+            decoded.as_bytes()
+        );
+        let policy = wpalt::membership::policy(&site.app, "Private stories", "paid-reader", "")
+            .await
+            .unwrap();
+        wpalt::membership::protect(&site.app, "post", &published.id, &policy, 0, 0)
+            .await
+            .unwrap();
+        let protected = router.clone().oneshot(request()).await.unwrap();
+        assert_eq!(protected.headers()["x-wpalt-cache"], "miss");
+        assert!(
+            !String::from_utf8(
+                axum::body::to_bytes(protected.into_body(), 1_000_000)
+                    .await
+                    .unwrap()
+                    .to_vec()
+            )
+            .unwrap()
+            .contains("cached-public-story")
+        );
+        let private = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/cached-public-story")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert!(!private.headers().contains_key("x-wpalt-cache"));
+        wpalt::membership::release(&site.app, "post", &published.id)
+            .await
+            .unwrap();
+        let reopened = router.oneshot(request()).await.unwrap();
+        assert!(
+            String::from_utf8(
+                axum::body::to_bytes(reopened.into_body(), 1_000_000)
+                    .await
+                    .unwrap()
+                    .to_vec()
+            )
+            .unwrap()
+            .contains("cached-public-story")
+        );
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn local_request_rules_cannot_be_bypassed_with_forwarded_headers_or_cached_pages() {
+    use axum::extract::ConnectInfo;
+    use std::net::SocketAddr;
+    let mut site = Site::new(false, true).await;
+    let mut config = (*site.app.config).clone();
+    config.cache.enabled = true;
+    config.protection = wpalt::operations::protection::Config {
+        enabled: true,
+        denied_prefixes: vec!["/admin".into()],
+        denied_peers: vec!["192.0.2.9".parse().unwrap()],
+        requests_per_window: 2,
+        window_seconds: 60,
+    };
+    site.app.config = std::sync::Arc::new(config);
+    let router = wpalt::web::router(site.app.clone());
+    let request = |path: &str, peer: &str| {
+        let mut request = Request::builder()
+            .uri(path)
+            .header("x-forwarded-for", "198.51.100.100")
+            .body(Body::empty())
+            .unwrap();
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(peer.parse::<SocketAddr>().unwrap()));
+        request
+    };
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/admin", "192.0.2.1:1234"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/", "192.0.2.9:1234"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/", "192.0.2.1:1234"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/", "192.0.2.1:1235"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/", "192.0.2.1:1236"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    assert_eq!(
+        router
+            .clone()
+            .oneshot(request("/", "192.0.2.2:1234"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        router
+            .oneshot(request("/health", "192.0.2.1:1234"))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    site.close().await;
+}
+
+#[tokio::test]
+async fn native_image_derivatives_preserve_private_authority_and_validate_processing_limits() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        assert_eq!(
+            upload(&site, "private.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let id: String = sqlx::query_scalar("SELECT id FROM media LIMIT 1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let router = wpalt::web::router(site.app.clone());
+        let path = format!("/media/{id}/resize/320");
+        assert!(
+            !router
+                .clone()
+                .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .status()
+                .is_success()
+        );
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(&path)
+                    .header("cookie", format!("wpalt_session={}", site.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        assert_eq!(response.headers()["content-type"], "image/webp");
+        let bytes = axum::body::to_bytes(response.into_body(), 1_000_000)
+            .await
+            .unwrap();
+        assert_eq!(
+            image::guess_format(&bytes).unwrap(),
+            image::ImageFormat::WebP
+        );
+        assert_eq!(site.app.media_cache.lock().await.statistics().0, 1);
+        // Saturating encoders must not prevent reuse, but cached bytes never bypass authority.
+        let permits = site
+            .app
+            .media_work
+            .clone()
+            .acquire_many_owned(site.app.media_work.available_permits() as u32)
+            .await
+            .unwrap();
+        let reused = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(&path)
+                    .header("cookie", format!("wpalt_session={}", site.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(reused.status(), StatusCode::OK);
+        assert_eq!(
+            axum::body::to_bytes(reused.into_body(), 1_000_000)
+                .await
+                .unwrap(),
+            bytes
+        );
+        let denied = router
+            .clone()
+            .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert!(
+            !denied.status().is_success(),
+            "a populated derivative cache cannot grant access"
+        );
+        drop(permits);
+        let decoded = image::load_from_memory(&bytes).unwrap();
+        let source = image::load_from_memory(&png()).unwrap();
+        assert_eq!(
+            decoded.width(),
+            source.width(),
+            "small images are never enlarged"
+        );
+        let avif = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("{path}/avif"))
+                    .header("cookie", format!("wpalt_session={}", site.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(avif.status(), StatusCode::OK);
+        assert_eq!(avif.headers()["content-type"], "image/avif");
+        let avif_bytes = axum::body::to_bytes(avif.into_body(), 1_000_000)
+            .await
+            .unwrap();
+        assert_eq!(
+            image::guess_format(&avif_bytes).unwrap(),
+            image::ImageFormat::Avif
+        );
+        assert_eq!(
+            site.app.media_cache.lock().await.statistics().0,
+            2,
+            "formats cannot collide"
+        );
+        assert!(wpalt::operations::media::derivative_format(&png(), 320, "jpeg").is_err());
+        assert!(wpalt::operations::media::derivative(&png(), 999).is_err());
+        assert!(wpalt::operations::media::derivative(b"not an image", 320).is_err());
+        let mut chunks = Vec::new();
+        fn chunk(output: &mut Vec<u8>, tag: &[u8; 4], data: &[u8]) {
+            output.extend_from_slice(tag);
+            output.extend_from_slice(&(data.len() as u32).to_le_bytes());
+            output.extend_from_slice(data);
+            if data.len() % 2 == 1 {
+                output.push(0);
+            }
+        }
+        let mut extended = vec![2, 0, 0, 0];
+        extended.extend_from_slice(&(source.width() - 1).to_le_bytes()[..3]);
+        extended.extend_from_slice(&(source.height() - 1).to_le_bytes()[..3]);
+        chunk(&mut chunks, b"VP8X", &extended);
+        chunk(&mut chunks, b"ANIM", &[0; 6]);
+        for _ in 0..2 {
+            let mut frame = vec![0; 6];
+            frame.extend_from_slice(&(source.width() - 1).to_le_bytes()[..3]);
+            frame.extend_from_slice(&(source.height() - 1).to_le_bytes()[..3]);
+            frame.extend_from_slice(&[244, 1, 0, 0]);
+            frame.extend_from_slice(&bytes[12..]);
+            chunk(&mut chunks, b"ANMF", &frame);
+        }
+        let mut animated_webp = b"RIFF".to_vec();
+        animated_webp.extend_from_slice(&(chunks.len() as u32 + 4).to_le_bytes());
+        animated_webp.extend_from_slice(b"WEBP");
+        animated_webp.extend_from_slice(&chunks);
+        assert!(
+            image::codecs::webp::WebPDecoder::new(Cursor::new(&animated_webp))
+                .unwrap()
+                .has_animation()
+        );
+        for animated in [
+            include_bytes!("fixtures/animated.png").as_slice(),
+            animated_webp.as_slice(),
+        ] {
+            assert!(
+                wpalt::operations::media::derivative_format(animated, 320, "avif").is_err(),
+                "animation must not silently become a still image"
+            );
+        }
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn integrity_scan_reports_damaged_private_files_without_modifying_them() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        assert_eq!(
+            upload(&site, "private.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let clean = wpalt::operations::integrity::scan(&site.app).await.unwrap();
+        assert_eq!(clean.checked, 1);
+        assert!(clean.failed.is_empty() && !clean.limited);
+        let filename: String = sqlx::query_scalar("SELECT filename FROM media LIMIT 1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let path = site.app.config.data_dir.join("media").join(filename);
+        std::fs::write(&path, b"damaged-image").unwrap();
+        let damaged = wpalt::operations::integrity::scan(&site.app).await.unwrap();
+        assert_eq!(damaged.failed.len(), 1);
+        assert_eq!(std::fs::read(&path).unwrap(), b"damaged-image");
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn privileged_audit_records_attempt_and_outcome_without_passwords_or_capabilities() {
+    let site = Site::new(false, true).await;
+    let router = wpalt::web::router(site.app.clone());
+    let response = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/users")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .header("origin", site.app.config.origin())
+                .body(Body::from(
+                    "password=secret-that-must-not-be-logged&csrf=private-capability",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(!response.status().is_success());
+    let events = wpalt::operations::audit::read(&site.app).await.unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].phase, "response");
+    assert_eq!(events[1].phase, "intent");
+    assert_eq!(events[0].request_id, events[1].request_id);
+    assert!(events[0].actor.is_empty());
+    let raw =
+        std::fs::read_to_string(site.app.config.data_dir.join("privileged-audit.jsonl")).unwrap();
+    assert!(!raw.contains("secret-that-must-not-be-logged") && !raw.contains("private-capability"));
+    let denied = router
+        .oneshot(
+            Request::builder()
+                .uri("/admin/operations/audit")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_ne!(denied.status(), StatusCode::OK);
+    // Rotation must not make the previous file invisible to owner inspection.
+    for n in 0..530 {
+        wpalt::operations::audit::append(
+            &site.app,
+            wpalt::operations::audit::Event {
+                at: wpalt::now(),
+                request_id: format!("rotation-{n}"),
+                actor: "host-owner".into(),
+                route: format!("test:{}", "x".repeat(2000)),
+                phase: "outcome".into(),
+                status: 200,
+            },
+        )
+        .await
+        .unwrap();
+    }
+    assert!(
+        site.app
+            .config
+            .data_dir
+            .join("privileged-audit.previous.jsonl")
+            .exists()
+    );
+    let rotated = wpalt::operations::audit::read(&site.app).await.unwrap();
+    assert_eq!(rotated.len(), 200);
+    assert_eq!(rotated.first().unwrap().request_id, "rotation-529");
+    assert_eq!(rotated.last().unwrap().request_id, "rotation-330");
+    // If intent cannot be persisted, no privileged handler is dispatched.
+    let journal = site.app.config.data_dir.join("privileged-audit.jsonl");
+    std::fs::remove_file(&journal).unwrap();
+    std::fs::create_dir(&journal).unwrap();
+    let blocked = wpalt::web::router(site.app.clone())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/admin/users")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .header("origin", site.app.config.origin())
+                .header("cookie", format!("wpalt_session={}", site.token))
+                .body(Body::from(
+                    "name=Unwritten&email=new@example.test&role=admin&password=never-create-me",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(blocked.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap(),
+        1
+    );
+    site.close().await;
+}
+
+#[tokio::test]
+async fn local_authenticator_requires_proof_rejects_replay_and_restores_with_one_use_recovery() {
+    use wpalt::operations::factor;
+    // RFC 4226 counter vectors establish interoperable HMAC-SHA1 truncation.
+    assert_eq!(factor::code(b"12345678901234567890", 0), "755224");
+    assert_eq!(factor::code(b"12345678901234567890", 1), "287082");
+    for pg in engines() {
+        let source = Site::new(pg, true).await;
+        let uri = factor::begin(&source.app, source.session(), PASSWORD)
+            .await
+            .unwrap();
+        assert!(uri.starts_with("otpauth://totp/wpalt:"));
+        let pending: String = sqlx::query_scalar("SELECT pending FROM user_factors")
+            .fetch_one(&source.app.db.pool)
+            .await
+            .unwrap();
+        let key = hex::decode(pending).unwrap();
+        let code = factor::code(&key, wpalt::now() / 30);
+        let recovery = factor::confirm(&source.app, source.session(), &code)
+            .await
+            .unwrap();
+        assert_eq!(recovery.len(), 8);
+        assert!(
+            auth::login(&source.app, "owner@example.test", PASSWORD)
+                .await
+                .is_err()
+        );
+        assert!(
+            auth::login_with_code(&source.app, "owner@example.test", PASSWORD, &code)
+                .await
+                .is_err(),
+            "enrollment proof cannot be reused"
+        );
+        assert!(
+            auth::login_with_code(&source.app, "owner@example.test", PASSWORD, &recovery[0])
+                .await
+                .is_ok()
+        );
+        assert!(
+            auth::login_with_code(&source.app, "owner@example.test", PASSWORD, &recovery[0])
+                .await
+                .is_err()
+        );
+        let (first, second) = tokio::join!(
+            auth::login_with_code(&source.app, "owner@example.test", PASSWORD, &recovery[3]),
+            auth::login_with_code(&source.app, "owner@example.test", PASSWORD, &recovery[3])
+        );
+        assert_eq!(
+            usize::from(first.is_ok()) + usize::from(second.is_ok()),
+            1,
+            "only one concurrent recovery-code login may commit"
+        );
+        let snapshot = backup::capture(&source.app).await.unwrap();
+        let fresh = Site::new(pg, false).await;
+        backup::restore(&fresh.app, &snapshot).await.unwrap();
+        assert!(
+            auth::login(&fresh.app, "owner@example.test", PASSWORD)
+                .await
+                .is_err()
+        );
+        assert!(
+            auth::login_with_code(&fresh.app, "owner@example.test", PASSWORD, &recovery[0])
+                .await
+                .is_err()
+        );
+        let (_, session) =
+            auth::login_with_code(&fresh.app, "owner@example.test", PASSWORD, &recovery[1])
+                .await
+                .unwrap();
+        factor::disable(&fresh.app, &session, PASSWORD, &recovery[2])
+            .await
+            .unwrap();
+        assert!(
+            auth::login(&fresh.app, "owner@example.test", PASSWORD)
+                .await
+                .is_ok()
+        );
+        source.close().await;
+        fresh.close().await;
+    }
+}
+
+#[tokio::test]
+async fn incremental_recovery_reuses_authenticated_chunks_and_rejects_incomplete_independent_sets()
+{
+    use wpalt::operations::{encryption, incremental};
+    let directory = tempfile::tempdir().unwrap();
+    let key = encryption::generate_key();
+    let mut source = vec![0u8; 200_000];
+    for (i, b) in source.iter_mut().enumerate() {
+        *b = (i % 251) as u8;
+    }
+    let manifest = incremental::write(directory.path(), &key, &source)
+        .await
+        .unwrap();
+    let count = std::fs::read_dir(directory.path().join("wpalt-objects"))
+        .unwrap()
+        .count();
+    let repeat = incremental::write(directory.path(), &key, &source)
+        .await
+        .unwrap();
+    assert_eq!(manifest, repeat);
+    assert_eq!(
+        std::fs::read_dir(directory.path().join("wpalt-objects"))
+            .unwrap()
+            .count(),
+        count
+    );
+    assert_eq!(
+        incremental::assemble(directory.path(), &key, &manifest, source.len())
+            .await
+            .unwrap(),
+        source
+    );
+    let path = std::fs::read_dir(directory.path().join("wpalt-objects"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    std::fs::remove_file(path).unwrap();
+    assert!(
+        incremental::assemble(directory.path(), &key, &manifest, source.len())
+            .await
+            .is_err()
+    );
+    assert!(
+        incremental::assemble(directory.path(), &key, &manifest, 1)
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn migration_and_incremental_restore_preserve_owned_graph_before_any_target_writes() {
+    use wpalt::operations::{encryption, incremental};
+    for pg in engines() {
+        let original = Site::new(pg, true).await;
+        content::save(
+            &original.app,
+            original.session(),
+            None,
+            input("incremental-owned-story", "publish"),
+        )
+        .await
+        .unwrap();
+        let current = backup::capture(&original.app).await.unwrap();
+        let mut old: serde_json::Value = serde_json::from_slice(&current).unwrap();
+        let mut payload: serde_json::Value =
+            serde_json::from_str(old["payload"].as_str().unwrap()).unwrap();
+        payload["schema"] = serde_json::json!(9);
+        payload.as_object_mut().unwrap().remove("audit_history");
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("user_factors");
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("user_passkeys");
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("privacy_requests");
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("recovery_mode");
+        let raw = serde_json::to_string(&payload).unwrap();
+        old["payload"] = serde_json::json!(raw);
+        old["sha256"] = serde_json::json!(auth::digest(raw.as_bytes()));
+        old["format"] = serde_json::json!("wpalt-backup-v8");
+        let legacy = serde_json::to_vec(&old).unwrap();
+        assert!(
+            backup::inspect(&original.app.config, &legacy).is_err(),
+            "ordinary recovery does not carry old runtime formats"
+        );
+        let migrated = backup::migrate_m6(&original.app.config, &legacy).unwrap();
+        assert_eq!(
+            backup::inspect(&original.app.config, &migrated).unwrap()["schema"],
+            12
+        );
+        let destination = tempfile::tempdir().unwrap();
+        let key = encryption::generate_key();
+        let manifest = incremental::write(destination.path(), &key, &migrated)
+            .await
+            .unwrap();
+        let encrypted = encryption::seal(&key, &manifest).unwrap();
+        // Lose the source; no parent snapshots or original DB are consulted.
+        original.close().await;
+        let fresh = Site::new(pg, false).await;
+        let manifest =
+            encryption::open(&key, &encrypted, fresh.app.config.max_backup_bytes).unwrap();
+        let decoded = incremental::assemble(
+            destination.path(),
+            &key,
+            &manifest,
+            fresh.app.config.max_backup_bytes,
+        )
+        .await
+        .unwrap();
+        backup::restore(&fresh.app, &decoded).await.unwrap();
+        assert!(
+            auth::login(&fresh.app, "owner@example.test", PASSWORD)
+                .await
+                .is_ok()
+        );
+        assert_eq!(
+            get(&fresh.app, "/incremental-owned-story", None).await.0,
+            StatusCode::OK
+        );
+        assert!(
+            backup::restore(&fresh.app, &decoded).await.is_err(),
+            "selective tools never overwrite a live graph"
+        );
+        fresh.close().await;
+    }
+}
+
+#[tokio::test]
+async fn recovery_cleanup_requires_current_preview_and_preserves_every_retained_point() {
+    use wpalt::operations::{encryption, incremental};
+    let dir = tempfile::tempdir().unwrap();
+    let key = encryption::generate_key();
+    let keep = vec![7u8; 90_000];
+    let discarded = vec![9u8; 90_000];
+    let manifest = incremental::write(dir.path(), &key, &keep).await.unwrap();
+    incremental::write(dir.path(), &key, &discarded)
+        .await
+        .unwrap();
+    let point = dir.path().join("wpalt-retained.wpbackup");
+    backup::write_private(&point, &encryption::seal(&key, &manifest).unwrap()).unwrap();
+    let preview = incremental::cleanup(dir.path(), &key, 1024 * 1024, None)
+        .await
+        .unwrap();
+    assert!(preview.unused_objects > 0);
+    assert!(!preview.deleted);
+    assert!(
+        incremental::cleanup(dir.path(), &key, 1024 * 1024, Some("stale-plan"))
+            .await
+            .is_err()
+    );
+    let deleted = incremental::cleanup(dir.path(), &key, 1024 * 1024, Some(&preview.plan))
+        .await
+        .unwrap();
+    assert!(deleted.deleted);
+    assert_eq!(
+        incremental::assemble(dir.path(), &key, &manifest, 1024 * 1024)
+            .await
+            .unwrap(),
+        keep
+    );
+    assert_eq!(
+        incremental::cleanup(dir.path(), &key, 1024 * 1024, None)
+            .await
+            .unwrap()
+            .unused_objects,
+        0
+    );
+    incremental::write(dir.path(), &key, &discarded)
+        .await
+        .unwrap();
+    let before = std::fs::read_dir(dir.path().join("wpalt-objects"))
+        .unwrap()
+        .count();
+    std::fs::write(&point, b"damaged recovery point").unwrap();
+    assert!(
+        incremental::cleanup(dir.path(), &key, 1024 * 1024, Some(&preview.plan))
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        std::fs::read_dir(dir.path().join("wpalt-objects"))
+            .unwrap()
+            .count(),
+        before,
+        "corrupt retained point stops deletion"
+    );
+}
+
+#[tokio::test]
+async fn paginated_integrity_reaches_late_damage_and_labels_patterns_without_deleting_files() {
+    use wpalt::operations::integrity;
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let bytes = png();
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        let mut last = String::new();
+        for i in 1..=1001u128 {
+            let id = uuid::Uuid::from_u128(i).to_string();
+            let filename = format!("{id}.png");
+            std::fs::write(
+                site.app.config.data_dir.join("media").join(&filename),
+                &bytes,
+            )
+            .unwrap();
+            sqlx::query("INSERT INTO media(id,filename,original_name,mime,alt,visibility,size,sha256,created_at) VALUES($1,$2,'fixture.png','image/png','','private',$3,$4,0)").bind(&id).bind(&filename).bind(bytes.len() as i64).bind(auth::digest(&bytes)).execute(&mut *tx).await.unwrap();
+            last = filename;
+        }
+        tx.commit().await.unwrap();
+        let path = site.app.config.data_dir.join("media").join(last);
+        std::fs::write(&path, b"<?php late-damaged-file").unwrap();
+        let first = integrity::scan(&site.app).await.unwrap();
+        assert_eq!(first.checked, 1000);
+        assert!(first.limited && first.failed.is_empty());
+        assert_eq!(first.next_attachment, "done");
+        let next = integrity::scan_page(&site.app, &first.next_image, &first.next_attachment)
+            .await
+            .unwrap();
+        assert_eq!(next.checked, 1);
+        assert!(!next.limited);
+        assert_eq!(next.failed.len(), 1);
+        // Size mismatch is already conclusive; no unnecessary file read/pattern work.
+        assert!(next.pattern_warnings.is_empty());
+        let bytes = b"<?php embedded payload for explicit owner review";
+        std::fs::write(&path, bytes).unwrap();
+        sqlx::query("UPDATE media SET size=$1,sha256=$2 WHERE filename=$3")
+            .bind(bytes.len() as i64)
+            .bind(auth::digest(bytes))
+            .bind(path.file_name().unwrap().to_str().unwrap())
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let warning = integrity::scan_page(&site.app, &first.next_image, "done")
+            .await
+            .unwrap();
+        assert!(warning.failed.is_empty());
+        assert_eq!(warning.pattern_warnings.len(), 1);
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        assert!(
+            integrity::scan_page(&site.app, "../unsafe", "")
+                .await
+                .is_err()
+        );
+        site.close().await;
+    }
+}
+
+/// A local challenge admits one submission, binds its destination and rejects
+/// forged/replayed work before moderation. Both supported database engines run this.
+#[tokio::test]
+async fn local_abuse_guard_binds_resource_and_admits_only_one_racing_submitter() {
+    for pg in engines() {
+        let mut site = Site::new(pg, true).await;
+        let config = std::sync::Arc::make_mut(&mut site.app.config);
+        config.spam.enabled = true;
+        config.spam.proof_bits = 8;
+        config.spam.max_links = 1;
+        content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("guarded-story", "publish"),
+        )
+        .await
+        .unwrap();
+        let resource = "comment:guarded-story";
+        let (status, _, bytes) = request(
+            &site.app,
+            "POST",
+            "/api/spam/challenge",
+            None,
+            "application/json",
+            serde_json::to_vec(&serde_json::json!({"resource":resource})).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let challenge: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let token = challenge["token"].as_str().unwrap().to_owned();
+        let solution = (0..1048576)
+            .map(|n| n.to_string())
+            .find(|n| wpalt::operations::spam::solved(&token, n, 8))
+            .unwrap();
+        let proof = wpalt::operations::spam::Proof {
+            token: token.clone(),
+            solution: solution.clone(),
+            website: String::new(),
+        };
+        assert!(
+            wpalt::operations::spam::verify(&site.app, "form:other", &proof, "hello")
+                .await
+                .is_err()
+        );
+        assert!(
+            wpalt::operations::spam::verify(&site.app, resource, &proof, "HTTP://a HTTPS://b")
+                .await
+                .is_err()
+        );
+        let honeypot = wpalt::operations::spam::Proof {
+            token: token.clone(),
+            solution: solution.clone(),
+            website: "bot.example".into(),
+        };
+        assert!(
+            wpalt::operations::spam::verify(&site.app, resource, &honeypot, "hello")
+                .await
+                .is_err()
+        );
+        let body = format!(
+            "name=Visitor&body=A+useful+comment&token={token}&solution={solution}&website="
+        )
+        .into_bytes();
+        let (left, right) = tokio::join!(
+            request(
+                &site.app,
+                "POST",
+                "/guarded-story/comments",
+                None,
+                "application/x-www-form-urlencoded",
+                body.clone()
+            ),
+            request(
+                &site.app,
+                "POST",
+                "/guarded-story/comments",
+                None,
+                "application/x-www-form-urlencoded",
+                body
+            )
+        );
+        assert_eq!(
+            [left.0, right.0]
+                .iter()
+                .filter(|s| **s == StatusCode::OK)
+                .count(),
+            1
+        );
+        assert_eq!(
+            [left.0, right.0]
+                .iter()
+                .filter(|s| **s == StatusCode::FORBIDDEN)
+                .count(),
+            1
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM comments")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            count, 1,
+            "a losing replay must not create a moderation entry"
+        );
+        site.close().await;
+    }
+}
+
+/// A native archive retry preserves the same segment; authenticated filename and
+/// cluster identity are checked before an engine output can be replaced.
+#[tokio::test]
+async fn native_wal_archive_is_idempotent_bound_to_cluster_and_preserves_output_on_corruption() {
+    use wpalt::operations::{encryption, postgres_archive as wal};
+    let directory = tempfile::tempdir().unwrap();
+    let archive = directory.path().join("archive");
+    std::fs::create_dir(&archive).unwrap();
+    let key_path = directory.path().join("key");
+    backup::write_private(
+        &key_path,
+        hex::encode(encryption::generate_key()).as_bytes(),
+    )
+    .unwrap();
+    let config = Config {
+        postgres_archive: wal::Config {
+            enabled: true,
+            system_id: "123456789".into(),
+            key_file: key_path,
+            directory: archive.clone(),
+            max_segment_bytes: 1024 * 1024,
+        },
+        ..Default::default()
+    };
+    let name = "000000010000000000000001";
+    let mut segment = vec![0u8; 1024 * 1024];
+    segment[0..2].copy_from_slice(&0xD116u16.to_le_bytes());
+    segment[2..4].copy_from_slice(&2u16.to_le_bytes());
+    segment[4..8].copy_from_slice(&1u32.to_le_bytes());
+    segment[8..16].copy_from_slice(&1048576u64.to_le_bytes());
+    segment[24..32].copy_from_slice(&123456789u64.to_le_bytes());
+    segment[32..36].copy_from_slice(&1048576u32.to_le_bytes());
+    segment[36..40].copy_from_slice(&8192u32.to_le_bytes());
+    segment[128..136].copy_from_slice(b"WAL_DATA");
+    let input = directory.path().join("input");
+    std::fs::write(&input, &segment).unwrap();
+    wal::store(&config, &input, name).await.unwrap();
+    let package = archive.join(format!("{name}.wpwal"));
+    let first = std::fs::read(&package).unwrap();
+    wal::store(&config, &input, name).await.unwrap();
+    assert_eq!(
+        std::fs::read(&package).unwrap(),
+        first,
+        "idempotent retry cannot reseal or replace an existing segment"
+    );
+    let output = directory.path().join("engine-output");
+    std::fs::write(&output, b"previous engine bytes").unwrap();
+    wal::restore(&config, name, &output).await.unwrap();
+    assert_eq!(std::fs::read(&output).unwrap(), segment);
+    let mut swapped = config.clone();
+    swapped.postgres_archive.system_id = "123456790".into();
+    assert!(wal::restore(&swapped, name, &output).await.is_err());
+    let other = "000000010000000000000002";
+    std::fs::write(archive.join(format!("{other}.wpwal")), &first).unwrap();
+    assert!(wal::restore(&config, other, &output).await.is_err());
+    let mut damaged = first;
+    *damaged.last_mut().unwrap() ^= 1;
+    std::fs::write(&package, damaged).unwrap();
+    assert!(wal::restore(&config, name, &output).await.is_err());
+    assert_eq!(
+        std::fs::read(&output).unwrap(),
+        segment,
+        "failed authentication cannot touch existing engine output"
+    );
+    assert!(wal::store(&config, &input, "../outside").await.is_err());
+    assert!(!wal::valid_name("000000010000000000000001.partial"));
+    assert!(
+        wal::valid_name("00000002.history")
+            && wal::valid_name("000000010000000000000001.00000028.backup")
+    );
+}
+
+/// Cleanup must preserve draft/history references, reject stale plans and leave
+/// unexpected filesystem objects untouched. Exercise both real database engines.
+#[tokio::test]
+async fn cleanup_preserves_references_and_rejects_stale_or_unsafe_plans() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let retained = uuid::Uuid::new_v4().to_string();
+        let unused = uuid::Uuid::new_v4().to_string();
+        let orphan = uuid::Uuid::new_v4().to_string();
+        let disposable = uuid::Uuid::new_v4().to_string();
+        for id in [&retained, &unused, &disposable] {
+            let filename = format!("{id}.png");
+            tokio::fs::write(
+                site.app.config.data_dir.join("media").join(&filename),
+                b"synthetic",
+            )
+            .await
+            .unwrap();
+            sqlx::query("INSERT INTO media(id,filename,original_name,mime,alt,visibility,size,sha256,created_at) VALUES($1,$2,'fixture.png','image/png','','private',9,$3,0)").bind(id).bind(filename).bind(auth::digest(b"synthetic")).execute(&site.app.db.pool).await.unwrap();
+        }
+        let orphan_path = site
+            .app
+            .config
+            .data_dir
+            .join("media")
+            .join(format!("{orphan}.png"));
+        tokio::fs::write(&orphan_path, b"orphan").await.unwrap();
+        let mut post = input("cleanup-draft", "save");
+        // Imported percent-encoded media URLs also retain the original.
+        post.body = format!("![draft](/media/{})", retained.replace('-', "%2D"));
+        content::save(&site.app, site.session(), None, post)
+            .await
+            .unwrap();
+        let plan = wpalt::operations::cleanup::preview(&site.app)
+            .await
+            .unwrap();
+        assert_eq!(plan.retained, 1);
+        assert_eq!(plan.candidates.len(), 3);
+        assert!(
+            plan.candidates
+                .iter()
+                .any(|c| c.id == orphan && !c.registered)
+        );
+        // A concurrent editorial save adds a reference after the preview.
+        let mut second = input("cleanup-new-reference", "save");
+        second.body = format!("![new](/media/{unused})");
+        content::save(&site.app, site.session(), None, second)
+            .await
+            .unwrap();
+        assert_eq!(
+            wpalt::operations::cleanup::execute(&site.app, &plan.hash, plan.cutoff)
+                .await
+                .unwrap_err()
+                .0,
+            StatusCode::CONFLICT
+        );
+        assert!(orphan_path.exists());
+        let next = wpalt::operations::cleanup::preview(&site.app)
+            .await
+            .unwrap();
+        assert_eq!(next.retained, 2);
+        let result = wpalt::operations::cleanup::execute(&site.app, &next.hash, next.cutoff)
+            .await
+            .unwrap();
+        assert_eq!(result.removed_files, 2);
+        assert!(result.pending_files.is_empty());
+        assert!(!orphan_path.exists());
+        assert!(
+            site.app
+                .config
+                .data_dir
+                .join("media")
+                .join(format!("{retained}.png"))
+                .exists()
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM media")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 2);
+        let unexpected = site
+            .app
+            .config
+            .data_dir
+            .join("media")
+            .join("owner-notes.txt");
+        tokio::fs::write(&unexpected, b"must retain").await.unwrap();
+        assert!(
+            wpalt::operations::cleanup::preview(&site.app)
+                .await
+                .is_err()
+        );
+        assert_eq!(tokio::fs::read(unexpected).await.unwrap(), b"must retain");
+        site.close().await;
+    }
+}
+
+/// Reachable CSS includes reused components/responsive rules without shipping
+/// unrelated templates; public and draft routes preserve publication boundaries.
+#[tokio::test]
+async fn theme_styles_are_template_scoped_and_preserve_reachable_components() {
+    use wpalt::theme;
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let mut stored = theme::load(&site.app, "paper", true).await.unwrap();
+        let component: theme::Node=serde_json::from_value(serde_json::json!({"id":"critical_component","kind":"text","text":"Included","style":{"color":"#123456","mobile_columns":1}})).unwrap();
+        stored.package.components.insert(
+            "critical".into(),
+            theme::Component {
+                parameters: Default::default(),
+                root: component,
+            },
+        );
+        stored
+            .package
+            .templates
+            .get_mut("home")
+            .unwrap()
+            .children
+            .push(
+            serde_json::from_value(
+                serde_json::json!({"id":"critical_use","kind":"component","component":"critical"}),
+            )
+            .unwrap(),
+        );
+        stored.package.templates.get_mut("search").unwrap().children.push(serde_json::from_value(serde_json::json!({"id":"unrelated_search","kind":"text","text":"Search only","style":{"color":"#654321"}})).unwrap());
+        let full = stored.package.css();
+        let scoped = stored.package.css_for("home").unwrap();
+        assert!(
+            scoped.contains(".n-critical_component{")
+                && scoped.contains("@media(max-width:700px){.n-critical_component")
+        );
+        assert!(!scoped.contains(".n-unrelated_search{"));
+        assert!(scoped.len() < full.len());
+        theme::save(&site.app, "paper", stored.package, stored.version, true)
+            .await
+            .unwrap();
+        let (_, html) = get(&site.app, "/", None).await;
+        assert!(html.contains("style.css?template=home"));
+        assert!(html.contains("rel=\"preload\"") && html.contains("as=\"style\""));
+        let (status, css) = get(&site.app, "/themes/paper/2/style.css?template=home", None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(css.contains(".n-critical_component{") && !css.contains(".n-unrelated_search{"));
+        assert_eq!(
+            get(
+                &site.app,
+                "/themes/paper/2/style.css?template=unknown",
+                None
+            )
+            .await
+            .0,
+            StatusCode::NOT_FOUND
+        );
+        site.close().await;
+    }
+}
+
+/// Actual native processing, HTTP authority and host-independent recovery. The
+/// optional tool is required in CI, explicit skip only for local installations.
+#[tokio::test]
+async fn local_video_worker_preserves_authority_and_recovers_processed_media() {
+    let ffmpeg = std::env::var("WPALT_TEST_FFMPEG").unwrap_or_else(|_| {
+        if cfg!(target_os = "macos") {
+            "/opt/homebrew/bin/ffmpeg".into()
+        } else {
+            "/usr/bin/ffmpeg".into()
+        }
+    });
+    let ffprobe = std::env::var("WPALT_TEST_FFPROBE").unwrap_or_else(|_| {
+        if cfg!(target_os = "macos") {
+            "/opt/homebrew/bin/ffprobe".into()
+        } else {
+            "/usr/bin/ffprobe".into()
+        }
+    });
+    if !std::path::Path::new(&ffmpeg).exists() || !std::path::Path::new(&ffprobe).exists() {
+        assert!(
+            std::env::var("CI").is_err(),
+            "CI must install the native video fixture tools"
+        );
+        eprintln!("Local optional FFmpeg fixture unavailable; video journey not verified.");
+        return;
+    }
+    let fixture = tempfile::tempdir().unwrap();
+    let source = fixture.path().join("source.mp4");
+    let status = std::process::Command::new(&ffmpeg)
+        .args([
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=green:s=64x48:r=5",
+            "-t",
+            "1",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-threads",
+            "1",
+        ])
+        .arg(&source)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let source = std::fs::read(source).unwrap();
+    for pg in engines() {
+        let mut site = Site::new(pg, true).await;
+        assert!(
+            wpalt::operations::video::transcode(&site.app, &source)
+                .await
+                .is_err(),
+            "disabled worker is inert"
+        );
+        let mut config = (*site.app.config).clone();
+        config.video = wpalt::operations::video::Config {
+            enabled: true,
+            ffmpeg: ffmpeg.clone().into(),
+            ffprobe: ffprobe.clone().into(),
+        };
+        site.app.config = std::sync::Arc::new(config);
+        let mut permits = Vec::new();
+        for _ in 0..site.app.config.worker_concurrency {
+            permits.push(site.app.media_work.try_acquire().unwrap());
+        }
+        assert!(
+            wpalt::operations::video::transcode(&site.app, &source)
+                .await
+                .is_err(),
+            "saturated native pool rejects work"
+        );
+        drop(permits);
+        let mut body=format!("--video-fixture\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{}\r\n--video-fixture\r\nContent-Disposition: form-data; name=\"file\"; filename=\"short.mp4\"\r\nContent-Type: video/mp4\r\n\r\n",site.session().csrf).into_bytes();
+        body.extend_from_slice(&source);
+        body.extend_from_slice(b"\r\n--video-fixture--\r\n");
+        let (status, _, _) = request(
+            &site.app,
+            "POST",
+            "/admin/media/video",
+            Some(&site.token),
+            "multipart/form-data; boundary=video-fixture",
+            body.clone(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let id: String = sqlx::query_scalar("SELECT id FROM media WHERE mime='video/mp4'")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let url = format!("/media/{id}");
+        assert_eq!(get(&site.app, &url, None).await.0, StatusCode::UNAUTHORIZED);
+        let (status, headers, encoded) =
+            request(&site.app, "GET", &url, Some(&site.token), "", vec![]).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers["content-type"], "video/mp4");
+        assert_eq!(&encoded[4..8], b"ftyp");
+        assert!(
+            get(&site.app, "/admin/media", Some(&site.token))
+                .await
+                .1
+                .contains("Open processed video")
+        );
+        let archive = backup::capture(&site.app).await.unwrap();
+        auth::add_user(
+            &site.app,
+            "another-owner@example.test",
+            "Another owner",
+            "admin",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        // The other owner holds the write boundary while a valid native request
+        // starts. Revoke its account/session before releasing the commit lock.
+        let guard = site.app.mutation().await;
+        let app = site.app.clone();
+        let token = site.token.clone();
+        let pending = tokio::spawn(async move {
+            request(
+                &app,
+                "POST",
+                "/admin/media/video",
+                Some(&token),
+                "multipart/form-data; boundary=video-fixture",
+                body,
+            )
+            .await
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            while site.app.media_work.available_permits() == site.app.config.worker_concurrency {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("native work must reach its admitted processing stage");
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        sqlx::query("UPDATE users SET role='editor' WHERE id=$1")
+            .bind(&site.session().user.id)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM sessions WHERE user_id=$1")
+            .bind(&site.session().user.id)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        drop(guard);
+        assert_eq!(
+            pending.await.unwrap().0,
+            StatusCode::UNAUTHORIZED,
+            "revocation during processing wins before publication"
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM media WHERE mime='video/mp4'")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            count, 1,
+            "revoked native request cannot leave another media record"
+        );
+        assert!(
+            wpalt::operations::video::transcode(&site.app, b"not-a-video")
+                .await
+                .is_err()
+        );
+        assert!(
+            std::fs::read_dir(&site.app.config.data_dir)
+                .unwrap()
+                .all(|p| !p
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".video-")),
+            "completed and rejected workers leave no private intermediates"
+        );
+        site.close().await;
+        let fresh = Site::new(pg, false).await;
+        backup::restore(&fresh.app, &archive).await.unwrap();
+        let (token, _) = auth::login(&fresh.app, "owner@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let (_, _, restored) = request(&fresh.app, "GET", &url, Some(&token), "", vec![]).await;
+        assert_eq!(restored, encoded);
+        assert_eq!(
+            get(&fresh.app, &url, None).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+        fresh.close().await;
+    }
+}
+
+/// Native peer/session-derived buckets preserve actual role and regional
+/// presentation, without letting forged forwarding or stale account state win.
+#[tokio::test]
+async fn role_region_cache_variants_revalidate_authority_and_ignore_spoofed_headers() {
+    use axum::extract::ConnectInfo;
+    use wpalt::operations::variants;
+    for pg in engines() {
+        let mut site = Site::new(pg, true).await;
+        let mut cfg = (*site.app.config).clone();
+        cfg.cache.enabled = true;
+        cfg.variants = variants::Config {
+            role_variants: true,
+            region_networks: vec![
+                variants::Region {
+                    network: "192.0.2.0/24".into(),
+                    region: "local-east".into(),
+                },
+                variants::Region {
+                    network: "2001:db8::/32".into(),
+                    region: "local-west".into(),
+                },
+            ],
+        };
+        site.app.config = std::sync::Arc::new(cfg);
+        let stored = wpalt::theme::load(&site.app, "paper", true).await.unwrap();
+        let mut package = stored.package;
+        for (id, bind) in [("region_label", "site.region"), ("role_label", "site.role")] {
+            package.templates.get_mut("home").unwrap().children.push(
+                serde_json::from_value(
+                    serde_json::json!({"id":id,"kind":"text","text":{"bind":bind}}),
+                )
+                .unwrap(),
+            );
+        }
+        wpalt::theme::save(&site.app, "paper", package, stored.version, true)
+            .await
+            .unwrap();
+        async fn visit(
+            site: &Site,
+            peer: &str,
+            cookie: Option<String>,
+        ) -> (StatusCode, axum::http::HeaderMap, String) {
+            let mut request = Request::builder()
+                .uri("/")
+                .header("x-wpalt-local-region", "forged")
+                .header("x-wpalt-local-role", "admin")
+                .header("x-forwarded-for", "192.0.2.55")
+                .body(Body::empty())
+                .unwrap();
+            request
+                .extensions_mut()
+                .insert(ConnectInfo(peer.parse::<std::net::SocketAddr>().unwrap()));
+            if let Some(cookie) = cookie {
+                request
+                    .headers_mut()
+                    .insert("cookie", cookie.parse().unwrap());
+            }
+            let response = wpalt::web::router(site.app.clone())
+                .oneshot(request)
+                .await
+                .unwrap();
+            let status = response.status();
+            let headers = response.headers().clone();
+            let body = String::from_utf8(
+                response
+                    .into_body()
+                    .collect()
+                    .await
+                    .unwrap()
+                    .to_bytes()
+                    .to_vec(),
+            )
+            .unwrap();
+            (status, headers, body)
+        }
+        let (_, east_headers, east) = visit(&site, "192.0.2.7:1234", None).await;
+        assert!(
+            east.contains("local-east") && east.contains("anonymous") && !east.contains("forged")
+        );
+        assert_eq!(east_headers["x-wpalt-cache"], "miss");
+        assert_eq!(
+            visit(&site, "192.0.2.9:1234", None).await.1["x-wpalt-cache"],
+            "hit"
+        );
+        let (_, west_headers, west) = visit(&site, "[2001:db8::1]:1234", None).await;
+        assert!(west.contains("local-west"));
+        assert_eq!(west_headers["x-wpalt-cache"], "miss");
+        let cookie = format!("wpalt_session={}", site.token);
+        let (_, headers, owner) = visit(&site, "192.0.2.7:1234", Some(cookie.clone())).await;
+        assert!(owner.contains(">admin</p>"));
+        assert_eq!(headers["x-wpalt-cache"], "miss");
+        assert_eq!(
+            visit(&site, "192.0.2.7:1234", Some(cookie.clone())).await.1["x-wpalt-cache"],
+            "hit"
+        );
+        let (_, headers, _) = visit(
+            &site,
+            "192.0.2.7:1234",
+            Some(format!("{cookie}; private_preference=1")),
+        )
+        .await;
+        assert!(
+            !headers.contains_key("x-wpalt-cache"),
+            "unknown personalized cookies still bypass storage"
+        );
+        {
+            let _guard = site.app.mutation().await;
+            sqlx::query("UPDATE users SET role='subscriber' WHERE id=$1")
+                .bind(&site.session().user.id)
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+        }
+        let (_, headers, subscriber) = visit(&site, "192.0.2.7:1234", Some(cookie)).await;
+        assert!(subscriber.contains(">subscriber</p>") && !subscriber.contains(">admin</p>"));
+        assert_eq!(headers["x-wpalt-cache"], "miss");
+        let (_, _, unknown) = visit(&site, "198.51.100.7:1234", None).await;
+        assert!(unknown.contains(">unknown</p>") && !unknown.contains("local-east"));
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn background_history_reports_failure_interruption_and_blocks_unrecorded_dispatch() {
+    use wpalt::operations::jobs::{read, run_cycle, stage};
+    for postgres in engines() {
+        let site = Site::new(postgres, true).await;
+        run_cycle(&site.app, async {
+            vec![
+                stage("publication", async { Ok(3) }).await,
+                stage("mail", async {
+                    Err(wpalt::error::Error::invalid("secret-mail-token"))
+                })
+                .await,
+            ]
+        })
+        .await
+        .unwrap();
+        let history = read(&site.app).await.unwrap();
+        assert_eq!(history[0].state, "failed");
+        assert_eq!(history[0].stages[0].count, Some(3));
+        assert!(!history[0].stages[1].succeeded);
+        let path = site.app.config.data_dir.join("background-jobs.json");
+        assert!(
+            !tokio::fs::read_to_string(&path)
+                .await
+                .unwrap()
+                .contains("secret-mail-token")
+        );
+
+        // Kill a worker after durable intent but before any claimed outcome.
+        let entered = std::sync::Arc::new(tokio::sync::Notify::new());
+        let signal = entered.clone();
+        let app = site.app.clone();
+        let task = tokio::spawn(async move {
+            run_cycle(&app, async {
+                signal.notify_one();
+                std::future::pending::<Vec<wpalt::operations::jobs::Stage>>().await
+            })
+            .await
+        });
+        entered.notified().await;
+        assert_eq!(read(&site.app).await.unwrap()[0].state, "running");
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+        run_cycle(&site.app, async {
+            vec![stage("publication", async { Ok(0) }).await]
+        })
+        .await
+        .unwrap();
+        let history = read(&site.app).await.unwrap();
+        assert_eq!(history[0].state, "succeeded");
+        assert_eq!(history[1].state, "interrupted");
+        assert_eq!(history[1].finished_at, 0);
+        assert!(history[1].stages.is_empty());
+        for _ in 0..65 {
+            run_cycle(&site.app, async {
+                vec![stage("publication", async { Ok(0) }).await]
+            })
+            .await
+            .unwrap();
+        }
+        assert_eq!(read(&site.app).await.unwrap().len(), 64);
+        assert!(tokio::fs::metadata(&path).await.unwrap().len() <= 128 * 1024);
+        tokio::fs::remove_file(&path).await.unwrap();
+        tokio::fs::create_dir(&path).await.unwrap();
+        let dispatched = std::sync::atomic::AtomicBool::new(false);
+        assert!(
+            run_cycle(&site.app, async {
+                dispatched.store(true, std::sync::atomic::Ordering::SeqCst);
+                Vec::new()
+            })
+            .await
+            .is_err()
+        );
+        assert!(!dispatched.load(std::sync::atomic::Ordering::SeqCst));
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn local_layout_metadata_respects_media_authority_and_never_rewrites_publication() {
+    use serde_json::json;
+    use wpalt::theme;
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        assert_eq!(
+            upload(&site, "layout.png", &png(), "public").await,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            upload(&site, "private.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let public: String = sqlx::query_scalar("SELECT id FROM media WHERE visibility='public'")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let private: String = sqlx::query_scalar("SELECT id FROM media WHERE visibility='private'")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let mut package = theme::load(&site.app, "paper", true).await.unwrap().package;
+        package.templates.get_mut("home").unwrap().children.extend([
+            serde_json::from_value(
+                json!({"id":"lead_local","kind":"image","image":public,"loading":"eager"}),
+            )
+            .unwrap(),
+            serde_json::from_value(json!({"id":"private_local","kind":"image","image":private}))
+                .unwrap(),
+        ]);
+        theme::save(&site.app, "paper", package, 1, true)
+            .await
+            .unwrap();
+        let (_, home) = get(&site.app, "/", None).await;
+        assert!(home.contains("width=\"8\" height=\"8\" loading=\"eager\" fetchpriority=\"high\""));
+        assert!(home.contains(&format!("href=\"/media/{public}\" as=\"image\"")));
+        assert!(!home.contains(&format!("/media/{private}")));
+        let mut post = input("imported-local", "publish");
+        post.body = format!(
+            "![Imported local image](/media/{public})\n\n![External](https://external.invalid/image.png)"
+        );
+        let record = content::save(&site.app, site.session(), None, post)
+            .await
+            .unwrap();
+        let original: String =
+            sqlx::query_scalar("SELECT published_document FROM posts WHERE id=$1")
+                .bind(&record.id)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert!(!original.contains("\"width\""));
+        let (_, rendered) = get(&site.app, "/imported-local", None).await;
+        assert!(rendered.contains(&format!(
+            "src=\"/media/{public}\" alt=\"Imported local image\" width=\"8\" height=\"8\""
+        )));
+        assert!(rendered.contains("https://external.invalid/image.png"));
+        let unchanged: String =
+            sqlx::query_scalar("SELECT published_document FROM posts WHERE id=$1")
+                .bind(&record.id)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(original, unchanged);
+        // Reuse metadata without permitting a cached private reference to render.
+        let settings = site.app.db.settings().await.unwrap();
+        let live = theme::load(&site.app, "paper", false)
+            .await
+            .unwrap()
+            .package;
+        let context = theme::context(
+            &site.app,
+            &settings,
+            &live,
+            None,
+            Vec::new(),
+            false,
+            "home",
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(context.media_dimensions.get(&public), Some(&(8, 8)));
+        assert!(!context.media_dimensions.contains_key(&private));
+        site.app.media_cache.lock().await.clear();
+        let mut permits = Vec::new();
+        for _ in 0..site.app.config.worker_concurrency {
+            permits.push(site.app.media_work.try_acquire().unwrap());
+        }
+        let busy = theme::context(
+            &site.app,
+            &settings,
+            &live,
+            None,
+            Vec::new(),
+            false,
+            "home",
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(busy.media.contains_key(&public));
+        assert!(
+            busy.media_dimensions.is_empty(),
+            "optional layout metadata yields to a saturated worker pool"
+        );
+        drop(permits);
+        let _guard = site.app.mutation().await;
+        sqlx::query("UPDATE media SET visibility='private' WHERE id=$1")
+            .bind(&public)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        drop(_guard);
+        let (_, changed) = get(&site.app, "/", None).await;
+        assert!(!changed.contains(&format!("/media/{public}")));
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn compiled_browser_security_controls_cover_cache_errors_and_secret_routes() {
+    use wpalt::operations::headers::{Policy, Referrer};
+    for pg in engines() {
+        let mut site = Site::new(pg, true).await;
+        let response = wpalt::web::router(site.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .header("x-forwarded-proto", "https")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert!(!response.headers().contains_key("strict-transport-security"));
+        assert_eq!(
+            response.headers()["cross-origin-opener-policy"],
+            "same-origin"
+        );
+        let mut cfg = (*site.app.config).clone();
+        cfg.base_url = "https://site.example.test".into();
+        cfg.cache.enabled = true;
+        cfg.headers.referrer = Referrer::SameOrigin;
+        cfg.headers.hsts_seconds = 60;
+        cfg.headers.hsts_include_subdomains = true;
+        cfg.headers.isolate_opener = false;
+        cfg.headers.upgrade_insecure_requests = true;
+        cfg.validate().unwrap();
+        site.app.security_headers = std::sync::Arc::new(Policy::compile(&cfg));
+        site.app.config = std::sync::Arc::new(cfg);
+        for expected in ["miss", "hit"] {
+            let (status, headers, _) = request(&site.app, "GET", "/", None, "", Vec::new()).await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(headers["x-wpalt-cache"], expected);
+            assert_eq!(
+                headers["strict-transport-security"],
+                "max-age=60; includeSubDomains"
+            );
+            assert_eq!(headers["referrer-policy"], "same-origin");
+            assert!(!headers.contains_key("cross-origin-opener-policy"));
+            assert!(
+                headers["content-security-policy"]
+                    .to_str()
+                    .unwrap()
+                    .contains("upgrade-insecure-requests")
+            );
+            assert_eq!(headers["x-content-type-options"], "nosniff");
+            assert!(!headers.contains_key("server") && !headers.contains_key("x-powered-by"));
+        }
+        let (status, headers, _) = request(
+            &site.app,
+            "POST",
+            "/admin/operations/cache/purge",
+            None,
+            "application/x-www-form-urlencoded",
+            b"csrf=forged".to_vec(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(headers["cross-origin-resource-policy"], "same-origin");
+        assert!(
+            headers["content-security-policy"]
+                .to_str()
+                .unwrap()
+                .contains("script-src 'self'")
+        );
+        let (_, headers, _) = request(
+            &site.app,
+            "GET",
+            "/audience/confirm/not-a-valid-token",
+            None,
+            "",
+            Vec::new(),
+        )
+        .await;
+        assert_eq!(headers["referrer-policy"], "no-referrer");
+        let (status, headers, _) = request(
+            &site.app,
+            "GET",
+            "/admin/design/paper/preview",
+            Some(&site.token),
+            "",
+            Vec::new(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let csp = headers["content-security-policy"].to_str().unwrap();
+        assert!(
+            csp.contains("script-src 'none'")
+                && csp.contains("form-action 'none'")
+                && csp.contains("frame-ancestors 'self'")
+        );
+        let mut invalid = (*site.app.config).clone();
+        invalid.headers.hsts_seconds = 63072001;
+        assert!(invalid.validate().is_err());
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn optional_scripts_require_current_declared_consent_and_never_leak_cached_bytes() {
+    use wpalt::operations::consent_scripts::{Config as ScriptConfig, Script, Scripts};
+    async fn visitor(
+        app: &App,
+        method: &str,
+        path: &str,
+        cookie: &str,
+        body: serde_json::Value,
+        gpc: bool,
+    ) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+        let mut request = Request::builder()
+            .method(method)
+            .uri(path)
+            .header("origin", app.config.origin())
+            .header("cookie", cookie)
+            .header("content-type", "application/json");
+        if gpc {
+            request = request.header("sec-gpc", "1");
+        }
+        let response = wpalt::web::router(app.clone())
+            .oneshot(request.body(Body::from(body.to_string())).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let headers = response.headers().clone();
+        (
+            status,
+            headers,
+            response
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .to_vec(),
+        )
+    }
+    for postgres in engines() {
+        let mut site = Site::new(postgres, true).await;
+        let file = site._directory.path().join("analytics.js");
+        let code = b"window.localAnalyticsExample = true;";
+        std::fs::write(&file, code).unwrap();
+        let mut config = ScriptConfig {
+            scripts: vec![Script {
+                id: "local-example".into(),
+                label: "Local example".into(),
+                purpose: "Count locally consented interactions.".into(),
+                path: file.clone(),
+                sha256: auth::digest(code),
+            }],
+        };
+        site.app.consent_scripts = std::sync::Arc::new(Scripts::compile(&config).unwrap());
+        sqlx::query("UPDATE engagement_settings SET enabled=1 WHERE id=1")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let manifest = site.app.consent_scripts.manifest.clone();
+        let url = format!("/api/engagement/scripts/{manifest}/local-example");
+        assert_eq!(
+            visitor(&site.app, "GET", &url, "", serde_json::json!({}), false)
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        let stale = visitor(
+            &site.app,
+            "POST",
+            "/api/engagement/consent",
+            "",
+            serde_json::json!({"allow":true,"policy":1,"manifest":"old"}),
+            false,
+        )
+        .await;
+        assert_eq!(stale.0, StatusCode::CONFLICT);
+        let granted = visitor(
+            &site.app,
+            "POST",
+            "/api/engagement/consent",
+            "",
+            serde_json::json!({"allow":true,"policy":1,"manifest":manifest}),
+            false,
+        )
+        .await;
+        assert_eq!(granted.0, StatusCode::OK);
+        let cookie = granted.1["set-cookie"]
+            .to_str()
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap();
+        let served = visitor(&site.app, "GET", &url, cookie, serde_json::json!({}), false).await;
+        assert_eq!(served.0, StatusCode::OK);
+        assert_eq!(served.2, code);
+        assert_eq!(served.1["cache-control"], "no-store");
+        assert_eq!(
+            visitor(&site.app, "GET", &url, cookie, serde_json::json!({}), true)
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        // The same source cannot be read with another visitor's absent grant, even after a hit.
+        assert_eq!(
+            visitor(&site.app, "GET", &url, "", serde_json::json!({}), false)
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        let archive = backup::capture(&site.app).await.unwrap();
+        let mut recovered = Site::new(postgres, false).await;
+        recovered.app.consent_scripts = std::sync::Arc::new(Scripts::compile(&config).unwrap());
+        backup::restore(&recovered.app, &archive).await.unwrap();
+        assert_eq!(
+            visitor(
+                &recovered.app,
+                "GET",
+                &url,
+                cookie,
+                serde_json::json!({}),
+                false
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        // A purpose-only change requires a new explicit manifest acceptance after restart.
+        config.scripts[0].purpose = "A newly declared local analytics purpose.".into();
+        site.app.consent_scripts = std::sync::Arc::new(Scripts::compile(&config).unwrap());
+        let new_url = format!(
+            "/api/engagement/scripts/{}/local-example",
+            site.app.consent_scripts.manifest
+        );
+        assert_eq!(
+            visitor(&site.app, "GET", &url, cookie, serde_json::json!({}), false)
+                .await
+                .0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            visitor(
+                &site.app,
+                "GET",
+                &new_url,
+                cookie,
+                serde_json::json!({}),
+                false
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        let headers = axum::http::HeaderMap::from_iter([(
+            axum::http::header::COOKIE,
+            cookie.parse().unwrap(),
+        )]);
+        assert_eq!(
+            wpalt::business::engagement::status(&site.app, &headers)
+                .await
+                .unwrap()["consented"],
+            false
+        );
+        assert!(
+            wpalt::business::promotions::visit(
+                &site.app,
+                &headers,
+                serde_json::from_value(
+                    serde_json::json!({"path":"/","device":"desktop","referrer":"direct"})
+                )
+                .unwrap()
+            )
+            .await
+            .unwrap()
+            .is_none()
+        );
+        let withdrew = visitor(
+            &recovered.app,
+            "POST",
+            "/api/engagement/consent",
+            cookie,
+            serde_json::json!({"allow":false,"policy":1}),
+            false,
+        )
+        .await;
+        assert_eq!(withdrew.0, StatusCode::OK);
+        assert_eq!(
+            visitor(
+                &recovered.app,
+                "GET",
+                &url,
+                cookie,
+                serde_json::json!({}),
+                false
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        std::fs::write(&file, b"changed without updating reviewed checksum").unwrap();
+        assert!(
+            Scripts::compile(&config).is_err(),
+            "Changed owner file fails closed at startup"
+        );
+        recovered.close().await;
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn personal_data_requests_preserve_identity_isolation_decisions_and_fresh_recovery() {
+    use serde_json::json;
+    let mut engine_evidence = Vec::new();
+    fn form(fields: &[(&str, &str)]) -> Vec<u8> {
+        url::form_urlencoded::Serializer::new(String::new())
+            .extend_pairs(fields.iter().copied())
+            .finish()
+            .into_bytes()
+    }
+    for postgres in engines() {
+        let mut site = Site::new(postgres, true).await;
+        auth::add_user(
+            &site.app,
+            "reader@example.test",
+            "Private reader",
+            "subscriber",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (reader, session) = auth::login(&site.app, "reader@example.test", PASSWORD)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO member_profiles(user_id,biography) VALUES($1,$2)")
+            .bind(&session.user.id)
+            .bind("MY_PRIVATE_BIOGRAPHY")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("owner-private", "save"),
+        )
+        .await
+        .unwrap();
+        let proof = form(&[("csrf", &session.csrf), ("password", PASSWORD)]);
+        let denied = request(
+            &site.app,
+            "POST",
+            "/account/privacy/export",
+            Some(&reader),
+            "application/x-www-form-urlencoded",
+            form(&[("csrf", &session.csrf), ("password", "incorrect")]),
+        )
+        .await;
+        assert_eq!(denied.0, StatusCode::FORBIDDEN);
+        let data = request(
+            &site.app,
+            "POST",
+            "/account/privacy/export",
+            Some(&reader),
+            "application/x-www-form-urlencoded",
+            proof.clone(),
+        )
+        .await;
+        assert_eq!(data.0, StatusCode::OK);
+        assert_eq!(data.1["cache-control"], "no-store");
+        let exported: serde_json::Value = serde_json::from_slice(&data.2).unwrap();
+        assert_eq!(
+            exported["account_linked_records"]["users"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            exported["account_linked_records"]["member_profiles"][0]["biography"],
+            "MY_PRIVATE_BIOGRAPHY"
+        );
+        assert!(
+            exported["account_linked_records"]["posts"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        let raw = String::from_utf8(data.2).unwrap();
+        assert!(
+            !raw.contains("owner@example.test")
+                && !raw.contains("password_hash")
+                && !raw.contains("$argon2")
+                && !raw.contains(&reader)
+        );
+        let body = form(&[
+            ("csrf", &session.csrf),
+            ("password", PASSWORD),
+            ("kind", "erase"),
+        ]);
+        let (a, b) = tokio::join!(
+            request(
+                &site.app,
+                "POST",
+                "/account/privacy",
+                Some(&reader),
+                "application/x-www-form-urlencoded",
+                body.clone()
+            ),
+            request(
+                &site.app,
+                "POST",
+                "/account/privacy",
+                Some(&reader),
+                "application/x-www-form-urlencoded",
+                body
+            )
+        );
+        assert_eq!(a.0, StatusCode::SEE_OTHER);
+        assert_eq!(b.0, StatusCode::SEE_OTHER);
+        let id: String = sqlx::query_scalar("SELECT id FROM privacy_requests WHERE user_id=$1")
+            .bind(&session.user.id)
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM privacy_requests")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1, "Retry/race yields one open erasure request");
+        assert_eq!(
+            request(
+                &site.app,
+                "GET",
+                &format!("/admin/privacy/{id}"),
+                Some(&reader),
+                "",
+                vec![]
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        let decision = form(&[
+            ("csrf", &site.session().csrf),
+            ("version", "1"),
+            ("state", "partial"),
+            (
+                "response",
+                "Account profile reviewed; financial records retained for owner review. <script>never executable</script>",
+            ),
+        ]);
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &format!("/admin/privacy/{id}"),
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                decision.clone()
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &format!("/admin/privacy/{id}"),
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                decision
+            )
+            .await
+            .0,
+            StatusCode::CONFLICT
+        );
+        let history = request(
+            &site.app,
+            "GET",
+            "/account/privacy",
+            Some(&reader),
+            "",
+            vec![],
+        )
+        .await;
+        let html = String::from_utf8(history.2).unwrap();
+        assert!(html.contains("partial") && html.contains("&lt;script&gt;never executable"));
+        let archive = backup::capture(&site.app).await.unwrap();
+        let restored = Site::new(postgres, false).await;
+        backup::restore(&restored.app, &archive).await.unwrap();
+        let (restored_reader, restored_session) =
+            auth::login(&restored.app, "reader@example.test", PASSWORD)
+                .await
+                .unwrap();
+        let restored_data = request(
+            &restored.app,
+            "POST",
+            "/account/privacy/export",
+            Some(&restored_reader),
+            "application/x-www-form-urlencoded",
+            form(&[("csrf", &restored_session.csrf), ("password", PASSWORD)]),
+        )
+        .await;
+        assert_eq!(restored_data.0, StatusCode::OK);
+        let value: serde_json::Value = serde_json::from_slice(&restored_data.2).unwrap();
+        assert_eq!(
+            value["account_linked_records"]["privacy_requests"][0]["state"],
+            "partial"
+        );
+        // Validate the foreign subject before any target records are written.
+        let mut envelope: serde_json::Value = serde_json::from_slice(&archive).unwrap();
+        let mut payload: serde_json::Value =
+            serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        payload["tables"]["privacy_requests"][0]["user_id"] =
+            json!(uuid::Uuid::new_v4().to_string());
+        let raw = payload.to_string();
+        envelope["sha256"] = json!(auth::digest(raw.as_bytes()));
+        envelope["payload"] = json!(raw);
+        let empty = Site::new(postgres, false).await;
+        assert!(
+            backup::restore(&empty.app, &serde_json::to_vec(&envelope).unwrap())
+                .await
+                .is_err()
+        );
+        let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+            .fetch_one(&empty.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(users, 0);
+        // Fail explicitly instead of quietly returning a partial data archive.
+        let mut config = (*site.app.config).clone();
+        config.privacy.export_bytes = 64 * 1024;
+        site.app.config = std::sync::Arc::new(config);
+        sqlx::query("UPDATE member_profiles SET biography=$1 WHERE user_id=$2")
+            .bind("PRIVATE_LONG_DATA".repeat(5000))
+            .bind(&session.user.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/account/privacy/export",
+                Some(&reader),
+                "application/x-www-form-urlencoded",
+                proof
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        let new_request = form(&[
+            ("csrf", &session.csrf),
+            ("password", PASSWORD),
+            ("kind", "erase"),
+        ]);
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/account/privacy",
+                Some(&reader),
+                "application/x-www-form-urlencoded",
+                new_request
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        let erase_id: String = sqlx::query_scalar(
+            "SELECT id FROM privacy_requests WHERE user_id=$1 AND state='requested'",
+        )
+        .bind(&session.user.id)
+        .fetch_one(&site.app.db.pool)
+        .await
+        .unwrap();
+        let erase = form(&[
+            ("csrf", &site.session().csrf),
+            ("version", "1"),
+            ("confirm", "true"),
+            (
+                "response",
+                "Profile removed; independent backups require separate retention review.",
+            ),
+        ]);
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &format!("/admin/privacy/{erase_id}/erase-account"),
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                erase.clone()
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &format!("/admin/privacy/{erase_id}/erase-account"),
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                erase
+            )
+            .await
+            .0,
+            StatusCode::CONFLICT
+        );
+        assert!(
+            auth::login(&site.app, "reader@example.test", PASSWORD)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            request(
+                &site.app,
+                "GET",
+                "/account/privacy",
+                Some(&reader),
+                "",
+                vec![]
+            )
+            .await
+            .0,
+            StatusCode::UNAUTHORIZED
+        );
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM member_profiles WHERE user_id=$1")
+                .bind(&session.user.id)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 0);
+        let user = sqlx::query("SELECT email,name,role FROM users WHERE id=$1")
+            .bind(&session.user.id)
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(user.get::<String, _>("role"), "disabled");
+        assert!(
+            !user
+                .get::<String, _>("email")
+                .contains("reader@example.test")
+        );
+        // Site ownership cannot disappear during an erasure workflow.
+        let owner_request = form(&[
+            ("csrf", &site.session().csrf),
+            ("password", PASSWORD),
+            ("kind", "erase"),
+        ]);
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/account/privacy",
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                owner_request
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        let owner_id: String = sqlx::query_scalar(
+            "SELECT id FROM privacy_requests WHERE user_id=$1 AND state='requested'",
+        )
+        .bind(&site.session().user.id)
+        .fetch_one(&site.app.db.pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &format!("/admin/privacy/{owner_id}/erase-account"),
+                Some(&site.token),
+                "application/x-www-form-urlencoded",
+                form(&[
+                    ("csrf", &site.session().csrf),
+                    ("version", "1"),
+                    ("confirm", "true"),
+                    ("response", "Must preserve the last owner.")
+                ])
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert!(
+            auth::login(&site.app, "owner@example.test", PASSWORD)
+                .await
+                .is_ok()
+        );
+        // A populated owner queue retains pending-first ordering and all later
+        // records when the indexed page is selected before joining user names.
+        auth::add_user(
+            &site.app,
+            "queue@example.test",
+            "Queue fixture",
+            "subscriber",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let subjects: Vec<String> = sqlx::query_scalar("SELECT id FROM users ORDER BY id")
+            .fetch_all(&site.app.db.pool)
+            .await
+            .unwrap();
+        let mut expected = std::collections::HashSet::new();
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        for subject in subjects {
+            for _ in 0..40 {
+                let id = uuid::Uuid::new_v4().to_string();
+                sqlx::query("INSERT INTO privacy_requests(id,user_id,kind,state,response,created_at,resolved_at) VALUES($1,$2,'access','fulfilled','Synthetic completed review',1,2)")
+                    .bind(&id).bind(&subject).execute(&mut *tx).await.unwrap();
+                expected.insert(id);
+            }
+        }
+        tx.commit().await.unwrap();
+        assert_eq!(expected.len(), 120);
+        let mut seen = std::collections::HashSet::new();
+        for page in 0..3 {
+            let (status, _, body) = request(
+                &site.app,
+                "GET",
+                &format!("/admin/privacy?page={page}"),
+                Some(&site.token),
+                "",
+                Vec::new(),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            let html = String::from_utf8(body).unwrap();
+            if page == 0 {
+                assert!(
+                    html.find(&owner_id).unwrap() < html.find("fulfilled").unwrap(),
+                    "Pending cases must precede resolved history."
+                );
+                assert!(html.contains("More requests"));
+            }
+            for suffix in html.split("href=\"/admin/privacy/").skip(1) {
+                let id = suffix.split('"').next().unwrap();
+                if expected.contains(id) {
+                    assert!(
+                        seen.insert(id.to_owned()),
+                        "A stable paginated queue must not repeat cases."
+                    );
+                }
+            }
+        }
+        assert_eq!(
+            seen, expected,
+            "All completed cases must remain reachable beyond the first owner page."
+        );
+        let explain = if postgres {
+            "EXPLAIN (ANALYZE,BUFFERS) "
+        } else {
+            "EXPLAIN QUERY PLAN "
+        };
+        let queue_sql = "SELECT p.id,p.kind,p.state,p.created_at,u.name FROM (SELECT id,user_id,kind,state,created_at FROM privacy_requests ORDER BY state DESC,created_at,id LIMIT 101 OFFSET 0) p JOIN users u ON u.id=p.user_id ORDER BY p.state DESC,p.created_at,p.id";
+        let plan = sqlx::query(&format!("{explain}{queue_sql}"))
+            .fetch_all(&site.app.db.pool)
+            .await
+            .unwrap()
+            .iter()
+            .map(|r| r.get::<String, _>(if postgres { 0 } else { 3 }))
+            .collect::<Vec<_>>();
+        engine_evidence.push(json!({"engine":if postgres {"PostgreSQL"} else {"SQLite"},"completed_fixture_records":120,"page_limit":101,"all_completed_records_reached_once":true,"queue_query_plan":plan}));
+        empty.close().await;
+        restored.close().await;
+        site.close().await;
+    }
+    std::fs::create_dir_all("work").unwrap();
+    std::fs::write(
+        "work/m7-privacy-volume.json",
+        serde_json::to_vec_pretty(&engine_evidence).unwrap(),
+    )
+    .unwrap();
+}
+
+#[tokio::test]
+async fn selective_recovery_preserves_link_dependencies_and_shared_domains_before_fresh_restore() {
+    for postgres in engines() {
+        let site = Site::new(postgres, true).await;
+        let linked = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("linked-story", "publish"),
+        )
+        .await
+        .unwrap();
+        let unrelated = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("unrelated-story", "publish"),
+        )
+        .await
+        .unwrap();
+        let mut root = input("selected-story", "publish");
+        root.body = "Read [the linked story](/linked-story?from=selection).".into();
+        let root = content::save(&site.app, site.session(), None, root)
+            .await
+            .unwrap();
+        let archive = backup::capture(&site.app).await.unwrap();
+        let selected =
+            backup::selection::prepare(&site.app.config, &archive, std::slice::from_ref(&root.id))
+                .unwrap();
+        let retained = selected.report["retained_posts"].as_array().unwrap();
+        assert!(retained.iter().any(|id| id == &root.id));
+        assert!(retained.iter().any(|id| id == &linked.id));
+        assert!(!retained.iter().any(|id| id == &unrelated.id));
+        let repeat =
+            backup::selection::prepare(&site.app.config, &archive, std::slice::from_ref(&root.id))
+                .unwrap();
+        assert_eq!(
+            selected.plan, repeat.plan,
+            "The preview must bind a deterministic exact package."
+        );
+        assert_eq!(selected.bytes, repeat.bytes);
+        let target = Site::new(postgres, false).await;
+        backup::restore(&target.app, &selected.bytes).await.unwrap();
+        assert_eq!(
+            get(&target.app, "/selected-story", None).await.0,
+            StatusCode::OK
+        );
+        assert_eq!(
+            get(&target.app, "/linked-story", None).await.0,
+            StatusCode::OK
+        );
+        assert_eq!(
+            get(&target.app, "/unrelated-story", None).await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert!(
+            auth::login(&target.app, "owner@example.test", PASSWORD)
+                .await
+                .is_ok()
+        );
+        assert!(
+            backup::restore(&target.app, &selected.bytes).await.is_err(),
+            "Selection cannot merge into an occupied target."
+        );
+        assert!(
+            backup::selection::prepare(
+                &site.app.config,
+                &archive,
+                &[uuid::Uuid::new_v4().to_string()]
+            )
+            .is_err()
+        );
+        let mut corrupt = archive.clone();
+        let last = corrupt.len() - 1;
+        corrupt[last] ^= 1;
+        assert!(backup::selection::prepare(&site.app.config, &corrupt, &[root.id]).is_err());
+        target.close().await;
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn url_aware_clone_stays_read_only_across_recovery_until_explicit_owner_review() {
+    for postgres in engines() {
+        let site = Site::new(postgres, true).await;
+        let mut post = input("cloned-story", "publish");
+        post.body = "[Local](https://source.example.test/about) [Unrelated](https://source.example.test.evil.invalid/about)".into();
+        let post = content::save(&site.app, site.session(), None, post)
+            .await
+            .unwrap();
+        let archive = backup::capture(&site.app).await.unwrap();
+        let prepared = backup::selection::clone_package(
+            &site.app.config,
+            &archive,
+            "https://source.example.test",
+        )
+        .unwrap();
+        assert_eq!(prepared.report["held"], true);
+        assert!(prepared.report["rewritten_occurrences"].as_u64().unwrap() > 0);
+        assert!(
+            backup::selection::clone_package(
+                &site.app.config,
+                &archive,
+                "https://source.example.test/path"
+            )
+            .is_err()
+        );
+        let mut target = Site::new(postgres, false).await;
+        backup::restore(&target.app, &prepared.bytes).await.unwrap();
+        assert!(
+            target
+                .app
+                .clone_held
+                .load(std::sync::atomic::Ordering::SeqCst)
+        );
+        assert!(
+            auth::session(
+                &target.app,
+                &axum::http::HeaderMap::from_iter([(
+                    axum::http::header::COOKIE,
+                    format!("wpalt_session={}", site.token).parse().unwrap()
+                )])
+            )
+            .await
+            .is_err()
+        );
+        let (token, session) = auth::login(&target.app, "owner@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let (status, html) = get(&target.app, "/cloned-story", None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains("http://127.0.0.1:3000/about"));
+        assert!(html.contains("https://source.example.test.evil.invalid/about"));
+        let (_, operations) = get(&target.app, "/admin/operations", Some(&token)).await;
+        assert!(operations.contains("Read-only recovered clone"));
+        let mut update = input("cloned-story", "publish");
+        update.version = post.version;
+        update.csrf = session.csrf.clone();
+        let body = serde_json::to_vec(&update).unwrap();
+        assert_eq!(
+            request(
+                &target.app,
+                "POST",
+                &format!("/api/admin/content/{}", post.id),
+                Some(&token),
+                "application/json",
+                body
+            )
+            .await
+            .0,
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            request(
+                &target.app,
+                "POST",
+                "/commerce/stripe/webhook",
+                None,
+                "application/json",
+                b"{}".to_vec()
+            )
+            .await
+            .0,
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        let dispatched = std::sync::atomic::AtomicBool::new(false);
+        assert!(
+            wpalt::operations::jobs::run_cycle(&target.app, async {
+                dispatched.store(true, std::sync::atomic::Ordering::SeqCst);
+                vec![]
+            })
+            .await
+            .is_err()
+        );
+        assert!(!dispatched.load(std::sync::atomic::Ordering::SeqCst));
+        target.app.db.pool.close().await;
+        target.app = App::open((*target.app.config).clone()).await.unwrap();
+        assert!(
+            target
+                .app
+                .clone_held
+                .load(std::sync::atomic::Ordering::SeqCst),
+            "Restart cannot remove a clone hold."
+        );
+        let held_archive = backup::capture(&target.app).await.unwrap();
+        let recovered = Site::new(postgres, false).await;
+        backup::restore(&recovered.app, &held_archive)
+            .await
+            .unwrap();
+        assert!(
+            wpalt::operations::clone_hold::held(&recovered.app)
+                .await
+                .unwrap()
+        );
+        assert!(
+            wpalt::operations::clone_hold::activate(&target.app, "too short")
+                .await
+                .is_err()
+        );
+        wpalt::operations::clone_hold::activate(&target.app,"Reviewed source shutdown, message queues, payment ownership, identity callbacks and credentials in this isolated synthetic fixture.").await.unwrap();
+        assert!(
+            !target
+                .app
+                .clone_held
+                .load(std::sync::atomic::Ordering::SeqCst)
+        );
+        assert!(
+            !wpalt::operations::clone_hold::held(&target.app)
+                .await
+                .unwrap()
+        );
+        assert!(
+            wpalt::operations::clone_hold::activate(
+                &target.app,
+                "Repeated activation must not silently pass an already activated clone."
+            )
+            .await
+            .is_err()
+        );
+        recovered.close().await;
+        target.close().await;
+        site.close().await;
+    }
+}

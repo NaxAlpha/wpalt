@@ -134,7 +134,7 @@ async fn start(State(app): State<App>) -> Result<Response> {
     let nonce = auth::random_token();
     let verifier = auth::random_token();
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     sqlx::query("DELETE FROM identity_flows WHERE expires_at<=$1")
         .bind(now())
         .execute(&app.db.pool)
@@ -324,7 +324,7 @@ async fn callback(
     Ok(response)
 }
 pub async fn identity_session(app: &App, issuer: &str, subject: &str) -> Result<(String, Session)> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let r=sqlx::query("SELECT u.id,u.email,u.name,u.role FROM member_identities i JOIN users u ON u.id=i.user_id WHERE i.issuer=$1 AND i.subject=$2 AND u.role<>'disabled'").bind(issuer).bind(subject).fetch_optional(&app.db.pool).await?.ok_or_else(Error::forbidden)?;
     let token = auth::random_token();
     let session = Session {
@@ -337,6 +337,16 @@ pub async fn identity_session(app: &App, issuer: &str, subject: &str) -> Result<
         csrf: auth::random_token(),
         hash: auth::digest(token.as_bytes()),
     };
+    let factor: Option<String> =
+        sqlx::query_scalar("SELECT secret FROM user_factors WHERE user_id=$1")
+            .bind(&session.user.id)
+            .fetch_optional(&app.db.pool)
+            .await?;
+    if factor.is_some_and(|s| !s.is_empty()) {
+        return Err(Error::invalid(
+            "This account requires local authenticator sign-in; use password and code.",
+        ));
+    }
     sqlx::query("INSERT INTO sessions(token_hash,user_id,csrf,expires_at) VALUES($1,$2,$3,$4)")
         .bind(&session.hash)
         .bind(&session.user.id)

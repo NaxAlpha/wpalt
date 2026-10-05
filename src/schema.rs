@@ -397,15 +397,14 @@ impl Registry {
             };
             match field.kind.as_str() {
                 "relationship" => {
-                    if let Some(id) = value.as_str() {
-                        if relations
+                    if let Some(id) = value.as_str()
+                        && relations
                             .insert(id.into(), field.target.clone())
                             .is_some_and(|old| old != field.target)
-                        {
-                            return Err(Error::invalid(
-                                "A record cannot represent two different relationship target models.",
-                            ));
-                        }
+                    {
+                        return Err(Error::invalid(
+                            "A record cannot represent two different relationship target models.",
+                        ));
                     }
                 }
                 "media" => {
@@ -609,7 +608,7 @@ async fn preflight(app: &App, registry: &Registry) -> Result<()> {
     Ok(())
 }
 pub async fn save_model(app: &App, id: &str, model: Model, version: i64) -> Result<i64> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     let actual: Option<i64> = sqlx::query_scalar("SELECT version FROM content_models WHERE id=$1")
         .bind(id)
         .fetch_optional(&app.db.pool)
@@ -648,7 +647,7 @@ pub async fn save_model(app: &App, id: &str, model: Model, version: i64) -> Resu
     Ok(version + 1)
 }
 pub async fn save_common(app: &App, definition: Definition, version: i64) -> Result<i64> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     check_design_version(app, version).await?;
     let mut registry = Registry::load(app).await?;
     registry.common = definition.clone();
@@ -674,7 +673,7 @@ pub async fn save_common(app: &App, definition: Definition, version: i64) -> Res
     Ok(version + 1)
 }
 pub async fn save_options(app: &App, values: Value, version: i64, publish: bool) -> Result<i64> {
-    let _guard = app.mutations.lock().await;
+    let _guard = app.mutation().await;
     check_design_version(app, version).await?;
     let registry = Registry::load(app).await?;
     registry.validate_values(&registry.common.options, &values)?;

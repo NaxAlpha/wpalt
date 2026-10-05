@@ -298,6 +298,7 @@ async fn preview(
 #[derive(Deserialize)]
 struct StyleQuery {
     v: Option<i64>,
+    template: Option<String>,
 }
 async fn draft_css(
     State(app): State<App>,
@@ -324,13 +325,18 @@ async fn draft_css(
     };
     Ok((
         [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
-        package.css(),
+        if let Some(template) = query.template {
+            package.css_for(&template)?
+        } else {
+            package.css()
+        },
     )
         .into_response())
 }
 async fn live_css(
     State(app): State<App>,
     Path((id, version)): Path<(String, i64)>,
+    Query(query): Query<StyleQuery>,
 ) -> Result<Response> {
     let raw: String = sqlx::query_scalar(
         "SELECT package FROM theme_revisions WHERE theme_id=$1 AND version=$2 AND published=1",
@@ -347,7 +353,11 @@ async fn live_css(
             (header::CONTENT_TYPE, "text/css; charset=utf-8"),
             (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
         ],
-        package.css(),
+        if let Some(template) = query.template {
+            package.css_for(&template)?
+        } else {
+            package.css()
+        },
     )
         .into_response())
 }

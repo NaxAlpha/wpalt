@@ -1,0 +1,202 @@
+{
+  "machine": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "cpu": "arm",
+    "logical_cpus": 8
+  },
+  "posts_requested": 1000,
+  "requests_per_scenario": 100,
+  "binary_bytes": 17572048,
+  "binary_sha256": "748f344ad6dcfb8cbba50eeb964689187f1942120e967dcc1d6d99cc98992c43",
+  "conditions": "Full uncompressed HTML document; warm application; no browser asset/render timing; localhost; Python HTTP client overhead included. Cache allowlist/TTL enabled only with --cached; private/story/commerce routes bypass.",
+  "cache_enabled": false,
+  "debug_logging": false,
+  "commerce_fixture": "four physical/digital/monthly membership/group-booking products, one UTC slot, no invented payments",
+  "profiles": [
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 0.984,
+      "p95_ms": 1.224,
+      "p99_ms": 2.138,
+      "requests_per_second": 910.6,
+      "document_bytes": 9814
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 6.33,
+      "p95_ms": 7.501,
+      "p99_ms": 7.832,
+      "requests_per_second": 1520.8,
+      "document_bytes": 9814
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 0.642,
+      "p95_ms": 0.857,
+      "p99_ms": 1.091,
+      "requests_per_second": 1454.1,
+      "document_bytes": 3676
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 2.045,
+      "p95_ms": 2.572,
+      "p99_ms": 2.689,
+      "requests_per_second": 4569.1,
+      "document_bytes": 3676
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 1.98,
+      "p95_ms": 2.252,
+      "p99_ms": 2.396,
+      "requests_per_second": 496.7,
+      "document_bytes": 6258
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 14.771,
+      "p95_ms": 23.857,
+      "p99_ms": 25.825,
+      "requests_per_second": 602.6,
+      "document_bytes": 6258
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "catalog",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 0.301,
+      "p95_ms": 0.359,
+      "p99_ms": 0.379,
+      "requests_per_second": 3217.3,
+      "document_bytes": 2158
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "catalog",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 1.546,
+      "p95_ms": 2.431,
+      "p99_ms": 3.675,
+      "requests_per_second": 5499.7,
+      "document_bytes": 2158
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "product",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 0.292,
+      "p95_ms": 0.4,
+      "p99_ms": 0.434,
+      "requests_per_second": 3186.4,
+      "document_bytes": 1419
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "product",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 1.835,
+      "p95_ms": 2.877,
+      "p99_ms": 3.518,
+      "requests_per_second": 4835.0,
+      "document_bytes": 1419
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 5.662,
+      "p95_ms": 6.354,
+      "p99_ms": 6.958,
+      "requests_per_second": 174.6,
+      "document_bytes": 55994
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 85.852,
+      "p95_ms": 115.025,
+      "p99_ms": 172.531,
+      "requests_per_second": 109.3,
+      "document_bytes": 55994
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap_index",
+      "concurrency": 1,
+      "requests": 100,
+      "p50_ms": 1.365,
+      "p95_ms": 1.5,
+      "p99_ms": 1.563,
+      "requests_per_second": 734.2,
+      "document_bytes": 273
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap_index",
+      "concurrency": 10,
+      "requests": 100,
+      "p50_ms": 8.321,
+      "p95_ms": 10.617,
+      "p99_ms": 11.195,
+      "requests_per_second": 1154.0,
+      "document_bytes": 273
+    }
+  ],
+  "cold_first_request_ms": {
+    "sqlite": 2.182
+  },
+  "studio_asset_bytes": {
+    "raw": 36796,
+    "gzip": 13140
+  },
+  "composition_fixture": "20 dynamic cards with typed field bindings and three explicit reusable component parameters",
+  "runtime": {
+    "sqlite": {
+      "rss_after_load_bytes": 57966592,
+      "log_bytes": 351595,
+      "site_files_bytes": 19867569
+    }
+  },
+  "source_scope": "Intermediate optimized M7 protection/media/integrity checkpoint before privileged-audit additions; identified by executable SHA256. Not the final M7 artifact.",
+  "limitations": "Localhost macOS ARM64, 100 requests/scenario, concurrent developer compilation/testing may affect timings. Indicative checkpoint, no production capacity or WordPress parity claim."
+}

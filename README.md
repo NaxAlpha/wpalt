@@ -12,7 +12,7 @@ Manage locally assigned memberships, protected content/downloads, ordered course
 
 ## Run
 
-Rust 1.85 or newer is the declared build floor, verified by CI. Node/npm are frontend development tools; the resulting server requires no Cargo, Node or PHP at runtime.
+Rust 1.88 or newer is the declared build floor, verified by CI. Node/npm are frontend development tools; the resulting server requires no Cargo, Node or PHP at runtime.
 
 ```sh
 npm ci --prefix frontend --ignore-scripts
@@ -62,3 +62,5 @@ M1–M8 are pre-adoption development. M2 provides typed models, parameterized re
 The integrated writing milestone and its structured-document API/migration are documented in [authoring](docs/authoring.md). This remains a pre-adoption milestone build; full WordPress/plugin parity is the roadmap goal, not the current capability claim.
 
 Development distribution and pipeline: [automatic releases and CI](docs/automatic-releases.md).
+
+M7 defined-scope delivery: [operations guide](docs/resilient-operations.md), [contract](docs/m7-contract.md) and [verification with operating limits](docs/evidence/m7-verification.md). Final-source gates determine PR #13 readiness.

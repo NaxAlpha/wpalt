@@ -2,10 +2,10 @@
 """Reproducible HTTP/document baseline. Uses a fresh database; never clears an existing site.
 Optional PostgreSQL URL MUST identify an empty, isolated test database.
 """
-import argparse,concurrent.futures,hashlib,json,math,os,platform,secrets,socket,subprocess,tempfile,time,urllib.request
+import argparse,concurrent.futures,hashlib,json,math,os,platform,secrets,socket,sqlite3,subprocess,tempfile,time,urllib.request
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--binary',default='target/release/wpalt');p.add_argument('--posts',type=int,default=1000);p.add_argument('--requests',type=int,default=200);p.add_argument('--postgres-url');p.add_argument('--wordpress-url');p.add_argument('--composed',action='store_true');p.add_argument('--discovery',action='store_true');p.add_argument('--commerce',action='store_true');p.add_argument('--debug',action='store_true');p.add_argument('--output',default='work/benchmark.json');args=p.parse_args()
-binary=Path(args.binary).resolve();results={'machine':{'platform':platform.platform(),'cpu':platform.processor(),'logical_cpus':os.cpu_count()},'posts_requested':args.posts,'requests_per_scenario':args.requests,'binary_bytes':binary.stat().st_size,'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'conditions':'Full uncompressed HTML document; warm application; no browser asset/render timing; no application response cache; localhost; Python HTTP client overhead included.','debug_logging':args.debug,'commerce_fixture':('four physical/digital/monthly membership/group-booking products, one UTC slot, no invented payments' if args.commerce else None),'profiles':[]}
+p=argparse.ArgumentParser();p.add_argument('--binary',default='target/release/wpalt');p.add_argument('--posts',type=int,default=1000);p.add_argument('--requests',type=int,default=200);p.add_argument('--postgres-url');p.add_argument('--wordpress-url');p.add_argument('--composed',action='store_true');p.add_argument('--discovery',action='store_true');p.add_argument('--commerce',action='store_true');p.add_argument('--debug',action='store_true');p.add_argument('--cached',action='store_true');p.add_argument('--output',default='work/benchmark.json');args=p.parse_args()
+binary=Path(args.binary).resolve();results={'machine':{'platform':platform.platform(),'cpu':platform.processor(),'logical_cpus':os.cpu_count()},'posts_requested':args.posts,'requests_per_scenario':args.requests,'binary_bytes':binary.stat().st_size,'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'conditions':'Full uncompressed HTML document; warm application; no browser asset/render timing; localhost; Python HTTP client overhead included. Cache allowlist/TTL enabled only with --cached; private/commerce routes bypass; eligible public articles use the page cache.', 'cache_enabled':args.cached,'debug_logging':args.debug,'commerce_fixture':('four physical/digital/monthly membership/group-booking products, one UTC slot, no invented payments' if args.commerce else None),'profiles':[]}
 def percentile(values,p):return sorted(values)[max(0,math.ceil(len(values)*p)-1)]
 def load(url,concurrency):
     def one(_):
@@ -24,6 +24,8 @@ with tempfile.TemporaryDirectory(prefix='wpalt-benchmark-') as temporary:
         origin=f'http://127.0.0.1:{port}';directory=root/engine;directory.mkdir();cfg=directory/'config.toml'
         url=db or f'sqlite://{directory}/site.db?mode=rwc'
         cfg.write_text(f'database_url = "{url}"\ndata_dir = "{directory}/data"\nlisten = "127.0.0.1:{port}"\nbase_url = "{origin}"\ndebug = {str(args.debug).lower()}\n')
+        if args.cached:
+            with cfg.open('a') as f:f.write('[cache]\nenabled = true\n')
         def run(*arguments,input=None):
             r=subprocess.run([str(binary),'--config',str(cfg),*arguments],input=input,text=True,capture_output=True)
             assert r.returncode==0,(arguments,r.stderr)
@@ -34,13 +36,27 @@ with tempfile.TemporaryDirectory(prefix='wpalt-benchmark-') as temporary:
             package['components']={'benchmark-card':{'parameters':{'title':'string','subtitle':'string','url':'string'},'root':{'id':'benchmark-card-root','kind':'section','style':{'padding':24},'children':[{'id':'benchmark-title','kind':'heading','text':{'bind':'params.title'}},{'id':'benchmark-subtitle','kind':'text','text':{'bind':'params.subtitle'}},{'id':'benchmark-link','kind':'link','text':'Read project','href':{'bind':'params.url'}}]}}}
             package['templates']['home']['children'][-1]={'id':'benchmark-collection','kind':'collection','source':'post','limit':20,'children':[{'id':'benchmark-instance','kind':'component','component':'benchmark-card','arguments':{'title':{'bind':'item.title'},'subtitle':{'bind':'item.fields.subtitle'},'url':{'bind':'item.url'}}}]}
             package_path=directory/'benchmark-theme.json';package_path.write_text(json.dumps(package));run('theme','import','paper',str(package_path),'--publish')
-        log=(directory/'server.log').open('w');server=subprocess.Popen([str(binary),'--config',str(cfg),'serve'],stdout=log,stderr=log)
+        if not db:
+            # Explain the actual application predicates on the populated fixture.
+            # These plans are evidence, not fragile assertions about planner text.
+            queries={
+                'sitemap_page':("SELECT id,published_slug,published_locale,published_seo FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND id>? ORDER BY id LIMIT 1001", ('',)),
+                'privacy_subject_history':('SELECT id,kind,state,response,created_at,resolved_at FROM privacy_requests WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 51 OFFSET ?', ('fixture',0)),
+                'privacy_owner_queue':('SELECT p.id,p.kind,p.state,p.created_at,u.name FROM (SELECT id,user_id,kind,state,created_at FROM privacy_requests ORDER BY state DESC,created_at,id LIMIT 101 OFFSET ?) p JOIN users u ON u.id=p.user_id ORDER BY p.state DESC,p.created_at,p.id', (0,)),
+                'account_authored_content':('SELECT id FROM posts WHERE author_id=? ORDER BY id LIMIT 1001', ('fixture',)),
+            }
+            with sqlite3.connect(directory/'site.db') as connection:
+                results.setdefault('fixture_counts',{})[engine]={'posts':connection.execute('SELECT COUNT(*) FROM posts').fetchone()[0]}
+                results.setdefault('query_plans',{})[engine]={name:[row[3] for row in connection.execute('EXPLAIN QUERY PLAN '+sql,bindings)] for name,(sql,bindings) in queries.items()}
+        log=(directory/'server.log').open('w');startup=time.perf_counter();server=subprocess.Popen([str(binary),'--config',str(cfg),'serve'],stdout=log,stderr=log)
         try:
             for _ in range(100):
                 try:
                     with urllib.request.urlopen(origin+'/health',timeout=1):break
                 except Exception:assert server.poll() is None;time.sleep(.1)
             else:raise AssertionError('Server readiness timeout')
+            results.setdefault('startup_to_health_ms',{})[engine]=round((time.perf_counter()-startup)*1000,3)
+            idle_rss=rss(server.pid)
             paths={'home':'/','story':'/journal-1','search':'/search?q=publishing'}
             if args.commerce:
                 import re
@@ -60,7 +76,10 @@ with tempfile.TemporaryDirectory(prefix='wpalt-benchmark-') as temporary:
                 for _ in range(10):
                     with urllib.request.urlopen(origin+path) as r:r.read()
                 for concurrency in [1,10]:results['profiles'].append({'system':'wpalt','database':engine,'endpoint':endpoint,**load(origin+path,concurrency)})
-            results.setdefault('runtime',{})[engine]={'rss_after_load_bytes':rss(server.pid),'log_bytes':(directory/'server.log').stat().st_size,'site_files_bytes':sum(f.stat().st_size for f in directory.rglob('*') if f.is_file() and f.name not in ('server.log','config.toml'))}
+            files={str(f.relative_to(directory)):f.stat().st_size for f in directory.rglob('*') if f.is_file() and f.name not in ('server.log','config.toml')}
+            history=directory/'data'/'background-jobs.json'
+            cycles=json.loads(history.read_text()) if history.exists() else []
+            results.setdefault('runtime',{})[engine]={'rss_ready_bytes':idle_rss,'rss_after_load_bytes':rss(server.pid),'rss_measurement':'Resident snapshots, not peak memory; includes startup password-verification dummy hash allocation.','log_bytes':(directory/'server.log').stat().st_size,'site_files_bytes':sum(files.values()),'site_file_bytes':files,'background_cycles':cycles}
         finally:server.terminate();server.wait(timeout=10);log.close()
     if args.wordpress_url:
         for endpoint,path in [('home','/'),('story','/journal-1'),('search','/?s=publishing')]:

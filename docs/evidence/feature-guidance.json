@@ -1069,6 +1069,579 @@
         "security guidance update"
       ],
       "status": "defined-scope verified locally; final-source CI and artifact gates on PR #12"
+    },
+    {
+      "feature_id": "M7-recovery",
+      "area": "Authenticated independent recovery",
+      "scope": "M7 initial slices",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.rs/ring/0.17.14/ring/aead/index.html",
+        "https://www.sqlite.org/backup.html",
+        "https://www.postgresql.org/docs/current/backup.html"
+      ],
+      "applicable_versions": [
+        "ring 0.17.14",
+        "wpalt schema 9, encrypted envelope 1, single owning process"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Use random recovery keys and fresh nonces; authenticate version metadata and ciphertext before restoration.",
+        "Logical database/media snapshots are not native WAL PITR; verify independent copies and restore into fresh targets."
+      ],
+      "tests": [
+        "encrypted_recovery_survives_original_loss_and_reports_failed_independent_copies"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-cache",
+      "area": "Anonymous bounded response cache",
+      "scope": "M7 initial slices",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control"
+      ],
+      "applicable_versions": [
+        "ring 0.17.14",
+        "wpalt schema 9, encrypted envelope 1, single owning process"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Exclude personalized/private/cookie-bearing output; invalidate on publication and access mutation.",
+        "Bound total bytes, entries and TTL; fresh request IDs and outer security headers per response."
+      ],
+      "tests": [
+        "anonymous_cache_never_reuses_sessions_and_invalidates_published_access_changes"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream guideline or version change",
+        "relevant vulnerability"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-local-protection",
+      "area": "Local request and native-media bounds",
+      "scope": "M7 initial slices",
+      "basis": "internal-with-upstream",
+      "sources": [
+        "https://docs.rs/image/0.25.8/image/struct.Limits.html",
+        "https://docs.rs/axum/0.8.9/axum/extract/struct.ConnectInfo.html"
+      ],
+      "applicable_versions": [
+        "image 0.25",
+        "Axum 0.8",
+        "wpalt single owning process"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Never trust forwarded peer headers implicitly; bounded active counters fail closed.",
+        "Media transforms use original authorization and bounded decoding; scans never silently change stored files.",
+        "Image dimension limits are strict; max_alloc is decoder best-effort and not a process RSS ceiling."
+      ],
+      "tests": [
+        "local_request_rules_cannot_be_bypassed_with_forwarded_headers_or_cached_pages",
+        "native_image_derivatives_preserve_private_authority_and_validate_processing_limits",
+        "integrity_scan_reports_damaged_private_files_without_modifying_them"
+      ],
+      "triggers": [
+        "affected release",
+        "upstream version changes",
+        "relevant vulnerability"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-local-authentication",
+      "area": "Local TOTP/passkeys and portable incremental recovery",
+      "scope": "Schema 10 M7 implementation",
+      "basis": "internal-with-upstream",
+      "sources": [
+        "https://www.rfc-editor.org/rfc/rfc6238",
+        "https://docs.rs/webauthn-rs/latest/webauthn_rs/struct.Webauthn.html",
+        "https://docs.rs/webauthn-rs/latest/webauthn_rs/prelude/struct.Passkey.html"
+      ],
+      "applicable_versions": [
+        "webauthn-rs 0.5.5",
+        "Rust 1.88 minimum",
+        "wpalt schema 10, archive v10"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "TOTP codes cannot be replayed; recovery codes consumed transactionally; revoked sessions cannot finish enrollment.",
+        "WebAuthn user verification, exact origin and signature checks use the maintained library; private bounded single-use challenges and current credential versions.",
+        "Incremental points validate reconstructed graphs; pruning verifies retained points before deletion; explicit migrations stay outside ordinary restore."
+      ],
+      "tests": [
+        "local_authenticator_requires_proof_rejects_replay_and_restores_with_one_use_recovery",
+        "migration_and_incremental_restore_preserve_owned_graph_before_any_target_writes",
+        "recovery_cleanup_requires_current_preview_and_preserves_every_retained_point",
+        "scripts/operations_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected release",
+        "upstream version changes",
+        "relevant vulnerability"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-owner-page-inspection",
+      "area": "Local inventory and cookie inspection",
+      "scope": "Paginated owner inventory and finite same-origin browser sample",
+      "basis": "internal-with-upstream",
+      "sources": [
+        "https://playwright.dev/docs/api/class-browsercontext",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie"
+      ],
+      "applicable_versions": [
+        "Playwright 1.62.1",
+        "wpalt schema 10"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Bound inventory rows/bytes and expose keyset continuation; no mutation/quarantine on checksum or executable-pattern warnings.",
+        "Cookie scanner samples explicit owner pages, blocks foreign requests and excludes cookie/storage values; observed consent states are not legal certification."
+      ],
+      "tests": [
+        "paginated_integrity_reaches_late_damage_and_labels_patterns_without_deleting_files",
+        "scripts/operations_acceptance.cjs",
+        "scripts/cookie_scan.cjs"
+      ],
+      "triggers": [
+        "affected release",
+        "upstream version changes",
+        "relevant vulnerability"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-SPAM",
+      "area": "Local submission abuse friction",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Bot_Management_and_Anti-Automation_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 10",
+        "Browser Web Crypto"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Layer bounded challenges and heuristics with input validation, rate limits and moderation; do not claim proof of human identity or shared spam classification.",
+        "Authenticate resource and expiry; admit each proof once; bound client work and replay memory; no foreign services or fingerprints."
+      ],
+      "tests": [
+        "local_abuse_guard_binds_resource_and_admits_only_one_racing_submitter",
+        "scripts/spam_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected release",
+        "upstream guidance change",
+        "relevant vulnerability"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-NATIVE-AVIF",
+      "area": "Native image encoding and derivative reuse",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.rs/image/0.25.9/image/codecs/avif/struct.AvifEncoder.html",
+        "https://docs.rs/image/0.25.9/image/codecs/webp/struct.WebPDecoder.html",
+        "https://docs.rs/image/0.25.9/image/codecs/png/struct.PngDecoder.html",
+        "https://github.com/xiph/rav1e/commit/c247d53ae43dd1312dbd90117c45e4c0ee6b06ce"
+      ],
+      "applicable_versions": [
+        "image 0.25.9",
+        "ravif 0.12.0",
+        "Rust 1.88 floor"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Bound AVIF output pixels and encoder threads; do not silently discard animation.",
+        "Authenticate each request before byte-cache reuse; separate retained storage budgets from transient worker allocations.",
+        "Verify every vendor-source byte against the registry checksum plus the narrow upstream pastey/lifetime maintenance transformations; remove the path patch when a reviewed registry release contains the fix."
+      ],
+      "tests": [
+        "native_image_derivatives_preserve_private_authority_and_validate_processing_limits",
+        "scripts/operations_acceptance.cjs",
+        "scripts/verify_encoder_vendor.py"
+      ],
+      "triggers": [
+        "encoder or browser changes",
+        "relevant vulnerability",
+        "affected release"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-PG-NATIVE-WAL",
+      "area": "Native PostgreSQL archival and point-in-time recovery",
+      "scope": "M7 PostgreSQL 17 integration; real-engine verification pending",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.postgresql.org/docs/17/continuous-archiving.html",
+        "https://github.com/postgres/postgres/blob/REL_17_STABLE/src/include/access/xlog_internal.h",
+        "https://hub.docker.com/_/postgres"
+      ],
+      "applicable_versions": [
+        "PostgreSQL 17 native long-page headers",
+        "wpalt-postgres-wal-v1"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Distinguish native physical base+WAL chain from logical application snapshots; maintain matching immutable media independently.",
+        "Bind encrypted segments to cluster identifier and native filename; fail before replacement on missing, wrong-key, wrong-identity or corrupted records.",
+        "Do not overwrite different archived segments or prune a chain without proven retained-base coverage."
+      ],
+      "tests": [
+        "native_wal_archive_is_idempotent_bound_to_cluster_and_preserves_output_on_corruption",
+        "scripts/native_pitr_acceptance.py"
+      ],
+      "triggers": [
+        "PostgreSQL major/version or image changes",
+        "relevant vulnerabilities",
+        "affected release"
+      ],
+      "status": "implementation-reviewed; real-engine-test-pending"
+    },
+    {
+      "feature_id": "M7-CLEANUP",
+      "area": "Reference-aware media and expired-session cleanup",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.sqlite.org/lang_transaction.html",
+        "https://www.postgresql.org/docs/17/sql-delete.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 10",
+        "SQLite transactional DELETE",
+        "PostgreSQL 17 transactional DELETE"
+      ],
+      "last_checked": "2026-10-04",
+      "next_review": "2026-11-03",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Bound scans and preserve draft/live/historical module references. Recheck candidate set under the owning process mutation lock. Commit library removal before unlink so interruption leaves retryable unserved orphans. Unknown files and symlinks fail closed."
+      ],
+      "tests": [
+        "cleanup_preserves_references_and_rejects_stale_or_unsafe_plans",
+        "operations browser cleanup preview/result at 320/768/1440"
+      ],
+      "triggers": [
+        "new persisted module or reference format",
+        "schema/storage/engine change",
+        "release or relevant security guidance"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-ASSET-LOADING",
+      "area": "Scoped theme CSS, intrinsic dimensions and loading hints",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/rel/preload",
+        "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/img",
+        "https://docs.rs/image/0.25.9/image/struct.ImageReader.html#method.into_dimensions"
+      ],
+      "applicable_versions": [
+        "HTML preload/as=style and image",
+        "img width/height/loading/fetchpriority",
+        "wpalt authoring document 1 optional image metadata"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Match preload resource URL/destination with the actual consumer; preload only one selected local lead image, never imported external resources. Bound authoring dimensions and preserve explicit loading policy. Prune render-unreachable theme trees without guessing responsive/conditional visibility. Retain external-only style CSP.",
+        "Enrich only transient imported/local composition image layout; authorize source rows before metadata cache use, bound header input and decoder workers, omit optional metadata under pressure, never fetch external images. Document/composition share at most one rendered local eager preload."
+      ],
+      "tests": [
+        "theme_styles_are_template_scoped_and_preserve_reachable_components",
+        "image_dimensions_and_priority_are_bounded_and_external_preloads_are_excluded",
+        "authoring browser publication journey",
+        "local_layout_metadata_respects_media_authority_and_never_rewrites_publication"
+      ],
+      "triggers": [
+        "browser loading/CSP change",
+        "theme or document schema changes",
+        "asset pipeline or affected release"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-LOCAL-VIDEO",
+      "area": "Optional native video worker",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://ffmpeg.org/ffmpeg.html",
+        "https://ffmpeg.org/ffmpeg-protocols.html"
+      ],
+      "applicable_versions": [
+        "Owner-installed FFmpeg with libx264/AAC and FFprobe",
+        "wpalt fixed MP4/WebM local processing profile"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Use owner-configured absolute tools with fixed arguments and no shell, network protocols or arbitrary codec arguments. Bound source, streams, dimensions, duration, worker concurrency, process deadlines and output. Preserve media authorization and backup/checksum identity. Maintain host OS sandbox/limits for untrusted codec input.",
+        "Retain failed source choice and explain ambiguous interrupted requests before retry; revalidate current authority at publication after long native work. Keep owner previews quiet and test populated/error/busy geometry and actual playback."
+      ],
+      "tests": [
+        "local_video_worker_preserves_authority_and_recovers_processed_media",
+        "video_acceptance.cjs actual decode/play, retry/busy/authority and geometry"
+      ],
+      "triggers": [
+        "FFmpeg version or relevant decoder advisory",
+        "worker profile/host isolation changes",
+        "release and security review"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-CACHE-VARIANTS",
+      "area": "Current-session roles and local native-peer regions",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Forwarded-For"
+      ],
+      "applicable_versions": [
+        "wpalt single-owner native ConnectInfo peer",
+        "Current server-side constrained session roles"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Presentation buckets never authorize resources. Validate session role under the mutation lock before cache hits, key role/region/query separately, preserve private/no-store and other-cookie bypass. Ignore forwarded/role/region headers; use only native peer CIDR mappings. Document proxy and geolocation-data limitations."
+      ],
+      "tests": [
+        "role_region_cache_variants_revalidate_authority_and_ignore_spoofed_headers",
+        "anonymous_cache_never_reuses_sessions_and_invalidates_published_access_changes"
+      ],
+      "triggers": [
+        "proxy or distributed topology changes",
+        "role/entitlement personalization changes",
+        "guidance changes or release"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-BACKGROUND-HISTORY",
+      "area": "Durable bounded scheduler outcomes and interruptions",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html#method.abort",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "wpalt single owning process",
+        "Tokio async task cancellation and non-cancellable blocking I/O"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Persist intent before dispatch, bound history to 64 cycles/128 KiB, retain I/O ownership during non-cancellable blocking sync. Report unresolved/interrupted cycles and per-stage outcomes without raw error secrets. Never use journal entries to replay financial or delivery actions; domain state governs retries."
+      ],
+      "tests": [
+        "background_history_reports_failure_interruption_and_blocks_unrecorded_dispatch"
+      ],
+      "triggers": [
+        "scheduler or cancellation changes",
+        "financial/delivery retry changes",
+        "release and logging security review"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-SECURITY-HEADERS",
+      "area": "Compiled browser hardening controls",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Opener-Policy"
+      ],
+      "applicable_versions": [
+        "Modern CSP/COOP/CORP/HSTS browser policies",
+        "wpalt single server or owner TLS reverse proxy"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Compile bounded typed controls at startup; preserve strict CSP, no-referrer secret routes and script-free previews on successes/cache/errors. Emit HSTS from configured HTTPS only, document subdomain/retained-policy hazards and never auto-submit preload lists. Preserve optional public sharing and explicit opener integration control."
+      ],
+      "tests": [
+        "compiled_browser_security_controls_cover_cache_errors_and_secret_routes",
+        "complete browser Studio/authoring/passkey workflow"
+      ],
+      "triggers": [
+        "TLS/proxy or iframe/popup integration changes",
+        "browser security guidance changes",
+        "release and security review"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-CONSENT-SCRIPTS",
+      "area": "privacy/security",
+      "scope": "Manifest-bound own-origin optional analytics scripts; owner-reviewed privileged page code, not arbitrary third-party sandbox/legal certification",
+      "basis": "Browser CSP/cache guidance and engineering inference; GPC honored conservatively",
+      "sources": [
+        "https://www.w3.org/TR/CSP3/",
+        "https://www.w3.org/TR/gpc/",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control"
+      ],
+      "applicable_versions": [
+        "CSP3 working draft 2026-09-16",
+        "wpalt M7 preview",
+        "Chrome 154/Playwright 1.62.1"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Review and checksum-pin bounded local files before startup",
+        "Explicit disclosure and full manifest-bound grant; renewed consent for changed code/purpose",
+        "Reject unauthorized/GPC/stale grants; no-store source reads",
+        "Withdrawal erases analytics and unloads optional page code; no unsafe-inline/eval CSP weakening"
+      ],
+      "tests": [
+        "optional_scripts_require_current_declared_consent_and_never_leak_cached_bytes",
+        "scripts/consent_scripts_acceptance.cjs actual execution/withdrawal/GPC and responsive disclosure"
+      ],
+      "triggers": [
+        "Changed scripts/purposes or consent categories",
+        "Changed CSP/GPC/browser guidance",
+        "Affected release or dependency update"
+      ],
+      "status": "implemented; exact-source cumulative delivery verification pending"
+    },
+    {
+      "feature_id": "M7-DATA-REQUESTS",
+      "area": "privacy/security/recovery",
+      "scope": "Password-proven local-account data export and owner-reviewed access/erasure queue; anonymous and independent systems require separately verified handling",
+      "basis": "WordPress reference behavior plus explicit engineering policy; no legal certification or API parity claim",
+      "sources": [
+        "https://wordpress.org/documentation/article/wordpress-privacy/",
+        "https://developer.wordpress.org/plugins/privacy/adding-the-personal-data-eraser-to-your-plugin/",
+        "https://www.sqlite.org/partialindex.html",
+        "https://www.postgresql.org/docs/17/transaction-iso.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 12 / archive v12",
+        "SQLite and PostgreSQL 17",
+        "Chrome 154/Playwright 1.62.1"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Reauthenticate and revalidate current sessions; reject cross-account/admin access and credential exports",
+        "Bound private queue and current field-allowlisted exports; no silent truncation",
+        "Retain request outcomes through validated fresh recovery; reject foreign subjects before writes",
+        "Document manual handling, financial and independent recovery retention; no automatic erasure success",
+        "Explicit account/profile erasure disables authentication, preserves stable financial subjects, refuses last-owner removal and records only partial completion"
+      ],
+      "tests": [
+        "personal_data_requests_preserve_identity_isolation_decisions_and_fresh_recovery",
+        "scripts/operations_acceptance.cjs native JSON download, request, owner decision and responsive request screens",
+        "Last-owner browser failure preserves review notes and allows retry; actual offline export verifies private permissions/no overwrite"
+      ],
+      "triggers": [
+        "Changed schema/export fields or retention policies",
+        "Changed privacy/browser/database guidance",
+        "Affected release"
+      ],
+      "status": "implemented; exact-source cumulative delivery verification pending"
+    },
+    {
+      "feature_id": "M7-SELECTIVE-CLONE",
+      "area": "recovery/security/performance",
+      "scope": "Dependency-aware editorial selection and origin-aware read-only fresh-target clone",
+      "basis": "Primary WordPress migration reference and explicit wpalt operational safety policy; no live graph merge or arbitrary code rewrite",
+      "sources": [
+        "https://developer.wordpress.org/advanced-administration/upgrade/migrating/",
+        "https://www.sqlite.org/queryplanner.html",
+        "https://www.postgresql.org/docs/17/transaction-iso.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 12 / archive v12",
+        "SQLite and PostgreSQL 17"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Validate full graph before and after bounded dependency selection; bind source/output bytes to preview hash",
+        "Rewrite declared presentation JSON strings with origin boundary checks; preserve immutable financial records and credentials",
+        "Durable clone hold blocks HTTP side effects and scheduler future polling across recovery; explicit stopped-host reviewed activation",
+        "Current archive only; database migration preserves data and dedicated M6 converter produces current schema"
+      ],
+      "tests": [
+        "selective_recovery_preserves_link_dependencies_and_shared_domains_before_fresh_restore",
+        "url_aware_clone_stays_read_only_across_recovery_until_explicit_owner_review",
+        "scripts/cli_acceptance.py portable clean-binary recovery"
+      ],
+      "triggers": [
+        "Changed graph/schema/module dependencies",
+        "Changed URL grammar, authentication/provider ownership or deployment mode",
+        "Affected release"
+      ],
+      "status": "implemented; integrated exact-source delivery verification pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."
