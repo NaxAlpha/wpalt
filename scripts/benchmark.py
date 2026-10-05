@@ -102,8 +102,11 @@ with tempfile.TemporaryDirectory(prefix='wpalt-benchmark-') as temporary:
             results['studio_asset_bytes']={'raw':len(assets),'gzip':len(gzip.compress(assets))}
             results['composition_fixture']='20 dynamic cards with typed field bindings and three explicit reusable component parameters' if args.composed else 'default theme'
             for endpoint,path in paths.items():
-                for _ in range(10):
-                    with urllib.request.urlopen(origin+path) as r:r.read()
+                # Each independently started process owns its cache. Warm all measured
+                # endpoints; the first-request/startup measurement above remains cold.
+                for node_origin in origins:
+                    for _ in range(10):
+                        with urllib.request.urlopen(node_origin+path) as r:r.read()
                 for repeat in range(args.repeats):
                     for concurrency in [1,10,*([32] if args.stress else [])]:results['profiles'].append({'system':'wpalt','database':engine,'endpoint':endpoint,'repeat':repeat+1,'processes':len(origins),**load([o+path for o in origins],concurrency)})
             files={str(f.relative_to(directory)):f.stat().st_size for f in directory.rglob('*') if f.is_file() and f.suffix not in ('.log','.toml')}

@@ -201,7 +201,9 @@ impl Coordinator {
             if started.elapsed() >= std::time::Duration::from_secs(10) {
                 return Err(unavailable_reason("admission-timeout"));
             }
-            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            // A bounded asynchronous retry avoids spinning while reducing the
+            // tail penalty of successive short cross-process ownership holds.
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         }
     }
     fn read(&self) -> Result<State> {
