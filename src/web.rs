@@ -29,6 +29,10 @@ pub fn router(app: App) -> Router {
     };
     Router::new()
         .merge(crate::builder_web::routes())
+        .merge(crate::platform::web::routes())
+        .merge(crate::platform::integrations::routes())
+        .merge(crate::platform::events::routes())
+        .merge(crate::platform::integration_web::routes())
         .merge(crate::operations::privacy::routes())
         .merge(business)
         .merge(crate::discovery::routes())
@@ -147,6 +151,7 @@ async fn security_and_trace(
         && method != axum::http::Method::HEAD
         && (route.starts_with("/admin")
             || route.starts_with("/api/admin")
+            || route.starts_with("/api/v1/")
             || route.starts_with("/account/security")
             || route.starts_with("/account/passkeys")
             || route.starts_with("/account/privacy"));
@@ -158,11 +163,19 @@ async fn security_and_trace(
         .check(&app.config.protection, &request);
     let admitted = permit.is_ok() && protection.is_ok();
     let actor = if privileged_write && admitted {
-        auth::session(&app, request.headers())
-            .await
-            .ok()
-            .map(|s| s.user.id)
-            .unwrap_or_default()
+        if route.starts_with("/api/v1/") {
+            crate::platform::integrations::authenticate_with_identity(&app, request.headers(), true)
+                .await
+                .ok()
+                .map(|(s, credential_id)| format!("{}:integration:{credential_id}", s.user.id))
+                .unwrap_or_default()
+        } else {
+            auth::session(&app, request.headers())
+                .await
+                .ok()
+                .map(|s| s.user.id)
+                .unwrap_or_default()
+        }
     } else {
         String::new()
     };
@@ -215,6 +228,8 @@ async fn security_and_trace(
         && auth::same_origin(&app, request.headers()).is_err()
         && !capability_navigation(&route, request.headers())
         && !(method == axum::http::Method::POST && route == "/commerce/stripe/webhook")
+        && !((route == "/api/v1/content" && method == axum::http::Method::POST)
+            || (route == "/api/v1/content/{id}" && method == axum::http::Method::PUT))
     {
         Error::forbidden().into_response()
     } else {
@@ -342,6 +357,7 @@ async fn security_and_trace(
     }
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
+        || route.starts_with("/api/v1/")
         || route == "/login"
         || route.starts_with("/account")
         || route.starts_with("/passkeys")
@@ -371,6 +387,7 @@ async fn security_and_trace(
     app.security_headers.apply(&route, h);
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
+        || route.starts_with("/api/v1/")
         || route == "/login"
         || route.starts_with("/account")
         || route.starts_with("/passkeys")
@@ -654,7 +671,7 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
             .push_bind(id)
             .push(")");
     }
-    sql.push(" ORDER BY published_at DESC,id DESC LIMIT 21) SELECT p.id,p.published_locale,p.published_slug AS slug,p.kind,p.published_title AS title,substr(p.published_body,1,220) AS summary,p.published_fields,p.published_at FROM candidates c JOIN posts p ON p.id=c.id ORDER BY c.published_at DESC,c.id DESC");
+    sql.push(" ORDER BY published_at DESC,id DESC LIMIT 21) SELECT p.id,p.published_locale,p.published_slug AS slug,p.kind,p.published_title AS title,substr(p.published_body,1,220) AS summary,CASE WHEN substr(p.published_body,221,1)<>'' THEN 1 ELSE 0 END AS summary_truncated,p.published_fields,p.published_at FROM candidates c JOIN posts p ON p.id=c.id ORDER BY c.published_at DESC,c.id DESC");
     let rows = app.db.fetch_builder(&mut sql).await?;
     Ok(rows
         .into_iter()
@@ -669,7 +686,10 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
                 .to_owned(),
             kind: r.get("kind"),
             title: r.get("title"),
-            summary: view::excerpt(&r.get::<String, _>("summary")),
+            summary: view::bounded_excerpt(
+                &r.get::<String, _>("summary"),
+                r.get::<i64, _>("summary_truncated") != 0,
+            ),
             fields: serde_json::from_str(&r.get::<String, _>("published_fields"))
                 .unwrap_or_default(),
             published_at: r.get("published_at"),
@@ -2105,7 +2125,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
             @if app.clone_held.load(std::sync::atomic::Ordering::SeqCst) {
                 section class="panel" {h2 {"Read-only recovered clone"}p {"Background work and HTTP writes are paused. Review source shutdown, message queues, external payment ownership, identity callbacks and credentials before stopped-host activation. Presentation previews remain available; source sessions and passkeys were removed."}}
             }
-            div class="split" {section class="panel" {h2 {"Back up & move"}p class="muted" {"Download a consistent database-and-media snapshot. It includes password hashes and private content; keep it secure. This download is unencrypted."}
+            div class="split" {section class="panel" {h2 {"Back up & move"}p {a href="/admin/migration" {"Assess a WordPress migration"}}p {a href="/admin/integrations" {"Manage integrations"}}p class="muted" {"Download a consistent database-and-media snapshot. It includes password hashes and private content; keep it secure. This download is unencrypted."}
                 form method="post" action="/admin/backup" {(view::csrf(&s))button {"Download full backup"}}
                 p class="muted" {"Restore with the CLI into an empty database/data directory while the server is stopped. Keep an independent copy to recover from losing this host."}
                 a href="/admin/export" {"Export portable content JSON →"}

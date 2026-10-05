@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = {'wpalt', 'BUILD.json', 'INSTALL.md', 'wpalt.example.toml', 'operations.md',
-         'theme-authoring.md', 'membership-learning.md', 'm5-contract.md', 'commerce-reservations.md', 'm6-contract.md', 'resilient-operations.md', 'm7-contract.md', 'THIRD_PARTY_NOTICES.md'}
+         'theme-authoring.md', 'membership-learning.md', 'm5-contract.md', 'commerce-reservations.md', 'm6-contract.md', 'resilient-operations.md', 'm7-contract.md', 'migration-and-extensions.md', 'm8-contract.md', 'local_ai_worker.py', 'webhook_worker.py', 'field-journal.json', 'theme-example.md', 'integration-example.md', 'THIRD_PARTY_NOTICES.md'}
 
 
 def command(*args):
@@ -62,7 +62,7 @@ def verify(directory, source):
             raise ValueError('Business asset mismatch: ' + name)
     for name, path in [('wpalt.example.toml','wpalt.example.toml'),('operations.md','docs/operations.md'),
                        ('theme-authoring.md','docs/theme-authoring.md'),('membership-learning.md','docs/membership-learning.md'),
-                       ('m5-contract.md','docs/m5-contract.md'),('commerce-reservations.md','docs/commerce-reservations.md'),('m6-contract.md','docs/m6-contract.md'),('resilient-operations.md','docs/resilient-operations.md'),('m7-contract.md','docs/m7-contract.md'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:
+                       ('m5-contract.md','docs/m5-contract.md'),('commerce-reservations.md','docs/commerce-reservations.md'),('m6-contract.md','docs/m6-contract.md'),('resilient-operations.md','docs/resilient-operations.md'),('m7-contract.md','docs/m7-contract.md'),('migration-and-extensions.md','docs/migration-and-extensions.md'),('m8-contract.md','docs/m8-contract.md'),('local_ai_worker.py','examples/integrations/local_ai_worker.py'),('webhook_worker.py','examples/integrations/webhook_worker.py'),('field-journal.json','examples/themes/field-journal.json'),('theme-example.md','examples/themes/README.md'),('integration-example.md','examples/integrations/README.md'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:
         if files[name] != source_bytes(path):
             raise ValueError('Packaged guide mismatch: ' + name)
     timestamp = int(command('git', 'show', '-s', '--format=%ct', source))

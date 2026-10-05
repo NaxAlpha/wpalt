@@ -25,6 +25,7 @@ pub struct Config {
     pub protection: crate::operations::protection::Config,
     pub cache: crate::operations::cache::Config,
     pub recovery: crate::operations::recovery::Config,
+    pub integration_events: crate::platform::events::Config,
     pub business_enabled: bool,
     pub membership_enabled: bool,
     pub membership_max_records: i64,
@@ -63,6 +64,7 @@ impl Default for Config {
             protection: Default::default(),
             cache: Default::default(),
             recovery: Default::default(),
+            integration_events: Default::default(),
             business_enabled: true,
             membership_enabled: true,
             membership_max_records: 1_000_000,
@@ -145,6 +147,7 @@ impl Config {
         self.postgres_archive.validate()?;
         self.cache.validate()?;
         self.recovery.validate()?;
+        self.integration_events.validate()?;
         self.commerce.validate()?;
         ensure!(
             !self.commerce.stripe.enabled || self.base_url.starts_with("https://"),

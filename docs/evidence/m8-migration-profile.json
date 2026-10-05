@@ -1,0 +1,106 @@
+{
+  "format": "wpalt-migration-profile-v1",
+  "machine": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+  "binary_sha256": "f33ef39bf93b38db50f4d9babbfa170df557286c69c3afba967e239cc13ab3b8",
+  "scope": "Offline WXR assessment: process startup, XML/tree admission, classification and complete JSON report serialization. No DB, media mapping, HTML conversion or recovery cost included.",
+  "measurement": "Wall includes the minimal timer launcher; CPU/RSS come from its spawned native command, excluding Python fork high-water memory. CPU timer values have platform rounding. All output counts reconcile.",
+  "profiles": [
+    {
+      "items": 10,
+      "input_bytes": 3381,
+      "input_sha256": "d414b98390d3597a210d6cc5a469082035ec6a197978afd9ce624c490c8a1229",
+      "samples": [
+        {
+          "wall_ms": 20.899,
+          "cpu_ms": 0.0,
+          "peak_rss_bytes": 12853248
+        },
+        {
+          "wall_ms": 7.605,
+          "cpu_ms": 0.0,
+          "peak_rss_bytes": 13258752
+        },
+        {
+          "wall_ms": 7.537,
+          "cpu_ms": 0.0,
+          "peak_rss_bytes": 13320192
+        }
+      ],
+      "median_wall_ms": 7.605,
+      "largest_peak_rss_bytes": 13320192
+    },
+    {
+      "items": 100,
+      "input_bytes": 32095,
+      "input_sha256": "fb3733392e6b8fdf72b102885f9115ca18a90b8e3eef243c53be162c783c6af3",
+      "samples": [
+        {
+          "wall_ms": 7.553,
+          "cpu_ms": 0.0,
+          "peak_rss_bytes": 13246464
+        },
+        {
+          "wall_ms": 7.591,
+          "cpu_ms": 0.0,
+          "peak_rss_bytes": 13242368
+        },
+        {
+          "wall_ms": 7.565,
+          "cpu_ms": 0.0,
+          "peak_rss_bytes": 13459456
+        }
+      ],
+      "median_wall_ms": 7.565,
+      "largest_peak_rss_bytes": 13459456
+    },
+    {
+      "items": 1000,
+      "input_bytes": 322799,
+      "input_sha256": "f64dae60df236fca6c9af3169a874ca80888d120eca3eccbdccf8dd29d164737",
+      "samples": [
+        {
+          "wall_ms": 15.708,
+          "cpu_ms": 0.0,
+          "peak_rss_bytes": 16736256
+        },
+        {
+          "wall_ms": 15.649,
+          "cpu_ms": 0.0,
+          "peak_rss_bytes": 17240064
+        },
+        {
+          "wall_ms": 15.65,
+          "cpu_ms": 0.0,
+          "peak_rss_bytes": 16482304
+        }
+      ],
+      "median_wall_ms": 15.65,
+      "largest_peak_rss_bytes": 17240064
+    },
+    {
+      "items": 5000,
+      "input_bytes": 1630799,
+      "input_sha256": "e1d07930891ac2722a4573776ccda2605e91a78990fa61ca7886c42fda5f946f",
+      "samples": [
+        {
+          "wall_ms": 63.851,
+          "cpu_ms": 30.0,
+          "peak_rss_bytes": 34578432
+        },
+        {
+          "wall_ms": 64.044,
+          "cpu_ms": 40.0,
+          "peak_rss_bytes": 34398208
+        },
+        {
+          "wall_ms": 63.998,
+          "cpu_ms": 30.0,
+          "peak_rss_bytes": 33947648
+        }
+      ],
+      "median_wall_ms": 63.998,
+      "largest_peak_rss_bytes": 34578432
+    }
+  ],
+  "status": "passed"
+}

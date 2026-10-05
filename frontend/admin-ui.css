@@ -834,3 +834,7 @@ body.admin .media-card video {
   max-height: 240px;
   object-fit: contain;
 }
+
+.admin .migration-review {
+  overflow-wrap: anywhere;
+}

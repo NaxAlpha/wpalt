@@ -679,6 +679,26 @@ async fn permissions_csrf_sessions_and_origin_protect_every_write_surface() {
             get(&site.app, "/admin/posts", Some(&etoken)).await.0,
             StatusCode::SEE_OTHER
         );
+        // A request can hold an authenticated Session while logout/revocation wins.
+        // The domain write must recheck it after acquiring its mutation boundary.
+        assert!(
+            content::save(
+                &site.app,
+                &editor,
+                None,
+                input("revoked-editor-write", "publish")
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM posts WHERE slug=$1")
+                .bind("revoked-editor-write")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap(),
+            0
+        );
         // Expired and explicitly revoked accounts cannot retain their old authority.
         sqlx::query("UPDATE sessions SET expires_at=0 WHERE token_hash=$1")
             .bind(&moderator.hash)
@@ -5586,5 +5606,1249 @@ async fn url_aware_clone_stays_read_only_across_recovery_until_explicit_owner_re
         recovered.close().await;
         target.close().await;
         site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn wordpress_preview_package_recovers_content_without_inventing_private_access_or_payments() {
+    use wpalt::platform::wordpress;
+    let source = include_bytes!("fixtures/wordpress-core.xml");
+    let assessment = wordpress::assess(source).unwrap();
+    assert_eq!(assessment.report["source_items"], 4);
+    assert_eq!(assessment.report["supported_core_items"], 2);
+    assert!(
+        assessment.report["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|w| w["code"] == "source_queue_not_replayed")
+    );
+    assert!(
+        assessment.report["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|w| w["type"] == "shop_order")
+    );
+    // Namespace prefixes are aliases; namespace URIs determine interpretation.
+    let aliased = String::from_utf8(source.to_vec())
+        .unwrap()
+        .replace("wp:", "export:")
+        .replace("xmlns:wp=", "xmlns:export=");
+    assert_eq!(
+        wordpress::assess(aliased.as_bytes()).unwrap().report["supported_core_items"],
+        2
+    );
+    for invalid in [
+        String::from_utf8(source.to_vec()).unwrap().replace(
+            "<channel>",
+            "<!DOCTYPE channel [<!ENTITY remote SYSTEM 'file:///etc/passwd'>]><channel>",
+        ),
+        String::from_utf8(source.to_vec())
+            .unwrap()
+            .replace("<wp:post_id>13</wp:post_id>", "<wp:post_id>12</wp:post_id>"),
+        String::from_utf8(source.to_vec()).unwrap().replace(
+            "http://wordpress.org/export/1.2/",
+            "https://attacker.invalid/export/",
+        ),
+        String::from_utf8(source.to_vec())
+            .unwrap()
+            .replace("garden &amp;", "garden &external;"),
+        String::from_utf8(source.to_vec())
+            .unwrap()
+            .replace("</rss>", ""),
+        format!("<rss>{}</rss>", "<x>".repeat(70)),
+        String::from_utf8(source.to_vec()).unwrap().replace(
+            "<wp:post_id>13</wp:post_id>",
+            "<wp:post_id>012</wp:post_id>",
+        ),
+        format!(
+            "<rss {}><channel/></rss>",
+            (0..300)
+                .map(|n| format!("xmlns:n{n}=\"urn:{n}\""))
+                .collect::<Vec<_>>()
+                .join(" ")
+        ),
+        String::from_utf8(source.to_vec()).unwrap().replace(
+            "<channel>",
+            "<channel duplicated=\"one\" duplicated=\"two\">",
+        ),
+    ] {
+        assert!(wordpress::assess(invalid.as_bytes()).is_err());
+    }
+    for postgres in engines() {
+        let template = Site::new(postgres, true).await;
+        let email = template.session.as_ref().unwrap().user.email.clone();
+        let router = wpalt::web::router(template.app.clone());
+        let anonymous = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/migration")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_ne!(anonymous.status(), StatusCode::OK);
+        let multipart = |csrf: &str, action: &str, xml: &str| {
+            format!(
+                "--migration-boundary\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{csrf}\r\n--migration-boundary\r\nContent-Disposition: form-data; name=\"action\"\r\n\r\n{action}\r\n--migration-boundary\r\nContent-Disposition: form-data; name=\"source\"; filename=\"export.xml\"\r\nContent-Type: application/xml\r\n\r\n{xml}\r\n--migration-boundary--\r\n"
+            )
+        };
+        for (csrf, action, expected) in [
+            ("wrong", "preview", StatusCode::FORBIDDEN),
+            (template.session().csrf.as_str(), "preview", StatusCode::OK),
+            (template.session().csrf.as_str(), "download", StatusCode::OK),
+        ] {
+            let response = router
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/admin/migration")
+                        .header("cookie", format!("wpalt_session={}", template.token))
+                        .header("origin", template.app.config.origin())
+                        .header(
+                            "content-type",
+                            "multipart/form-data; boundary=migration-boundary",
+                        )
+                        .body(Body::from(multipart(
+                            csrf,
+                            action,
+                            std::str::from_utf8(source).unwrap(),
+                        )))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), expected);
+            if action == "download" && expected == StatusCode::OK {
+                assert_eq!(response.headers()["cache-control"], "no-store");
+                let report: serde_json::Value = serde_json::from_slice(
+                    &response.into_body().collect().await.unwrap().to_bytes(),
+                )
+                .unwrap();
+                assert_eq!(report["source_items"], 4);
+            }
+        }
+        let prepared = wordpress::prepare(&template.app, source, &email)
+            .await
+            .unwrap();
+        let repeated = wordpress::prepare(&template.app, source, &email)
+            .await
+            .unwrap();
+        assert_eq!(prepared.plan, repeated.plan);
+        assert_eq!(prepared.bytes, repeated.bytes);
+        assert!(template.app.db.pool.size() > 0);
+        let template_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM posts")
+            .fetch_one(&template.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            template_count, 0,
+            "Preview/package creation must not mutate the template"
+        );
+        assert!(
+            wordpress::prepare(&template.app, source, "unmapped@example.invalid")
+                .await
+                .is_err()
+        );
+        let media_root = tempfile::tempdir().unwrap();
+        std::fs::create_dir(media_root.path().join("2025")).unwrap();
+        std::fs::write(
+            media_root.path().join("2025/garden.png"),
+            include_bytes!("fixtures/animated.png"),
+        )
+        .unwrap();
+        let prepared =
+            wordpress::prepare_with_media(&template.app, source, &email, Some(media_root.path()))
+                .await
+                .unwrap();
+        assert_eq!(prepared.report["media_mapped"], 1);
+        let protected=String::from_utf8(source.to_vec()).unwrap().replace("<wp:post_id>12</wp:post_id>","<wp:post_id>12</wp:post_id><wp:post_password>source-secret-not-imported</wp:post_password>");
+        let protected_package = wordpress::prepare_with_media(
+            &template.app,
+            protected.as_bytes(),
+            &email,
+            Some(media_root.path()),
+        )
+        .await
+        .unwrap();
+        assert!(
+            protected_package.report["warnings"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|w| w["code"] == "access_mapping_required")
+        );
+        let e: serde_json::Value = serde_json::from_slice(&protected_package.bytes).unwrap();
+        let snapshot: serde_json::Value =
+            serde_json::from_str(e["payload"].as_str().unwrap()).unwrap();
+        assert!(
+            snapshot["tables"]["posts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|p| p["status"] == "draft")
+        );
+        assert_eq!(snapshot["tables"]["media"][0]["visibility"], "private");
+        // Selected ACF references are typed and recoverable, never an access grant.
+        let acf_source = String::from_utf8(source.to_vec()).unwrap().replace(
+            "<wp:comment>",
+            &format!(
+                "{}<wp:comment>",
+                include_str!("fixtures/wordpress-acf-values.xml.fragment")
+            ),
+        );
+        let mapping =
+            wpalt::platform::acf::Mapping::parse(include_bytes!("fixtures/wordpress-acf-map.json"))
+                .unwrap();
+        let mapped = wordpress::prepare_with_mapping(
+            &template.app,
+            acf_source.as_bytes(),
+            &email,
+            None,
+            Some(&mapping),
+        )
+        .await
+        .unwrap();
+        assert_ne!(mapped.plan, prepared.plan);
+        let mapped_target = Site::new(postgres, false).await;
+        backup::restore(&mapped_target.app, &mapped.bytes)
+            .await
+            .unwrap();
+        let mapped_row =
+            sqlx::query("SELECT fields,status,published_fields FROM posts WHERE slug='garden'")
+                .fetch_one(&mapped_target.app.db.pool)
+                .await
+                .unwrap();
+        let values: serde_json::Value =
+            serde_json::from_str(&mapped_row.get::<String, _>("fields")).unwrap();
+        assert_eq!(values["teaser"], "A field-owned garden story.");
+        assert_eq!(values["reading_count"].as_u64(), Some(12));
+        assert_eq!(values["show_marker"], false);
+        assert_eq!(mapped_row.get::<String, _>("status"), "draft");
+        assert_eq!(mapped_row.get::<String, _>("published_fields"), "{}");
+        let registry = wpalt::schema::Registry::load(&mapped_target.app)
+            .await
+            .unwrap();
+        assert_eq!(registry.common.fields["teaser"].kind, "string");
+        for invalid_source in [
+            acf_source.replace("field_garden_teaser", "field_wrong_reference"),
+            acf_source.replace(
+                "<wp:meta_value>12</wp:meta_value>",
+                "<wp:meta_value>9007199254740993</wp:meta_value>",
+            ),
+        ] {
+            assert!(
+                wordpress::prepare_with_mapping(
+                    &template.app,
+                    invalid_source.as_bytes(),
+                    &email,
+                    None,
+                    Some(&mapping)
+                )
+                .await
+                .is_err()
+            );
+        }
+        let mut invalid_map: serde_json::Value =
+            serde_json::from_slice(include_bytes!("fixtures/wordpress-acf-map.json")).unwrap();
+        invalid_map["fields"][1]["target_name"] = "teaser".into();
+        assert!(
+            wpalt::platform::acf::Mapping::parse(&serde_json::to_vec(&invalid_map).unwrap())
+                .is_err()
+        );
+        // Large precise identifiers must be explicitly retained as strings.
+        let big_source = acf_source.replace(
+            "<wp:meta_value>12</wp:meta_value>",
+            "<wp:meta_value>9007199254740993</wp:meta_value>",
+        );
+        let mut string_map: serde_json::Value =
+            serde_json::from_slice(include_bytes!("fixtures/wordpress-acf-map.json")).unwrap();
+        string_map["fields"][1]["kind"] = "string".into();
+        let string_map =
+            wpalt::platform::acf::Mapping::parse(&serde_json::to_vec(&string_map).unwrap())
+                .unwrap();
+        let exact = wordpress::prepare_with_mapping(
+            &template.app,
+            big_source.as_bytes(),
+            &email,
+            None,
+            Some(&string_map),
+        )
+        .await
+        .unwrap();
+        let envelope: serde_json::Value = serde_json::from_slice(&exact.bytes).unwrap();
+        let snapshot: serde_json::Value =
+            serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        let exact_values: serde_json::Value =
+            serde_json::from_str(snapshot["tables"]["posts"][0]["fields"].as_str().unwrap())
+                .unwrap();
+        assert_eq!(exact_values["reading_count"], "9007199254740993");
+        assert_ne!(exact.plan, mapped.plan);
+        mapped_target.close().await;
+        // The optional builder projection is draft-only and selection-bound.
+        let elements = serde_json::json!([
+            {"id":"projected1","elType":"widget","widgetType":"heading","settings":{"title":"A projected title","header_size":"h2"},"elements":[]},
+            {"id":"projected2","elType":"widget","widgetType":"text-editor","settings":{"editor":"<p>Builder-owned content.</p>"},"elements":[]},
+            {"id":"omitted1","elType":"widget","widgetType":"posts","settings":{},"elements":[]}]);
+        let builder_source = String::from_utf8(source.to_vec()).unwrap().replace("<wp:comment>",
+            &format!("<wp:postmeta><wp:meta_key>_elementor_data</wp:meta_key><wp:meta_value><![CDATA[{elements}]]></wp:meta_value></wp:postmeta><wp:comment>"));
+        let projected = wordpress::prepare_with_adapters(
+            &template.app,
+            builder_source.as_bytes(),
+            &email,
+            None,
+            wordpress::AdapterOptions {
+                elementor_content: true,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let unselected = wordpress::prepare_with_mapping(
+            &template.app,
+            builder_source.as_bytes(),
+            &email,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert_ne!(projected.plan, unselected.plan);
+        let report = projected.report["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|w| w["code"] == "elementor_content_projection")
+            .unwrap();
+        assert_eq!(report["report"]["elements"], 3);
+        assert!(
+            report["report"]["warnings"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|w| w["element"] == "omitted1")
+        );
+        let builder_target = Site::new(postgres, false).await;
+        backup::restore(&builder_target.app, &projected.bytes)
+            .await
+            .unwrap();
+        let row = sqlx::query("SELECT body,status,published_body FROM posts WHERE slug='garden'")
+            .fetch_one(&builder_target.app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            row.get::<String, _>("body")
+                .contains("Builder-owned content.")
+        );
+        assert_eq!(row.get::<String, _>("status"), "draft");
+        assert_eq!(row.get::<String, _>("published_body"), "");
+        builder_target.close().await;
+        // Separately exported free-plugin definitions preserve presentation order,
+        // but cannot bring publication, notifications or consent into the target.
+        let forms_source = br#"{"format":"wpalt-wpforms-source-v1","source_site":"https://garden.example","plugin_version":"2.0.2.1","forms":[{"source_id":"71","definition":{"id":"71","settings":{"form_title":"Contact","notifications":{"admin":{"email":"private@example.test"}}},"fields":{"9":{"id":"9","type":"email","label":"Your email","required":"1"},"2":{"id":"2","type":"textarea","label":"Message"}}}}]}"#;
+        let form_package = wordpress::prepare_with_adapters(
+            &template.app,
+            source,
+            &email,
+            None,
+            wordpress::AdapterOptions {
+                wpforms_export: Some(forms_source),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(form_package.report["counts"]["forms"], 1);
+        assert_ne!(form_package.plan, unselected.plan);
+        assert!(
+            !form_package
+                .report
+                .to_string()
+                .contains("private@example.test")
+        );
+        let form_target = Site::new(postgres, false).await;
+        backup::restore(&form_target.app, &form_package.bytes)
+            .await
+            .unwrap();
+        let form =
+            sqlx::query("SELECT draft,live,published_version,entry_count FROM business_forms")
+                .fetch_one(&form_target.app.db.pool)
+                .await
+                .unwrap();
+        let definition: wpalt::business::forms::FormDefinition =
+            serde_json::from_str(&form.get::<String, _>("draft")).unwrap();
+        assert_eq!(definition.fields[0].name, "wpforms_9");
+        assert_eq!(definition.fields[1].name, "wpforms_2");
+        assert!(definition.fields[0].schema.required);
+        assert!(definition.notifications.is_empty());
+        assert!(definition.subscription.is_none());
+        assert!(definition.registration.is_none());
+        assert_eq!(form.get::<String, _>("live"), "");
+        assert_eq!(form.get::<i64, _>("published_version"), 0);
+        assert_eq!(form.get::<i64, _>("entry_count"), 0);
+        let usage: i64 = sqlx::query_scalar("SELECT items FROM business_usage WHERE kind='forms'")
+            .fetch_one(&form_target.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(usage, 1);
+        form_target.close().await;
+        let unsupported = String::from_utf8(forms_source.to_vec())
+            .unwrap()
+            .replace("textarea", "payment");
+        let unsupported = wordpress::prepare_with_adapters(
+            &template.app,
+            source,
+            &email,
+            None,
+            wordpress::AdapterOptions {
+                wpforms_export: Some(unsupported.as_bytes()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(unsupported.report["counts"]["forms"], 0);
+        assert_eq!(
+            unsupported.report["wpforms_mapping"]["forms"][0]["supported"],
+            false
+        );
+        let foreign = String::from_utf8(forms_source.to_vec())
+            .unwrap()
+            .replace("garden.example", "foreign.example");
+        assert!(
+            wordpress::prepare_with_adapters(
+                &template.app,
+                source,
+                &email,
+                None,
+                wordpress::AdapterOptions {
+                    wpforms_export: Some(foreign.as_bytes()),
+                    ..Default::default()
+                }
+            )
+            .await
+            .is_err()
+        );
+
+        let unsafe_path = String::from_utf8(source.to_vec()).unwrap().replace(
+            "2025/garden.png</wp:meta_value>",
+            "../outside.png</wp:meta_value>",
+        );
+        assert!(
+            wordpress::prepare_with_media(
+                &template.app,
+                unsafe_path.as_bytes(),
+                &email,
+                Some(media_root.path())
+            )
+            .await
+            .is_err()
+        );
+        #[cfg(unix)]
+        {
+            std::fs::remove_file(media_root.path().join("2025/garden.png")).unwrap();
+            std::os::unix::fs::symlink(
+                std::env::current_dir()
+                    .unwrap()
+                    .join("tests/fixtures/animated.png"),
+                media_root.path().join("2025/garden.png"),
+            )
+            .unwrap();
+            assert!(
+                wordpress::prepare_with_media(
+                    &template.app,
+                    source,
+                    &email,
+                    Some(media_root.path())
+                )
+                .await
+                .is_err()
+            );
+            std::fs::remove_file(media_root.path().join("2025/garden.png")).unwrap();
+            std::fs::write(
+                media_root.path().join("2025/garden.png"),
+                include_bytes!("fixtures/animated.png"),
+            )
+            .unwrap();
+        }
+        let target = Site::new(postgres, false).await;
+        backup::restore(&target.app, &prepared.bytes).await.unwrap();
+        let story = wpalt::model::Post::from_row(
+            sqlx::query("SELECT * FROM posts WHERE slug=$1")
+                .bind("garden")
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(story.title, "A garden & its people");
+        assert_eq!(story.status, "published");
+        let rendered = wpalt::web::router(target.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/garden")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rendered.status(), StatusCode::OK);
+        let html = String::from_utf8(
+            rendered
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .to_vec(),
+        )
+        .unwrap();
+        assert_eq!(
+            target.app.db.settings().await.unwrap().title,
+            "A reference garden"
+        );
+        assert!(html.contains("<strong>quiet garden</strong>"));
+        assert!(html.contains("<table>"));
+        assert!(html.contains("Seasonal planting notes"));
+        assert!(html.contains("First note"));
+        assert!(html.contains("let example = 1 &lt; 2;"));
+        assert!(!html.contains("never execute"));
+        assert!(story.document.contains("/media/"));
+        let media_id: String = sqlx::query_scalar("SELECT id FROM media")
+            .fetch_one(&target.app.db.pool)
+            .await
+            .unwrap();
+        let media_response = wpalt::web::router(target.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/media/{media_id}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(media_response.status(), StatusCode::OK);
+        assert_eq!(
+            media_response
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .as_ref(),
+            include_bytes!("fixtures/animated.png")
+        );
+        assert!(story.body.contains("quiet garden"));
+        assert!(!story.document.contains("never execute"));
+        assert!(story.seo.contains("Independent garden stories."));
+        let private =
+            sqlx::query("SELECT id FROM posts WHERE published_slug=$1 AND status='published'")
+                .bind("private-page")
+                .fetch_optional(&target.app.db.pool)
+                .await
+                .unwrap();
+        assert!(
+            private.is_none(),
+            "Source private page must not become public without access mapping"
+        );
+        let counts=sqlx::query("SELECT (SELECT COUNT(*) FROM comments) AS comments,(SELECT COUNT(*) FROM terms) AS terms,(SELECT COUNT(*) FROM shop_orders) AS orders").fetch_one(&target.app.db.pool).await.unwrap();
+        assert_eq!(counts.get::<i64, _>("comments"), 1);
+        assert_eq!(counts.get::<i64, _>("terms"), 2);
+        assert_eq!(counts.get::<i64, _>("orders"), 0);
+        let response = wpalt::web::router(target.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/2025/04/garden/")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY);
+        assert_eq!(response.headers()["location"], "/garden");
+        assert!(
+            backup::restore(&target.app, &prepared.bytes).await.is_err(),
+            "A retry cannot overwrite an occupied site"
+        );
+        template.close().await;
+        target.close().await;
+    }
+}
+
+/// External code can read selected content and propose drafts, without acquiring
+/// publication or browser privileges; revocation and recovery close authority.
+#[tokio::test]
+async fn scoped_integration_drafts_revoke_without_publication_or_recovery_authority() {
+    use std::future::Future;
+    use wpalt::platform::integrations as api;
+    for postgres in engines() {
+        let site = Site::new(postgres, true).await;
+        let owner = site.session();
+        let reader = api::issue(
+            &site.app,
+            owner,
+            &owner.user.email,
+            "Read-only exporter",
+            false,
+            7,
+        )
+        .await
+        .unwrap();
+        let writer = api::issue(
+            &site.app,
+            owner,
+            &owner.user.email,
+            "Independent draft worker",
+            true,
+            7,
+        )
+        .await
+        .unwrap();
+        let headers = |token: &str| {
+            let mut headers = axum::http::HeaderMap::new();
+            headers.insert("authorization", format!("Bearer {token}").parse().unwrap());
+            headers
+        };
+        let actor = api::authenticate(&site.app, &headers(&writer.token), true)
+            .await
+            .unwrap();
+        assert!(
+            api::issue(&site.app, &actor, &owner.user.email, "Escalation", true, 7)
+                .await
+                .is_err()
+        );
+        assert!(
+            api::authenticate(&site.app, &headers(&reader.token), true)
+                .await
+                .is_err()
+        );
+        let router = wpalt::web::router(site.app.clone());
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/content")
+                    .header("authorization", format!("Bearer {}", reader.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        assert!(response.headers().get("set-cookie").is_none());
+        for (name, value) in [
+            ("cookie", format!("wpalt_session={}", site.token)),
+            ("origin", "https://untrusted.example".into()),
+        ] {
+            let response = router
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/api/v1/content")
+                        .header("authorization", format!("Bearer {}", reader.token))
+                        .header(name, value)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        }
+        let mut draft = input("external-draft", "save");
+        draft.body = "An independent worker suggestion.".into();
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/content")
+                    .header("authorization", format!("Bearer {}", reader.token))
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&draft).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/content")
+                    .header("authorization", format!("Bearer {}", writer.token))
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&draft).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let created: serde_json::Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        let id = created["id"].as_str().unwrap();
+        assert_eq!(created["status"], "draft");
+        assert_eq!(
+            wpalt::content::get(&site.app, id)
+                .await
+                .unwrap()
+                .published_body,
+            ""
+        );
+        draft.action = "publish".into();
+        draft.version = 1;
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri(format!("/api/v1/content/{id}"))
+                    .header("authorization", format!("Bearer {}", writer.token))
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&draft).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert!(
+            content::save(&site.app, &actor, Some(id), draft.clone())
+                .await
+                .is_err()
+        );
+        draft.action = "save".into();
+        let saved = content::save(&site.app, &actor, Some(id), draft.clone())
+            .await
+            .unwrap();
+        assert_eq!(saved.version, 2);
+        assert!(
+            content::save(&site.app, &actor, Some(id), draft.clone())
+                .await
+                .is_err()
+        );
+        // A scheduled working copy must not become an indirect publication path.
+        let mut scheduled_input = input("scheduled-integration-boundary", "schedule");
+        scheduled_input.publish_at = wpalt::now() + 3600;
+        let scheduled = content::save(&site.app, owner, None, scheduled_input.clone())
+            .await
+            .unwrap();
+        scheduled_input.action = "save".into();
+        scheduled_input.publish_at = 0;
+        scheduled_input.version = scheduled.version;
+        assert!(
+            content::save(&site.app, &actor, Some(&scheduled.id), scheduled_input)
+                .await
+                .is_err()
+        );
+        // Coordinate queue order without sleeps: revocation owns the next turn
+        // before an already-authenticated writer acquires the same mutex.
+        draft.version = 2;
+        let guard = site.app.mutation().await;
+        let mut revocation = Box::pin(api::revoke(&site.app, owner, &writer.id));
+        assert!(matches!(
+            std::future::poll_fn(|cx| std::task::Poll::Ready(revocation.as_mut().poll(cx))).await,
+            std::task::Poll::Pending
+        ));
+        let mut waiting_write = Box::pin(content::save(&site.app, &actor, Some(id), draft));
+        assert!(matches!(
+            std::future::poll_fn(|cx| std::task::Poll::Ready(waiting_write.as_mut().poll(cx)))
+                .await,
+            std::task::Poll::Pending
+        ));
+        drop(guard);
+        revocation.await.unwrap();
+        assert!(
+            waiting_write.await.is_err(),
+            "A queued writer cannot pass a winning revocation"
+        );
+        assert!(
+            api::authenticate(&site.app, &headers(&writer.token), false)
+                .await
+                .is_err()
+        );
+        // Credentials never become browser cookies or portable recovery grants.
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/posts")
+                    .header("cookie", format!("wpalt_session={}", reader.token))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        let archive = backup::capture(&site.app).await.unwrap();
+        assert!(
+            !String::from_utf8(archive.clone())
+                .unwrap()
+                .contains(&auth::digest(reader.token.as_bytes()))
+        );
+        let target = Site::new(postgres, false).await;
+        backup::restore(&target.app, &archive).await.unwrap();
+        assert!(
+            api::authenticate(&target.app, &headers(&reader.token), false)
+                .await
+                .is_err()
+        );
+        target.close().await;
+        let mut different_origin = site.app.clone();
+        let mut config = (*different_origin.config).clone();
+        config.base_url = "https://recovered.example.test".into();
+        different_origin.config = std::sync::Arc::new(config);
+        assert!(
+            api::authenticate(&different_origin, &headers(&reader.token), false)
+                .await
+                .is_err()
+        );
+        let expiring = api::issue(
+            &site.app,
+            owner,
+            &owner.user.email,
+            "Expiry fixture",
+            false,
+            1,
+        )
+        .await
+        .unwrap();
+        sqlx::query("UPDATE integration_credentials SET expires_at=0 WHERE id=$1")
+            .bind(&expiring.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            api::authenticate(&site.app, &headers(&expiring.token), false)
+                .await
+                .is_err()
+        );
+        // A changed account credential invalidates its delegated access immediately.
+        sqlx::query("UPDATE users SET password_hash=$1 WHERE id=$2")
+            .bind("changed-credential-fingerprint")
+            .bind(&owner.user.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            api::authenticate(&site.app, &headers(&reader.token), false)
+                .await
+                .is_err()
+        );
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn integration_events_commit_with_content_and_report_bounded_replay_gaps() {
+    for postgres in engines() {
+        let mut site = Site::new(postgres, true).await;
+        std::sync::Arc::make_mut(&mut site.app.config)
+            .integration_events
+            .retained_events = 32;
+        let owner = site.session().clone();
+        let grant = wpalt::platform::integrations::issue(
+            &site.app,
+            &owner,
+            &owner.user.email,
+            "Event consumer",
+            false,
+            7,
+        )
+        .await
+        .unwrap();
+        let router = wpalt::web::router(site.app.clone());
+        async fn feed(router: axum::Router, token: &str, after: &str) -> axum::response::Response {
+            router
+                .oneshot(
+                    Request::builder()
+                        .uri(format!("/api/v1/events?after={after}"))
+                        .header("authorization", format!("Bearer {token}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap()
+        }
+        let response = feed(router.clone(), &grant.token, "").await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let initial: serde_json::Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        assert_eq!(initial["events"], serde_json::json!([]));
+        let mut draft = input("event-draft", "save");
+        draft.body = "PRIVATE_EVENT_BODY".into();
+        let post = content::save(&site.app, &owner, None, draft.clone())
+            .await
+            .unwrap();
+        let response = feed(
+            router.clone(),
+            &grant.token,
+            initial["next"].as_str().unwrap(),
+        )
+        .await;
+        let page: serde_json::Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        assert_eq!(page["events"].as_array().unwrap().len(), 1);
+        assert_eq!(page["events"][0]["content_id"], post.id);
+        assert_eq!(page["events"][0]["version"], 1);
+        assert!(!page.to_string().contains("PRIVATE_EVENT_BODY"));
+        // A physical rollback can reuse a sequence. Its new random event anchor
+        // must invalidate the old cursor instead of skipping unrelated changes.
+        let original = page["events"][0].to_string();
+        let mut branch = page["events"][0].clone();
+        branch["id"] = format!(
+            "{}:1:{}",
+            initial["epoch"].as_str().unwrap(),
+            uuid::Uuid::new_v4()
+        )
+        .into();
+        sqlx::query("UPDATE integration_events SET payload=$1 WHERE sequence=1")
+            .bind(branch.to_string())
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            feed(router.clone(), &grant.token, page["next"].as_str().unwrap())
+                .await
+                .status(),
+            StatusCode::CONFLICT
+        );
+        sqlx::query("UPDATE integration_events SET payload=$1 WHERE sequence=1")
+            .bind(original)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        draft.version = 0;
+        assert!(
+            content::save(&site.app, &owner, Some(&post.id), draft.clone())
+                .await
+                .is_err()
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM integration_events")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+        // Fault after the domain writes: the entire transaction must roll back,
+        // including revisions and content, when journal persistence fails.
+        sqlx::query("DELETE FROM integration_event_state")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let mut failed = input("journal-failure", "save");
+        failed.body = "Not committed".into();
+        assert!(
+            content::save(&site.app, &owner, None, failed)
+                .await
+                .is_err()
+        );
+        let missing: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM posts WHERE slug='journal-failure'")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(missing, 0);
+        sqlx::query("INSERT INTO integration_event_state(id,epoch,sequence) VALUES(1,$1,1)")
+            .bind(initial["epoch"].as_str().unwrap())
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        for version in 1..=34 {
+            draft.version = version;
+            content::save(&site.app, &owner, Some(&post.id), draft.clone())
+                .await
+                .unwrap();
+        }
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM integration_events")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 32);
+        assert_eq!(
+            feed(router.clone(), &grant.token, page["next"].as_str().unwrap())
+                .await
+                .status(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            feed(router.clone(), &grant.token, "foreign:1:start")
+                .await
+                .status(),
+            StatusCode::CONFLICT
+        );
+        let response = feed(router.clone(), &grant.token, "").await;
+        let page: serde_json::Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        assert_eq!(page["events"].as_array().unwrap().len(), 25);
+        assert_eq!(page["has_more"], true);
+        wpalt::platform::integrations::revoke(&site.app, &owner, &grant.id)
+            .await
+            .unwrap();
+        assert_eq!(
+            feed(router, &grant.token, page["next"].as_str().unwrap())
+                .await
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn selected_plugin_clusters_recover_definitions_without_consent_access_or_settlement() {
+    use wpalt::{backup, platform::wordpress};
+    for postgres in engines() {
+        let template = Site::new(postgres, true).await;
+        let email: String = sqlx::query_scalar("SELECT email FROM users")
+            .fetch_one(&template.app.db.pool)
+            .await
+            .unwrap();
+        let source = include_bytes!("fixtures/wordpress-core.xml");
+        let cluster = include_bytes!("fixtures/wordpress-clusters.json");
+        let package = wordpress::prepare_with_adapters(
+            &template.app,
+            source,
+            &email,
+            None,
+            wordpress::AdapterOptions {
+                cluster_export: Some(cluster),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(package.report["counts"]["posts"], 4);
+        assert_eq!(package.report["counts"]["comments"], 0);
+        assert_eq!(package.report["counts"]["redirects"], 0);
+        assert_eq!(
+            package.report["cluster_mapping"]["counts"],
+            serde_json::json!({"contacts":1,"membership_policies":1,"courses":1,"lessons":2,"products":1})
+        );
+        assert_eq!(
+            package.report["cluster_mapping"]["unsupported"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            !package
+                .report
+                .to_string()
+                .contains("quarantined@example.test")
+        );
+        let mut target = Site::new(postgres, false).await;
+        backup::restore(&target.app, &package.bytes).await.unwrap();
+        for table in [
+            "audience_memberships",
+            "audience_consent_events",
+            "mail_jobs",
+            "member_grants",
+            "member_progress",
+            "shop_orders",
+            "shop_payments",
+        ] {
+            let count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap();
+            assert_eq!(count, 0, "No inferred operational authority: {table}");
+        }
+        let suppressed: i64 = sqlx::query_scalar("SELECT suppressed FROM audience_contacts")
+            .fetch_one(&target.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(suppressed, 1);
+        let policies: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM member_policies WHERE enabled=0")
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(policies, 2);
+        let course: String = sqlx::query_scalar("SELECT draft FROM member_courses")
+            .fetch_one(&target.app.db.pool)
+            .await
+            .unwrap();
+        let course: serde_json::Value = serde_json::from_str(&course).unwrap();
+        assert_eq!(course["lessons"][0]["title"], "First lesson");
+        assert_eq!(course["lessons"][1]["title"], "Next lesson");
+        let post_id = course["lessons"][0]["post_id"].as_str().unwrap();
+        assert!(
+            !wpalt::membership::allowed(&target.app, "post", post_id, None, 0)
+                .await
+                .unwrap()
+        );
+        let migrated_export = backup::capture(&target.app).await.unwrap();
+        // Publishing an individual imported lesson still cannot bypass its disabled resource policy.
+        sqlx::query("UPDATE posts SET status='published',published_slug=slug,published_title=title,published_body=body,published_document=document WHERE id=$1").bind(post_id).execute(&target.app.db.pool).await.unwrap();
+        let response = wpalt::web::router(target.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/sensei-lesson-4")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_ne!(response.status(), StatusCode::OK);
+        let (minor, active): (i64, i64) =
+            sqlx::query_as("SELECT price_minor,active FROM shop_variants")
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!((minor, active), (1234, 0));
+        // Recover the untouched package again into another independent empty instance.
+        let recovered = Site::new(postgres, false).await;
+        backup::restore(&recovered.app, &migrated_export)
+            .await
+            .unwrap();
+        let contacts: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM audience_contacts WHERE suppressed=1")
+                .fetch_one(&recovered.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(contacts, 1);
+        let live: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM posts WHERE status='published'")
+            .fetch_one(&recovered.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            live, 0,
+            "Unknown PMPro table restrictions cannot expose WXR core content"
+        );
+        recovered.close().await;
+        for alter in [
+            "foreign-origin",
+            "precision",
+            "duplicate-email",
+            "unknown-field",
+        ] {
+            let mut value: serde_json::Value = serde_json::from_slice(cluster).unwrap();
+            match alter {
+                "foreign-origin" => value["source_site"] = "https://foreign.example".into(),
+                "precision" => {
+                    value["woocommerce"]["products"][0]["regular_price"] = "12.345".into()
+                }
+                "duplicate-email" => {
+                    let mut duplicate = value["mailpoet"]["subscribers"][0].clone();
+                    duplicate["id"] = "9".into();
+                    value["mailpoet"]["subscribers"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(duplicate);
+                }
+                _ => value["pmpro"]["active_grants"] = serde_json::json!(["untrusted"]),
+            }
+            let raw = serde_json::to_vec(&value).unwrap();
+            assert!(
+                wordpress::prepare_with_adapters(
+                    &template.app,
+                    source,
+                    &email,
+                    None,
+                    wordpress::AdapterOptions {
+                        cluster_export: Some(&raw),
+                        ..Default::default()
+                    }
+                )
+                .await
+                .is_err(),
+                "Reject {alter}"
+            );
+        }
+        let unchanged: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM posts")
+            .fetch_one(&template.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(unchanged, 0);
+        // Owner review connects the imported catalog to ordinary native checkout.
+        let (token, session) = auth::login(&target.app, &email, PASSWORD).await.unwrap();
+        target.token = token;
+        target.session = Some(session);
+        use wpalt::commerce::catalog::{self, ProductInput, VariantInput};
+        let (product_id, variant_id): (String, String) = sqlx::query_as(
+            "SELECT p.id,v.id FROM shop_products p JOIN shop_variants v ON v.product_id=p.id",
+        )
+        .fetch_one(&target.app.db.pool)
+        .await
+        .unwrap();
+        catalog::save_product(
+            &target.app,
+            target.session(),
+            Some(&product_id),
+            1,
+            &ProductInput {
+                slug: "garden-kit".into(),
+                title: "Garden kit".into(),
+                description: "A physical kit.".into(),
+                kind: "physical".into(),
+                entitlement: "".into(),
+                access_seconds: 0,
+                download_id: "".into(),
+                published: true,
+            },
+        )
+        .await
+        .unwrap();
+        catalog::save_variant(
+            &target.app,
+            target.session(),
+            &product_id,
+            Some(&variant_id),
+            1,
+            &VariantInput {
+                title: "Garden kit".into(),
+                sku: "KIT-6".into(),
+                price_minor: 1234,
+                member_price_minor: -1,
+                member_key: "".into(),
+                stock_total: 4,
+                billing_interval: "".into(),
+                active: true,
+            },
+        )
+        .await
+        .unwrap();
+        let (_, buyer) = commerce_journeys::shopper(&target, "new-buyer@example.test").await;
+        let checkout = commerce_journeys::cart(&target, &buyer, &variant_id, "", 1).await;
+        let order = wpalt::commerce::orders::checkout(&target.app, &buyer, &checkout)
+            .await
+            .unwrap();
+        let payments: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM shop_payments")
+            .fetch_one(&target.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            payments, 0,
+            "Native checkout has no inferred source settlement"
+        );
+        commerce_journeys::pay(&target, &order, "explicit-owner-receipt-after-import").await;
+        let export = backup::capture(&target.app).await.unwrap();
+        let business_recovery = Site::new(postgres, false).await;
+        backup::restore(&business_recovery.app, &export)
+            .await
+            .unwrap();
+        let state: String = sqlx::query_scalar("SELECT payment_state FROM shop_orders WHERE id=$1")
+            .bind(&order)
+            .fetch_one(&business_recovery.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(state, "paid");
+        let sold: i64 = sqlx::query_scalar("SELECT sold FROM shop_variants WHERE id=$1")
+            .bind(&variant_id)
+            .fetch_one(&business_recovery.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(sold, 1);
+        business_recovery.close().await;
+        target.close().await;
+        template.close().await;
     }
 }

@@ -116,3 +116,8 @@ denied_prefixes = []
 denied_peers = []
 requests_per_window = 300
 window_seconds = 60
+
+# Durable content metadata for independently operated webhook workers.
+# Replay is bounded by event count; gaps require explicit reconciliation.
+[integration_events]
+retained_events = 4096

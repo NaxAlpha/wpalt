@@ -1,0 +1,116 @@
+# Migration and extensions — M8 development
+
+M8 is incomplete. Current core migration tools are an independently tested first slice; plugin/business adapters, owner administration, external APIs/webhooks/worker extensions and complete milestone evidence remain required. See [contract](m8-contract.md).
+
+Owners can open **Operations → Assess a WordPress migration** to upload an export, review a bounded populated assessment and download the complete report. Invalid XML produces a readable retry screen. Uploaded source stays in memory under shared bounded local-processing admission; it is not stored. The native file must be selected again for retry/download.
+
+## Offline assessment
+
+`wpalt wordpress-assess site.xml` reads a UTF-8 WordPress WXR 1.2 export without opening a database or fetching source/media URLs. Review types, counts, URLs, metadata keys and warnings. The report contains source titles/URLs and should be kept private. WXR is not a complete plugin database: a source order record is never proof of a settled payment, and export absence is not proof data did not exist. Retain the original export and independently copied uploads.
+
+XML budgets: 32 MiB input, 100,000 elements, depth 64, 10,000 items and 512 KiB per element. Namespaces resolve by URI, so alternate prefixes work while spoofed namespaces, external entities, DTDs and malformed structures fail. Core identities/fields must be unambiguous. No PHP/shortcode execution.
+
+## Core fresh-target package
+
+Initialize a separate empty migration template with one administrator. This template supplies current configuration/theme/schema and the explicit author mapping; existing site domain records prevent package creation.
+
+```
+wpalt --config migration-template.toml init --admin-email owner@example.test
+wpalt --config migration-template.toml wordpress-prepare site.xml \
+  --owner-email owner@example.test --media-dir independently-copied-uploads
+```
+
+Review the plan/counts/warnings, then repeat with `--execute PLAN --output new-private-package.json`. A changed source, mappings, template or media bytes changes the plan. Output is a NEW private file; overwrite is refused. The source/template remain untouched. Packages contain administrator credentials and data: protect them like backups. Restore into a separate empty target with `wpalt --config fresh-target.toml restore new-private-package.json`; occupied targets refuse retries. Validate the recovered site before cutover. Rollback is retaining the source and abandoning the isolated target, not destructive live-site undo.
+
+Supported first slice: exported site title/description (bounded; blank title retains the template title), posts/pages, structured sanitized HTML projection, category/tag relationships, basic comments, literal Yoast title/description/noindex, exact safe path redirects and explicit owner attribution. Current theme/schema remain the template's. Private/future/pending, password-protected, shortcode-bearing or ambiguous plugin access content stays draft. No imported credentials, entitlement grants, schedules or payment settlement. Unsupported metadata/types are reported; retain/reconcile them through subsequent adapters before cutover. HTML conversion has a conservative 128 KiB/8,192-tag/depth-48 balanced-markup admission boundary; arbitrary theme CSS, widgets, scripts and PHP are not imported by this slice.
+
+Optional `--media-dir` maps `_wp_attached_file` paths within an independently copied uploads directory. Unix descriptor-relative no-follow traversal rejects symlinks/races/path escapes; only regular PNG/JPEG/WebP/GIF originals up to eight MiB/4,096 pixels are embedded. Aggregate media stays within the recovery budget. Orphan/private/ambiguous-parent images remain private. Known image/link source URLs map to local IDs; no server fetch. Missing media directories leave explicit warnings and original external image URLs, which still depend on the source for browser delivery. Derived images, unsupported video and remote media need explicit later mappings. Non-Unix safe-media mapping is not currently supported.
+
+## Verification
+
+`cargo test --locked wordpress_preview_package` runs the connected core journey on SQLite and on real PostgreSQL when `TEST_DATABASE_URL` is configured. It verifies namespace aliases/spoofing, malformed XML/entities/duplicate identities, deterministic previews, unchanged template, private-access/payment safety, local-image bytes, traversal/symlink rejection, fresh recovery, redirects and occupied-target refusal. `python3 scripts/migration_acceptance.py --binary PATH` exercises the actual CLI/private-file/exact-plan boundary. No full migration/extension completion claim.
+
+WordPress core `_pingme`, `_encloseme` and `_trackbackme` flags are reported as source work that is not replayed. They do not force otherwise safe published content into draft. No ping, enclosure discovery or trackback request is sent by migration. Unknown plugin metadata still requires review.
+
+## Explicit ACF scalar fields
+
+Supply `--field-mapping fields.json` to `wordpress-prepare` for selected source registrations. The preview includes the mapping identity; execution requires a new plan when the mapping changes. Example:
+
+```json
+{
+  "format": "wpalt-acf-scalar-map-v1",
+  "fields": [
+    {"source_name": "garden_teaser", "source_key": "field_garden_teaser", "target_name": "teaser", "kind": "string"}
+  ]
+}
+```
+
+The source value `garden_teaser` must have exactly one `_garden_teaser` reference to that explicit field key. Missing/wrong/duplicate selected references reject the package. At most 32 mappings and a 128 KiB mapping file are admitted; source/target names currently use the native lowercase ASCII identifier grammar. Registered text/textarea/single scalar values map to native strings up to 8,000 bytes, number values to finite native JSON numbers within the browser-safe magnitude (absolute value ≤ 9,007,199,254,740,991), and true/false metadata strictly from `0`/`1`. Integers beyond that range must explicitly map to strings; they are never silently rounded. Decimal numbers use the native JSON floating-point contract and are not an exact financial ledger. Fields are optional shared native definitions; conflicting template definitions fail validation.
+
+Selected ACF values become editable native structured fields after fresh recovery. Mapping fields does not interpret PHP objects/arrays, repeaters/flexible layouts, media IDs, relationships, ACF registration code or access rules. Source content bearing unknown metadata stays draft even when selected scalar fields are preserved. Review permissions and publish through the normal native workflow. Other source fields remain reported for further adapters; retain the source and field registrations independently.
+
+## Explicit Elementor draft content
+
+`wpalt elementor-project template.json` assesses an independently retained Elementor 0.4 JSON export without opening a database. Review per-element mappings, omitted setting names, unsupported widgets and page settings. Repeat with `--execute PLAN --output new-private-draft.json` to write a new private file containing the native document and report. The plan includes source identity and projected output; changed inputs and existing output files reject execution. The package is a draft document artifact, not a recovery archive or an automatically installed theme.
+
+For WXR packages, explicitly select `wordpress-prepare ... --elementor-content` to project `_elementor_data` heading/text content using the documented 0.4 structure. The preview includes each source post's projection and source-data hash. Unknown Elementor metadata keeps imported posts draft; publish only after reviewing the native document and every loss. Omitting the flag retains ordinary `post_content` conversion. Changing the flag invalidates the plan. Duplicate selected data records or malformed structures reject the package. Known image/link URLs still use the shared local mapping.
+
+Supported projection: container/section/column child ordering, literal headings and sanitized text-editor blocks, including supported native lists/tables/marks. Containers flatten into ordered document blocks; their layout is not reproduced. Every unsupported element is identified, and nested descendants are accounted for independently. Arbitrary responsive styling, dynamic tags, assets, additional widgets, popup execution and theme conditions remain unsupported; this is not full F024 or visual parity. Keep original source/settings/assets. Bounds: two MiB JSON, 2,000 unique elements, traversal depth 32, native document validation and shared pre-parser HTML budgets. The standalone envelope rejects unknown structural fields/versions rather than silently pretending to understand them.
+
+Structure guidance checked 2026-10-05 against [Elementor general structure](https://developers.elementor.com/docs/data-structure/general-structure/) and [widget structure](https://developers.elementor.com/docs/data-structure/widget-element/); scheduled maintenance is recorded in the feature-guidance register.
+
+## Scoped content integrations (in development)
+
+Open **Operations → Manage integrations** to grant read or draft access, download a one-time secret and revoke credentials while the server runs. Review the explicit private-content scope before granting it. Invalid name/expiry input retains the form with a readable error. After a native download, refresh the credential list. Browser download permissions are controlled by the browser/OS; keep the token in a private folder and set file permissions to 0600 on Unix.
+
+Alternatively, while the server is stopped, issue an external process a credential bound to an existing editor/admin account:
+
+```
+wpalt --config site.toml integration create --user-email editor@example.test \
+  --name "Independent draft worker" --draft --days 7 worker-token.txt
+wpalt --config site.toml integration list
+wpalt --config site.toml integration revoke CREDENTIAL_UUID
+```
+
+The new token file is private, never overwritten, and the secret is absent from console/audit output. Without `--draft`, the grant is `content:read`; with it, the grant additionally has `content:draft`. **Content read includes private and draft editorial content across the site**; grant it only to an explicitly trusted process. The account must retain current editor/admin authority. Expiry is 1–30 days; at most 128 credentials are retained, including expired records until revoked. Changing the account password or disabling its role invalidates delegated access. Revocation is immediate for subsequent reads and rechecked before a waiting draft write. The CLI obeys the stopped-host lock; the owner screen handles running-host revocation.
+
+Send `Authorization: Bearer TOKEN` to the owner's HTTPS origin (literal loopback HTTP is permitted for development). Cookies and foreign browser Origins are rejected; there is no cross-origin browser credential flow. Do not place the token in a URL. `GET /api/v1/content?after=LAST_UUID` returns at most 25 metadata records and a `next` cursor; `GET /api/v1/content/UUID` returns one native editorial record. `POST /api/v1/content` creates a draft, and `PUT /api/v1/content/UUID` updates an existing draft with its current `version`. JSON uses the native `PostInput` fields: title/slug/kind/body, optional canonical document/fields/taxonomies/locale/SEO, and `action: "save"`, `publish_at: 0`. A new draft uses version 0. Stale writes conflict. Published and scheduled records, publication/scheduling/unpublication commands and unrelated administration are denied to the draft scope. Request bodies are limited to one MiB; reads and failures are no-store/noindex. State changes retain privileged audit admission and correlated diagnostics without payload/token logging.
+
+Database schema 14 includes the credential table and bounded content-event journal; portable recovery graph format/schema remains 12 with the same domain validation. Integration credentials, like browser sessions, are intentionally not captured or restored. Reissue credentials after recovery, clone or migration; losing access to the old site cannot require a wpalt vendor account. See the [decision record](decisions/0012-migration-and-extension-boundaries.md). The bounded content event feed and independently operated webhook worker are documented below; broader adapters and final independent extension evidence remain incomplete. The optional [local AI worker example](../examples/integrations/README.md) demonstrates a separately operated review-to-draft process; actual installed-model inference evidence remains pending.
+
+Integration credentials bind the configured site origin; changing it requires reissue. A full physical PostgreSQL rollback includes credential/session tables, unlike portable graph recovery. Before serving a same-origin physical rollback, list and revoke retained integration grants and review account/session authority; past revocation can be undone by restoring old database state. The portable recovery exclusion is not a guarantee about physical engine backups.
+
+
+### Selected WPForms definitions
+
+`wordpress-prepare SOURCE.xml --owner-email OWNER --wpforms-export FORMS.json` adds a separately exported set of WPForms definitions to the exact preview. Ordinary WordPress WXR excludes the WPForms post type (`can_export: false`); do not interpret its absence as a site with no forms. The free plugin's local JSON definitions can be exported by the owner without a vendor account. No PHP/plugin code executes inside wpalt.
+
+The supplemental JSON envelope is `{"format":"wpalt-wpforms-source-v1","source_site":"https://source.example","plugin_version":"2.0.2.1","forms":[{"source_id":"71","definition":{"id":"71","settings":{"form_title":"Contact"},"fields":{"9":{"id":"9","type":"email","label":"Email","required":"1"},"2":{"id":"2","type":"textarea","label":"Message"}}}}]}`. Retain the untouched original definition, including additional settings; the report lists omitted keys. Source origin must match WXR. Input is bounded to 512 KiB, 32 forms and 128 source controls per form; supported native definitions contain at most 32 controls. Enable native business forms and sufficient quota.
+
+Selected text, email and textarea controls preserve source object insertion order, labels and required flags. Unsupported controls or conditional logic mark the entire form unsupported. Admitted forms recover as draft definitions with publication, notifications, subscriptions, registrations and entries disabled. Review omitted settings and configure the native form before publishing. Changing the supplemental file changes the execution plan. Plugin version is owner-declared provenance, not attestation. Actual free-plugin reference validation remains a separate required gate.
+
+
+### Durable content events and independent webhook delivery
+
+A content save or scheduled publication commits its metadata event in the same database transaction. If journal persistence fails, content and revision changes roll back. `GET /api/v1/events` uses a content-read bearer grant, admits no browser cookie credentials, and returns at most 25 events per page with `next`, `has_more`, retained bounds and source epoch. Each cursor includes a random event identity anchor: reused sequence numbers after physical rollback cannot silently identify different events. Events contain content UUID/version/status/action/time, without body, title, credentials or author identity. Read authority covers private editorial metadata as well as private content. Revocation and polling serialize with mutations; no lock is held during transport or webhook work.
+
+Continue with `?after=OPAQUE_CURSOR`. Persist the cursor only after handling the event. An omitted cursor starts at the oldest retained event, **not a complete historical snapshot**. `[integration_events] retained_events = 4096` bounds storage (32–100,000 admitted). Reducing capacity takes effect on the next content mutation. Overflow evicts oldest records; a cursor older than retained history or from a different source epoch fails with 409, requiring explicit state reconciliation. Retention has no age expiry: a quiet site preserves its recent events. Versioned events survive restart and physical same-cluster recovery. Portable domain recovery excludes transport history and credentials, produces a fresh epoch, and requires new grants plus state reconciliation. Database version 14 and portable graph version 12 remain independent.
+
+The optional Unix/Python standard-library `webhook_worker.py` reads one bounded page, signs each canonical event body with HMAC-SHA256 and delivers it to an explicitly selected HTTPS endpoint (literal loopback HTTP for development). It sends no CMS Authorization credential to the receiver, refuses redirects and ambient proxies, and uses bounded input and a 30-second transport timeout. The application neither launches this process nor fetches the destination. Protect its token, signing key and checkpoint directory; configure process limits and scheduling through your OS.
+
+Successful 2xx delivery advances an atomic private, fsynced checkpoint after each event. A per-checkpoint advisory lock prevents concurrent cooperating worker invocations. Failed delivery pauses without advancing that event. A crash after receiver success but before durable checkpoint can repeat delivery: this is **at least once**, requiring durable receiver deduplication of `X-Wpalt-Event-ID`. Verify `X-Wpalt-Signature` against the exact raw body using constant-time comparison and a separate random signing key, and bind deduplication to the selected source. A source/destination mismatch, replay gap or epoch reset never silently rewinds an existing checkpoint. Recover/reconcile receiver state before creating a fresh checkpoint or selecting an explicit new `--start-at` cursor. Physical rollback can replay already delivered events, so receiver deduplication remains required. New events receive independent random identity anchors; a resumed cursor validates its retained anchor and pauses if the lineage changed.
+
+Initial coverage is `content.changed` for native saves and scheduled publication. It does not claim events for business/order/membership mutations, delete/export operations, or exactly-once remote execution. Use the current-state content API for initial synchronization and gap reconciliation. `scripts/integration_acceptance.py` exercises the actual independent webhook process, signed delivery, failed-response retry, private checkpoints and restart replay; the connected Rust journey verifies atomic failure, capacity, paging, gaps and revocation on supported engines.
+
+### Selected audience, membership, learning and catalog definitions
+
+`wordpress-prepare SOURCE.xml --owner-email OWNER --cluster-export CLUSTERS.json` adds an explicit private, locally extracted `wpalt-plugin-clusters-v1` supplement. Its source origin must exactly match WXR; its bytes, declared plugin versions, selected counts and omissions are part of the execution preview. The [synthetic envelope](../tests/fixtures/wordpress-clusters.json) documents the fields; `synthetic-test` is test provenance, never an upstream version claim. Extract only reviewed fields using owner-operated plugin APIs. The disposable reference fixture exercises MailPoet's subscriber API, PMPro level creation/read, Sensei's ordered course lesson API and WooCommerce product objects. It is not a general production export tool; retain complete original exports and version/configuration records privately.
+
+- MailPoet ID/email/name/status become locally managed **suppressed** contacts. Every admitted source status stays suppressed; no list membership, consent events, campaigns, jobs, custom fields or confirmation token is reconstructed. Imported contacts cannot receive native campaign mail until the owner separately reviews consent and suppression. Source list/segment relationships remain unsupported; retain the original source.
+- PMPro level ID/name become disabled native entitlement policies. Billing, pricing, user memberships, post restriction tables and role mappings are unsupported. Because restriction tables may be absent from WXR, supplying PMPro holds **all core posts/pages as drafts and media private**, withholding comments, redirects and public taxonomy projection. The owner must review access before native publication. This conservative hold is explicit in the preview; no inference that a source level grants access.
+- Sensei course ID/title and explicitly ordered lesson ID/title/content become a draft course with draft native lesson posts. Each lesson and course retains a disabled native resource policy, so separately publishing a lesson does not remove its access gate. Selected lesson HTML uses the existing bounded sanitizer/document importer. Native sequential progression is a reviewable default; source quiz answers, progress, completions, modules, prerequisites, enrollment, download assets and certificates are unsupported. Review/recreate them before enabling/publishing the course.
+- WooCommerce simple physical product ID/name/slug/description/SKU/regular decimal price and nullable managed stock become unpublished products and inactive variants. Exact text prices convert to configured USD/EUR/GBP cents or JPY units without float rounding; excess precision, currency mismatch and duplicate SKU/slug fail. Variable, virtual, downloadable or backorder-enabled products are explicitly reported unsupported. `null` stock means unmanaged, not a guessed quantity. Sale prices, tax/shipping policies, categories, images, variations, subscriptions, discounts, customer accounts, holds, historical orders, payments, refunds and fulfillment remain unsupported. No settlement or stock allocations are reconstructed. Review stock and commerce settings before activating variants.
+
+Admission: 2 MiB total JSON; up to 10,000 contacts, 128 PMPro levels, 100 courses with 100 lessons each, and 1,000 products, additionally constrained by configured native quotas and complete portable-graph validation. Duplicate source IDs, malformed structures, undeclared envelope fields, invalid identities and inconsistent relationships fail before output. Projection works in memory over one captured fresh template; it performs no per-source-row database query, fetch or plugin execution. Reports contain versions/counts/source identities/hashes, without source emails or content. The resulting recovery file contains private contact/content data and must remain private. Source version declarations are provenance, not cryptographic plugin attestation. Changing a supplement invalidates its previous preview; normal private create-new output and occupied-target restore rules apply.
+
+Current connected SQLite and CLI evidence covers cluster recovery, repeat export/recovery, private hold, lesson policy, exact money, unsupported products and rejected origin/precision/duplicates/unknown fields. Actual free-plugin and PostgreSQL verification remain separate gates in M8; a synthetic fixture alone does not establish upstream compatibility.

@@ -157,6 +157,11 @@ pub async fn save(
         return Err(Error::forbidden());
     }
     let _guard = app.mutation().await;
+    crate::auth::current_editor(app, session).await?;
+    if session.hash.starts_with("integration:") && (input.action != "save" || input.publish_at != 0)
+    {
+        return Err(Error::forbidden());
+    }
     let settings = app.db.settings().await?;
     validate_input(&input, &settings)?;
     let structured = !input.document.is_empty() && !input.import_markdown;
@@ -230,6 +235,9 @@ pub async fn save(
         None
     };
     if let Some(old) = &old {
+        if session.hash.starts_with("integration:") && old.status != "draft" {
+            return Err(Error::forbidden());
+        }
         if old.version != input.version {
             return Err(Error::conflict());
         }
@@ -354,6 +362,7 @@ pub async fn save(
         .bind(post.version - app.config.revision_retention)
         .execute(&mut *tx)
         .await?;
+    crate::platform::events::append(app, &mut tx, &post, &input.action).await?;
     tx.commit().await?;
     tracing::info!(event="content_saved", content_id=%post.id, version=post.version, action=%input.action);
     Ok(post)
@@ -424,6 +433,7 @@ pub async fn publish_due(app: &App) -> Result<usize> {
                 .bind(p.version - app.config.revision_retention)
                 .execute(&mut *tx)
                 .await?;
+            crate::platform::events::append(app, &mut tx, &p, "scheduled_publish").await?;
             n += 1;
         }
     }

@@ -1,0 +1,293 @@
+{
+  "format": "wpalt-m8-wordpress-reference-v1",
+  "binary_sha256": "f33ef39bf93b38db50f4d9babbfa170df557286c69c3afba967e239cc13ab3b8",
+  "reference_cli_php_memory_limit": "512M",
+  "scope": "Actual synthetic core WXR export with free Yoast, ACF, Elementor and WPForms installed; core posts/private page, terms/comment/SEO and fresh recovery. Explicit ACF scalars retain draft access; other adapters remain separate gates.",
+  "images": {
+    "wordpress:7.1.2-php8.3-apache": [
+      "wordpress@sha256:4abf7a450ee477dde967584f8174d7e03221d224c4971a0c38d84e7254426e64"
+    ],
+    "wordpress:cli-php8.3": [
+      "wordpress@sha256:36243da432a0f0a3b56dc3240ecee9b159108d71305e7c064d987a20a465bfde"
+    ],
+    "mariadb:11.4": [
+      "mariadb@sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6"
+    ]
+  },
+  "wordpress_version": "7.1.2",
+  "plugins": [
+    {
+      "name": "advanced-custom-fields",
+      "status": "active",
+      "update": "none",
+      "version": "6.8.10",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "akismet",
+      "status": "inactive",
+      "update": "none",
+      "version": "5.7.2",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "elementor",
+      "status": "active",
+      "update": "none",
+      "version": "4.3.3",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "hello",
+      "status": "inactive",
+      "update": "none",
+      "version": "1.7.2",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "wpforms-lite",
+      "status": "active",
+      "update": "none",
+      "version": "2.0.2.1",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "wordpress-seo",
+      "status": "active",
+      "update": "none",
+      "version": "28.6",
+      "update_version": "",
+      "auto_update": "off"
+    }
+  ],
+  "source_counts": {
+    "posts": 4,
+    "export_items": 5,
+    "types": {
+      "page": 2,
+      "post": 2,
+      "elementor_library": 1
+    },
+    "comments": 1,
+    "category": "migration-stories",
+    "forms": 1
+  },
+  "form_export_sha256": "bd493c6f45b3a40e0ab6f4a24f1b6068294b15c991c9f5df6dfa071a52fa53c0",
+  "export_sha256": "14089fd3b0c3d63673acf2871b46488c56261625c8425d201f27cb976f5173cd",
+  "assessment": {
+    "source_items": 5,
+    "supported_core_items": 4,
+    "types": {
+      "elementor_library": 1,
+      "page": 2,
+      "post": 2
+    },
+    "warnings": [
+      {
+        "code": "unsupported_record",
+        "source_id": "4",
+        "status": "publish",
+        "type": "elementor_library"
+      },
+      {
+        "code": "metadata_requires_adapter",
+        "keys": [
+          "_elementor_edit_mode",
+          "_elementor_template_type"
+        ],
+        "source_id": "4"
+      },
+      {
+        "code": "source_queue_not_replayed",
+        "reason": "WordPress ping/enclosure queue flags are not access rules and do not trigger outbound work during migration.",
+        "source_id": "5"
+      },
+      {
+        "code": "metadata_requires_adapter",
+        "keys": [
+          "_pingme",
+          "_encloseme",
+          "_yoast_wpseo_metadesc"
+        ],
+        "source_id": "5"
+      },
+      {
+        "code": "access_mapping_required",
+        "reason": "Password, shortcode or unrecognized plugin access cannot establish safe public delivery; retain as draft.",
+        "source_id": "6"
+      },
+      {
+        "code": "source_queue_not_replayed",
+        "reason": "WordPress ping/enclosure queue flags are not access rules and do not trigger outbound work during migration.",
+        "source_id": "6"
+      },
+      {
+        "code": "metadata_requires_adapter",
+        "keys": [
+          "_pingme",
+          "_encloseme",
+          "garden_teaser",
+          "_garden_teaser",
+          "reading_count",
+          "_reading_count",
+          "show_marker",
+          "_show_marker"
+        ],
+        "source_id": "6"
+      },
+      {
+        "code": "access_mapping_required",
+        "reason": "Password, shortcode or unrecognized plugin access cannot establish safe public delivery; retain as draft.",
+        "source_id": "7"
+      },
+      {
+        "code": "metadata_requires_adapter",
+        "keys": [
+          "_elementor_edit_mode",
+          "_elementor_migrations_state_d2a1",
+          "_wp_page_template",
+          "_elementor_data",
+          "_elementor_page_assets",
+          "_elementor_template_type",
+          "_elementor_version",
+          "_elementor_global_class_usage_indexed",
+          "_elementor_global_class_usage_indexed_preview"
+        ],
+        "source_id": "7"
+      },
+      {
+        "code": "retain_as_draft",
+        "reason": "No implicit private access, schedule or approval is inferred.",
+        "source_id": "11"
+      }
+    ]
+  },
+  "cluster_source_counts": {
+    "contacts": 1,
+    "membership_policies": 1,
+    "courses": 1,
+    "lessons": 2,
+    "products": 1
+  },
+  "cluster_plugins": [
+    {
+      "name": "advanced-custom-fields",
+      "status": "active",
+      "update": "none",
+      "version": "6.8.10",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "akismet",
+      "status": "inactive",
+      "update": "none",
+      "version": "5.7.2",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "elementor",
+      "status": "active",
+      "update": "none",
+      "version": "4.3.3",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "hello",
+      "status": "inactive",
+      "update": "none",
+      "version": "1.7.2",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "mailpoet",
+      "status": "active",
+      "update": "none",
+      "version": "5.40.0",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "paid-memberships-pro",
+      "status": "active",
+      "update": "none",
+      "version": "3.8.7",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "sensei-lms",
+      "status": "active",
+      "update": "none",
+      "version": "4.26.4",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "woocommerce",
+      "status": "active",
+      "update": "none",
+      "version": "11.1.2",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "wpforms-lite",
+      "status": "active",
+      "update": "none",
+      "version": "2.0.2.1",
+      "update_version": "",
+      "auto_update": "off"
+    },
+    {
+      "name": "wordpress-seo",
+      "status": "active",
+      "update": "none",
+      "version": "28.6",
+      "update_version": "",
+      "auto_update": "off"
+    }
+  ],
+  "cluster_export_sha256": "a201962390df76e72a139bbdf6a9aedaa3548d4c19344a9671f9d2307500ac13",
+  "cluster_projection": {
+    "boundary": "Selected definitions only. Contacts suppressed; policies disabled; courses and lesson posts draft; products unpublished and variants inactive. No source consent, memberships, progress, credentials, jobs, orders or payments imported.",
+    "counts": {
+      "contacts": 1,
+      "courses": 1,
+      "lessons": 2,
+      "membership_policies": 1,
+      "products": 1
+    },
+    "publication_hold": "PMPro access tables are outside WXR: all core content held as draft, media private; comments/redirects/public taxonomy withheld until explicit owner access review.",
+    "source_sha256": "a201962390df76e72a139bbdf6a9aedaa3548d4c19344a9671f9d2307500ac13",
+    "unsupported": [],
+    "versions": {
+      "mailpoet": "5.40.0",
+      "pmpro": "3.8.7",
+      "sensei": "4.26.4",
+      "woocommerce": "11.1.2"
+    }
+  },
+  "assertions": [
+    "real export accepted offline",
+    "exact preview execution",
+    "template unchanged",
+    "counts and relationships recovered",
+    "private page retained as draft",
+    "literal SEO preserved",
+    "registered ACF scalars recovered as draft",
+    "Elementor plugin-saved content projected as draft",
+    "free WPForms plugin-created definition recovered as unpublished draft with actions disabled",
+    "no invented orders",
+    "occupied retry denied"
+  ],
+  "status": "passed"
+}

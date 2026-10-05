@@ -1,0 +1,356 @@
+{
+  "machine": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "cpu": "arm",
+    "logical_cpus": 8
+  },
+  "posts_requested": 1000,
+  "requests_per_scenario": 200,
+  "binary_bytes": 27122656,
+  "binary_sha256": "3fab970fd3cc86dfd3c3347ea3a84211d1975ad2d443bc7b8eda0b6fa20aec33",
+  "conditions": "Full uncompressed HTML document; warm application; no browser asset/render timing; localhost; Python HTTP client overhead included. Cache allowlist/TTL enabled only with --cached; private/commerce routes bypass; eligible public articles use the page cache.",
+  "cache_enabled": false,
+  "debug_logging": false,
+  "commerce_fixture": "four physical/digital/monthly membership/group-booking products, one UTC slot, no invented payments",
+  "profiles": [
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 1.031,
+      "p95_ms": 1.293,
+      "p99_ms": 1.38,
+      "requests_per_second": 908.7,
+      "document_bytes": 9867
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "home",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 8.567,
+      "p95_ms": 10.881,
+      "p99_ms": 11.732,
+      "requests_per_second": 1171.1,
+      "document_bytes": 9867
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 2.486,
+      "p95_ms": 3.721,
+      "p99_ms": 4.111,
+      "requests_per_second": 374.4,
+      "document_bytes": 3788
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "story",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 31.381,
+      "p95_ms": 51.883,
+      "p99_ms": 56.985,
+      "requests_per_second": 294.1,
+      "document_bytes": 3788
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 1.84,
+      "p95_ms": 2.05,
+      "p99_ms": 11.668,
+      "requests_per_second": 406.8,
+      "document_bytes": 6311
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "search",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 14.014,
+      "p95_ms": 22.351,
+      "p99_ms": 26.41,
+      "requests_per_second": 562.3,
+      "document_bytes": 6311
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "catalog",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 0.258,
+      "p95_ms": 0.385,
+      "p99_ms": 1.704,
+      "requests_per_second": 2623.2,
+      "document_bytes": 2158
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "catalog",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 1.58,
+      "p95_ms": 3.006,
+      "p99_ms": 3.551,
+      "requests_per_second": 5474.7,
+      "document_bytes": 2158
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "product",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 0.282,
+      "p95_ms": 0.316,
+      "p99_ms": 0.354,
+      "requests_per_second": 3412.2,
+      "document_bytes": 1408
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "product",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 1.683,
+      "p95_ms": 2.693,
+      "p99_ms": 3.165,
+      "requests_per_second": 5658.0,
+      "document_bytes": 1408
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 6.907,
+      "p95_ms": 9.322,
+      "p99_ms": 9.989,
+      "requests_per_second": 138.6,
+      "document_bytes": 55994
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 86.296,
+      "p95_ms": 145.228,
+      "p99_ms": 164.347,
+      "requests_per_second": 106.1,
+      "document_bytes": 55994
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap_index",
+      "concurrency": 1,
+      "requests": 200,
+      "p50_ms": 1.176,
+      "p95_ms": 1.261,
+      "p99_ms": 1.311,
+      "requests_per_second": 932.2,
+      "document_bytes": 273
+    },
+    {
+      "system": "wpalt",
+      "database": "sqlite",
+      "endpoint": "sitemap_index",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 7.713,
+      "p95_ms": 9.698,
+      "p99_ms": 10.082,
+      "requests_per_second": 1255.7,
+      "document_bytes": 273
+    }
+  ],
+  "fixture_counts": {
+    "sqlite": {
+      "posts": 1001
+    }
+  },
+  "query_plans": {
+    "sqlite": {
+      "sitemap_page": [
+        "SEARCH posts USING INDEX published_sitemap (status=? AND id>?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH mr USING COVERING INDEX sqlite_autoindex_member_resources_1 (kind=? AND resource_id=?)"
+      ],
+      "privacy_subject_history": [
+        "SEARCH privacy_requests USING INDEX privacy_subject_history (user_id=?)"
+      ],
+      "privacy_owner_queue": [
+        "CO-ROUTINE p",
+        "SCAN privacy_requests USING INDEX privacy_owner_queue",
+        "SCAN p",
+        "SCAN u"
+      ],
+      "account_authored_content": [
+        "SEARCH posts USING COVERING INDEX privacy_posts_author (author_id=?)"
+      ]
+    }
+  },
+  "startup_to_health_ms": {
+    "sqlite": 125.587
+  },
+  "cold_first_request_ms": {
+    "sqlite": 1.945
+  },
+  "studio_asset_bytes": {
+    "raw": 37110,
+    "gzip": 13235
+  },
+  "composition_fixture": "20 dynamic cards with typed field bindings and three explicit reusable component parameters",
+  "runtime": {
+    "sqlite": {
+      "rss_ready_bytes": 41877504,
+      "rss_after_load_bytes": 62324736,
+      "rss_measurement": "Resident snapshots, not peak memory; includes startup password-verification dummy hash allocation.",
+      "log_bytes": 685783,
+      "site_files_bytes": 20628146,
+      "site_file_bytes": {
+        "site.db": 16228352,
+        "site.db-shm": 32768,
+        "benchmark-theme.json": 1433,
+        "site.db-wal": 4363112,
+        "data/background-jobs.json": 1353,
+        "data/privileged-audit.jsonl": 1128,
+        "data/.wpalt.lock": 0
+      },
+      "background_cycles": [
+        {
+          "id": "6d3da369-841e-449d-b32b-9534a93c55bb",
+          "started_at": 1791191790,
+          "finished_at": 1791191790,
+          "state": "succeeded",
+          "elapsed_ms": 437,
+          "stages": [
+            {
+              "name": "recovery",
+              "succeeded": true,
+              "count": null,
+              "elapsed_ms": 0
+            },
+            {
+              "name": "publication",
+              "succeeded": true,
+              "count": 0,
+              "elapsed_ms": 49
+            },
+            {
+              "name": "campaigns",
+              "succeeded": true,
+              "count": 0,
+              "elapsed_ms": 7
+            },
+            {
+              "name": "commerce",
+              "succeeded": true,
+              "count": 0,
+              "elapsed_ms": 112
+            },
+            {
+              "name": "mail",
+              "succeeded": true,
+              "count": 0,
+              "elapsed_ms": 49
+            },
+            {
+              "name": "engagement-retention",
+              "succeeded": true,
+              "count": null,
+              "elapsed_ms": 17
+            },
+            {
+              "name": "quota-retention",
+              "succeeded": true,
+              "count": null,
+              "elapsed_ms": 138
+            },
+            {
+              "name": "maintenance",
+              "succeeded": true,
+              "count": null,
+              "elapsed_ms": 63
+            }
+          ]
+        },
+        {
+          "id": "20630485-f75b-4bde-9b29-6ad2b22c92c6",
+          "started_at": 1791191785,
+          "finished_at": 1791191785,
+          "state": "succeeded",
+          "elapsed_ms": 1,
+          "stages": [
+            {
+              "name": "recovery",
+              "succeeded": true,
+              "count": null,
+              "elapsed_ms": 0
+            },
+            {
+              "name": "publication",
+              "succeeded": true,
+              "count": 0,
+              "elapsed_ms": 0
+            },
+            {
+              "name": "campaigns",
+              "succeeded": true,
+              "count": 0,
+              "elapsed_ms": 0
+            },
+            {
+              "name": "commerce",
+              "succeeded": true,
+              "count": 0,
+              "elapsed_ms": 0
+            },
+            {
+              "name": "mail",
+              "succeeded": true,
+              "count": 0,
+              "elapsed_ms": 0
+            },
+            {
+              "name": "engagement-retention",
+              "succeeded": true,
+              "count": null,
+              "elapsed_ms": 0
+            },
+            {
+              "name": "quota-retention",
+              "succeeded": true,
+              "count": null,
+              "elapsed_ms": 0
+            },
+            {
+              "name": "maintenance",
+              "succeeded": true,
+              "count": null,
+              "elapsed_ms": 0
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

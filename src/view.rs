@@ -128,6 +128,21 @@ pub fn excerpt(markdown: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// Bound work before Markdown parsing, preserve complete final words, and make truncation explicit.
+pub fn bounded_excerpt(markdown: &str, source_truncated: bool) -> String {
+    let mut chars = markdown.chars();
+    let raw: String = chars.by_ref().take(220).collect();
+    let truncated = source_truncated || chars.next().is_some();
+    let mut plain = excerpt(&raw);
+    if truncated {
+        if let Some((whole, _)) = plain.rsplit_once(char::is_whitespace) {
+            plain = whole.trim_end().to_owned();
+        }
+        plain.push('…');
+    }
+    plain
+}
+
 /// Display server timestamps with an explicit zone and a useful empty state.
 pub fn timestamp(seconds: i64) -> String {
     if seconds == 0 {

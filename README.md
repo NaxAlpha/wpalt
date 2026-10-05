@@ -66,4 +66,4 @@ The integrated writing milestone and its structured-document API/migration are d
 
 Development distribution and pipeline: [automatic releases and CI](docs/automatic-releases.md).
 
-M7 defined-scope delivery: [operations guide](docs/resilient-operations.md), [contract](docs/m7-contract.md) and [verification with operating limits](docs/evidence/m7-verification.md). Final-source gates determine PR #13 readiness.
+M7 defined-scope delivery: [operations guide](docs/resilient-operations.md), [contract](docs/m7-contract.md) and [verification with operating limits](docs/evidence/m7-verification.md). M7 is merged; its automatic release is verified. M8 migration/extensibility implements the selected [contract](docs/m8-contract.md), with [operator instructions](docs/migration-and-extensions.md) and [verification, resource evidence and limits](docs/evidence/m8-verification.md). PR #14 remains unmerged; readiness requires final-source CI. Universal plugin migration and complete Elementor compatibility are not claimed.

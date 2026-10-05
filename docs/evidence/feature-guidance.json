@@ -1643,6 +1643,340 @@
         "Affected release"
       ],
       "status": "implemented; integrated exact-source delivery verification pending"
+    },
+    {
+      "feature_id": "M8-01",
+      "area": "WordPress core migration",
+      "scope": "M8 first slice",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developer.wordpress.org/reference/functions/export_wp/",
+        "https://developer.wordpress.org/cli/commands/export/",
+        "https://developer.wordpress.org/reference/functions/_publish_post_hook/",
+        "https://docs.rs/quick-xml/0.42.0/quick_xml/",
+        "https://rustsec.org/advisories/RUSTSEC-2026-0195.html",
+        "https://rustsec.org/advisories/RUSTSEC-2026-0194.html",
+        "https://docs.rs/html5ever/0.39.0/html5ever/",
+        "https://docs.rs/rustix/latest/rustix/fs/fn.openat.html"
+      ],
+      "applicable_versions": [
+        "WXR 1.2",
+        "quick-xml 0.42.0 (upstream Rust floor 1.86; project floor 1.88)",
+        "html5ever 0.39.0 / markup5ever_rcdom 0.39.0",
+        "wpalt schema/archive 12"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Export is a supported content subset, not a complete plugin database.",
+        "Resolve XML namespaces, reject external entity/DTD and resource excess.",
+        "Fresh-target deterministic preview/private package; no inferred credentials, access or payment settlement.",
+        "Descriptor-relative no-follow regular local media; no fetch or unsafe path resolution."
+      ],
+      "tests": [
+        "wordpress_preview_package_recovers_content_without_inventing_private_access_or_payments",
+        "scripts/migration_acceptance.py",
+        "scripts/wordpress_migration_reference.py"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream export/version change",
+        "parser or filesystem vulnerability"
+      ],
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
+    },
+    {
+      "feature_id": "M8-02",
+      "area": "Explicit ACF scalar migration",
+      "scope": "M8 selected field adapter",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.advancedcustomfields.com/resources/update_field/",
+        "https://www.advancedcustomfields.com/resources/local-json/",
+        "https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-number.max_safe_integer"
+      ],
+      "applicable_versions": [
+        "ACF field-key references and selected scalar metadata; actual free plugin version recorded by CI",
+        "wpalt-acf-scalar-map-v1",
+        "wpalt schema/archive 12",
+        "ECMAScript Number safe-integer boundary"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Require explicit registered field-key/name/native-type agreement and reject ambiguity.",
+        "Bound mapping bytes/count, preserve typed scalar values without PHP execution or access inference.",
+        "Reject unsafe numeric magnitude; precise identifiers require explicit string mapping.",
+        "Bind mapping changes to the preview and recover native shared field definitions/values."
+      ],
+      "tests": [
+        "wordpress_preview_package_recovers_content_without_inventing_private_access_or_payments",
+        "scripts/migration_acceptance.py",
+        "scripts/wordpress_migration_reference.py (actual ACF 6.8.10 passed at 4419a0e)"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream ACF storage/registration change",
+        "native field/editor numeric contract change"
+      ],
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
+    },
+    {
+      "feature_id": "M8-03",
+      "area": "Explicit Elementor content projection",
+      "scope": "Selected draft content; full F024 incomplete",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developers.elementor.com/docs/data-structure/general-structure/",
+        "https://developers.elementor.com/docs/data-structure/widget-element/",
+        "https://github.com/elementor/elementor/blob/main/core/base/document.php"
+      ],
+      "applicable_versions": [
+        "Elementor export structure 0.4; installed free plugin version recorded by reference CI",
+        "wpalt-elementor-draft-v1",
+        "wpalt schema/archive 12"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Bound bytes, depth, unique elements and HTML before conversion.",
+        "Preserve supported heading/text order and report exact unsupported elements/settings without executable source.",
+        "Bind private new-file execution and explicit WXR projection selection to the reviewed plan; retain draft access."
+      ],
+      "tests": [
+        "tests/elementor.rs",
+        "scripts/migration_acceptance.py",
+        "scripts/wordpress_migration_reference.py"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "upstream data structure/version change",
+        "HTML parser security advisory"
+      ],
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
+    },
+    {
+      "feature_id": "M8-04",
+      "area": "Scoped external content API",
+      "scope": "Owner-issued external process read/draft access",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.rfc-editor.org/rfc/rfc6750",
+        "https://www.rfc-editor.org/rfc/rfc9700",
+        "https://developer.wordpress.org/rest-api/using-the-rest-api/authentication/"
+      ],
+      "applicable_versions": [
+        "wpalt API v1 content slice",
+        "Database 13; recovery graph 12; integration credentials not recovered"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Keep scoped external credentials separate from browser/recovery authority; protect storage and HTTPS transport.",
+        "Bound credential count/lifetime and keyset pagination; recheck current account, expiry and scope at mutation boundary.",
+        "Deny publication, scheduled/published record mutation, scope escalation, cookies and foreign origins; use existing domain validation/audit/optimistic versions."
+      ],
+      "tests": [
+        "scoped_integration_drafts_revoke_without_publication_or_recovery_authority",
+        "scripts/integration_acceptance.py",
+        "scripts/integration_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "authentication or account contract change",
+        "credential security advisory"
+      ],
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
+    },
+    {
+      "feature_id": "M8-05",
+      "area": "Independent local AI proposal worker",
+      "scope": "Selected local content proposal workflow; full F023 incomplete",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.ollama.com/api/generate",
+        "https://docs.python.org/3/library/urllib.request.html",
+        "https://docs.python.org/3/library/os.html#os.open",
+        "https://docs.ollama.com/capabilities/structured-outputs",
+        "https://ollama.com/library/qwen3:0.6b"
+      ],
+      "applicable_versions": [
+        "Ollama 0.35.1",
+        "Qwen3 0.6B digest 7df6b6e09427a769808717c0a93cadc4ae99ed4eb8bf5ca557c90846becea435",
+        "Python 3 standard library",
+        "wpalt API v1 content read/draft and native theme format 1"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Keep extension execution outside the CMS and grant sensitive source content explicitly.",
+        "Admit literal loopback model endpoints, refuse redirects/proxies, and bound inputs/responses/timeouts.",
+        "Write a new private source-bound proposal before applying only an unscheduled native draft; preserve owner review and handle stale/uncertain retries."
+      ],
+      "tests": [
+        "scripts/integration_acceptance.py (actual CMS and synthetic local model protocol)",
+        "scripts/integration_acceptance.cjs (owner scopes/live revocation)",
+        "scripts/local_ai_reference.py (actual installed model)",
+        "scripts/independent_theme_acceptance.cjs"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "local inference API/version change",
+        "transport or filesystem security change"
+      ],
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
+    },
+    {
+      "feature_id": "M8-06",
+      "area": "Selected free WPForms definition migration",
+      "scope": "Explicit separately exported primitive definitions; entries and operational actions excluded",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://plugins.svn.wordpress.org/wpforms-lite/tags/2.0.2.1/includes/class-form.php",
+        "https://plugins.svn.wordpress.org/wpforms-lite/tags/2.0.2.1/src/WPForms.php",
+        "https://developer.wordpress.org/reference/functions/export_wp/"
+      ],
+      "applicable_versions": [
+        "WPForms Lite 2.0.2.1",
+        "wpalt-wpforms-source-v1",
+        "wpalt portable graph 12"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Ordinary WXR excludes can_export=false WPForms definitions; require an explicit same-origin supplemental source.",
+        "Preserve JSON wire field order, labels and required flags for selected controls; report all omitted keys and reject unsupported whole forms.",
+        "Restore only unpublished native drafts with no notifications, inferred consent, registration, entries or financial actions; bind source to preview and quota counters."
+      ],
+      "tests": [
+        "tests/acceptance.rs::wordpress_preview_package_recovers_content_without_inventing_private_access_or_payments",
+        "scripts/wordpress_migration_reference.py"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "WPForms data/version change",
+        "native form schema or quota changes"
+      ],
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
+    },
+    {
+      "feature_id": "M8-07",
+      "area": "Transactional content replay and external webhook delivery",
+      "scope": "Content changes only; bounded journal and at-least-once delivery",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.rfc-editor.org/rfc/rfc2104",
+        "https://docs.python.org/3/library/fcntl.html",
+        "https://docs.python.org/3/library/os.html#os.fsync"
+      ],
+      "applicable_versions": [
+        "HMAC-SHA256 RFC2104",
+        "Python 3 Unix standard library",
+        "wpalt-content-event-v1 / wpalt-event-feed-v1",
+        "Database 14; portable domain graph 12"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Commit selected events with domain mutation; bound primary-key replay and report capacity gaps/source reset.",
+        "Keep webhook execution outside CMS authority; never forward bearer credentials, follow redirects or infer exactly-once delivery.",
+        "Advance a private atomic durable checkpoint only after successful signed delivery; deduplicate stable IDs on the receiver."
+      ],
+      "tests": [
+        "tests/acceptance.rs::integration_events_commit_with_content_and_report_bounded_replay_gaps",
+        "scripts/integration_acceptance.py"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "event schema/domain coverage change",
+        "transport/checkpoint/recovery change"
+      ],
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
+    },
+    {
+      "feature_id": "M8-08",
+      "area": "Independent native themes and trusted styling/assets assessment",
+      "scope": "Declarative public theme profile, independent example and local-layout proposal validation; no raw CSS/JS loader",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.w3.org/TR/CSP3/",
+        "https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html"
+      ],
+      "applicable_versions": [
+        "wpalt theme format 1",
+        "Public theme contract 1",
+        "WCAG 2.2 / CSP3"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Keep independently authored themes declarative, native-validator gated, draft before deliberate publication and no mandatory account.",
+        "Preserve separate public/admin typography contracts, responsive geometry, keyboard target/focus, text spacing and scoped accessibility.",
+        "Assess raw CSS/fonts/files as distinct explicit owner capabilities; keep authorization, CSP and public/private media authority outside theme control."
+      ],
+      "tests": [
+        "scripts/independent_theme_acceptance.cjs",
+        "scripts/local_ai_reference.py",
+        "tests/acceptance.rs::theme_styles_are_template_scoped_and_preserve_reachable_components"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "theme grammar, CSS generation or asset boundary change",
+        "accessibility or CSP guidance update"
+      ],
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
+    },
+    {
+      "feature_id": "M8-09",
+      "area": "Selected audience/access/learning/catalog migration definitions",
+      "scope": "Bounded explicit plugin supplement and safe native recovery",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://github.com/mailpoet/mailpoet/blob/trunk/doc/api_methods/GetSubscribers.md",
+        "https://www.paidmembershipspro.com/documentation/advanced/api/rest-api/",
+        "https://github.com/Automattic/sensei/blob/trunk/includes/class-sensei-course.php",
+        "https://woocommerce.github.io/code-reference/classes/WC-Product.html"
+      ],
+      "applicable_versions": [
+        "wpalt-plugin-clusters-v1",
+        "PMPro 3.8.7 reference target; other actual plugin versions recorded by reference CI"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Never infer consent, access or financial settlement from selected source definitions.",
+        "Hold WXR core publication/media when omitted PMPro restriction tables make access ambiguous.",
+        "Preserve selected ordered lessons and exact decimal minor-unit price without float rounding; reject ambiguous input before output."
+      ],
+      "tests": [
+        "tests/acceptance.rs::selected_plugin_clusters_recover_definitions_without_consent_access_or_settlement",
+        "scripts/migration_acceptance.py",
+        "scripts/wordpress_migration_reference.py"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "source plugin API/configuration change",
+        "native graph or authority change"
+      ],
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

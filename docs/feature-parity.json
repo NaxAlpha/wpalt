@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M7 defined-scope implementation verified; final-source gates required before PR #13 readiness.",
+  "milestone": "M7 merged/verified; selected M8 contract implemented and implementation checkpoint verified. PR #14 final documentation-source gates precede readiness; broader feature limits remain explicit.",
   "capabilities": [
     {
       "id": "F001",
@@ -360,10 +360,11 @@
       "capability": "AI layout/content generation locally",
       "deployment": "W",
       "milestone": "M8",
-      "status": "planned",
+      "status": "implemented-defined-M8-scope: actual local content and bounded theme-layout proposals verified; no general generation-quality guarantee",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "sequencing_reason": "Local AI worker integrations and Elementor import/output mapping belong to extensibility/migration; no PHP plugin runtime compatibility is assumed. Requirement retained for explicit reconciliation."
+      "sequencing_reason": "Local AI worker integrations and Elementor import/output mapping belong to extensibility/migration; no PHP plugin runtime compatibility is assumed. Requirement retained for explicit reconciliation.",
+      "implementation": "examples/integrations/local_ai_worker.py; scoped API read/draft; actual Ollama 0.35.1/Qwen3 0.6B content and bounded native-theme layout workflow; scripts/local_ai_reference.py"
     },
     {
       "id": "F024",
@@ -371,10 +372,11 @@
       "capability": "Exact Elementor template/widget compatibility",
       "deployment": "L",
       "milestone": "M8",
-      "status": "planned",
+      "status": "in-progress: selected 0.4 heading/text projection with exact loss reports; full styles/widgets/conditions incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "sequencing_reason": "Local AI worker integrations and Elementor import/output mapping belong to extensibility/migration; no PHP plugin runtime compatibility is assumed. Requirement retained for explicit reconciliation."
+      "sequencing_reason": "Local AI worker integrations and Elementor import/output mapping belong to extensibility/migration; no PHP plugin runtime compatibility is assumed. Requirement retained for explicit reconciliation.",
+      "implementation": "src/platform/elementor.rs; explicit WXR --elementor-content; actual free Elementor 4.3.3 saved document/export reconciliation passed at 17fb901; unimplemented widgets/style details remain explicit losses"
     },
     {
       "id": "F025",

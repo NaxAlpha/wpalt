@@ -12,6 +12,7 @@ pub mod membership;
 pub mod migrations;
 pub mod model;
 pub mod operations;
+pub mod platform;
 pub mod schema;
 pub mod theme;
 pub mod view;

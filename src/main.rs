@@ -31,6 +31,46 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Stopped-host least-privilege credentials for external integrations.
+    Integration {
+        #[command(subcommand)]
+        command: IntegrationCommand,
+    },
+    /// Project bounded Elementor 0.4 content offline, with explicit losses.
+    ElementorProject {
+        input: PathBuf,
+        #[arg(long, requires = "output")]
+        execute: Option<String>,
+        #[arg(long, requires = "execute")]
+        output: Option<PathBuf>,
+    },
+    /// Assess a WordPress WXR 1.2 export offline without database or network access.
+    #[command(name = "wordpress-assess")]
+    WordPressAssess { input: PathBuf },
+    /// Preview a core WordPress fresh-target package from an empty initialized template.
+    #[command(name = "wordpress-prepare")]
+    WordPressPrepare {
+        input: PathBuf,
+        #[arg(long)]
+        media_dir: Option<PathBuf>,
+        #[arg(long)]
+        field_mapping: Option<PathBuf>,
+        /// Explicitly project Elementor 0.4 heading/text content; retain draft and review losses.
+        #[arg(long)]
+        elementor_content: bool,
+        /// Separately exported WPForms definitions; imports selected controls as unpublished drafts.
+        #[arg(long)]
+        wpforms_export: Option<PathBuf>,
+        /// Explicit quarantined audience, disabled membership, draft learning and catalog definitions.
+        #[arg(long)]
+        cluster_export: Option<PathBuf>,
+        #[arg(long)]
+        owner_email: String,
+        #[arg(long, requires = "output")]
+        execute: Option<String>,
+        #[arg(long, requires = "execute")]
+        output: Option<PathBuf>,
+    },
     /// Initialize a site. Read the initial password from stdin, never an argv flag.
     Init {
         #[arg(long)]
@@ -178,6 +218,26 @@ enum Command {
         posts: u32,
     },
 }
+#[derive(Subcommand)]
+enum IntegrationCommand {
+    /// Create content:read, optionally content:draft. Secret goes to a NEW private file.
+    Create {
+        #[arg(long)]
+        user_email: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        draft: bool,
+        #[arg(long, default_value_t = 7)]
+        days: i64,
+        output: PathBuf,
+    },
+    List,
+    Revoke {
+        id: String,
+    },
+}
+
 #[derive(Subcommand)]
 enum ShopCommand {
     ProductImport {
@@ -411,6 +471,10 @@ async fn shop_command(app: &App, command: ShopCommand) -> wpalt::error::Result<(
 }
 #[derive(Subcommand)]
 enum ThemeCommand {
+    /// Validate a native package against this site without saving or publishing it.
+    Validate {
+        input: PathBuf,
+    },
     Import {
         id: String,
         input: PathBuf,
@@ -680,6 +744,46 @@ async fn main() -> anyhow::Result<()> {
     // Portable recovery tools operate on files/config only: no live server,
     // database, site lock, installation or vendor account is needed.
     match &cli.command {
+        Command::ElementorProject {
+            input,
+            execute,
+            output,
+        } => {
+            let bytes = backup::read_bounded(input, wpalt::platform::elementor::MAX_BYTES)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            let projection =
+                wpalt::platform::elementor::project(&bytes).map_err(|e| anyhow::anyhow!(e.1))?;
+            let package = serde_json::json!({"format":"wpalt-elementor-draft-v1",
+                "document":serde_json::from_str::<serde_json::Value>(&projection.document.encode())?,
+                "report":projection.report});
+            let encoded = serde_json::to_vec(&package)?;
+            let plan = auth::digest(&encoded);
+            if let Some(reviewed) = execute {
+                anyhow::ensure!(
+                    reviewed == &plan,
+                    "Source or projection changed; review the current plan."
+                );
+                backup::write_private(output.as_ref().expect("clap requires output"), &encoded)?;
+            }
+            println!(
+                "{}",
+                serde_json::to_string_pretty(
+                    &serde_json::json!({"plan":plan,"report":package["report"],"output_created":execute.is_some()})
+                )?
+            );
+            return Ok(());
+        }
+        Command::WordPressAssess { input } => {
+            let bytes = backup::read_bounded(input, wpalt::platform::wordpress::MAX_BYTES)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            let report = wpalt::platform::wordpress::assess(&bytes)
+                .map_err(|e| anyhow::anyhow!(e.1))?
+                .report;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            return Ok(());
+        }
         Command::WalStore { input, name } => {
             wpalt::operations::postgres_archive::store(&config, input, name)
                 .await
@@ -798,8 +902,12 @@ async fn main() -> anyhow::Result<()> {
     );
     // Journal command classes without collecting argv, paths or secrets.
     let route = match &cli.command {
+        Command::Integration { .. } => Some("cli:integration"),
         Command::Init { .. } => Some("cli:init"),
         Command::Backup { .. } => Some("cli:backup"),
+        Command::WordPressPrepare {
+            execute: Some(_), ..
+        } => Some("cli:wordpress-prepare"),
         Command::RecoveryRun => Some("cli:recovery-run"),
         Command::UpgradePrepare { .. } => Some("cli:upgrade-prepare"),
         Command::VideoTranscode { .. } => Some("cli:video-transcode"),
@@ -861,6 +969,67 @@ async fn main() -> anyhow::Result<()> {
 
 async fn execute(app: App, command: Command) -> anyhow::Result<()> {
     match command {
+        Command::Integration { command } => {
+            use sqlx::Row;
+            let row = sqlx::query(
+                "SELECT id,email,name,role FROM users WHERE role='admin' ORDER BY id LIMIT 1",
+            )
+            .fetch_optional(&app.db.pool)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Initialize an owner account first."))?;
+            let owner = Session {
+                user: User {
+                    id: row.get("id"),
+                    email: row.get("email"),
+                    name: row.get("name"),
+                    role: row.get("role"),
+                },
+                hash: String::new(),
+                csrf: String::new(),
+            };
+            use wpalt::platform::integrations as api;
+            match command {
+                IntegrationCommand::List => println!(
+                    "{}",
+                    serde_json::to_string_pretty(
+                        &api::inventory(&app, &owner)
+                            .await
+                            .map_err(|e| anyhow::anyhow!(e.1))?
+                    )?
+                ),
+                IntegrationCommand::Revoke { id } => {
+                    api::revoke(&app, &owner, &id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e.1))?;
+                    println!("Credential revoked.");
+                }
+                IntegrationCommand::Create {
+                    user_email,
+                    name,
+                    draft,
+                    days,
+                    output,
+                } => {
+                    anyhow::ensure!(!output.exists(), "Choose a new private credential file.");
+                    let issued = api::issue(&app, &owner, &user_email, &name, draft, days)
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e.1))?;
+                    if let Err(error) = backup::write_private(&output, issued.token.as_bytes()) {
+                        api::revoke(&app, &owner, &issued.id)
+                            .await
+                            .map_err(|e| anyhow::anyhow!(e.1))?;
+                        return Err(error.context(
+                            "Credential delivery failed; its authorization was revoked.",
+                        ));
+                    }
+                    println!(
+                        "{}",
+                        serde_json::json!({"id":issued.id,"scopes":if draft {vec!["content:read","content:draft"]}else{vec!["content:read"]},"secret_written":true})
+                    );
+                }
+            }
+        }
+
         Command::Init {
             admin_email,
             admin_name,
@@ -870,6 +1039,69 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
                 "Site initialized. Run wpalt serve, then visit {}/login",
                 app.config.origin()
             );
+        }
+        Command::WordPressPrepare {
+            input,
+            media_dir,
+            field_mapping,
+            elementor_content,
+            wpforms_export,
+            cluster_export,
+            owner_email,
+            execute,
+            output,
+        } => {
+            let bytes = backup::read_bounded(&input, wpalt::platform::wordpress::MAX_BYTES)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            let mapping = if let Some(path) = field_mapping {
+                let raw = backup::read_bounded(&path, wpalt::platform::acf::MAX_BYTES)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e.1))?;
+                Some(wpalt::platform::acf::Mapping::parse(&raw).map_err(|e| anyhow::anyhow!(e.1))?)
+            } else {
+                None
+            };
+            let forms = if let Some(path) = wpforms_export {
+                Some(
+                    backup::read_bounded(&path, wpalt::platform::wpforms::MAX_BYTES)
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e.1))?,
+                )
+            } else {
+                None
+            };
+            let clusters = if let Some(path) = cluster_export {
+                Some(
+                    backup::read_bounded(&path, wpalt::platform::clusters::MAX_BYTES)
+                        .await
+                        .map_err(|e| anyhow::anyhow!(e.1))?,
+                )
+            } else {
+                None
+            };
+            let prepared = wpalt::platform::wordpress::prepare_with_adapters(
+                &app,
+                &bytes,
+                &owner_email,
+                media_dir.as_deref(),
+                wpalt::platform::wordpress::AdapterOptions {
+                    fields: mapping.as_ref(),
+                    elementor_content,
+                    wpforms_export: forms.as_deref(),
+                    cluster_export: clusters.as_deref(),
+                },
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?;
+            if let Some(plan) = execute {
+                anyhow::ensure!(
+                    plan == prepared.plan,
+                    "WordPress migration preview changed; review the new plan before execution"
+                );
+                backup::write_private(&output.expect("clap requires output"), &prepared.bytes)?;
+            }
+            println!("{}", serde_json::to_string_pretty(&prepared.report)?);
         }
         Command::Config => unreachable!(),
         Command::UpgradePrepare { output, key_file } => {
@@ -906,7 +1138,9 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             .map_err(|e| anyhow::anyhow!(e.1))?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
-        Command::WalStore { .. }
+        Command::ElementorProject { .. }
+        | Command::WordPressAssess { .. }
+        | Command::WalStore { .. }
         | Command::WalRestore { .. }
         | Command::RecoveryInspect { .. }
         | Command::RecoveryFile { .. }
@@ -1078,6 +1312,15 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             use wpalt::{schema, theme};
             let result: wpalt::error::Result<()> = async {
                 match command {
+                    ThemeCommand::Validate { input } => {
+                        let bytes = backup::read_bounded(&input, 256 * 1024).await?;
+                        let raw = std::str::from_utf8(&bytes).map_err(|_| {
+                            wpalt::error::Error::invalid("Use a UTF-8 theme package.")
+                        })?;
+                        let package =
+                            theme::Package::parse(raw, &schema::Registry::load(&app).await?)?;
+                        theme::validate_literal_references(&app, &package).await?;
+                    }
                     ThemeCommand::Import { id, input, publish } => {
                         let file = std::fs::File::open(input)?;
                         if file.metadata()?.len() > 256 * 1024 {
