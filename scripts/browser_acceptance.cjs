@@ -128,6 +128,7 @@ async function freePort() {
     page.getByRole("button", { name: "Sign in", exact: true }),
   );
   await page.waitForURL(origin + "/admin");
+  if (process.env.WPALT_MIGRATION_ONLY) { await require("./migration_acceptance.cjs")(owner,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_SPAM_ONLY) {
     await require("./spam_acceptance.cjs")(owner, origin, output);
     return;
@@ -659,6 +660,7 @@ async function freePort() {
   await require("./authoring_acceptance.cjs")(owner, origin, output, mediaUrl);
   await require("./membership_acceptance.cjs")(owner, origin, output);
   await require("./commerce_acceptance.cjs")(owner, origin, output);
+  await require("./migration_acceptance.cjs")(owner,origin,output);
   await require("./operations_acceptance.cjs")(owner, origin, output, password);
   assert.deepEqual(errors, [], "Browser JavaScript errors");
   assert.deepEqual(remote, [], "Unexpected external runtime requests");

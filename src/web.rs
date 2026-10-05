@@ -29,6 +29,7 @@ pub fn router(app: App) -> Router {
     };
     Router::new()
         .merge(crate::builder_web::routes())
+        .merge(crate::platform::web::routes())
         .merge(crate::operations::privacy::routes())
         .merge(business)
         .merge(crate::discovery::routes())
@@ -2105,7 +2106,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
             @if app.clone_held.load(std::sync::atomic::Ordering::SeqCst) {
                 section class="panel" {h2 {"Read-only recovered clone"}p {"Background work and HTTP writes are paused. Review source shutdown, message queues, external payment ownership, identity callbacks and credentials before stopped-host activation. Presentation previews remain available; source sessions and passkeys were removed."}}
             }
-            div class="split" {section class="panel" {h2 {"Back up & move"}p class="muted" {"Download a consistent database-and-media snapshot. It includes password hashes and private content; keep it secure. This download is unencrypted."}
+            div class="split" {section class="panel" {h2 {"Back up & move"}p {a href="/admin/migration" {"Assess a WordPress migration"}}p class="muted" {"Download a consistent database-and-media snapshot. It includes password hashes and private content; keep it secure. This download is unencrypted."}
                 form method="post" action="/admin/backup" {(view::csrf(&s))button {"Download full backup"}}
                 p class="muted" {"Restore with the CLI into an empty database/data directory while the server is stopped. Keep an independent copy to recover from losing this host."}
                 a href="/admin/export" {"Export portable content JSON →"}

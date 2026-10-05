@@ -298,3 +298,9 @@ M6 PR #12 is merged; M7 is active under [its completion contract](m7-contract.md
 ## M7 defined-scope delivery — 2026-10-05
 
 All 27 required families have integrated evidence in [verification](evidence/m7-verification.md). Seven implementation gates passed, including PostgreSQL, Linux browsers, source-unavailable PITR and matched WordPress/plugin workload. Final documentation-source gates and independent archive verification determine PR #13 readiness. Full plugin parity/distributed operation remain future scope. Human merge is separate.
+
+## M7 merged; M8 active — 2026-10-05
+
+User authorized M7 PR #13 merge and M8. M7 merged as `1fb3d6bd51cb7f37742cb07350691070940ade18`; final PR run 37259699636 passed all seven gates and the exact clean archive was independently verified. Actual-main run 37263670903 is tracked separately. M8 follows [its contract](m8-contract.md); no M8 completion claim.
+
+M7 actual-main run 37263670903 passed all core jobs and published `nightly-202610050428-1fb3d6bd51cb`. Downloaded release verified against source `1fb3d6bd51cb7f37742cb07350691070940ade18`; archive SHA-256 `0eb3176a15213141f28a9fb858874f6afdc6dd9394a742c1f833fc1546433d87`, executable SHA-256 `10cbc42e4b3f4940a0c34c2da3ed7092523b166dc7a8e932d791e29720b7bc42`. M8's first core migration slice is documented in [migration and extensions](migration-and-extensions.md); it does not complete M8.

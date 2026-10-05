@@ -31,6 +31,22 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Assess a WordPress WXR 1.2 export offline without database or network access.
+    #[command(name = "wordpress-assess")]
+    WordPressAssess { input: PathBuf },
+    /// Preview a core WordPress fresh-target package from an empty initialized template.
+    #[command(name = "wordpress-prepare")]
+    WordPressPrepare {
+        input: PathBuf,
+        #[arg(long)]
+        media_dir: Option<PathBuf>,
+        #[arg(long)]
+        owner_email: String,
+        #[arg(long, requires = "output")]
+        execute: Option<String>,
+        #[arg(long, requires = "execute")]
+        output: Option<PathBuf>,
+    },
     /// Initialize a site. Read the initial password from stdin, never an argv flag.
     Init {
         #[arg(long)]
@@ -680,6 +696,16 @@ async fn main() -> anyhow::Result<()> {
     // Portable recovery tools operate on files/config only: no live server,
     // database, site lock, installation or vendor account is needed.
     match &cli.command {
+        Command::WordPressAssess { input } => {
+            let bytes = backup::read_bounded(input, wpalt::platform::wordpress::MAX_BYTES)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            let report = wpalt::platform::wordpress::assess(&bytes)
+                .map_err(|e| anyhow::anyhow!(e.1))?
+                .report;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            return Ok(());
+        }
         Command::WalStore { input, name } => {
             wpalt::operations::postgres_archive::store(&config, input, name)
                 .await
@@ -800,6 +826,9 @@ async fn main() -> anyhow::Result<()> {
     let route = match &cli.command {
         Command::Init { .. } => Some("cli:init"),
         Command::Backup { .. } => Some("cli:backup"),
+        Command::WordPressPrepare {
+            execute: Some(_), ..
+        } => Some("cli:wordpress-prepare"),
         Command::RecoveryRun => Some("cli:recovery-run"),
         Command::UpgradePrepare { .. } => Some("cli:upgrade-prepare"),
         Command::VideoTranscode { .. } => Some("cli:video-transcode"),
@@ -871,6 +900,33 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
                 app.config.origin()
             );
         }
+        Command::WordPressPrepare {
+            input,
+            media_dir,
+            owner_email,
+            execute,
+            output,
+        } => {
+            let bytes = backup::read_bounded(&input, wpalt::platform::wordpress::MAX_BYTES)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            let prepared = wpalt::platform::wordpress::prepare_with_media(
+                &app,
+                &bytes,
+                &owner_email,
+                media_dir.as_deref(),
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?;
+            if let Some(plan) = execute {
+                anyhow::ensure!(
+                    plan == prepared.plan,
+                    "WordPress migration preview changed; review the new plan before execution"
+                );
+                backup::write_private(&output.expect("clap requires output"), &prepared.bytes)?;
+            }
+            println!("{}", serde_json::to_string_pretty(&prepared.report)?);
+        }
         Command::Config => unreachable!(),
         Command::UpgradePrepare { output, key_file } => {
             let receipt = wpalt::operations::upgrade::prepare(&app, &output, &key_file)
@@ -906,7 +962,8 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             .map_err(|e| anyhow::anyhow!(e.1))?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
-        Command::WalStore { .. }
+        Command::WordPressAssess { .. }
+        | Command::WalStore { .. }
         | Command::WalRestore { .. }
         | Command::RecoveryInspect { .. }
         | Command::RecoveryFile { .. }

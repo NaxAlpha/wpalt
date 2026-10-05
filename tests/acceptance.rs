@@ -5588,3 +5588,304 @@ async fn url_aware_clone_stays_read_only_across_recovery_until_explicit_owner_re
         site.close().await;
     }
 }
+
+#[tokio::test]
+async fn wordpress_preview_package_recovers_content_without_inventing_private_access_or_payments() {
+    use wpalt::platform::wordpress;
+    let source = include_bytes!("fixtures/wordpress-core.xml");
+    let assessment = wordpress::assess(source).unwrap();
+    assert_eq!(assessment.report["source_items"], 4);
+    assert_eq!(assessment.report["supported_core_items"], 2);
+    assert!(
+        assessment.report["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|w| w["type"] == "shop_order")
+    );
+    // Namespace prefixes are aliases; namespace URIs determine interpretation.
+    let aliased = String::from_utf8(source.to_vec())
+        .unwrap()
+        .replace("wp:", "export:")
+        .replace("xmlns:wp=", "xmlns:export=");
+    assert_eq!(
+        wordpress::assess(aliased.as_bytes()).unwrap().report["supported_core_items"],
+        2
+    );
+    for invalid in [
+        String::from_utf8(source.to_vec()).unwrap().replace(
+            "<channel>",
+            "<!DOCTYPE channel [<!ENTITY remote SYSTEM 'file:///etc/passwd'>]><channel>",
+        ),
+        String::from_utf8(source.to_vec())
+            .unwrap()
+            .replace("<wp:post_id>13</wp:post_id>", "<wp:post_id>12</wp:post_id>"),
+        String::from_utf8(source.to_vec()).unwrap().replace(
+            "http://wordpress.org/export/1.2/",
+            "https://attacker.invalid/export/",
+        ),
+        String::from_utf8(source.to_vec())
+            .unwrap()
+            .replace("garden &amp;", "garden &external;"),
+        String::from_utf8(source.to_vec())
+            .unwrap()
+            .replace("</rss>", ""),
+        format!("<rss>{}</rss>", "<x>".repeat(70)),
+    ] {
+        assert!(wordpress::assess(invalid.as_bytes()).is_err());
+    }
+    for postgres in engines() {
+        let template = Site::new(postgres, true).await;
+        let email = template.session.as_ref().unwrap().user.email.clone();
+        let router = wpalt::web::router(template.app.clone());
+        let anonymous = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/migration")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_ne!(anonymous.status(), StatusCode::OK);
+        let multipart = |csrf: &str, action: &str, xml: &str| {
+            format!(
+                "--migration-boundary\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{csrf}\r\n--migration-boundary\r\nContent-Disposition: form-data; name=\"action\"\r\n\r\n{action}\r\n--migration-boundary\r\nContent-Disposition: form-data; name=\"source\"; filename=\"export.xml\"\r\nContent-Type: application/xml\r\n\r\n{xml}\r\n--migration-boundary--\r\n"
+            )
+        };
+        for (csrf, action, expected) in [
+            ("wrong", "preview", StatusCode::FORBIDDEN),
+            (template.session().csrf.as_str(), "preview", StatusCode::OK),
+            (template.session().csrf.as_str(), "download", StatusCode::OK),
+        ] {
+            let response = router
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/admin/migration")
+                        .header("cookie", format!("wpalt_session={}", template.token))
+                        .header("origin", template.app.config.origin())
+                        .header(
+                            "content-type",
+                            "multipart/form-data; boundary=migration-boundary",
+                        )
+                        .body(Body::from(multipart(
+                            csrf,
+                            action,
+                            std::str::from_utf8(source).unwrap(),
+                        )))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), expected);
+            if action == "download" && expected == StatusCode::OK {
+                assert_eq!(response.headers()["cache-control"], "no-store");
+                let report: serde_json::Value = serde_json::from_slice(
+                    &response.into_body().collect().await.unwrap().to_bytes(),
+                )
+                .unwrap();
+                assert_eq!(report["source_items"], 4);
+            }
+        }
+        let prepared = wordpress::prepare(&template.app, source, &email)
+            .await
+            .unwrap();
+        let repeated = wordpress::prepare(&template.app, source, &email)
+            .await
+            .unwrap();
+        assert_eq!(prepared.plan, repeated.plan);
+        assert_eq!(prepared.bytes, repeated.bytes);
+        assert!(template.app.db.pool.size() > 0);
+        let template_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM posts")
+            .fetch_one(&template.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            template_count, 0,
+            "Preview/package creation must not mutate the template"
+        );
+        assert!(
+            wordpress::prepare(&template.app, source, "unmapped@example.invalid")
+                .await
+                .is_err()
+        );
+        let media_root = tempfile::tempdir().unwrap();
+        std::fs::create_dir(media_root.path().join("2025")).unwrap();
+        std::fs::write(
+            media_root.path().join("2025/garden.png"),
+            include_bytes!("fixtures/animated.png"),
+        )
+        .unwrap();
+        let prepared =
+            wordpress::prepare_with_media(&template.app, source, &email, Some(media_root.path()))
+                .await
+                .unwrap();
+        assert_eq!(prepared.report["media_mapped"], 1);
+        let protected=String::from_utf8(source.to_vec()).unwrap().replace("<wp:post_id>12</wp:post_id>","<wp:post_id>12</wp:post_id><wp:post_password>source-secret-not-imported</wp:post_password>");
+        let protected_package = wordpress::prepare_with_media(
+            &template.app,
+            protected.as_bytes(),
+            &email,
+            Some(media_root.path()),
+        )
+        .await
+        .unwrap();
+        assert!(
+            protected_package.report["warnings"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|w| w["code"] == "access_mapping_required")
+        );
+        let e: serde_json::Value = serde_json::from_slice(&protected_package.bytes).unwrap();
+        let snapshot: serde_json::Value =
+            serde_json::from_str(e["payload"].as_str().unwrap()).unwrap();
+        assert!(
+            snapshot["tables"]["posts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|p| p["status"] == "draft")
+        );
+        assert_eq!(snapshot["tables"]["media"][0]["visibility"], "private");
+        let unsafe_path = String::from_utf8(source.to_vec()).unwrap().replace(
+            "2025/garden.png</wp:meta_value>",
+            "../outside.png</wp:meta_value>",
+        );
+        assert!(
+            wordpress::prepare_with_media(
+                &template.app,
+                unsafe_path.as_bytes(),
+                &email,
+                Some(media_root.path())
+            )
+            .await
+            .is_err()
+        );
+        #[cfg(unix)]
+        {
+            std::fs::remove_file(media_root.path().join("2025/garden.png")).unwrap();
+            std::os::unix::fs::symlink(
+                std::env::current_dir()
+                    .unwrap()
+                    .join("tests/fixtures/animated.png"),
+                media_root.path().join("2025/garden.png"),
+            )
+            .unwrap();
+            assert!(
+                wordpress::prepare_with_media(
+                    &template.app,
+                    source,
+                    &email,
+                    Some(media_root.path())
+                )
+                .await
+                .is_err()
+            );
+            std::fs::remove_file(media_root.path().join("2025/garden.png")).unwrap();
+            std::fs::write(
+                media_root.path().join("2025/garden.png"),
+                include_bytes!("fixtures/animated.png"),
+            )
+            .unwrap();
+        }
+        let target = Site::new(postgres, false).await;
+        backup::restore(&target.app, &prepared.bytes).await.unwrap();
+        let story = wpalt::model::Post::from_row(
+            sqlx::query("SELECT * FROM posts WHERE slug=$1")
+                .bind("garden")
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(story.title, "A garden & its people");
+        assert_eq!(story.status, "published");
+        let rendered = wpalt::web::router(target.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/garden")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rendered.status(), StatusCode::OK);
+        let html = String::from_utf8(
+            rendered
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .to_vec(),
+        )
+        .unwrap();
+        assert!(html.contains("<strong>quiet garden</strong>"));
+        assert!(html.contains("<table>"));
+        assert!(html.contains("First note"));
+        assert!(html.contains("let example = 1 &lt; 2;"));
+        assert!(!html.contains("never execute"));
+        assert!(story.document.contains("/media/"));
+        let media_id: String = sqlx::query_scalar("SELECT id FROM media")
+            .fetch_one(&target.app.db.pool)
+            .await
+            .unwrap();
+        let media_response = wpalt::web::router(target.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/media/{media_id}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(media_response.status(), StatusCode::OK);
+        assert_eq!(
+            media_response
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .as_ref(),
+            include_bytes!("fixtures/animated.png")
+        );
+        assert!(story.body.contains("quiet garden"));
+        assert!(!story.document.contains("never execute"));
+        assert!(story.seo.contains("Independent garden stories."));
+        let private =
+            sqlx::query("SELECT id FROM posts WHERE published_slug=$1 AND status='published'")
+                .bind("private-page")
+                .fetch_optional(&target.app.db.pool)
+                .await
+                .unwrap();
+        assert!(
+            private.is_none(),
+            "Source private page must not become public without access mapping"
+        );
+        let counts=sqlx::query("SELECT (SELECT COUNT(*) FROM comments) AS comments,(SELECT COUNT(*) FROM terms) AS terms,(SELECT COUNT(*) FROM shop_orders) AS orders").fetch_one(&target.app.db.pool).await.unwrap();
+        assert_eq!(counts.get::<i64, _>("comments"), 1);
+        assert_eq!(counts.get::<i64, _>("terms"), 2);
+        assert_eq!(counts.get::<i64, _>("orders"), 0);
+        let response = wpalt::web::router(target.app.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/2025/04/garden/")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY);
+        assert_eq!(response.headers()["location"], "/garden");
+        assert!(
+            backup::restore(&target.app, &prepared.bytes).await.is_err(),
+            "A retry cannot overwrite an occupied site"
+        );
+        template.close().await;
+        target.close().await;
+    }
+}

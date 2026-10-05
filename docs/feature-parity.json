@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M7 defined-scope implementation verified; final-source gates required before PR #13 readiness.",
+  "milestone": "M7 merged/verified; M8 active and incomplete. Core migration first slice is under development; F023/F024 and remaining M8 contract outputs remain required.",
   "capabilities": [
     {
       "id": "F001",
