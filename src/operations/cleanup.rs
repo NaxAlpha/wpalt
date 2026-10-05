@@ -267,7 +267,7 @@ pub async fn execute(app: &App, expected: &str, cutoff: i64) -> Result<Outcome> 
         .clone()
         .try_acquire_owned()
         .map_err(|_| Error::invalid("Maintenance workers are busy; try again shortly."))?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let plan = inventory(app, cutoff).await?;
     if plan.hash != expected {
         return Err(Error::conflict());

@@ -14,7 +14,7 @@ const binary = path.resolve(
   process.env.WPALT_BINARY || path.join(root, "target/debug/wpalt"),
 );
 const password = crypto.randomBytes(24).toString("hex");
-let server, browser, logFd;
+let server, browser, logFd, localFixture;
 function command(config, args, input) {
   const r = spawnSync(binary, ["--config", config, ...args], {
     input,
@@ -39,10 +39,12 @@ async function freePort() {
 (async () => {
   const port = await freePort(),
     origin = `http://localhost:${port}`;
+  if (process.env.WPALT_LOCAL_PROCESSES) localFixture = await require("./local_process_browser_fixture.cjs")(temporary);
   const config = path.join(temporary, "site.toml");
+  const databaseUrl = localFixture ? localFixture.databaseUrl : `sqlite://${temporary}/site.db?mode=rwc`;
   fs.writeFileSync(
     config,
-    `database_url = "sqlite://${temporary}/site.db?mode=rwc"\ndata_dir = "${temporary}/data"\nlisten = "127.0.0.1:${port}"\nbase_url = "${origin}"\n`,
+    `database_url = ${JSON.stringify(databaseUrl)}\ndata_dir = "${temporary}/data"\nlisten = "127.0.0.1:${port}"\nbase_url = "${origin}"\n`,
   );
   if (process.env.WPALT_SPAM_ONLY) fs.appendFileSync(config, "\n[spam]\nenabled = true\nproof_bits = 8\n");
   if (process.env.WPALT_SCRIPTS_ONLY) {
@@ -76,15 +78,18 @@ async function freePort() {
     fs.writeFileSync(config,`database_url = "sqlite://${temporary}/clone.db?mode=rwc"\ndata_dir = "${temporary}/clone-data"\nlisten = "127.0.0.1:${port}"\nbase_url = "${origin}"\n`);
     command(config,['restore',cloned]);
   }
-  logFd = fs.openSync(path.join(temporary, "server.log"), "w");
-  server = spawn(binary, ["--config", config, "serve"], {
-    stdio: ["ignore", logFd, logFd],
-  });
+  if (localFixture) {
+    assert(!process.env.WPALT_CLONE_ONLY, "Clone-only fixture uses its separately supported single-site path");
+    await localFixture.start(binary, config, port);
+  } else {
+    logFd = fs.openSync(path.join(temporary, "server.log"), "w");
+    server = spawn(binary, ["--config", config, "serve"], { stdio: ["ignore", logFd, logFd] });
+  }
   for (let i = 0; i < 100; i++) {
     try {
       if ((await fetch(origin + "/health")).ok) break;
     } catch (_) {}
-    assert.equal(server.exitCode, null, "Server failed to start");
+    if (server) assert.equal(server.exitCode, null, "Server failed to start");
     if (i === 99) throw Error("Server readiness timed out");
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
@@ -103,7 +108,9 @@ async function freePort() {
   const page = await owner.newPage(),
     visitor = await publicContext.newPage();
   const errors = [],
-    remote = [];
+    remote = [],
+    passkeyNodes = [];
+  if (localFixture) owner.on("response", r => { const route = new URL(r.url()).pathname; if (route.includes("passkeys/") && (route.endsWith("/start") || route.endsWith("/finish"))) passkeyNodes.push({route,node:r.headers()["x-wpalt-node"],status:r.status()}); });
   for (const context of [owner, publicContext]) {
     context.on("page", (p) => p.on("pageerror", (e) => errors.push(e.message)));
     context.on("request", (r) => {
@@ -666,6 +673,12 @@ async function freePort() {
   await require("./integration_acceptance.cjs")(owner,origin,output);
   await require("./independent_theme_acceptance.cjs")(owner,publicContext,origin,output);
   await require("./operations_acceptance.cjs")(owner, origin, output, password);
+  if (localFixture) {
+    const registration = passkeyNodes.filter(r=>r.route.startsWith("/account/passkeys/"));
+    const authentication = passkeyNodes.filter(r=>r.route.startsWith("/passkeys/login/"));
+    const crosses = [registration,authentication].some(rows=>rows.some(r=>r.route.endsWith("/start") && r.status===200 && rows.some(f=>f.route.endsWith("/finish") && f.status===200 && f.node && f.node!==r.node)));
+    assert(crosses, "Actual passkey challenge must finish on a different local process");
+  }
   assert.deepEqual(errors, [], "Browser JavaScript errors");
   assert.deepEqual(remote, [], "Unexpected external runtime requests");
   fs.writeFileSync(
@@ -695,6 +708,7 @@ async function freePort() {
         ],
         external_requests: remote.length,
         script_errors: errors.length,
+        ...(localFixture ? { local_processes: {...localFixture.report(), passkey_nodes:passkeyNodes} } : {}),
       },
       null,
       2,
@@ -741,6 +755,7 @@ async function freePort() {
         });
       });
     }
+    if (localFixture) await localFixture.close();
     if (logFd !== undefined) fs.closeSync(logFd);
     fs.rmSync(temporary, { recursive: true, force: true });
   });

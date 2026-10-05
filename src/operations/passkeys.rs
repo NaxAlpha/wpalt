@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use webauthn_rs::prelude::*;
 
 pub const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS user_passkeys(credential_id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),definition TEXT NOT NULL,version BIGINT NOT NULL DEFAULT 1); CREATE INDEX IF NOT EXISTS user_passkeys_owner ON user_passkeys(user_id);";
+#[derive(Serialize, Deserialize)]
 pub enum Ceremony {
     Register {
         user: String,
@@ -34,7 +35,7 @@ impl Ceremony {
         }
     }
 }
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Ceremonies {
     entries: BTreeMap<String, Ceremony>,
 }
@@ -151,7 +152,7 @@ pub async fn register_finish(app: &App, s: &Session, input: Registration) -> Res
     let passkey = engine(app)?
         .finish_passkey_registration(&input.credential, &state)
         .map_err(|_| Error::forbidden())?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     super::factor::live_session(app, s).await?;
     let current: Option<String> =
         sqlx::query_scalar("SELECT password_hash FROM users WHERE id=$1 AND role<>'disabled'")
@@ -232,7 +233,7 @@ pub async fn authenticate_finish(app: &App, input: Authentication) -> Result<(St
     let result = engine(app)?
         .finish_passkey_authentication(&input.credential, &state)
         .map_err(|_| Error::forbidden())?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     let account=sqlx::query("SELECT id,email,name,role FROM users WHERE id=$1 AND password_hash=$2 AND role<>'disabled'").bind(&user).bind(hash).fetch_optional(&mut *tx).await?.ok_or_else(Error::forbidden)?;
     let id = hex::encode(result.cred_id().as_ref());

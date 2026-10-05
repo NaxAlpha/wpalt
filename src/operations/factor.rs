@@ -60,7 +60,7 @@ fn base32(bytes: &[u8]) -> String {
 }
 pub async fn begin(app: &App, session: &Session, password: &str) -> Result<String> {
     let verified_hash = reauthenticate(app, session, password).await?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     current_credential(app, session, &verified_hash).await?;
     let existing: Option<String> =
         sqlx::query_scalar("SELECT secret FROM user_factors WHERE user_id=$1")
@@ -82,7 +82,7 @@ pub async fn begin(app: &App, session: &Session, password: &str) -> Result<Strin
     ))
 }
 pub async fn confirm(app: &App, session: &Session, submitted: &str) -> Result<Vec<String>> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     live_session(app, session).await?;
     let mut tx = app.db.pool.begin().await?;
     let row = sqlx::query("SELECT pending,pending_until,secret FROM user_factors WHERE user_id=$1")
@@ -160,7 +160,7 @@ pub async fn verify(tx: &mut Transaction<'_, Any>, user: &str, submitted: &str) 
 }
 pub async fn disable(app: &App, session: &Session, password: &str, submitted: &str) -> Result<()> {
     let verified_hash = reauthenticate(app, session, password).await?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     current_credential(app, session, &verified_hash).await?;
     let mut tx = app.db.pool.begin().await?;
     verify(&mut tx, &session.user.id, submitted).await?;
@@ -247,7 +247,7 @@ pub async fn authorize_change(
     code: &str,
 ) -> Result<String> {
     let hash = reauthenticate(app, s, password).await?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     current_credential(app, s, &hash).await?;
     let mut tx = app.db.pool.begin().await?;
     verify(&mut tx, &s.user.id, code).await?;

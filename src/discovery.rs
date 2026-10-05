@@ -230,7 +230,7 @@ pub async fn validate_content(app: &App, p: &PostInput) -> Result<()> {
 }
 pub async fn configure(app: &App, d: Definition, version: i64) -> Result<i64> {
     d.validate()?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let (old, _) = load(app).await?;
     let mut tx = app.db.pool.begin().await?;
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM posts")
@@ -531,7 +531,7 @@ pub async fn save_redirect(
             "Use distinct exact local paths and 301 or 302.",
         ));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let (d, _) = load(app).await?;
     if source == "/"
         || source == "/search"
@@ -668,7 +668,7 @@ async fn edit_redirect(
     let s = admin_session(&app, &headers).await?;
     crate::auth::csrf(&s, &f.csrf)?;
     if f.action == "delete" {
-        let _guard = app.mutation().await;
+        let _guard = app.mutation().await?;
         let r = sqlx::query("DELETE FROM redirects WHERE source=$1 AND version=$2")
             .bind(&f.source)
             .bind(f.version)

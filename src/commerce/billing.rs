@@ -68,7 +68,7 @@ pub async fn tick(app: &App) -> Result<usize> {
     if !app.config.commerce.enabled {
         return Ok(0);
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     let at = crate::now();
     let mut count = 0;
@@ -122,7 +122,7 @@ pub async fn tick(app: &App) -> Result<usize> {
     Ok(count)
 }
 pub async fn cancel(app: &App, s: &Session, id: &str, version: i64) -> Result<()> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     customer(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     let sub = sqlx::query("SELECT * FROM shop_subscriptions WHERE id=$1 AND user_id=$2")
@@ -177,7 +177,7 @@ pub async fn change(
     version: i64,
     variant: &str,
 ) -> Result<Option<String>> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     customer(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
     let sub = sqlx::query("SELECT * FROM shop_subscriptions WHERE id=$1 AND user_id=$2")
@@ -250,7 +250,7 @@ pub(crate) async fn provider_invoice(
     start: i64,
     end: i64,
 ) -> Result<String> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     let s =
         sqlx::query("SELECT * FROM shop_subscriptions WHERE provider='stripe' AND provider_ref=$1")

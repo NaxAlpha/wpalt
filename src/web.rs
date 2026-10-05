@@ -134,6 +134,60 @@ pub fn router(app: App) -> Router {
 }
 async fn security_and_trace(
     State(app): State<App>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    let Some(coordinator) = &app.local_coordinator else {
+        return security_and_trace_inner(State(app), request, next).await;
+    };
+    let Ok(_admission) = coordinator.admission.try_acquire() else {
+        return coordinated_error(
+            &app,
+            Error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Local node request capacity reached.",
+            ),
+        );
+    };
+    if request.method() == axum::http::Method::GET && request.uri().path() == "/health" {
+        if let Err(e) = coordinator.check().await {
+            return coordinated_error(&app, e);
+        }
+        return security_and_trace_inner(State(app.clone()), request, next).await;
+    }
+    let guard = match coordinator.begin(&app).await {
+        Ok(g) => g,
+        Err(e) => return coordinated_error(&app, e),
+    };
+    let response = security_and_trace_inner(State(app.clone()), request, next).await;
+    if (response.status().is_server_error() || response.status() == StatusCode::REQUEST_TIMEOUT)
+        && guard.unresolved()
+    {
+        return response;
+    }
+    match guard.complete(&app).await {
+        Ok(()) => response,
+        Err(e) => coordinated_error(&app, e),
+    }
+}
+fn coordinated_error(app: &App, error: Error) -> Response {
+    let id = uuid::Uuid::new_v4().to_string();
+    tracing::error!(event="local_process_admission_failed", request_id=%id, node_id=%app.node_id, status=error.0.as_u16());
+    let mut response = error.into_response();
+    app.security_headers.apply("/", response.headers_mut());
+    response
+        .headers_mut()
+        .insert("cache-control", HeaderValue::from_static("no-store"));
+    response
+        .headers_mut()
+        .insert("x-request-id", HeaderValue::from_str(&id).unwrap());
+    response
+        .headers_mut()
+        .insert("x-wpalt-node", HeaderValue::from_str(&app.node_id).unwrap());
+    response
+}
+async fn security_and_trace_inner(
+    State(app): State<App>,
     mut request: Request<Body>,
     next: Next,
 ) -> Response {
@@ -146,7 +200,7 @@ async fn security_and_trace(
         .get::<MatchedPath>()
         .map(|p| p.as_str().to_owned())
         .unwrap_or_else(|| "unmatched".into());
-    let span = tracing::info_span!("request",request_id=%id,method=%method,route=%route);
+    let span = tracing::info_span!("request",request_id=%id,node_id=%app.node_id,method=%method,route=%route);
     let privileged_write = method != axum::http::Method::GET
         && method != axum::http::Method::HEAD
         && (route.starts_with("/admin")
@@ -384,6 +438,7 @@ async fn security_and_trace(
         h.insert("cache-control", HeaderValue::from_static("no-store"));
     }
     h.insert("x-request-id", HeaderValue::from_str(&id).unwrap());
+    h.insert("x-wpalt-node", HeaderValue::from_str(&app.node_id).unwrap());
     app.security_headers.apply(&route, h);
     if route.starts_with("/admin")
         || route.starts_with("/api/admin")
@@ -507,6 +562,15 @@ async fn spam_challenge(
     Ok(Json(crate::operations::spam::issue(&app, &input.resource)?))
 }
 async fn health(State(app): State<App>) -> Result<Json<serde_json::Value>> {
+    let version: i64 = sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
+        .fetch_one(&app.db.pool)
+        .await?;
+    if version != 14 {
+        return Err(Error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Runtime schema is incompatible; stop all nodes and review the offline upgrade path.",
+        ));
+    }
     let initialized: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM settings")
         .fetch_one(&app.db.pool)
         .await?;
@@ -568,7 +632,7 @@ async fn logout(
 ) -> Result<Response> {
     let s = auth::session(&app, &headers).await?;
     auth::csrf(&s, &input.csrf)?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     sqlx::query("DELETE FROM sessions WHERE token_hash=$1")
         .bind(s.hash)
         .execute(&app.db.pool)
@@ -1366,7 +1430,7 @@ async fn upload_video(
         &file.ok_or_else(|| Error::invalid("Choose a video."))?,
     )
     .await?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let current = admin_session(&app, &headers).await?;
     admin(&current)?;
     auth::csrf(&current, &csrf)?;
@@ -1476,7 +1540,7 @@ async fn upload(
     let id = uuid::Uuid::new_v4().to_string();
     let filename = format!("{id}.{ext}");
     let hash = auth::digest(&bytes);
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let current = admin_session(&app, &headers).await?;
     editor(&current)?;
     auth::csrf(&current, &csrf)?;
@@ -1507,7 +1571,7 @@ async fn update_media(
     if input.alt.len() > 500 || !["public", "private"].contains(&input.visibility.as_str()) {
         return Err(Error::invalid("Invalid media details."));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let current = admin_session(&app, &headers).await?;
     editor(&current)?;
     auth::csrf(&current, &input.csrf)?;
@@ -1723,7 +1787,7 @@ async fn comment(
         .map(|c| c.0.0.ip().to_string())
         .unwrap_or_else(|| "local-test".into());
     let key = auth::digest(client.as_bytes());
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     let id: String =
         sqlx::query_scalar("SELECT id FROM posts WHERE published_slug=$1 AND status='published'")
@@ -1792,7 +1856,7 @@ async fn moderate(
     if !["approved", "rejected", "pending"].contains(&input.status.as_str()) {
         return Err(Error::invalid("Invalid moderation decision."));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let result = sqlx::query("UPDATE comments SET status=$1 WHERE id=$2")
         .bind(input.status)
         .bind(id)
@@ -1855,7 +1919,7 @@ async fn save_settings(
     };
     content::validate_settings(&settings)?;
     crate::theme::load(&app, &settings.theme, false).await?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     sqlx::query("UPDATE settings SET title=$1,description=$2,theme=$3,navigation=$4 WHERE id=1")
         .bind(settings.title)
         .bind(settings.description)
@@ -2095,7 +2159,7 @@ async fn cache_purge(
     let session = admin_session(&app, &headers).await?;
     admin(&session)?;
     auth::csrf(&session, &input.csrf)?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     app.page_cache.lock().await.clear();
     Ok(Redirect::to("/admin/operations"))
 }
@@ -2129,7 +2193,7 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
                 form method="post" action="/admin/backup" {(view::csrf(&s))button {"Download full backup"}}
                 p class="muted" {"Restore with the CLI into an empty database/data directory while the server is stopped. Keep an independent copy to recover from losing this host."}
                 a href="/admin/export" {"Export portable content JSON →"}
-            }section class="panel" {h2 {"Runtime"}p {"Database: " strong {(if app.db.postgres{"PostgreSQL"}else{"SQLite · WAL"})}}p {"Version: " (env!("CARGO_PKG_VERSION"))}p {"Scheduler: " (app.config.scheduler_seconds) " seconds"}p {"Debug: " (app.config.debug)}p {a href="/health" {"Readiness endpoint →"}}}}
+            }section class="panel" {h2 {"Runtime"}p {"Database: " strong {(if app.db.postgres{"PostgreSQL"}else{"SQLite · WAL"})}}p {"Version: " (env!("CARGO_PKG_VERSION"))}@if app.config.local_processes {p {"Local processes · " code {(&*app.node_id)}}p class="muted" {"This host shares site admission and temporary security state. An interrupted operation pauses the site; stop all nodes and review local-resume before restarting."}}p {"Scheduler: " (app.config.scheduler_seconds) " seconds"}p {"Debug: " (app.config.debug)}p {a href="/health" {"Readiness endpoint →"}}}}
             section class="panel" {
                 h2 {"Managed recovery"}
                 @if app.config.recovery.enabled {
@@ -2346,7 +2410,7 @@ async fn passkey_remove(
     auth::csrf(&s, &input.csrf)?;
     let hash =
         crate::operations::factor::authorize_change(&app, &s, &input.password, &input.code).await?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     crate::operations::factor::current_credential(&app, &s, &hash).await?;
     let mut tx = app.db.pool.begin().await?;
     if sqlx::query("DELETE FROM user_passkeys WHERE credential_id=$1 AND user_id=$2")

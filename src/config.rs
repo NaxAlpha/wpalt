@@ -13,6 +13,8 @@ pub struct Config {
     pub listen: SocketAddr,
     pub base_url: String,
     pub debug: bool,
+    /// Multiple processes on one Unix host, sharing the exact site directory/configuration.
+    pub local_processes: bool,
     pub postgres_archive: crate::operations::postgres_archive::Config,
     pub variants: crate::operations::variants::Config,
     pub privacy: crate::operations::privacy::Config,
@@ -52,6 +54,7 @@ impl Default for Config {
             listen: "127.0.0.1:3000".parse().unwrap(),
             base_url: "http://127.0.0.1:3000".into(),
             debug: false,
+            local_processes: false,
             postgres_archive: Default::default(),
             variants: Default::default(),
             privacy: Default::default(),
@@ -136,6 +139,14 @@ impl Config {
         Ok(c)
     }
     pub fn validate(&self) -> anyhow::Result<()> {
+        ensure!(
+            !self.local_processes || cfg!(unix),
+            "local_processes requires a Unix host"
+        );
+        ensure!(
+            !self.local_processes || self.database_url.starts_with("postgres"),
+            "local_processes requires PostgreSQL; SQLite remains single-process"
+        );
         self.protection.validate()?;
         self.spam.validate()?;
         self.media.validate()?;

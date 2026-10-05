@@ -1022,7 +1022,7 @@ pub fn safe_filename(name: &str) -> bool {
         && !name.contains('\\')
 }
 pub async fn capture(app: &App) -> Result<Vec<u8>> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     if app.db.postgres {
         sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
@@ -1719,7 +1719,7 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
 
 pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     let snapshot = validate(&app.config, encoded)?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     for (name, _) in TABLES {
         let count: i64 = if *name == "recovery_mode" {

@@ -4203,7 +4203,7 @@ async fn local_video_worker_preserves_authority_and_recovers_processed_media() {
         .unwrap();
         // The other owner holds the write boundary while a valid native request
         // starts. Revoke its account/session before releasing the commit lock.
-        let guard = site.app.mutation().await;
+        let guard = site.app.mutation().await.unwrap();
         let app = site.app.clone();
         let token = site.token.clone();
         let pending = tokio::spawn(async move {
@@ -4387,7 +4387,7 @@ async fn role_region_cache_variants_revalidate_authority_and_ignore_spoofed_head
             "unknown personalized cookies still bypass storage"
         );
         {
-            let _guard = site.app.mutation().await;
+            let _guard = site.app.mutation().await.unwrap();
             sqlx::query("UPDATE users SET role='subscriber' WHERE id=$1")
                 .bind(&site.session().user.id)
                 .execute(&site.app.db.pool)
@@ -4588,7 +4588,7 @@ async fn local_layout_metadata_respects_media_authority_and_never_rewrites_publi
             "optional layout metadata yields to a saturated worker pool"
         );
         drop(permits);
-        let _guard = site.app.mutation().await;
+        let _guard = site.app.mutation().await.unwrap();
         sqlx::query("UPDATE media SET visibility='private' WHERE id=$1")
             .bind(&public)
             .execute(&site.app.db.pool)
@@ -6348,7 +6348,7 @@ async fn scoped_integration_drafts_revoke_without_publication_or_recovery_author
         // Coordinate queue order without sleeps: revocation owns the next turn
         // before an already-authenticated writer acquires the same mutex.
         draft.version = 2;
-        let guard = site.app.mutation().await;
+        let guard = site.app.mutation().await.unwrap();
         let mut revocation = Box::pin(api::revoke(&site.app, owner, &writer.id));
         assert!(matches!(
             std::future::poll_fn(|cx| std::task::Poll::Ready(revocation.as_mut().poll(cx))).await,

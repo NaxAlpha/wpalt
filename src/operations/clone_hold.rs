@@ -19,7 +19,7 @@ pub async fn activate(app: &App, review: &str) -> Result<()> {
             "Provide a 40–2,000 character review of source shutdown, queues, external payment ownership, identities and credentials.",
         ));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     let row = sqlx::query("SELECT held,target_origin FROM recovery_mode WHERE id=1")
         .fetch_one(&app.db.pool)
         .await?;

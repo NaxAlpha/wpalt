@@ -79,7 +79,7 @@ async fn feed(
 ) -> Result<Json<Value>> {
     // Revalidate authority while serialized with mutations/revocation; never hold
     // this lock during client transport or external delivery.
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     super::integrations::authenticate(&app, &headers, false).await?;
     let mut tx = app.db.pool.begin().await?;
     let row = sqlx::query("SELECT epoch,sequence FROM integration_event_state WHERE id=1")

@@ -108,6 +108,38 @@ pub async fn run_cycle<F>(app: &App, work: F) -> Result<()>
 where
     F: Future<Output = Vec<Stage>>,
 {
+    let mut coordinator = if let Some(c) = &app.local_coordinator {
+        Some(c.begin(app).await?)
+    } else {
+        None
+    };
+    if app.clone_held.load(std::sync::atomic::Ordering::SeqCst)
+        && let Some(guard) = coordinator.take()
+    {
+        guard.complete(app).await?;
+        return Ok(());
+    }
+    if coordinator.is_some()
+        && read(app).await?.first().is_some_and(|cycle| {
+            cycle.started_at > crate::now() - app.config.scheduler_seconds as i64
+        })
+    {
+        return coordinator
+            .take()
+            .ok_or_else(|| Error::invalid("Missing local process ownership."))?
+            .complete(app)
+            .await;
+    }
+    run_cycle_inner(app, work).await?;
+    if let Some(guard) = coordinator {
+        guard.complete(app).await?;
+    }
+    Ok(())
+}
+async fn run_cycle_inner<F>(app: &App, work: F) -> Result<()>
+where
+    F: Future<Output = Vec<Stage>>,
+{
     let _guard = app.job_work.lock().await;
     if app.clone_held.load(std::sync::atomic::Ordering::SeqCst) {
         return Err(Error::invalid(

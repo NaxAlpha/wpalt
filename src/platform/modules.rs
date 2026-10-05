@@ -75,7 +75,7 @@ pub fn report(c: &Config) -> serde_json::Value {
     serde_json::json!({
         "format": "wpalt-module-inventory-v1",
         "modules": inventory(c),
-        "runtime": "single-process",
+        "runtime": if c.local_processes { "coordinated-local-processes" } else { "single-process" },
         "notice": "Inventory is configuration admission, not distributed certification, code unloading or permission authority."
     })
 }

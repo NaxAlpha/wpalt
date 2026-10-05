@@ -1,6 +1,6 @@
 # M9 — Distributed full-platform release
 
-Active 2026-10-05 after authorized M8 merge. This contract implements the existing M9 roadmap; it does not narrow the final product or certify the existing system for multi-node use.
+Active 2026-10-05 after authorized M8 merge. The user subsequently directed this delivery to rely on multiple processes locally for now. This contract implements the existing M9 roadmap; it does not narrow the final product or certify the existing system for multi-node use.
 
 ## End-user outcome
 
@@ -17,7 +17,7 @@ An owner deploys the cumulative CMS on a local SQLite site, single PostgreSQL se
 
 ## Verifiable completion gates
 
-- Two independently started application processes against real PostgreSQL and shared media; load-balanced user journeys without relying on sticky sessions for correctness. Repeat SQLite and one-process PostgreSQL journeys.
+- Two independently started application processes on the same Unix host against real PostgreSQL and one shared private site/media directory; load-balanced user journeys without relying on sticky sessions for correctness. Repeat SQLite and one-process PostgreSQL journeys.
 - Coordinated concurrent publication/version conflict, private-content/access revocation, form consent/actions, stock checkout/payment receipt and booking capacity preserve their invariants across nodes. Worker/process termination does not invent or lose committed domain authority.
 - Cross-node invalidation prevents serving withdrawn/restricted content from an old cache. Database/coordination loss fails closed for sensitive writes. Authentication challenges and abuse budgets cannot be multiplied simply by changing nodes.
 - Recover database/media/configuration coherently into a fresh installation; execute data-bearing supported upgrade, interruption/retry, incompatible-version preflight and documented restore-based rollback. No default automatic destructive upgrade on replica startup.
@@ -31,3 +31,7 @@ An owner deploys the cumulative CMS on a local SQLite site, single PostgreSQL se
 `App::mutation` and cached-read guards currently serialize only within one process; cache generation is an in-memory counter. Spam challenges, passkey ceremonies, login/protection limits and some worker/history/media/recovery locks are also local. The CLI data-directory lock correctly prevents local conflicting operations but is not a cross-server database fence. Some mail/campaign claims already use PostgreSQL row locks; that does not certify every surrounding operation. These dependencies must be traced and verified before multi-node enablement.
 
 Primary sources checked 2026-10-05: [PostgreSQL locking](https://www.postgresql.org/docs/current/explicit-locking.html), [transaction isolation](https://www.postgresql.org/docs/current/transaction-iso.html). Row/transaction ownership and connection-loss behavior inform fencing; PostgreSQL documentation is not evidence that application coordination is implemented.
+
+## Local-process delivery boundary — user direction
+
+For this delivery, verify independent local processes rather than requiring multiple physical servers. Same-host coordination uses a single kernel-owned admission lock and durable unresolved-operation intent. Requests and worker cycles serialize; crash/cancellation pauses all nodes until offline owner reconciliation. No automatic failover or multi-host filesystem/lease safety is claimed. Configuration identity is shared except listen address/debug output. Server-side passkey/replay/abuse state stays private and shared; public cache generation follows the same admission boundary. A separate worker may be supervised or invoked once by an owner system scheduler. Multi-host execution remains a later deployment boundary; other capability/upgrade/whole-system requirements remain required.

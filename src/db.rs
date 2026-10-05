@@ -5,6 +5,7 @@ use std::str::FromStr;
 #[derive(Clone)]
 pub struct Db {
     pub pool: AnyPool,
+    pub application_name: String,
     pub postgres: bool,
     pub business_enabled: bool,
     pub membership_enabled: bool,
@@ -19,6 +20,18 @@ impl Db {
     pub async fn open(config: &Config) -> anyhow::Result<Self> {
         sqlx::any::install_default_drivers();
         let postgres = config.database_url.starts_with("postgres");
+        let application_name = format!(
+            "wpalt:{}",
+            crate::auth::digest(
+                format!(
+                    "{}:{}",
+                    config.database_url,
+                    std::fs::canonicalize(&config.data_dir)?.display()
+                )
+                .as_bytes()
+            )
+        );
+        let connection_name = application_name.clone();
         let options = sqlx::any::AnyConnectOptions::from_str(&config.database_url)?
             .log_statements(if config.debug {
                 tracing::log::LevelFilter::Debug
@@ -33,6 +46,7 @@ impl Db {
             .max_connections(config.database_connections)
             .acquire_timeout(std::time::Duration::from_secs(10))
             .after_connect(move |conn, _| {
+                let connection_name = connection_name.clone();
                 Box::pin(async move {
                     if !postgres {
                         sqlx::query("PRAGMA foreign_keys=ON")
@@ -45,6 +59,10 @@ impl Db {
                             .execute(&mut *conn)
                             .await?;
                     } else {
+                        sqlx::query("SELECT set_config('application_name',$1,false)")
+                            .bind(connection_name)
+                            .execute(&mut *conn)
+                            .await?;
                         sqlx::query("SET statement_timeout = '10s'")
                             .execute(&mut *conn)
                             .await?;
@@ -56,6 +74,7 @@ impl Db {
             .await?;
         Ok(Self {
             pool,
+            application_name,
             postgres,
             business_enabled: config.business_enabled,
             membership_enabled: config.membership_enabled,

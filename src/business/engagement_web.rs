@@ -62,7 +62,7 @@ async fn consent(
     headers: HeaderMap,
     Json(input): Json<Consent>,
 ) -> Result<Response> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     if input.allow && input.manifest != app.consent_scripts.manifest {
         return Err(Error::conflict());
     }

@@ -40,7 +40,7 @@ pub async fn issue(
             "Choose a name within 100 bytes and an expiry of 1–30 days.",
         ));
     }
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     auth::current_editor(app, owner).await?;
     if app.clone_held.load(std::sync::atomic::Ordering::SeqCst) {
         return Err(Error::forbidden());
@@ -80,7 +80,7 @@ pub async fn revoke(app: &App, owner: &Session, id: &str) -> Result<()> {
         return Err(Error::forbidden());
     }
     uuid::Uuid::parse_str(id).map_err(|_| Error::invalid("Use the credential UUID."))?;
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     auth::current_editor(app, owner).await?;
     sqlx::query("DELETE FROM integration_credentials WHERE id=$1")
         .bind(id)

@@ -24,6 +24,8 @@ use tokio::sync::{Mutex, Semaphore};
 #[derive(Clone)]
 pub struct App {
     pub config: Arc<config::Config>,
+    pub node_id: Arc<String>,
+    pub local_coordinator: Option<Arc<platform::local_processes::Coordinator>>,
     pub clone_held: Arc<std::sync::atomic::AtomicBool>,
     pub consent_scripts: Arc<operations::consent_scripts::Scripts>,
     pub security_headers: Arc<operations::headers::Policy>,
@@ -50,16 +52,25 @@ pub struct App {
 }
 
 impl App {
-    pub async fn mutation(&self) -> operations::cache::Mutation<'_> {
+    pub async fn mutation(&self) -> error::Result<operations::cache::Mutation<'_>> {
+        if let Some(c) = &self.local_coordinator {
+            c.mark_intent()?;
+        }
         let guard = self.mutations.lock().await;
         self.cache_generation
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        operations::cache::Mutation {
+        Ok(operations::cache::Mutation {
             _guard: guard,
             generation: &self.cache_generation,
-        }
+        })
     }
     pub async fn open(config: config::Config) -> anyhow::Result<Self> {
+        Self::open_checked(config, false).await
+    }
+    pub async fn open_runtime(config: config::Config) -> anyhow::Result<Self> {
+        Self::open_checked(config, true).await
+    }
+    async fn open_checked(config: config::Config, runtime: bool) -> anyhow::Result<Self> {
         config.validate()?;
         let consent_scripts = if config.business_enabled && config.engagement.enabled {
             operations::consent_scripts::Scripts::compile(&config.consent_scripts)?
@@ -67,10 +78,51 @@ impl App {
             operations::consent_scripts::Scripts::default()
         };
         config.prepare_directories()?;
+        let local_coordinator = if config.local_processes {
+            Some(Arc::new(
+                platform::local_processes::Coordinator::new(&config)
+                    .map_err(|e| anyhow::anyhow!(e.1))?,
+            ))
+        } else {
+            None
+        };
+        let startup = if let Some(c) = &local_coordinator {
+            Some(c.lock().await.map_err(|e| anyhow::anyhow!(e.1))?)
+        } else {
+            None
+        };
+        let spam_secret = if let Some(c) = &local_coordinator {
+            c.initialize().map_err(|e| anyhow::anyhow!(e.1))?
+        } else {
+            operations::encryption::generate_key()
+        };
         let workers = config.worker_concurrency;
         let requests = config.request_concurrency;
         let db = db::Db::open(&config).await?;
-        db.migrate().await?;
+        if runtime {
+            let present: i64 = if db.postgres {
+                sqlx::query_scalar(
+                    "SELECT CASE WHEN to_regclass('schema_version') IS NULL THEN 0 ELSE 1 END",
+                )
+                .fetch_one(&db.pool)
+                .await?
+            } else {
+                sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'").fetch_one(&db.pool).await?
+            };
+            anyhow::ensure!(
+                present == 1,
+                "site is not initialized; run init before serving"
+            );
+            let version: i64 = sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
+                .fetch_one(&db.pool)
+                .await?;
+            anyhow::ensure!(
+                version == 14,
+                "runtime schema is incompatible; stop all nodes and use the documented offline upgrade/recovery path"
+            );
+        } else {
+            db.migrate().await?;
+        }
         let clone_held = sqlx::query_scalar::<_, i64>("SELECT held FROM recovery_mode WHERE id=1")
             .fetch_one(&db.pool)
             .await?
@@ -79,14 +131,17 @@ impl App {
             auth::hash_password("unused-dummy-credential-not-an-account")
         })
         .await??;
+        drop(startup);
         Ok(Self {
+            local_coordinator,
+            node_id: Arc::new(uuid::Uuid::new_v4().to_string()),
             clone_held: Arc::new(std::sync::atomic::AtomicBool::new(clone_held)),
             consent_scripts: Arc::new(consent_scripts),
             security_headers: Arc::new(operations::headers::Policy::compile(&config)),
             config: Arc::new(config),
             db,
             mutations: Arc::new(Mutex::new(())),
-            spam_secret: Arc::new(operations::encryption::generate_key()),
+            spam_secret: Arc::new(spam_secret),
             spam_used: Arc::new(Mutex::new(operations::spam::Used::default())),
             passkey_ceremonies: Arc::new(Mutex::new(operations::passkeys::Ceremonies::default())),
             audit_work: Arc::new(Mutex::new(())),

@@ -79,7 +79,24 @@ enum Command {
         admin_name: String,
     },
     /// Run the web server and durable publication scheduler.
-    Serve,
+    Serve {
+        /// Use a separately operated worker instead of the embedded scheduler.
+        #[arg(long)]
+        external_worker: bool,
+    },
+    /// Run coordinated background work on a local-process site.
+    Worker {
+        /// One bounded cycle for an owner-operated system scheduler.
+        #[arg(long)]
+        once: bool,
+    },
+    /// Offline exact-plan reconciliation after an interrupted local-process operation.
+    LocalResume {
+        #[arg(long)]
+        execute: Option<String>,
+        #[arg(long)]
+        acknowledge_external_effects: bool,
+    },
     /// Show effective module admission and domain ownership without opening a site.
     Modules,
     /// Show validated effective configuration with credentials redacted.
@@ -693,7 +710,7 @@ fn password() -> anyhow::Result<String> {
     );
     Ok(password)
 }
-fn lock(config: &Config) -> anyhow::Result<std::fs::File> {
+fn lock(config: &Config, shared: bool) -> anyhow::Result<std::fs::File> {
     config.prepare_directories()?;
     let mut options = std::fs::OpenOptions::new();
     options.create(true).read(true).write(true).truncate(false);
@@ -703,7 +720,12 @@ fn lock(config: &Config) -> anyhow::Result<std::fs::File> {
         options.mode(0o600);
     }
     let file = options.open(config.data_dir.join(".wpalt.lock"))?;
-    file.try_lock_exclusive().map_err(|_| {
+    (if shared {
+        FileExt::try_lock_shared(&file)
+    } else {
+        file.try_lock_exclusive()
+    })
+    .map_err(|_| {
         anyhow::anyhow!(
             "this data directory is already in use; stop the server before offline operations"
         )
@@ -894,13 +916,46 @@ async fn main() -> anyhow::Result<()> {
         })
         .with_writer(std::io::stderr)
         .init();
-    let _lock = lock(&config)?;
-    let app = App::open(config).await?;
+    let _lock = lock(
+        &config,
+        config.local_processes
+            && matches!(cli.command, Command::Serve { .. } | Command::Worker { .. }),
+    )?;
+    if let Command::LocalResume {
+        execute,
+        acknowledge_external_effects,
+    } = &cli.command
+    {
+        anyhow::ensure!(
+            config.local_processes,
+            "local-resume requires local_processes=true"
+        );
+        let mut inspection = config.clone();
+        inspection.local_processes = false;
+        let app = App::open(inspection).await?;
+        let report = wpalt::platform::local_processes::resume(
+            &config,
+            &app,
+            execute.as_deref(),
+            *acknowledge_external_effects,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!(e.1))?;
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
+    let runtime = matches!(cli.command, Command::Serve { .. } | Command::Worker { .. });
+    let app = if runtime {
+        App::open_runtime(config).await?
+    } else {
+        App::open(config).await?
+    };
     anyhow::ensure!(
         !app.clone_held.load(std::sync::atomic::Ordering::SeqCst)
             || matches!(
                 cli.command,
-                Command::Serve
+                Command::Serve { .. }
+                    | Command::Worker { .. }
                     | Command::CloneActivate { .. }
                     | Command::Backup { .. }
                     | Command::RecoveryStatus
@@ -1112,7 +1167,7 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             }
             println!("{}", serde_json::to_string_pretty(&prepared.report)?);
         }
-        Command::Config | Command::Modules => unreachable!(),
+        Command::Config | Command::Modules | Command::LocalResume { .. } => unreachable!(),
         Command::UpgradePrepare { output, key_file } => {
             let receipt = wpalt::operations::upgrade::prepare(&app, &output, &key_file)
                 .await
@@ -1375,69 +1430,101 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             .await
             .map_err(|e| anyhow::anyhow!(e.1))?,
         Command::SeedDemo { posts } => seed(&app, posts).await?,
-        Command::Serve => {
+        Command::Worker { once } => {
+            anyhow::ensure!(
+                app.config.local_processes,
+                "A separate worker requires local_processes=true"
+            );
+            let (stop, receiver) = tokio::sync::watch::channel(false);
+            let mut job = tokio::spawn(worker_loop(app, once, receiver));
+            if once {
+                job.await??;
+            } else {
+                tokio::select! {
+                    result = &mut job => { result??; },
+                    _ = shutdown() => { let _ = stop.send(true); drain_worker(job).await?; }
+                }
+            }
+        }
+        Command::Serve { external_worker } => {
             app.db.settings().await.map_err(|_| {
                 anyhow::anyhow!("site is not initialized; run wpalt init or restore first")
             })?;
-            let scheduled = app.clone();
-            let job = tokio::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(
-                    scheduled.config.scheduler_seconds,
-                ));
-                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-                loop {
-                    interval.tick().await;
-                    if scheduled
-                        .clone_held
-                        .load(std::sync::atomic::Ordering::SeqCst)
-                    {
-                        continue;
-                    }
-                    use wpalt::operations::jobs::{run_cycle, stage, stage_unit};
-                    if run_cycle(&scheduled, async {
-                        vec![
-                            stage_unit("recovery", wpalt::operations::recovery::tick(&scheduled))
-                                .await,
-                            stage("publication", content::publish_due(&scheduled)).await,
-                            stage("campaigns", wpalt::business::campaigns::tick(&scheduled)).await,
-                            stage("commerce", wpalt::commerce::tick(&scheduled)).await,
-                            stage("mail", wpalt::business::mail::tick(&scheduled)).await,
-                            stage_unit(
-                                "engagement-retention",
-                                wpalt::business::engagement::cleanup(&scheduled),
-                            )
-                            .await,
-                            stage_unit(
-                                "quota-retention",
-                                wpalt::business::quotas::cleanup(&scheduled),
-                            )
-                            .await,
-                            stage_unit("maintenance", cleanup(&scheduled)).await,
-                        ]
-                    })
-                    .await
-                    .is_err()
-                    {
-                        tracing::error!(
-                            event = "background_history_failed",
-                            action = "inspect_site_storage"
-                        );
-                    }
-                }
-            });
+            let (stop, receiver) = tokio::sync::watch::channel(false);
+            let job = if external_worker {
+                None
+            } else {
+                Some(tokio::spawn(worker_loop(app.clone(), false, receiver)))
+            };
             let listener = tokio::net::TcpListener::bind(app.config.listen).await?;
-            tracing::info!(event="server_started",listen=%app.config.listen);
-            axum::serve(
+            tracing::info!(event="server_started",listen=%app.config.listen,node_id=%app.node_id);
+            let result = axum::serve(
                 listener,
                 wpalt::web::router(app)
                     .into_make_service_with_connect_info::<std::net::SocketAddr>(),
             )
             .with_graceful_shutdown(shutdown())
-            .await?;
-            job.abort();
+            .await;
+            let _ = stop.send(true);
+            if let Some(job) = job {
+                drain_worker(job).await?;
+            }
+            result?;
         }
     }
     Ok(())
+}
+
+async fn drain_worker(mut job: tokio::task::JoinHandle<anyhow::Result<()>>) -> anyhow::Result<()> {
+    match tokio::time::timeout(std::time::Duration::from_secs(60), &mut job).await {
+        Ok(result) => result?,
+        Err(_) => {
+            job.abort();
+            anyhow::bail!(
+                "Worker did not drain; inspect local coordination and external effects before resuming."
+            );
+        }
+    }
+}
+async fn worker_loop(
+    app: App,
+    once: bool,
+    mut stop: tokio::sync::watch::Receiver<bool>,
+) -> anyhow::Result<()> {
+    use wpalt::operations::jobs::{run_cycle, stage, stage_unit};
+    let mut interval =
+        tokio::time::interval(std::time::Duration::from_secs(app.config.scheduler_seconds));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        tokio::select! { _ = stop.changed() => return Ok(()), _ = interval.tick() => {} }
+        if !app.config.local_processes && app.clone_held.load(std::sync::atomic::Ordering::SeqCst) {
+            if once {
+                return Ok(());
+            }
+            continue;
+        }
+        run_cycle(&app, async {
+            vec![
+                stage_unit("recovery", wpalt::operations::recovery::tick(&app)).await,
+                stage("publication", content::publish_due(&app)).await,
+                stage("campaigns", wpalt::business::campaigns::tick(&app)).await,
+                stage("commerce", wpalt::commerce::tick(&app)).await,
+                stage("mail", wpalt::business::mail::tick(&app)).await,
+                stage_unit(
+                    "engagement-retention",
+                    wpalt::business::engagement::cleanup(&app),
+                )
+                .await,
+                stage_unit("quota-retention", wpalt::business::quotas::cleanup(&app)).await,
+                stage_unit("maintenance", cleanup(&app)).await,
+            ]
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e.1))?;
+        if once {
+            return Ok(());
+        }
+    }
 }
 
 async fn shutdown() {
@@ -1454,7 +1541,7 @@ async fn shutdown() {
     }
 }
 async fn cleanup(app: &App) -> wpalt::error::Result<()> {
-    let _guard = app.mutation().await;
+    let _guard = app.mutation().await?;
     sqlx::query("DELETE FROM sessions WHERE expires_at<$1")
         .bind(wpalt::now())
         .execute(&app.db.pool)
