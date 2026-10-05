@@ -1984,8 +1984,8 @@
       "scope": "Validated offline CLI inventory, not distributed authority or dynamic code loading",
       "basis": "internal",
       "sources": [
-        "docs/distributed-operations.md",
-        "src/platform/modules.rs"
+        "https://github.com/NaxAlpha/wpalt/blob/395b9ecbe966b9dc1ed75cdc50356875343dc489/docs/distributed-operations.md",
+        "https://github.com/NaxAlpha/wpalt/blob/395b9ecbe966b9dc1ed75cdc50356875343dc489/src/platform/modules.rs"
       ],
       "applicable_versions": [
         "wpalt-module-inventory-v1"
