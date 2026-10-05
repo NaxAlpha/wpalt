@@ -109,6 +109,11 @@ where
     F: Future<Output = Vec<Stage>>,
 {
     let _guard = app.job_work.lock().await;
+    if app.clone_held.load(std::sync::atomic::Ordering::SeqCst) {
+        return Err(Error::invalid(
+            "Background work is paused for this read-only clone.",
+        ));
+    }
     let mut cycles = read(app).await?;
     for cycle in &mut cycles {
         if cycle.state == "running" {

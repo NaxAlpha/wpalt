@@ -21,6 +21,7 @@ function command(config, args, input) {
     encoding: "utf8",
   });
   assert.equal(r.status, 0, r.stderr);
+  return r.stdout;
 }
 async function submit(page, button) {
   await Promise.all([
@@ -67,6 +68,14 @@ async function freePort() {
     password + "\n",
   );
   command(config, ["seed-demo"]);
+  if (process.env.WPALT_CLONE_ONLY) {
+    const archive=path.join(temporary,'source.json'),cloned=path.join(temporary,'held.json');
+    command(config,['backup',archive]);
+    const preview=JSON.parse(command(config,['recovery-clone',archive,'--source-origin','https://old.example.test']));
+    command(config,['recovery-clone',archive,'--source-origin','https://old.example.test','--execute',preview.plan,'--output',cloned]);
+    fs.writeFileSync(config,`database_url = "sqlite://${temporary}/clone.db?mode=rwc"\ndata_dir = "${temporary}/clone-data"\nlisten = "127.0.0.1:${port}"\nbase_url = "${origin}"\n`);
+    command(config,['restore',cloned]);
+  }
   logFd = fs.openSync(path.join(temporary, "server.log"), "w");
   server = spawn(binary, ["--config", config, "serve"], {
     stdio: ["ignore", logFd, logFd],
@@ -122,6 +131,10 @@ async function freePort() {
   if (process.env.WPALT_SPAM_ONLY) {
     await require("./spam_acceptance.cjs")(owner, origin, output);
     return;
+  }
+  if (process.env.WPALT_CLONE_ONLY) {
+    await require('./clone_acceptance.cjs')(owner,origin,output);
+    assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);return;
   }
   if (process.env.WPALT_OPERATIONS_ONLY) {
     await require('./operations_acceptance.cjs')(owner,origin,output,password);

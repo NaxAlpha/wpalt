@@ -12,6 +12,8 @@ use std::{
     path::Path,
 };
 
+pub mod selection;
+
 /// Bound the read itself: metadata alone cannot prevent growth between stat and read.
 pub async fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>> {
     use tokio::io::AsyncReadExt;
@@ -28,6 +30,16 @@ pub async fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>> {
 
 // Types and table names are an allowlist, never supplied by an archive.
 pub(crate) const TABLES: &[(&str, &[(&str, bool)])] = &[
+    (
+        "recovery_mode",
+        &[
+            ("id", true),
+            ("held", true),
+            ("source_origin", false),
+            ("target_origin", false),
+            ("review", false),
+        ],
+    ),
     (
         "user_passkeys",
         &[
@@ -1111,7 +1123,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let snapshot = Snapshot {
         audit_history,
         private_files,
-        schema: 11,
+        schema: 12,
         created_at: crate::now(),
         tables,
         files,
@@ -1119,7 +1131,7 @@ pub async fn capture(app: &App) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v11".into(),
+        format: "wpalt-backup-v12".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -1136,14 +1148,14 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v11"
+    if envelope.format != "wpalt-backup-v12"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 11
+    if snapshot.schema != 12
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -1313,6 +1325,39 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
                     .ok_or(Error::invalid("Missing revision document"))?,
             )?;
         }
+    }
+    let modes = &snapshot.tables["recovery_mode"];
+    if modes.len() != 1
+        || modes[0]["id"] != 1
+        || ![Some(0), Some(1)].contains(&modes[0]["held"].as_i64())
+    {
+        return Err(Error::invalid("Invalid clone recovery mode."));
+    }
+    for field in ["source_origin", "target_origin"] {
+        let origin = modes[0][field]
+            .as_str()
+            .ok_or_else(|| Error::invalid("Invalid clone origin."))?;
+        if !origin.is_empty() {
+            let url =
+                url::Url::parse(origin).map_err(|_| Error::invalid("Invalid clone origin."))?;
+            if !["http", "https"].contains(&url.scheme())
+                || url.origin().ascii_serialization() != origin
+            {
+                return Err(Error::invalid(
+                    "Clone origins must be complete HTTP origins.",
+                ));
+            }
+        } else if modes[0]["held"] == 1 {
+            return Err(Error::invalid(
+                "A held clone requires source and target origins.",
+            ));
+        }
+    }
+    if modes[0]["review"]
+        .as_str()
+        .is_none_or(|s| s.len() > 2000 || s.chars().any(char::is_control))
+    {
+        return Err(Error::invalid("Invalid clone review."));
     }
     let discovery_rows = &snapshot.tables["discovery_settings"];
     if discovery_rows.len() != 1
@@ -1677,7 +1722,9 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     let _guard = app.mutation().await;
     let mut tx = app.db.pool.begin().await?;
     for (name, _) in TABLES {
-        let count: i64 = if *name == "discovery_settings" {
+        let count: i64 = if *name == "recovery_mode" {
+            sqlx::query_scalar("SELECT COUNT(*) FROM recovery_mode WHERE held<>0 OR source_origin<>'' OR target_origin<>'' OR review<>''").fetch_one(&mut *tx).await?
+        } else if *name == "discovery_settings" {
             sqlx::query_scalar(
                 "SELECT COUNT(*) FROM discovery_settings WHERE version<>1 OR definition<>$1",
             )
@@ -1716,7 +1763,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     sqlx::query("DELETE FROM discovery_settings")
         .execute(&mut *tx)
         .await?;
-    sqlx::raw_sql("DELETE FROM shop_settings; DELETE FROM business_usage; DELETE FROM engagement_settings; DELETE FROM engagement_usage; DELETE FROM engagement_event_names; DELETE FROM engagement_dimension_values;").execute(&mut *tx).await?;
+    sqlx::raw_sql("DELETE FROM recovery_mode; DELETE FROM shop_settings; DELETE FROM business_usage; DELETE FROM engagement_settings; DELETE FROM engagement_usage; DELETE FROM engagement_event_names; DELETE FROM engagement_dimension_values;").execute(&mut *tx).await?;
     for (name, columns) in TABLES
         .iter()
         .filter(|(name, _)| *name != "user_factors" && *name != "user_passkeys")
@@ -1783,7 +1830,10 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
     for event in snapshot.audit_history.into_iter().rev() {
         crate::operations::audit::append(app, event).await?;
     }
+    let clone_held = snapshot.tables["recovery_mode"][0]["held"] == 1;
     tx.commit().await?;
+    app.clone_held
+        .store(clone_held, std::sync::atomic::Ordering::SeqCst);
     tracing::info!(event = "backup_restored");
     Ok(())
 }
@@ -1872,19 +1922,21 @@ pub fn migrate_m6(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<
         || snapshot.tables.contains_key("user_factors")
         || snapshot.tables.contains_key("user_passkeys")
         || snapshot.tables.contains_key("privacy_requests")
+        || snapshot.tables.contains_key("recovery_mode")
     {
         return Err(Error::invalid(
             "Archive is not an unmigrated M6 recovery point.",
         ));
     }
-    snapshot.schema = 11;
+    snapshot.schema = 12;
     snapshot.tables.insert("privacy_requests".into(), vec![]);
+    snapshot.tables.insert("recovery_mode".into(), vec![serde_json::from_value(serde_json::json!({"id":1,"held":0,"source_origin":"","target_origin":"","review":""})).unwrap()]);
     snapshot.tables.insert("user_factors".into(), vec![]);
     snapshot.tables.insert("user_passkeys".into(), vec![]);
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Archive migration failed."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v11".into(),
+        format: "wpalt-backup-v12".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })

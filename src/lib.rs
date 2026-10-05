@@ -23,6 +23,7 @@ use tokio::sync::{Mutex, Semaphore};
 #[derive(Clone)]
 pub struct App {
     pub config: Arc<config::Config>,
+    pub clone_held: Arc<std::sync::atomic::AtomicBool>,
     pub consent_scripts: Arc<operations::consent_scripts::Scripts>,
     pub security_headers: Arc<operations::headers::Policy>,
     pub db: db::Db,
@@ -69,11 +70,16 @@ impl App {
         let requests = config.request_concurrency;
         let db = db::Db::open(&config).await?;
         db.migrate().await?;
+        let clone_held = sqlx::query_scalar::<_, i64>("SELECT held FROM recovery_mode WHERE id=1")
+            .fetch_one(&db.pool)
+            .await?
+            == 1;
         let dummy_hash = tokio::task::spawn_blocking(|| {
             auth::hash_password("unused-dummy-credential-not-an-account")
         })
         .await??;
         Ok(Self {
+            clone_held: Arc::new(std::sync::atomic::AtomicBool::new(clone_held)),
             consent_scripts: Arc::new(consent_scripts),
             security_headers: Arc::new(operations::headers::Policy::compile(&config)),
             config: Arc::new(config),

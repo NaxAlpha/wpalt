@@ -1960,7 +1960,7 @@
       "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Validated private file extraction and offline M6 archive conversion; URL-aware clone and selective graph workflows remain outstanding.",
+      "m7_coverage": "Validated private extraction, dependency-aware editorial selection with exact preview package, URL-aware fresh clone with durable read-only hold and explicit stopped-host activation; shared financial/access/workflow graph retained, no live graph merge. Integrated verification pending.",
       "evidence": [
         "m7-contract.md",
         "resilient-operations.md",

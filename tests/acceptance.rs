@@ -3554,6 +3554,10 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
             .as_object_mut()
             .unwrap()
             .remove("privacy_requests");
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("recovery_mode");
         let raw = serde_json::to_string(&payload).unwrap();
         old["payload"] = serde_json::json!(raw);
         old["sha256"] = serde_json::json!(auth::digest(raw.as_bytes()));
@@ -3566,7 +3570,7 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let migrated = backup::migrate_m6(&original.app.config, &legacy).unwrap();
         assert_eq!(
             backup::inspect(&original.app.config, &migrated).unwrap()["schema"],
-            11
+            12
         );
         let destination = tempfile::tempdir().unwrap();
         let key = encryption::generate_key();
@@ -5272,8 +5276,285 @@ async fn personal_data_requests_preserve_identity_isolation_decisions_and_fresh_
                 .await
                 .is_ok()
         );
+        // A populated owner queue retains pending-first ordering and all later
+        // records when the indexed page is selected before joining user names.
+        auth::add_user(
+            &site.app,
+            "queue@example.test",
+            "Queue fixture",
+            "subscriber",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let subjects: Vec<String> = sqlx::query_scalar("SELECT id FROM users ORDER BY id")
+            .fetch_all(&site.app.db.pool)
+            .await
+            .unwrap();
+        let mut expected = std::collections::HashSet::new();
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        for subject in subjects {
+            for _ in 0..40 {
+                let id = uuid::Uuid::new_v4().to_string();
+                sqlx::query("INSERT INTO privacy_requests(id,user_id,kind,state,response,created_at,resolved_at) VALUES($1,$2,'access','fulfilled','Synthetic completed review',1,2)")
+                    .bind(&id).bind(&subject).execute(&mut *tx).await.unwrap();
+                expected.insert(id);
+            }
+        }
+        tx.commit().await.unwrap();
+        assert_eq!(expected.len(), 120);
+        let mut seen = std::collections::HashSet::new();
+        for page in 0..3 {
+            let (status, _, body) = request(
+                &site.app,
+                "GET",
+                &format!("/admin/privacy?page={page}"),
+                Some(&site.token),
+                "",
+                Vec::new(),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            let html = String::from_utf8(body).unwrap();
+            if page == 0 {
+                assert!(
+                    html.find(&owner_id).unwrap() < html.find("fulfilled").unwrap(),
+                    "Pending cases must precede resolved history."
+                );
+                assert!(html.contains("More requests"));
+            }
+            for suffix in html.split("href=\"/admin/privacy/").skip(1) {
+                let id = suffix.split('"').next().unwrap();
+                if expected.contains(id) {
+                    assert!(
+                        seen.insert(id.to_owned()),
+                        "A stable paginated queue must not repeat cases."
+                    );
+                }
+            }
+        }
+        assert_eq!(
+            seen, expected,
+            "All completed cases must remain reachable beyond the first owner page."
+        );
         empty.close().await;
         restored.close().await;
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn selective_recovery_preserves_link_dependencies_and_shared_domains_before_fresh_restore() {
+    for postgres in engines() {
+        let site = Site::new(postgres, true).await;
+        let linked = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("linked-story", "publish"),
+        )
+        .await
+        .unwrap();
+        let unrelated = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("unrelated-story", "publish"),
+        )
+        .await
+        .unwrap();
+        let mut root = input("selected-story", "publish");
+        root.body = "Read [the linked story](/linked-story?from=selection).".into();
+        let root = content::save(&site.app, site.session(), None, root)
+            .await
+            .unwrap();
+        let archive = backup::capture(&site.app).await.unwrap();
+        let selected =
+            backup::selection::prepare(&site.app.config, &archive, std::slice::from_ref(&root.id))
+                .unwrap();
+        let retained = selected.report["retained_posts"].as_array().unwrap();
+        assert!(retained.iter().any(|id| id == &root.id));
+        assert!(retained.iter().any(|id| id == &linked.id));
+        assert!(!retained.iter().any(|id| id == &unrelated.id));
+        let repeat =
+            backup::selection::prepare(&site.app.config, &archive, std::slice::from_ref(&root.id))
+                .unwrap();
+        assert_eq!(
+            selected.plan, repeat.plan,
+            "The preview must bind a deterministic exact package."
+        );
+        assert_eq!(selected.bytes, repeat.bytes);
+        let target = Site::new(postgres, false).await;
+        backup::restore(&target.app, &selected.bytes).await.unwrap();
+        assert_eq!(
+            get(&target.app, "/selected-story", None).await.0,
+            StatusCode::OK
+        );
+        assert_eq!(
+            get(&target.app, "/linked-story", None).await.0,
+            StatusCode::OK
+        );
+        assert_eq!(
+            get(&target.app, "/unrelated-story", None).await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert!(
+            auth::login(&target.app, "owner@example.test", PASSWORD)
+                .await
+                .is_ok()
+        );
+        assert!(
+            backup::restore(&target.app, &selected.bytes).await.is_err(),
+            "Selection cannot merge into an occupied target."
+        );
+        assert!(
+            backup::selection::prepare(
+                &site.app.config,
+                &archive,
+                &[uuid::Uuid::new_v4().to_string()]
+            )
+            .is_err()
+        );
+        let mut corrupt = archive.clone();
+        let last = corrupt.len() - 1;
+        corrupt[last] ^= 1;
+        assert!(backup::selection::prepare(&site.app.config, &corrupt, &[root.id]).is_err());
+        target.close().await;
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn url_aware_clone_stays_read_only_across_recovery_until_explicit_owner_review() {
+    for postgres in engines() {
+        let site = Site::new(postgres, true).await;
+        let mut post = input("cloned-story", "publish");
+        post.body = "[Local](https://source.example.test/about) [Unrelated](https://source.example.test.evil.invalid/about)".into();
+        let post = content::save(&site.app, site.session(), None, post)
+            .await
+            .unwrap();
+        let archive = backup::capture(&site.app).await.unwrap();
+        let prepared = backup::selection::clone_package(
+            &site.app.config,
+            &archive,
+            "https://source.example.test",
+        )
+        .unwrap();
+        assert_eq!(prepared.report["held"], true);
+        assert!(prepared.report["rewritten_occurrences"].as_u64().unwrap() > 0);
+        assert!(
+            backup::selection::clone_package(
+                &site.app.config,
+                &archive,
+                "https://source.example.test/path"
+            )
+            .is_err()
+        );
+        let target = Site::new(postgres, false).await;
+        backup::restore(&target.app, &prepared.bytes).await.unwrap();
+        assert!(
+            target
+                .app
+                .clone_held
+                .load(std::sync::atomic::Ordering::SeqCst)
+        );
+        assert!(
+            auth::session(
+                &target.app,
+                &axum::http::HeaderMap::from_iter([(
+                    axum::http::header::COOKIE,
+                    format!("wpalt_session={}", site.token).parse().unwrap()
+                )])
+            )
+            .await
+            .is_err()
+        );
+        let (token, session) = auth::login(&target.app, "owner@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let (status, html) = get(&target.app, "/cloned-story", None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains("http://127.0.0.1:3000/about"));
+        assert!(html.contains("https://source.example.test.evil.invalid/about"));
+        let (_, operations) = get(&target.app, "/admin/operations", Some(&token)).await;
+        assert!(operations.contains("Read-only recovered clone"));
+        let mut update = input("cloned-story", "publish");
+        update.version = post.version;
+        update.csrf = session.csrf.clone();
+        let body = serde_json::to_vec(&update).unwrap();
+        assert_eq!(
+            request(
+                &target.app,
+                "POST",
+                &format!("/api/admin/content/{}", post.id),
+                Some(&token),
+                "application/json",
+                body
+            )
+            .await
+            .0,
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            request(
+                &target.app,
+                "POST",
+                "/commerce/stripe/webhook",
+                None,
+                "application/json",
+                b"{}".to_vec()
+            )
+            .await
+            .0,
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        let dispatched = std::sync::atomic::AtomicBool::new(false);
+        assert!(
+            wpalt::operations::jobs::run_cycle(&target.app, async {
+                dispatched.store(true, std::sync::atomic::Ordering::SeqCst);
+                vec![]
+            })
+            .await
+            .is_err()
+        );
+        assert!(!dispatched.load(std::sync::atomic::Ordering::SeqCst));
+        let held_archive = backup::capture(&target.app).await.unwrap();
+        let recovered = Site::new(postgres, false).await;
+        backup::restore(&recovered.app, &held_archive)
+            .await
+            .unwrap();
+        assert!(
+            wpalt::operations::clone_hold::held(&recovered.app)
+                .await
+                .unwrap()
+        );
+        assert!(
+            wpalt::operations::clone_hold::activate(&target.app, "too short")
+                .await
+                .is_err()
+        );
+        wpalt::operations::clone_hold::activate(&target.app,"Reviewed source shutdown, message queues, payment ownership, identity callbacks and credentials in this isolated synthetic fixture.").await.unwrap();
+        assert!(
+            !target
+                .app
+                .clone_held
+                .load(std::sync::atomic::Ordering::SeqCst)
+        );
+        assert!(
+            !wpalt::operations::clone_hold::held(&target.app)
+                .await
+                .unwrap()
+        );
+        assert!(
+            wpalt::operations::clone_hold::activate(
+                &target.app,
+                "Repeated activation must not silently pass an already activated clone."
+            )
+            .await
+            .is_err()
+        );
+        recovered.close().await;
+        target.close().await;
         site.close().await;
     }
 }

@@ -1606,6 +1606,42 @@
         "Affected release"
       ],
       "status": "implemented; exact-source cumulative delivery verification pending"
+    },
+    {
+      "feature_id": "M7-SELECTIVE-CLONE",
+      "area": "recovery/security/performance",
+      "scope": "Dependency-aware editorial selection and origin-aware read-only fresh-target clone",
+      "basis": "Primary WordPress migration reference and explicit wpalt operational safety policy; no live graph merge or arbitrary code rewrite",
+      "sources": [
+        "https://developer.wordpress.org/advanced-administration/upgrade/migrating/",
+        "https://www.sqlite.org/queryplanner.html",
+        "https://www.postgresql.org/docs/17/transaction-iso.html"
+      ],
+      "applicable_versions": [
+        "wpalt schema 12 / archive v12",
+        "SQLite and PostgreSQL 17"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Validate full graph before and after bounded dependency selection; bind source/output bytes to preview hash",
+        "Rewrite declared presentation JSON strings with origin boundary checks; preserve immutable financial records and credentials",
+        "Durable clone hold blocks HTTP side effects and scheduler future polling across recovery; explicit stopped-host reviewed activation",
+        "Current archive only; database migration preserves data and dedicated M6 converter produces current schema"
+      ],
+      "tests": [
+        "selective_recovery_preserves_link_dependencies_and_shared_domains_before_fresh_restore",
+        "url_aware_clone_stays_read_only_across_recovery_until_explicit_owner_review",
+        "scripts/cli_acceptance.py portable clean-binary recovery"
+      ],
+      "triggers": [
+        "Changed graph/schema/module dependencies",
+        "Changed URL grammar, authentication/provider ownership or deployment mode",
+        "Affected release"
+      ],
+      "status": "implemented; integrated exact-source delivery verification pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

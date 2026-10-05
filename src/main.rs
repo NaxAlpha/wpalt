@@ -91,6 +91,35 @@ enum Command {
         #[arg(long)]
         key_file: Option<PathBuf>,
     },
+    /// Preview dependency-aware editorial selection; publish a NEW private package with --execute PLAN --output FILE.
+    RecoverySelect {
+        input: PathBuf,
+        #[arg(long = "post", required = true)]
+        posts: Vec<String>,
+        #[arg(long)]
+        key_file: Option<PathBuf>,
+        #[arg(long, requires = "output")]
+        execute: Option<String>,
+        #[arg(long, requires = "execute")]
+        output: Option<PathBuf>,
+    },
+    /// Preview a read-only URL-aware clone package; create a NEW package using the exact --execute plan.
+    RecoveryClone {
+        input: PathBuf,
+        #[arg(long)]
+        source_origin: String,
+        #[arg(long)]
+        key_file: Option<PathBuf>,
+        #[arg(long, requires = "output")]
+        execute: Option<String>,
+        #[arg(long, requires = "execute")]
+        output: Option<PathBuf>,
+    },
+    /// Activate a recovered clone after reviewing source ownership and all side-effect queues, while stopped.
+    CloneActivate {
+        #[arg(long)]
+        review: String,
+    },
     /// Extract one validated media/private attachment as a new private file.
     RecoveryFile {
         input: PathBuf,
@@ -686,6 +715,52 @@ async fn main() -> anyhow::Result<()> {
             println!("Recovered a new private file.");
             return Ok(());
         }
+        Command::RecoverySelect {
+            input,
+            posts,
+            key_file,
+            execute,
+            output,
+        } => {
+            let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
+            let prepared = backup::selection::prepare(&config, &bytes, posts)
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            if let Some(plan) = execute {
+                anyhow::ensure!(
+                    *plan == prepared.plan,
+                    "Selection plan changed; inspect a fresh preview before creating the package."
+                );
+                backup::write_private(
+                    output.as_ref().expect("clap requires output"),
+                    &prepared.bytes,
+                )?;
+            }
+            println!("{}", serde_json::to_string_pretty(&prepared.report)?);
+            return Ok(());
+        }
+        Command::RecoveryClone {
+            input,
+            source_origin,
+            key_file,
+            execute,
+            output,
+        } => {
+            let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
+            let prepared = backup::selection::clone_package(&config, &bytes, source_origin)
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            if let Some(plan) = execute {
+                anyhow::ensure!(
+                    *plan == prepared.plan,
+                    "Clone plan changed; inspect a fresh preview."
+                );
+                backup::write_private(
+                    output.as_ref().expect("clap requires output"),
+                    &prepared.bytes,
+                )?;
+            }
+            println!("{}", serde_json::to_string_pretty(&prepared.report)?);
+            return Ok(());
+        }
         Command::MigrateBackup { input, output } => {
             let bytes = backup::read_bounded(input, config.max_backup_bytes)
                 .await
@@ -708,6 +783,19 @@ async fn main() -> anyhow::Result<()> {
         .init();
     let _lock = lock(&config)?;
     let app = App::open(config).await?;
+    anyhow::ensure!(
+        !app.clone_held.load(std::sync::atomic::Ordering::SeqCst)
+            || matches!(
+                cli.command,
+                Command::Serve
+                    | Command::CloneActivate { .. }
+                    | Command::Backup { .. }
+                    | Command::RecoveryStatus
+                    | Command::JobHistory
+                    | Command::PrivacyExport { .. }
+            ),
+        "This clone is held read-only. Review source shutdown, queues, payment ownership, identities and credentials before clone-activate."
+    );
     // Journal command classes without collecting argv, paths or secrets.
     let route = match &cli.command {
         Command::Init { .. } => Some("cli:init"),
@@ -716,6 +804,7 @@ async fn main() -> anyhow::Result<()> {
         Command::UpgradePrepare { .. } => Some("cli:upgrade-prepare"),
         Command::VideoTranscode { .. } => Some("cli:video-transcode"),
         Command::PrivacyExport { .. } => Some("cli:privacy-export"),
+        Command::CloneActivate { .. } => Some("cli:clone-activate"),
         Command::RecoveryPrune { .. } => Some("cli:recovery-prune"),
         Command::Cleanup {
             execute: Some(_), ..
@@ -821,7 +910,17 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
         | Command::WalRestore { .. }
         | Command::RecoveryInspect { .. }
         | Command::RecoveryFile { .. }
+        | Command::RecoverySelect { .. }
+        | Command::RecoveryClone { .. }
         | Command::MigrateBackup { .. } => unreachable!(),
+        Command::CloneActivate { review } => {
+            wpalt::operations::clone_hold::activate(&app, &review)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            println!(
+                "Clone activated. Inspect and reconcile uncertain jobs; activation is not proof that external ownership transferred."
+            );
+        }
         Command::AuthReset { email } => {
             let mut tx = app.db.pool.begin().await?;
             let user: String =
@@ -1036,6 +1135,12 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
                 interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                 loop {
                     interval.tick().await;
+                    if scheduled
+                        .clone_held
+                        .load(std::sync::atomic::Ordering::SeqCst)
+                    {
+                        continue;
+                    }
                     use wpalt::operations::jobs::{run_cycle, stage, stage_unit};
                     if run_cycle(&scheduled, async {
                         vec![

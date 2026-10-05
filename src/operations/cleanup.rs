@@ -35,7 +35,7 @@ pub struct Outcome {
     pub pending_files: Vec<String>,
 }
 // Also recognize percent-encoded URLs and decoded JSON strings. No network fetches.
-fn references(text: &str, ids: &mut HashSet<String>) {
+pub(crate) fn references(text: &str, ids: &mut HashSet<String>) {
     let mut decoded = Vec::with_capacity(text.len());
     let bytes = text.as_bytes();
     let mut i = 0;

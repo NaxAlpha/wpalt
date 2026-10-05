@@ -192,7 +192,9 @@ async fn queue(
     if offset > app.config.privacy.max_requests {
         return Err(Error::invalid("Privacy queue page is out of range."));
     }
-    let mut rows=sqlx::query("SELECT p.id,p.kind,p.state,p.created_at,u.name FROM privacy_requests p JOIN users u ON u.id=p.user_id ORDER BY p.state DESC,p.created_at,p.id LIMIT 101 OFFSET $1").bind(offset as i64).fetch_all(&app.db.pool).await?;
+    // Select the bounded page through the queue index before looking up names.
+    // Otherwise SQLite can drive the join from users and sort the whole queue.
+    let mut rows=sqlx::query("SELECT p.id,p.kind,p.state,p.created_at,u.name FROM (SELECT id,user_id,kind,state,created_at FROM privacy_requests ORDER BY state DESC,created_at,id LIMIT 101 OFFSET $1) p JOIN users u ON u.id=p.user_id ORDER BY p.state DESC,p.created_at,p.id").bind(offset as i64).fetch_all(&app.db.pool).await?;
     let more = rows.len() > 100;
     rows.truncate(100);
     Ok(Html(view::layout(

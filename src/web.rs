@@ -189,7 +189,17 @@ async fn security_and_trace(
     } else {
         None
     };
-    let mut response = if let Some(error) = audit_failure {
+    let clone_blocked = app.clone_held.load(std::sync::atomic::Ordering::SeqCst)
+        && ((method != axum::http::Method::GET
+            && method != axum::http::Method::HEAD
+            && route != "/login"
+            && route != "/logout")
+            || requested_path.starts_with("/members/identity/")
+            || requested_path.starts_with("/api/engagement/scripts/")
+            || requested_path == "/shop/cart");
+    let mut response = if clone_blocked {
+        Error(StatusCode::SERVICE_UNAVAILABLE,"This recovered clone is read-only. Review source shutdown, queues, external payment ownership and credentials, then activate it using the stopped-host CLI.").into_response()
+    } else if let Some(error) = audit_failure {
         error.into_response()
     } else if let Err(error) = protection {
         tracing::warn!(event="local_request_blocked", route=%route, status=error.0.as_u16());
@@ -2092,6 +2102,9 @@ async fn operations(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
         Some(&s),
         html! {
             (view::heading("Operations","Operations","Manual snapshots, portable content and useful diagnostics without cloud dependencies."))
+            @if app.clone_held.load(std::sync::atomic::Ordering::SeqCst) {
+                section class="panel" {h2 {"Read-only recovered clone"}p {"Background work and HTTP writes are paused. Review source shutdown, message queues, external payment ownership, identity callbacks and credentials before stopped-host activation. Presentation previews remain available; source sessions and passkeys were removed."}}
+            }
             div class="split" {section class="panel" {h2 {"Back up & move"}p class="muted" {"Download a consistent database-and-media snapshot. It includes password hashes and private content; keep it secure. This download is unencrypted."}
                 form method="post" action="/admin/backup" {(view::csrf(&s))button {"Download full backup"}}
                 p class="muted" {"Restore with the CLI into an empty database/data directory while the server is stopped. Keep an independent copy to recover from losing this host."}

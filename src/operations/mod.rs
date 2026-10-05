@@ -25,4 +25,5 @@ pub mod headers;
 
 pub mod consent_scripts;
 
+pub mod clone_hold;
 pub mod privacy;

@@ -134,18 +134,36 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     portable=root/'portable.toml'
     portable.write_text(f'database_url = "postgres://invalid:invalid@127.0.0.1:1/unreachable"\ndata_dir = "{root/"never-created"}"\n')
     inspected=json.loads(run(portable,'recovery-inspect',str(snapshot)).stdout)
-    assert inspected['schema']==11
+    assert inspected['schema']==12
+    selected=json.loads(run(portable,'recovery-select',str(snapshot),'--post',lesson).stdout)
+    selection_file=root/'selection.json'
+    run(portable,'recovery-select',str(snapshot),'--post',lesson,'--execute','wrong-plan','--output',str(selection_file),ok=False)
+    assert not selection_file.exists()
+    run(portable,'recovery-select',str(snapshot),'--post',lesson,'--execute',selected['plan'],'--output',str(selection_file))
+    assert selection_file.stat().st_mode & 0o077==0
+    run(portable,'recovery-select',str(snapshot),'--post',lesson,'--execute',selected['plan'],'--output',str(selection_file),ok=False)
+    # A held clone can be inspected/recovered without inheriting live side effects.
+    clone_cfg=config_for('clone')
+    clone_file=root/'clone.json'
+    clone_preview=json.loads(run(clone_cfg,'recovery-clone',str(snapshot),'--source-origin','https://old.example.test').stdout)
+    run(clone_cfg,'recovery-clone',str(snapshot),'--source-origin','https://old.example.test','--execute',clone_preview['plan'],'--output',str(clone_file))
+    run(clone_cfg,'restore',str(clone_file))
+    run(clone_cfg,'shop','maintenance',ok=False)
+    run(clone_cfg,'clone-activate','--review','Too short',ok=False)
+    run(clone_cfg,'clone-activate','--review','Reviewed source shutdown, delivery queues, external payment ownership, callback URLs and credentials in this isolated synthetic fixture.')
+    run(clone_cfg,'shop','maintenance')
+    assert clone_file.stat().st_mode & 0o077==0
     assert not (root/'never-created').exists(),'Portable inspection must not create a site'
     key=root/'recovery.key';run(config,'recovery-key',str(key))
     encrypted=root/'encrypted.wpbackup'
     receipt=json.loads(run(config,'upgrade-prepare',str(encrypted),'--key-file',str(key)).stdout)
     import hashlib
-    assert receipt['format']=='wpalt-upgrade-receipt-v1' and receipt['schema']==11
+    assert receipt['format']=='wpalt-upgrade-receipt-v1' and receipt['schema']==12
     assert receipt['archive_sha256']==hashlib.sha256(encrypted.read_bytes()).hexdigest()
     assert receipt['archive_bytes']==encrypted.stat().st_size
     assert receipt['executable_sha256']==hashlib.sha256(binary.read_bytes()).hexdigest()
     run(config,'upgrade-prepare',str(encrypted),'--key-file',str(key),ok=False)
-    assert json.loads(run(portable,'recovery-inspect',str(encrypted),'--key-file',str(key)).stdout)['schema']==11
+    assert json.loads(run(portable,'recovery-inspect',str(encrypted),'--key-file',str(key)).stdout)['schema']==12
     wrong_key=root/'wrong.key';run(config,'recovery-key',str(wrong_key))
     run(portable,'recovery-inspect',str(encrypted),'--key-file',str(wrong_key),ok=False)
     run(target,'restore',str(snapshot));run(target,'restore',str(snapshot),ok=False)
