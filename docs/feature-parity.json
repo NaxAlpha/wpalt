@@ -1355,10 +1355,11 @@
       "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Optional owner-installed FFmpeg/FFprobe worker, owner-only admin upload and CLI, fixed two-minute/1080p input profile and 720p MP4 output; private/public delivery, recovery and bounded local workers. Host OS codec sandbox/aggregate memory quotas remain operator prerequisites, not an application isolation guarantee.",
+      "m7_coverage": "Optional owner-installed FFmpeg/FFprobe worker, owner-only admin upload and CLI, fixed two-minute/1080p input profile and 720p MP4 output; private/public delivery, recovery and bounded local workers. Host OS codec sandbox/aggregate memory quotas remain operator prerequisites, not an application isolation guarantee. Progressive busy/error retry retains source; real browser decodes/plays MP4 at three widths. Current-session revocation wins before media publication.",
       "evidence": [
         "resilient-operations.md",
-        "../tests/acceptance.rs"
+        "../tests/acceptance.rs",
+        "../scripts/video_acceptance.cjs"
       ]
     },
     {

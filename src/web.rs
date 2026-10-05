@@ -1274,8 +1274,8 @@ async fn media_list(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
         html! {
             (view::heading("Assets","Media library","Upload images, describe them and choose who can access them. SVG and executable uploads are not accepted."))
             section class="panel" {form method="post" action="/admin/media" enctype="multipart/form-data" {(view::csrf(&s))div class="field-row" {label {"Image" input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/gif" required;}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" {"Public"}option value="private" {"Editors only"}}}}label {"Alternative text" input name="alt" maxlength="500";}button {"Upload image"}}}
-            @if s.is_admin(){section class="panel" {h2 {"Local video processing"}p {"Optional owner-installed FFmpeg. MP4/WebM, two minutes maximum, source up to 1920×1080. Produces a bounded 720p MP4; subtitles and metadata are excluded."}form method="post" action="/admin/media/video" enctype="multipart/form-data" {(view::csrf(&s))label {"Video source" input type="file" name="file" accept="video/mp4,video/webm" required disabled[!app.config.video.enabled];}label {"Video visibility" select name="visibility" {option value="private" {"Editors only"}option value="public" {"Public"}}}button disabled[!app.config.video.enabled] {"Process local video"}} @if !app.config.video.enabled{p class="muted" {"Disabled. Configure absolute ffmpeg/ffprobe paths and enable [video] to use the local worker."}}}}
-            div class="cards" {@for r in rows {@let id=r.get::<String,_>("id");section class="panel media-card" {@if r.get::<String,_>("mime")=="video/mp4" {video controls preload="metadata" {source src=(format!("/media/{id}")) type="video/mp4";}} @else {img src=(format!("/media/{id}")) alt=(r.get::<String,_>("alt")) loading="lazy";}h3 {(r.get::<String,_>("original_name"))}p class="muted" {(r.get::<i64,_>("size")/1024) " KiB"}@if r.get::<String,_>("mime")=="video/mp4"{p {a href=(format!("/media/{id}")) {"Open processed video"}}} @else {code {(format!("![description](/media/{id})"))}details {summary {"Optimized image sizes"}p class="muted" {"Original access controls apply to every size. GIF animations retain their original file."}p {a href=(format!("/media/{id}/resize/320")) {"320px WebP"} " · " a href=(format!("/media/{id}/resize/640")) {"640px WebP"} " · " a href=(format!("/media/{id}/resize/1280/avif")) {"1280px AVIF"}}}}
+            @if s.is_admin(){section class="panel" {h2 {"Local video processing"}p {"Optional owner-installed FFmpeg. MP4/WebM, two minutes maximum, source up to 1920×1080. Produces a bounded 720p MP4; subtitles and metadata are excluded."}form method="post" action="/admin/media/video" enctype="multipart/form-data" data-local-video="true" {(view::csrf(&s))label {"Video source" input type="file" name="file" accept="video/mp4,video/webm" required disabled[!app.config.video.enabled];}label {"Video visibility" select name="visibility" {option value="private" {"Editors only"}option value="public" {"Public"}}}button disabled[!app.config.video.enabled] {"Process local video"}p data-video-status="true" role="status" aria-live="polite" hidden {}} @if !app.config.video.enabled{p class="muted" {"Disabled. Configure absolute ffmpeg/ffprobe paths and enable [video] to use the local worker."}}}}
+            div class="cards" {@for r in rows {@let id=r.get::<String,_>("id");section class="panel media-card" {@if r.get::<String,_>("mime")=="video/mp4" {video controls muted preload="metadata" aria-label=(r.get::<String,_>("original_name")) {source src=(format!("/media/{id}")) type="video/mp4";}} @else {img src=(format!("/media/{id}")) alt=(r.get::<String,_>("alt")) loading="lazy";}h3 {(r.get::<String,_>("original_name"))}p class="muted" {(r.get::<i64,_>("size")/1024) " KiB"}@if r.get::<String,_>("mime")=="video/mp4"{p {a href=(format!("/media/{id}")) {"Open processed video"}}} @else {code {(format!("![description](/media/{id})"))}details {summary {"Optimized image sizes"}p class="muted" {"Original access controls apply to every size. GIF animations retain their original file."}p {a href=(format!("/media/{id}/resize/320")) {"320px WebP"} " · " a href=(format!("/media/{id}/resize/640")) {"640px WebP"} " · " a href=(format!("/media/{id}/resize/1280/avif")) {"1280px AVIF"}}}}
                 form method="post" action=(format!("/admin/media/{id}")) {(view::csrf(&s))label {"Alternative text" input name="alt" value=(r.get::<String,_>("alt")) maxlength="500";}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" selected[r.get::<String,_>("visibility")=="public"] {"Public"}option value="private" selected[r.get::<String,_>("visibility")=="private"] {"Editors only"}}}button class="secondary" {"Save details"}}
             }}}
         },
@@ -1335,6 +1335,9 @@ async fn upload_video(
     )
     .await?;
     let _guard = app.mutation().await;
+    let current = admin_session(&app, &headers).await?;
+    admin(&current)?;
+    auth::csrf(&current, &csrf)?;
     let id = uuid::Uuid::new_v4().to_string();
     let filename = format!("{id}.mp4");
     let path = app.config.data_dir.join("media").join(&filename);
@@ -1442,6 +1445,9 @@ async fn upload(
     let filename = format!("{id}.{ext}");
     let hash = auth::digest(&bytes);
     let _guard = app.mutation().await;
+    let current = admin_session(&app, &headers).await?;
+    editor(&current)?;
+    auth::csrf(&current, &csrf)?;
     let path = app.config.data_dir.join("media").join(&filename);
     tokio::fs::write(&path, &bytes).await?;
     let result=sqlx::query("INSERT INTO media(id,filename,original_name,mime,alt,visibility,size,sha256,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)").bind(id).bind(filename).bind(name).bind(mime).bind(alt).bind(visibility).bind(bytes.len() as i64).bind(hash).bind(now()).execute(&app.db.pool).await;
@@ -1470,6 +1476,9 @@ async fn update_media(
         return Err(Error::invalid("Invalid media details."));
     }
     let _guard = app.mutation().await;
+    let current = admin_session(&app, &headers).await?;
+    editor(&current)?;
+    auth::csrf(&current, &input.csrf)?;
     let result = sqlx::query("UPDATE media SET alt=$1,visibility=$2 WHERE id=$3")
         .bind(input.alt)
         .bind(input.visibility)

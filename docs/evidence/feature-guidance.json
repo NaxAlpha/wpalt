@@ -1425,10 +1425,12 @@
       "review_interval_days": 30,
       "maintenance_owner": "wpalt maintainers",
       "requirements": [
-        "Use owner-configured absolute tools with fixed arguments and no shell, network protocols or arbitrary codec arguments. Bound source, streams, dimensions, duration, worker concurrency, process deadlines and output. Preserve media authorization and backup/checksum identity. Maintain host OS sandbox/limits for untrusted codec input."
+        "Use owner-configured absolute tools with fixed arguments and no shell, network protocols or arbitrary codec arguments. Bound source, streams, dimensions, duration, worker concurrency, process deadlines and output. Preserve media authorization and backup/checksum identity. Maintain host OS sandbox/limits for untrusted codec input.",
+        "Retain failed source choice and explain ambiguous interrupted requests before retry; revalidate current authority at publication after long native work. Keep owner previews quiet and test populated/error/busy geometry and actual playback."
       ],
       "tests": [
-        "local_video_worker_preserves_authority_and_recovers_processed_media"
+        "local_video_worker_preserves_authority_and_recovers_processed_media",
+        "video_acceptance.cjs actual decode/play, retry/busy/authority and geometry"
       ],
       "triggers": [
         "FFmpeg version or relevant decoder advisory",

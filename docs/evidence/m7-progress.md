@@ -28,3 +28,9 @@ Durable bounded background cycle history integrated into scheduler, owner Operat
 - Current exact-source cumulative six-gate CI, final screenshots/aesthetic review, milestone matrix completeness and coherent review packet/PR description. Keep external-service boundaries explicit and do not reduce required M7 scope silently.
 
 Before final readiness, reconcile the complete F072–F082, F103–F111, F115–F120 and F122 inventory in `m7-contract.md` with implemented end-user behavior and evidence. No milestone completion claim until these required outputs are delivered and verified. Merge requires a separate user instruction.
+
+## Native video interaction checkpoint — 2026-10-05
+
+`c20841a5894654538e6985ff1478b045f6a58cf2` passed all six gates in [run 37251404043](https://github.com/NaxAlpha/wpalt/actions/runs/37251404043), including real PostgreSQL image metadata/security-header cases and Linux browser checks.
+
+The next video update passes the complete local 77-case Rust suite and strict Clippy. Actual installed Chrome 154.0.8037.93 with FFmpeg 8.1.1 verified failed-source retry, held busy state, actual native MP4 metadata/playback, private/public/revoked access and exclusion from image pickers. Eighteen responsive/text-spacing measurements and three scoped accessibility scans passed; populated mobile screenshot inspected. A deterministic held-write-boundary race verifies that revoking the initiating session during admitted native processing prevents publication. No general OS codec isolation or whole-platform authorization-race guarantee is claimed. Cumulative actual Chrome authoring/Studio/business/Operations regression also passed after this update. Linux exact-source playback CI remains required.

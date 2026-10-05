@@ -6,7 +6,11 @@ use crate::{
     error::{Error, Result},
 };
 use serde::{Deserialize, Serialize};
-use std::{path::PathBuf, process::Stdio, time::Duration};
+use std::{
+    path::PathBuf,
+    process::Stdio,
+    time::{Duration, Instant},
+};
 use tokio::process::Command;
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -56,6 +60,7 @@ async fn process(command: &mut Command) -> Result<()> {
     }
 }
 pub async fn transcode(app: &App, source: &[u8]) -> Result<Vec<u8>> {
+    let started = Instant::now();
     let config = &app.config.video;
     if !config.enabled {
         return Err(Error::invalid("Local video processing is disabled."));
@@ -70,6 +75,7 @@ pub async fn transcode(app: &App, source: &[u8]) -> Result<Vec<u8>> {
         .clone()
         .try_acquire_owned()
         .map_err(|_| Error::invalid("Media workers are busy; try again shortly."))?;
+    tracing::debug!(event = "video_worker_admitted", source_bytes = source.len());
     let dir = app
         .config
         .data_dir
@@ -126,6 +132,10 @@ pub async fn transcode(app: &App, source: &[u8]) -> Result<Vec<u8>> {
             return Err(Error::invalid("Video inspection failed or timed out."));
         }
     }
+    tracing::debug!(
+        event = "video_inspection_completed",
+        elapsed_us = started.elapsed().as_micros() as u64
+    );
     let metadata: serde_json::Value =
         serde_json::from_slice(&backup::read_bounded(&report, 16 * 1024).await?)
             .map_err(|_| Error::invalid("Invalid video inspection."))?;
@@ -160,5 +170,10 @@ pub async fn transcode(app: &App, source: &[u8]) -> Result<Vec<u8>> {
     if bytes.len() < 16 || bytes.len() >= 32 * 1024 * 1024 || &bytes[4..8] != b"ftyp" {
         return Err(Error::invalid("Video output failed its bounded MP4 check."));
     }
+    tracing::debug!(
+        event = "video_worker_completed",
+        output_bytes = bytes.len(),
+        elapsed_us = started.elapsed().as_micros() as u64
+    );
     Ok(bytes)
 }

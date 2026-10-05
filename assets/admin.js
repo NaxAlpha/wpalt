@@ -70,3 +70,29 @@ for (const input of document.querySelectorAll('[data-epoch-for]')) {
   if(Number(hidden.value)>0){const date=new Date(Number(hidden.value)*1000);input.value=`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;}
   input.addEventListener('input',()=>{hidden.value=input.value?String(Math.floor(new Date(input.value).getTime()/1000)):'0';});
 }
+
+
+// Keep selected local source/visibility on failure and prevent duplicate native jobs.
+for (const form of document.querySelectorAll('[data-local-video]')) {
+  const button = form.querySelector('button'), status = form.querySelector('[data-video-status]');
+  let busy = false;
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (busy) return;
+    busy = true;button.disabled = true;form.setAttribute('aria-busy','true');
+    status.hidden = false;status.className = 'notice';status.setAttribute('role','status');
+    status.textContent = 'Processing locally… Keep this page open. Your source is retained if processing fails.';
+    try {
+      const response = await fetch(form.action,{method:'POST',body:new FormData(form),credentials:'same-origin',redirect:'manual',headers:{Accept:'application/json'}});
+      if (response.type === 'opaqueredirect') {location.assign('/admin/media');return;}
+      let message = 'Processing did not complete. Inspect the media library before retrying if the connection was lost.';
+      try {const result = await response.json();if(typeof result.error === 'string')message = result.error;} catch {}
+      status.textContent = message;status.className = 'notice error';status.setAttribute('role','alert');
+    } catch {
+      status.textContent = 'Connection interrupted. Inspect the media library before retrying; processing may have completed.';
+      status.className = 'notice error';status.setAttribute('role','alert');
+    } finally {
+      busy = false;button.disabled = false;form.removeAttribute('aria-busy');
+    }
+  });
+}

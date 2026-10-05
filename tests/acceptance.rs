@@ -4122,6 +4122,17 @@ async fn local_video_worker_preserves_authority_and_recovers_processed_media() {
             ffprobe: ffprobe.clone().into(),
         };
         site.app.config = std::sync::Arc::new(config);
+        let mut permits = Vec::new();
+        for _ in 0..site.app.config.worker_concurrency {
+            permits.push(site.app.media_work.try_acquire().unwrap());
+        }
+        assert!(
+            wpalt::operations::video::transcode(&site.app, &source)
+                .await
+                .is_err(),
+            "saturated native pool rejects work"
+        );
+        drop(permits);
         let mut body=format!("--video-fixture\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{}\r\n--video-fixture\r\nContent-Disposition: form-data; name=\"file\"; filename=\"short.mp4\"\r\nContent-Type: video/mp4\r\n\r\n",site.session().csrf).into_bytes();
         body.extend_from_slice(&source);
         body.extend_from_slice(b"\r\n--video-fixture--\r\n");
@@ -4131,7 +4142,7 @@ async fn local_video_worker_preserves_authority_and_recovers_processed_media() {
             "/admin/media/video",
             Some(&site.token),
             "multipart/form-data; boundary=video-fixture",
-            body,
+            body.clone(),
         )
         .await;
         assert_eq!(status, StatusCode::SEE_OTHER);
@@ -4153,6 +4164,64 @@ async fn local_video_worker_preserves_authority_and_recovers_processed_media() {
                 .contains("Open processed video")
         );
         let archive = backup::capture(&site.app).await.unwrap();
+        auth::add_user(
+            &site.app,
+            "another-owner@example.test",
+            "Another owner",
+            "admin",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        // The other owner holds the write boundary while a valid native request
+        // starts. Revoke its account/session before releasing the commit lock.
+        let guard = site.app.mutation().await;
+        let app = site.app.clone();
+        let token = site.token.clone();
+        let pending = tokio::spawn(async move {
+            request(
+                &app,
+                "POST",
+                "/admin/media/video",
+                Some(&token),
+                "multipart/form-data; boundary=video-fixture",
+                body,
+            )
+            .await
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            while site.app.media_work.available_permits() == site.app.config.worker_concurrency {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("native work must reach its admitted processing stage");
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        sqlx::query("UPDATE users SET role='editor' WHERE id=$1")
+            .bind(&site.session().user.id)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM sessions WHERE user_id=$1")
+            .bind(&site.session().user.id)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        drop(guard);
+        assert_eq!(
+            pending.await.unwrap().0,
+            StatusCode::UNAUTHORIZED,
+            "revocation during processing wins before publication"
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM media WHERE mime='video/mp4'")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            count, 1,
+            "revoked native request cannot leave another media record"
+        );
         assert!(
             wpalt::operations::video::transcode(&site.app, b"not-a-video")
                 .await

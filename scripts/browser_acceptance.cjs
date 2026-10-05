@@ -44,6 +44,17 @@ async function freePort() {
     `database_url = "sqlite://${temporary}/site.db?mode=rwc"\ndata_dir = "${temporary}/data"\nlisten = "127.0.0.1:${port}"\nbase_url = "${origin}"\n`,
   );
   if (process.env.WPALT_SPAM_ONLY) fs.appendFileSync(config, "\n[spam]\nenabled = true\nproof_bits = 8\n");
+  if (process.env.WPALT_VIDEO_ONLY) {
+    const ffmpeg = process.env.WPALT_TEST_FFMPEG || (process.platform === "darwin" ? "/opt/homebrew/bin/ffmpeg" : "/usr/bin/ffmpeg");
+    const ffprobe = process.env.WPALT_TEST_FFPROBE || (process.platform === "darwin" ? "/opt/homebrew/bin/ffprobe" : "/usr/bin/ffprobe");
+    assert(fs.existsSync(ffmpeg) && fs.existsSync(ffprobe),"Enabled video browser fixture requires owner-installed tools");
+    fs.appendFileSync(config,`\n[video]\nenabled = true\nffmpeg = ${JSON.stringify(ffmpeg)}\nffprobe = ${JSON.stringify(ffprobe)}\n`);
+    const fixture = path.join(temporary,"silent-fixture.mp4");
+    const generated = spawnSync(ffmpeg,["-v","error","-f","lavfi","-i","color=c=green:s=64x48:r=10:d=1","-an","-c:v","libx264","-threads","1","-pix_fmt","yuv420p",fixture],{encoding:"utf8"});
+    assert.equal(generated.status,0,"Generate bounded local silent browser fixture");
+    process.env.WPALT_VIDEO_TOOL_VERSION = spawnSync(ffmpeg,["-version"],{encoding:"utf8"}).stdout.split("\n")[0];
+    process.env.WPALT_VIDEO_FIXTURE = fixture;
+  }
   command(
     config,
     ["init", "--admin-email", "owner@example.test"],
@@ -104,6 +115,11 @@ async function freePort() {
   await page.waitForURL(origin + "/admin");
   if (process.env.WPALT_SPAM_ONLY) {
     await require("./spam_acceptance.cjs")(owner, origin, output);
+    return;
+  }
+  if (process.env.WPALT_VIDEO_ONLY) {
+    await require("./video_acceptance.cjs")(owner, publicContext, origin, output, process.env.WPALT_VIDEO_FIXTURE);
+    assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);
     return;
   }
   if (process.env.WPALT_OPERATIONS_ONLY) {

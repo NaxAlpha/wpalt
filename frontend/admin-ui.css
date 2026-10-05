@@ -827,3 +827,10 @@ img.ProseMirror-separator {
   min-height: 44px;
   font-weight: 400;
 }
+
+body.admin .media-card video {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+}
