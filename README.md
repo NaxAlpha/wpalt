@@ -63,4 +63,4 @@ The integrated writing milestone and its structured-document API/migration are d
 
 Development distribution and pipeline: [automatic releases and CI](docs/automatic-releases.md).
 
-M7 is in development: [completion contract](docs/m7-contract.md) and [initial resilience controls](docs/resilient-operations.md). Earlier capabilities remain supported; the full M7 delivery is not yet verified.
+M7 defined-scope delivery: [operations guide](docs/resilient-operations.md), [contract](docs/m7-contract.md) and [verification with operating limits](docs/evidence/m7-verification.md). Final-source gates determine PR #13 readiness.

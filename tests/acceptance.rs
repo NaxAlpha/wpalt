@@ -4891,6 +4891,7 @@ async fn optional_scripts_require_current_declared_consent_and_never_leak_cached
 #[tokio::test]
 async fn personal_data_requests_preserve_identity_isolation_decisions_and_fresh_recovery() {
     use serde_json::json;
+    let mut engine_evidence = Vec::new();
     fn form(fields: &[(&str, &str)]) -> Vec<u8> {
         url::form_urlencoded::Serializer::new(String::new())
             .extend_pairs(fields.iter().copied())
@@ -5337,10 +5338,30 @@ async fn personal_data_requests_preserve_identity_isolation_decisions_and_fresh_
             seen, expected,
             "All completed cases must remain reachable beyond the first owner page."
         );
+        let explain = if postgres {
+            "EXPLAIN (ANALYZE,BUFFERS) "
+        } else {
+            "EXPLAIN QUERY PLAN "
+        };
+        let queue_sql = "SELECT p.id,p.kind,p.state,p.created_at,u.name FROM (SELECT id,user_id,kind,state,created_at FROM privacy_requests ORDER BY state DESC,created_at,id LIMIT 101 OFFSET 0) p JOIN users u ON u.id=p.user_id ORDER BY p.state DESC,p.created_at,p.id";
+        let plan = sqlx::query(&format!("{explain}{queue_sql}"))
+            .fetch_all(&site.app.db.pool)
+            .await
+            .unwrap()
+            .iter()
+            .map(|r| r.get::<String, _>(if postgres { 0 } else { 3 }))
+            .collect::<Vec<_>>();
+        engine_evidence.push(json!({"engine":if postgres {"PostgreSQL"} else {"SQLite"},"completed_fixture_records":120,"page_limit":101,"all_completed_records_reached_once":true,"queue_query_plan":plan}));
         empty.close().await;
         restored.close().await;
         site.close().await;
     }
+    std::fs::create_dir_all("work").unwrap();
+    std::fs::write(
+        "work/m7-privacy-volume.json",
+        serde_json::to_vec_pretty(&engine_evidence).unwrap(),
+    )
+    .unwrap();
 }
 
 #[tokio::test]
@@ -5450,7 +5471,7 @@ async fn url_aware_clone_stays_read_only_across_recovery_until_explicit_owner_re
             )
             .is_err()
         );
-        let target = Site::new(postgres, false).await;
+        let mut target = Site::new(postgres, false).await;
         backup::restore(&target.app, &prepared.bytes).await.unwrap();
         assert!(
             target
@@ -5518,6 +5539,15 @@ async fn url_aware_clone_stays_read_only_across_recovery_until_explicit_owner_re
             .is_err()
         );
         assert!(!dispatched.load(std::sync::atomic::Ordering::SeqCst));
+        target.app.db.pool.close().await;
+        target.app = App::open((*target.app.config).clone()).await.unwrap();
+        assert!(
+            target
+                .app
+                .clone_held
+                .load(std::sync::atomic::Ordering::SeqCst),
+            "Restart cannot remove a clone hold."
+        );
         let held_archive = backup::capture(&target.app).await.unwrap();
         let recovered = Site::new(postgres, false).await;
         backup::restore(&recovered.app, &held_archive)

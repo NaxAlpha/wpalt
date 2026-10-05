@@ -1,0 +1,79 @@
+{
+  "binary_sha256": "4a38ce956f611e1f3025e729d63fbe62aea0753eb8f213689b41bf874c32a180",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "conditions": "Native release, SQLite, debug SQL enabled, isolated temporary sites; one vs 100 promotions, both 500,000-character variants; only final candidate matches; six selected requests, sequential; Python HTTP overhead included. RSS is sampled after requests, not peak memory.",
+  "profiles": [
+    {
+      "candidates": 1,
+      "targeting_plan": [
+        "SEARCH p USING COVERING INDEX promotion_targeting (active=?)",
+        "SEARCH i USING INDEX sqlite_autoindex_promotion_impressions_1 (promotion_id=? AND session_hash=?) LEFT-JOIN"
+      ],
+      "variant_json_bytes": 500118,
+      "requests": 6,
+      "response_bytes": [
+        500138,
+        500138,
+        500138,
+        500138,
+        500138,
+        500138
+      ],
+      "latencies_ms": [
+        3.730165772140026,
+        3.78062529489398,
+        3.399041946977377,
+        3.0862498097121716,
+        3.127917181700468,
+        2.8170421719551086
+      ],
+      "sql_queries_per_request": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "rss_before_bytes": 38912000,
+      "rss_after_bytes": 42483712
+    },
+    {
+      "candidates": 100,
+      "targeting_plan": [
+        "SEARCH p USING COVERING INDEX promotion_targeting (active=?)",
+        "SEARCH i USING INDEX sqlite_autoindex_promotion_impressions_1 (promotion_id=? AND session_hash=?) LEFT-JOIN"
+      ],
+      "variant_json_bytes": 500118,
+      "requests": 6,
+      "response_bytes": [
+        500138,
+        500138,
+        500138,
+        500138,
+        500138,
+        500138
+      ],
+      "latencies_ms": [
+        4.074290860444307,
+        3.6018332466483116,
+        3.2136659137904644,
+        3.012583125382662,
+        2.942000050097704,
+        3.0120410956442356
+      ],
+      "sql_queries_per_request": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "rss_before_bytes": 39419904,
+      "rss_after_bytes": 42680320
+    }
+  ],
+  "source_code_commit": "81db3d3ed75994d88ba29fea928d7011aa11c175",
+  "measured_on": "2026-10-05"
+}

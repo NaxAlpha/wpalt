@@ -1580,7 +1580,7 @@
         "https://www.postgresql.org/docs/17/transaction-iso.html"
       ],
       "applicable_versions": [
-        "wpalt schema 11 / archive v11",
+        "wpalt schema 12 / archive v12",
         "SQLite and PostgreSQL 17",
         "Chrome 154/Playwright 1.62.1"
       ],

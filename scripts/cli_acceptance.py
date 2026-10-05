@@ -203,4 +203,4 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     logs=log.read_text();assert secret not in logs;assert csrf not in logs
     for cookie in jar:assert cookie.value not in logs
     assert 'request_completed' in logs and 'elapsed_us' in logs and 'login_succeeded' in logs
-    print('PASS: configuration precedence, initialization, process lock, real login, persisted scheduler/restart, RSS XML, portable theme import/export/publication, commerce imports/demo/maintenance, private backup, fresh graph restore and redacted debug logs.')
+    print('PASS: configuration precedence, initialization, process lock, real login, persisted scheduler/restart, RSS XML, portable theme import/export/publication, commerce imports/demo/maintenance, private backup, preview-bound editorial selection, held clone/activation, fresh graph restore and redacted debug logs.')

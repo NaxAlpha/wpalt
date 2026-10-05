@@ -60,6 +60,11 @@ jobs:
         with:
           name: m6-volume-evidence
           path: work/m6-volume.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: m7-privacy-volume-evidence
+          path: work/m7-privacy-volume.json
   clean-build:
     runs-on: ubuntu-24.04
     steps:

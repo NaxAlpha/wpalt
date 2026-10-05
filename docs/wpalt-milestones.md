@@ -294,3 +294,7 @@ User authorized merging delivery PR #11 and proceeding with M6. PR #11 merged to
 ## M7 implementation checkpoint — 2026-10-04
 
 M6 PR #12 is merged; M7 is active under [its completion contract](m7-contract.md). Initial recovery/cache slices are described in [the operations guide](resilient-operations.md). Scheduled authenticated encrypted copies, retention, failure/interruption status, fresh-engine recovery and bounded anonymous listing/sitemap caching are implemented and pass current SQLite behavioral checks. The full 27-family M7 requirement inventory is still active; no completion or broad family-parity claim is made. PostgreSQL, browser/UI, performance and whole-milestone delivery evidence must be recorded before readiness. [Draft delivery PR #13](https://github.com/NaxAlpha/wpalt/pull/13) tracks continuing work; no merge is authorized yet.
+
+## M7 defined-scope delivery — 2026-10-05
+
+All 27 required families have integrated evidence in [verification](evidence/m7-verification.md). Seven implementation gates passed, including PostgreSQL, Linux browsers, source-unavailable PITR and matched WordPress/plugin workload. Final documentation-source gates and independent archive verification determine PR #13 readiness. Full plugin parity/distributed operation remain future scope. Human merge is separate.
