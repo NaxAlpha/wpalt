@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "purpose": "Public declarative themes have their own typography contract, distinct from admin components. Preserve keyboard targets, responsive grid geometry and readable content widths without requiring one font family. Native checkbox/radio indicators keep browser appearance; their associated labels retain the 44px target contract rather than a text-field corner radius.",
+  "body_font_px": 16,
+  "body_line_height": 1.6,
+  "control_font_px": 16,
+  "control_min_height": 44,
+  "control_radius": 6,
+  "focus_outline_min_px": 3,
+  "geometry_tolerance_px": 0.5,
+  "theme_shell_padding_px": 24,
+  "normal_text_contrast": 4.5
+}

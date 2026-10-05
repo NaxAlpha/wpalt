@@ -1,0 +1,191 @@
+{
+  "format": 1,
+  "name": "Field journal",
+  "tokens": {
+    "background": "#f8f6f1",
+    "panel": "#ffffff",
+    "text": "#242b27",
+    "muted": "#626b64",
+    "accent": "#315b48",
+    "font": "serif"
+  },
+  "components": {},
+  "header": {
+    "id": "masthead",
+    "kind": "section",
+    "style": {
+      "layout": "row",
+      "gap": 24,
+      "width": 1040,
+      "padding": 24
+    },
+    "children": [
+      {
+        "id": "site_navigation",
+        "kind": "navigation"
+      }
+    ]
+  },
+  "footer": {
+    "id": "colophon",
+    "kind": "section",
+    "style": {
+      "width": 1040,
+      "padding": 24
+    },
+    "children": [
+      {
+        "id": "local_note",
+        "kind": "text",
+        "text": "An independent publication. Your content, your server."
+      }
+    ]
+  },
+  "templates": {
+    "home": {
+      "id": "home",
+      "kind": "section",
+      "style": {
+        "layout": "stack",
+        "gap": 24,
+        "width": 1040
+      },
+      "children": [
+        {
+          "id": "homeintro",
+          "kind": "heading",
+          "level": 1,
+          "text": {
+            "bind": "site.title"
+          }
+        },
+        {
+          "id": "homedescription",
+          "kind": "text",
+          "text": {
+            "bind": "site.description"
+          }
+        },
+        {
+          "id": "homelist",
+          "kind": "collection",
+          "source": "listing",
+          "limit": 12,
+          "style": {
+            "layout": "stack",
+            "gap": 24
+          },
+          "children": [
+            {
+              "id": "homeentry",
+              "kind": "section",
+              "children": [
+                {
+                  "id": "homelink",
+                  "kind": "link",
+                  "href": {
+                    "bind": "item.url"
+                  },
+                  "text": {
+                    "bind": "item.title"
+                  }
+                },
+                {
+                  "id": "homeexcerpt",
+                  "kind": "text",
+                  "text": {
+                    "bind": "item.excerpt"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "search": {
+      "id": "search",
+      "kind": "section",
+      "style": {
+        "layout": "stack",
+        "gap": 24,
+        "width": 1040
+      },
+      "children": [
+        {
+          "id": "searchintro",
+          "kind": "heading",
+          "level": 1,
+          "text": {
+            "bind": "site.title"
+          }
+        },
+        {
+          "id": "searchdescription",
+          "kind": "text",
+          "text": {
+            "bind": "site.description"
+          }
+        },
+        {
+          "id": "searchlist",
+          "kind": "collection",
+          "source": "listing",
+          "limit": 12,
+          "style": {
+            "layout": "stack",
+            "gap": 24
+          },
+          "children": [
+            {
+              "id": "searchentry",
+              "kind": "section",
+              "children": [
+                {
+                  "id": "searchlink",
+                  "kind": "link",
+                  "href": {
+                    "bind": "item.url"
+                  },
+                  "text": {
+                    "bind": "item.title"
+                  }
+                },
+                {
+                  "id": "searchexcerpt",
+                  "kind": "text",
+                  "text": {
+                    "bind": "item.excerpt"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "content": {
+      "id": "article",
+      "kind": "section",
+      "style": {
+        "layout": "stack",
+        "gap": 24,
+        "width": 760
+      },
+      "children": [
+        {
+          "id": "article_title",
+          "kind": "heading",
+          "level": 1,
+          "text": {
+            "bind": "post.title"
+          }
+        },
+        {
+          "id": "article_body",
+          "kind": "body"
+        }
+      ]
+    }
+  }
+}

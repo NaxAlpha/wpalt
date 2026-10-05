@@ -469,9 +469,12 @@ impl Package {
             _ => "system-ui,sans-serif",
         };
         let mut out = format!(
-            "body{{background:{};color:{};font-family:{font}}}a{{color:{}}}.theme-shell{{max-width:1200px;margin:auto;padding:24px}}.theme-node img{{max-width:100%;height:auto}}.theme-grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}}.theme-row{{display:flex;flex-wrap:wrap;gap:24px}}.theme-card{{padding:24px;background:{};border-radius:12px}}@media(max-width:700px){{.theme-grid{{grid-template-columns:1fr}}}}",
+            "body.theme-site{{--bg:{};--ink:{};--accent:{};--panel:{};--muted:{};background:var(--bg);color:var(--ink);font-family:{font};font-size:16px;line-height:1.6}}.theme-site :is(input,button,select){{font-size:16px;min-height:44px;border-radius:6px}}.theme-site :is(a,input,button,select):focus-visible{{outline:3px solid var(--accent);outline-offset:3px}}a{{color:{}}}.theme-shell{{max-width:1200px;margin:auto;padding:24px}}.theme-node img{{max-width:100%;height:auto}}.theme-grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}}.theme-row{{display:flex;flex-wrap:wrap;gap:24px}}.theme-card{{padding:24px;background:{};border-radius:12px}}@media(max-width:700px){{.theme-grid{{grid-template-columns:1fr}}}}",
             self.tokens["background"],
             self.tokens["text"],
+            self.tokens["accent"],
+            self.tokens["panel"],
+            self.tokens["muted"],
             self.tokens["accent"],
             self.tokens["panel"]
         );
@@ -582,8 +585,11 @@ fn binding_kind(
         let parts: Vec<_> = path.split('.').collect();
         match parts.as_slice() {
             ["site", ..]
-            | ["post", "title" | "body" | "url" | "kind" | "id"]
-            | ["item", "title" | "body" | "url" | "kind" | "id" | "type"] => Some("string".into()),
+            | ["post", "title" | "body" | "excerpt" | "url" | "kind" | "id"]
+            | [
+                "item",
+                "title" | "body" | "excerpt" | "url" | "kind" | "id" | "type",
+            ] => Some("string".into()),
             ["params", key] => params.get(*key).cloned(),
             ["post", "fields", ..] => field_kind(
                 r,
@@ -798,7 +804,7 @@ fn binding(
     }
     let valid = match parts.as_slice() {
         ["site", key] => ["title", "description", "role", "region"].contains(key),
-        ["post", key] => ["title", "body", "url", "kind", "id"].contains(key),
+        ["post", key] => ["title", "body", "excerpt", "url", "kind", "id"].contains(key),
         ["params", key, tail @ ..] => params.get(*key).is_some_and(|kind| {
             tail.is_empty()
                 || (kind == "relationship"
@@ -819,7 +825,7 @@ fn binding(
             },
         ),
         ["item", key, tail @ ..] => {
-            if ["title", "body", "url", "kind", "id", "type"].contains(key) {
+            if ["title", "body", "excerpt", "url", "kind", "id", "type"].contains(key) {
                 tail.is_empty()
             } else if *key == "values" {
                 r.common
@@ -877,7 +883,7 @@ pub async fn load(app: &App, id: &str, draft: bool) -> Result<Stored> {
         package: Package::parse(&raw, &Registry::load(app).await?)?,
     })
 }
-async fn validate_literal_references(app: &App, package: &Package) -> Result<()> {
+pub async fn validate_literal_references(app: &App, package: &Package) -> Result<()> {
     fn gather(
         p: &Package,
         n: &Node,
@@ -1400,6 +1406,28 @@ impl Context {
         let Some(path) = v.get("bind").and_then(Value::as_str) else {
             return v.clone();
         };
+        if ["item.excerpt", "post.excerpt"].contains(&path) {
+            let source = if path == "item.excerpt" {
+                item
+            } else {
+                &self.root["post"]
+            };
+            let Some(body) = source["body"].as_str() else {
+                return v.get("fallback").cloned().unwrap_or(Value::Null);
+            };
+            // Derive only from the already authorized projection. Bound Markdown
+            // parsing before it starts; no extra database read or private lookup.
+            let mut chars = body.chars();
+            let raw: String = chars.by_ref().take(220).collect();
+            let mut excerpt = crate::view::excerpt(&raw);
+            if chars.next().is_some() {
+                if let Some((whole, _)) = excerpt.rsplit_once(char::is_whitespace) {
+                    excerpt = whole.trim_end().to_owned();
+                }
+                excerpt.push('…');
+            }
+            return excerpt.into();
+        }
         let mut parts = path.split('.');
         let root = parts.next().unwrap_or("");
         let mut value = match root {
@@ -1732,7 +1760,7 @@ pub fn document(
     let scripts = [&p.header, &p.footer, root]
         .into_iter()
         .any(|n| has_tabs(p, n));
-    let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";@if let Some(src)=priority_image{link rel="preload" href=(src) as="image";}@if preload{link rel="preload" href=(&style) as="style";}link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" class="theme-shell"{(body)(extra)}(footer)(crate::business::engagement::markup(settings,draft))(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
+    let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";@if let Some(src)=priority_image{link rel="preload" href=(src) as="image";}@if preload{link rel="preload" href=(&style) as="style";}link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" tabindex="-1" class="theme-shell"{(body)(extra)}(footer)(crate::business::engagement::markup(settings,draft))(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
     if output.len() > 2 * 1024 * 1024 {
         return Err(Error::invalid("Rendered document exceeds 2 MiB."));
     }

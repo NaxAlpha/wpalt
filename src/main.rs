@@ -468,6 +468,10 @@ async fn shop_command(app: &App, command: ShopCommand) -> wpalt::error::Result<(
 }
 #[derive(Subcommand)]
 enum ThemeCommand {
+    /// Validate a native package against this site without saving or publishing it.
+    Validate {
+        input: PathBuf,
+    },
     Import {
         id: String,
         input: PathBuf,
@@ -1294,6 +1298,15 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             use wpalt::{schema, theme};
             let result: wpalt::error::Result<()> = async {
                 match command {
+                    ThemeCommand::Validate { input } => {
+                        let bytes = backup::read_bounded(&input, 256 * 1024).await?;
+                        let raw = std::str::from_utf8(&bytes).map_err(|_| {
+                            wpalt::error::Error::invalid("Use a UTF-8 theme package.")
+                        })?;
+                        let package =
+                            theme::Package::parse(raw, &schema::Registry::load(&app).await?)?;
+                        theme::validate_literal_references(&app, &package).await?;
+                    }
                     ThemeCommand::Import { id, input, publish } => {
                         let file = std::fs::File::open(input)?;
                         if file.metadata()?.len() > 256 * 1024 {

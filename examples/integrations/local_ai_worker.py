@@ -52,6 +52,35 @@ def write_private(path,raw):
     with os.fdopen(os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'wb') as file:
         file.write(raw);file.flush();os.fsync(file.fileno())
 
+LAYOUT_SCHEMA={'type':'object','additionalProperties':False,'properties':{'palette':{'type':'string','enum':['paper','forest','ink']},'font':{'type':'string','enum':['system','serif']},'reading_width':{'type':'integer','enum':[640,720,760]},'home_columns':{'type':'integer','enum':[1,2,3]},'gap':{'type':'integer','enum':[16,24,32]}},'required':['palette','font','reading_width','home_columns','gap']}
+PALETTES={'paper':{'background':'#f8f6f1','panel':'#ffffff','text':'#242b27','muted':'#626b64','accent':'#315b48'},'forest':{'background':'#f0f5f1','panel':'#ffffff','text':'#172c21','muted':'#4d6257','accent':'#20593a'},'ink':{'background':'#f4f6f8','panel':'#ffffff','text':'#202831','muted':'#56616d','accent':'#254d79'}}
+def validate_layout(layout):
+    if not isinstance(layout,dict) or set(layout)!=set(LAYOUT_SCHEMA['required']):raise ValueError('Invalid layout fields.')
+    for key,definition in LAYOUT_SCHEMA['properties'].items():
+        if layout[key] not in definition['enum'] or (definition['type']=='integer' and type(layout[key]) is not int) or (definition['type']=='string' and not isinstance(layout[key],str)):raise ValueError('Invalid layout choice.')
+    return layout
+
+def layout_package(base,layout):
+    validate_layout(layout)
+    if base.get('format')!=1 or not isinstance(base.get('templates'),dict):raise ValueError('Choose a native base theme.')
+    base['name']='Local layout proposal'
+    base['tokens']={**PALETTES[layout['palette']],'font':layout['font']}
+    base['templates']['content'].setdefault('style',{})['width']=layout['reading_width']
+    # Locate one existing listing per home/search template. The model chooses
+    # only bounded presentation knobs; it cannot add links, assets or code.
+    def listing(node,depth=0):
+        if depth>12:raise ValueError('Base layout depth exceeds native budget.')
+        if node.get('kind')=='collection' and node.get('source')=='listing':return node
+        for child in node.get('children',[]):
+            found=listing(child,depth+1)
+            if found is not None:return found
+        return None
+    for name in ('home','search'):
+        node=listing(base['templates'][name])
+        if node is None:raise ValueError('Choose a base theme with native listing layouts.')
+        node['style']={**node.get('style',{}),'layout':'grid','columns':layout['home_columns'],'mobile_columns':1,'gap':layout['gap']}
+    return base
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--site',required=True);parser.add_argument('--token-file',required=True)
@@ -59,32 +88,46 @@ def main():
     suggest=commands.add_parser('suggest');suggest.add_argument('--source',required=True);suggest.add_argument('--slug',required=True)
     suggest.add_argument('--ollama',default='http://127.0.0.1:11434');suggest.add_argument('--model',required=True);suggest.add_argument('--output',required=True)
     apply=commands.add_parser('apply');apply.add_argument('input');apply.add_argument('--execute',required=True)
+    layout=commands.add_parser('layout');layout.add_argument('--source',required=True);layout.add_argument('--base-theme',required=True);layout.add_argument('--ollama',default='http://127.0.0.1:11434');layout.add_argument('--model',required=True);layout.add_argument('--output',required=True)
+    export=commands.add_parser('export-layout');export.add_argument('input');export.add_argument('--execute',required=True);export.add_argument('--output',required=True)
     args=parser.parse_args();site=origin(args.site)
     token=read_private(args.token_file,128).decode().strip()
     if len(token)!=64 or any(c not in '0123456789abcdef' for c in token):raise ValueError('Use an owner-issued opaque credential file.')
-    if args.command=='suggest':
+    if args.command in ('suggest','layout'):
         source_id=str(uuid.UUID(args.source));ai=origin(args.ollama,local=True)
         if not args.model or len(args.model)>100 or any(ord(c)<32 for c in args.model):raise ValueError('Choose a bounded installed local model name.')
-        if not args.slug or len(args.slug)>120 or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in args.slug):raise ValueError('Choose a new lowercase native draft slug.')
+        if args.command=='suggest' and (not args.slug or len(args.slug)>120 or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in args.slug)):raise ValueError('Choose a new lowercase native draft slug.')
         source=request(site+'/api/v1/content/'+source_id,token)['content']
         body=source['body']
         if not isinstance(body,str) or len(body.encode())>512*1024:raise ValueError('Source body exceeds its budget.')
-        generated=request(ai+'/api/generate',data={'model':args.model,'stream':False,'options':{'num_predict':2048},'prompt':'Propose a clearer edit of the supplied article. Preserve facts. Return Markdown only. You have no tools or publication authority. Article follows:\n'+body})
+        if args.command=='layout':
+            raw_base=read_private(args.base_theme,256*1024);base=json.loads(raw_base)
+            generated=request(ai+'/api/generate',data={'model':args.model,'stream':False,'think':False,'keep_alive':0,'format':LAYOUT_SCHEMA,'options':{'num_predict':512,'num_ctx':4096,'temperature':0},'prompt':'Choose a calm professional readable publication layout for the supplied article. Choose only the JSON schema presentation options. Do not rewrite the article or add tools, scripts, network resources or permissions. Schema: '+json.dumps(LAYOUT_SCHEMA)+' Article: '+body})
+            choices=validate_layout(json.loads(generated['response']))
+            package=layout_package(base,choices)
+            artifact={'format':'wpalt-local-ai-layout-v1','site':site,'source_id':source_id,'source_version':source['version'],'source_body_sha256':digest(body.encode()),'base_theme_sha256':digest(raw_base),'model':args.model,'layout':choices,'package':package,'boundary':'Bounded layout knobs on an explicitly chosen base theme. Native owner validation/import and deliberate publication required.'}
+            encoded=canonical(artifact);write_private(args.output,encoded)
+            print(json.dumps({'plan':digest(encoded),'proposal_written':True,'publication':'Owner validation and review required.'}));return
+        generated=request(ai+'/api/generate',data={'model':args.model,'stream':False,'think':False,'keep_alive':0,'options':{'num_predict':2048,'num_ctx':4096,'temperature':0},'prompt':'Propose a clearer edit of the supplied article. Preserve facts. Return Markdown only. You have no tools or publication authority. Article follows:\n'+body})
         text=generated.get('response')
         if not isinstance(text,str) or not text.strip() or len(text.encode())>512*1024:raise ValueError('Local model returned invalid or oversized text.')
         title=source['title'].encode()[:250].decode(errors='ignore')+' · Suggested edit'
-        artifact={'format':'wpalt-local-ai-proposal-v1','site':site,'source_id':source_id,'source_version':source['version'],'source_body_sha256':digest(body.encode()),'model':args.model,
+        artifact={'format':'wpalt-local-ai-proposal-v1','site':site,'source_id':source_id,'source_version':source['version'],'source_body_sha256':digest(body.encode()),'model':args.model,'model_metrics':{key:generated[key] for key in ('total_duration','load_duration','prompt_eval_count','prompt_eval_duration','eval_count','eval_duration') if isinstance(generated.get(key),int) and generated[key]>=0},
                   'input':{'title':title,'slug':args.slug,'kind':'post','body':text,'import_markdown':True,'action':'save','publish_at':0,'version':0}}
         encoded=canonical(artifact);write_private(args.output,encoded)
         print(json.dumps({'plan':digest(encoded),'proposal_written':True,'publication':'Owner review required in native editor.'}))
     else:
         raw=read_private(args.input,1024*1024);artifact=json.loads(raw)
-        if digest(canonical(artifact))!=args.execute or artifact.get('format')!='wpalt-local-ai-proposal-v1' or artifact.get('site')!=site:
+        expected='wpalt-local-ai-layout-v1' if args.command=='export-layout' else 'wpalt-local-ai-proposal-v1'
+        if digest(canonical(artifact))!=args.execute or artifact.get('format')!=expected or artifact.get('site')!=site:
             raise ValueError('Proposal or site changed; review the exact current proposal plan.')
         source_id=str(uuid.UUID(artifact['source_id']))
         current=request(site+'/api/v1/content/'+source_id,token)['content']
         if current['version']!=artifact['source_version'] or digest(current['body'].encode())!=artifact['source_body_sha256']:
             raise ValueError('Source changed; generate and review a new proposal.')
+        if args.command=='export-layout':
+            validate_layout(artifact['layout']);write_private(args.output,canonical(artifact['package']))
+            print(json.dumps({'package_written':True,'publication':'Validate through wpalt theme validate, import as draft and inspect before publishing.'}));return
         payload=artifact['input']
         if payload.get('action')!='save' or payload.get('publish_at')!=0 or payload.get('version')!=0:
             raise ValueError('This worker only creates a new unscheduled draft.')

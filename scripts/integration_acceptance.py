@@ -83,7 +83,8 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
                     size=int(self.headers.get('Content-Length','0'));assert size<=512*1024
                     payload=json.loads(self.rfile.read(size));received.append(payload)
                     assert not self.headers.get('Authorization')
-                    raw=json.dumps({'response':'A separately reviewed local suggestion.'}).encode()
+                    generated=json.dumps({'palette':'paper','font':'serif','reading_width':720,'home_columns':2,'gap':24}) if payload.get('format') else 'A separately reviewed local suggestion.'
+                    raw=json.dumps({'response':generated}).encode()
                     self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
             model=ThreadingHTTPServer(('127.0.0.1',0),Model)
             thread=threading.Thread(target=model.serve_forever,daemon=True);thread.start()
@@ -97,6 +98,17 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
             try:
                 preview=json.loads(external('suggest','--source',id_,'--slug','local-ai-proposal','--ollama',f'http://127.0.0.1:{model.server_port}','--model','synthetic-contract-fixture','--output',proposal).stdout)
                 assert received[0]['stream'] is False and 'PRIVATE_EXTERNAL_DRAFT' in received[0]['prompt']
+                base=root/'base-theme.json';base.write_bytes((worker.parents[1]/'themes/field-journal.json').read_bytes());base.chmod(0o600)
+                layout_proposal=root/'layout-proposal.json'
+                layout_preview=json.loads(external('layout','--source',id_,'--base-theme',base,'--ollama',f'http://127.0.0.1:{model.server_port}','--model','synthetic-contract-fixture','--output',layout_proposal).stdout)
+                exported=root/'generated-theme.json'
+                external('export-layout',layout_proposal,'--execute','stale','--output',exported,ok=False);assert not exported.exists()
+                external('export-layout',layout_proposal,'--execute',layout_preview['plan'],'--output',exported)
+                package=json.loads(exported.read_text());assert package['templates']['content']['style']['width']==720
+                assert package['templates']['home']['children'][2]['style']['columns']==2
+                assert exported.stat().st_mode&0o077==0
+                external('export-layout',layout_proposal,'--execute',layout_preview['plan'],'--output',exported,ok=False)
+
                 assert proposal.stat().st_mode&0o077==0
                 external('apply',proposal,'--execute','stale-plan',token_file=draft_file,ok=False)
                 external('apply',proposal,'--execute',preview['plan'],ok=False) # Read-only key cannot create a draft.

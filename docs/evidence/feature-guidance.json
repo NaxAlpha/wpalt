@@ -1803,12 +1803,15 @@
       "sources": [
         "https://docs.ollama.com/api/generate",
         "https://docs.python.org/3/library/urllib.request.html",
-        "https://docs.python.org/3/library/os.html#os.open"
+        "https://docs.python.org/3/library/os.html#os.open",
+        "https://docs.ollama.com/capabilities/structured-outputs",
+        "https://ollama.com/library/qwen3:0.6b"
       ],
       "applicable_versions": [
-        "Ollama /api/generate non-streamed protocol; actual engine/model evidence pending",
+        "Ollama 0.35.1",
+        "Qwen3 0.6B digest 7df6b6e09427a769808717c0a93cadc4ae99ed4eb8bf5ca557c90846becea435",
         "Python 3 standard library",
-        "wpalt API v1 content read/draft"
+        "wpalt API v1 content read/draft and native theme format 1"
       ],
       "last_checked": "2026-10-05",
       "next_review": "2026-11-04",
@@ -1821,14 +1824,16 @@
       ],
       "tests": [
         "scripts/integration_acceptance.py (actual CMS and synthetic local model protocol)",
-        "scripts/integration_acceptance.cjs (owner scopes/live revocation)"
+        "scripts/integration_acceptance.cjs (owner scopes/live revocation)",
+        "scripts/local_ai_reference.py (actual installed model)",
+        "scripts/independent_theme_acceptance.cjs"
       ],
       "triggers": [
         "affected milestone/release",
         "local inference API/version change",
         "transport or filesystem security change"
       ],
-      "status": "independent process boundary verified; installed-model inference/layout reference remains pending; F023 incomplete"
+      "status": "Actual content and bounded native layout proposals verified locally; synthetic sample returned original content unchanged; current-source cumulative/package gates pending, not a general model quality claim"
     },
     {
       "feature_id": "M8-06",
@@ -1900,6 +1905,41 @@
         "transport/checkpoint/recovery change"
       ],
       "status": "Connected SQLite atomic failure/gap/paging/revocation and actual independent process signed retry/restart checks pass; current full PostgreSQL/package gates pending"
+    },
+    {
+      "feature_id": "M8-08",
+      "area": "Independent native themes and trusted styling/assets assessment",
+      "scope": "Declarative public theme profile, independent example and local-layout proposal validation; no raw CSS/JS loader",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.w3.org/TR/CSP3/",
+        "https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html"
+      ],
+      "applicable_versions": [
+        "wpalt theme format 1",
+        "Public theme contract 1",
+        "WCAG 2.2 / CSP3"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Keep independently authored themes declarative, native-validator gated, draft before deliberate publication and no mandatory account.",
+        "Preserve separate public/admin typography contracts, responsive geometry, keyboard target/focus, text spacing and scoped accessibility.",
+        "Assess raw CSS/fonts/files as distinct explicit owner capabilities; keep authorization, CSP and public/private media authority outside theme control."
+      ],
+      "tests": [
+        "scripts/independent_theme_acceptance.cjs",
+        "scripts/local_ai_reference.py",
+        "tests/acceptance.rs::theme_styles_are_template_scoped_and_preserve_reachable_components"
+      ],
+      "triggers": [
+        "affected milestone/release",
+        "theme grammar, CSS generation or asset boundary change",
+        "accessibility or CSP guidance update"
+      ],
+      "status": "Nine responsive public-theme measurements, two axe audits, keyboard journey and human desktop/mobile inspection pass locally; current-source full/database/package gates pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."
