@@ -1403,6 +1403,36 @@
         "asset pipeline or affected release"
       ],
       "status": "reviewed"
+    },
+    {
+      "feature_id": "M7-LOCAL-VIDEO",
+      "area": "Optional native video worker",
+      "scope": "M7",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://ffmpeg.org/ffmpeg.html",
+        "https://ffmpeg.org/ffmpeg-protocols.html"
+      ],
+      "applicable_versions": [
+        "Owner-installed FFmpeg with libx264/AAC and FFprobe",
+        "wpalt fixed MP4/WebM local processing profile"
+      ],
+      "last_checked": "2026-10-05",
+      "next_review": "2026-11-04",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Use owner-configured absolute tools with fixed arguments and no shell, network protocols or arbitrary codec arguments. Bound source, streams, dimensions, duration, worker concurrency, process deadlines and output. Preserve media authorization and backup/checksum identity. Maintain host OS sandbox/limits for untrusted codec input."
+      ],
+      "tests": [
+        "local_video_worker_preserves_authority_and_recovers_processed_media"
+      ],
+      "triggers": [
+        "FFmpeg version or relevant decoder advisory",
+        "worker profile/host isolation changes",
+        "release and security review"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

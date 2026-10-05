@@ -14,3 +14,5 @@ pub mod protection;
 pub mod recovery;
 pub mod spam;
 pub mod upgrade;
+
+pub mod video;

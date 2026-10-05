@@ -1,6 +1,6 @@
 # M7 progress and remaining acceptance
 
-2026-10-04. M7 is **in progress**, PR #13 remains draft. This is an implementation/verification ledger, not milestone completion or permission to merge.
+2026-10-05. M7 is **in progress**, PR #13 remains draft. This is an implementation/verification ledger, not milestone completion or permission to merge.
 
 ## Verified pushed checkpoints
 
@@ -11,12 +11,12 @@
 
 Template-reachable CSS, optional theme stylesheet preload, editor intrinsic image dimensions, bounded lazy/eager loading choice and one explicit local lead-image preload. Clippy with warnings denied, affected Rust tests, frontend locked rebuild/formatting, guidance protocol and eight packaging tests passed locally. 52 local SQLite acceptance cases passed, with the two localhost TLS provider fixtures explicitly filtered because external/browser approval review is unavailable. Three document cases passed. This local run is not PostgreSQL verification. Browser publication assertions are written but **not yet executed** for this work. No silent baseline updates. Authoring document version 1 gains optional validated metadata; old documents remain readable without a historical rewrite. Shared base styles and composition-only image metadata still need further optimization/verification.
 
-The external/browser verification attempt was stopped by automatic approval review because account usage limits prevented review completion. It was not an unsafe-action determination. Do not bypass the approval check; resume external checks when review is available. Local source and test work remains possible.
+The previous external/browser verification attempt was stopped by automatic approval review because account usage limits prevented review completion. User approved continuation on 2026-10-05 and external review is now available again. Cleanup CI found an undersized return-link target; it was changed to the established button-style control. The new image priority select has an explicit accessible name. Optional native video processing now has an owner-only admin/CLI workflow and an actual transcoding/authority/fresh-recovery test. Current complete local Rust run passed 73 cases: 55 acceptance, 14 business, three document and one credential race; no network fixtures skipped. Latest source still needs cumulative exact-source CI and current browser completion.
 
 ## Outstanding M7 contract work
 
 - Finish image dimension/loading integration for composition images and imported content; verify full authoring browser journey and publication after local source changes.
-- Native own-server video processing and integrated owner workflow, bounded process/time/storage limits and failures.
+- Finish native video browser/release verification, bounded failure cases and operator process-isolation evidence; functional owner upload/CLI and real transcoding/recovery now implemented.
 - Role/geolocation cache variant design with authoritative inputs, privacy isolation, mutation/access invalidation and real journeys.
 - Broader shared background-job audit/history with bounded I/O and observable interruption/retry behavior.
 - Broader user data-request workflows and optional script consent enforcement without unsafe arbitrary-code or cloud requirements.

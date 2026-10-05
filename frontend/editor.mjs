@@ -877,6 +877,7 @@ function initialize(form, host, index) {
       const priorityLabel = document.createElement("label");
       priorityLabel.textContent = "Loading priority";
       const priority = document.createElement("select");
+      priority.setAttribute("aria-label", "Loading priority");
       for (const [value, label] of [
         ["lazy", "Lazy — ordinary article image"],
         ["eager", "Early — important first image"],

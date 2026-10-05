@@ -72,6 +72,8 @@ enum Command {
         #[arg(long, default_value = "")]
         after_attachment: String,
     },
+    /// Convert a bounded owner-selected MP4/WebM source into a new private MP4.
+    VideoTranscode { input: PathBuf, output: PathBuf },
     /// Preview unused media and expired sessions; deletion requires the exact recent plan.
     Cleanup {
         #[arg(long)]
@@ -708,6 +710,7 @@ async fn main() -> anyhow::Result<()> {
         Command::Backup { .. } => Some("cli:backup"),
         Command::RecoveryRun => Some("cli:recovery-run"),
         Command::UpgradePrepare { .. } => Some("cli:upgrade-prepare"),
+        Command::VideoTranscode { .. } => Some("cli:video-transcode"),
         Command::RecoveryPrune { .. } => Some("cli:recovery-prune"),
         Command::Cleanup {
             execute: Some(_), ..
@@ -832,6 +835,17 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             println!(
                 "Local authenticators and sessions cleared. Password sign-in remains required."
             );
+        }
+        Command::VideoTranscode { input, output } => {
+            let source =
+                backup::read_bounded(&input, app.config.max_upload_bytes.min(32 * 1024 * 1024))
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e.1))?;
+            let encoded = wpalt::operations::video::transcode(&app, &source)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+            backup::write_private(&output, &encoded)?;
+            println!("Created a new private bounded MP4 file.");
         }
         Command::Cleanup { execute, cutoff } => {
             if let Some(hash) = execute {

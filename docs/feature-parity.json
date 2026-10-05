@@ -1288,9 +1288,14 @@
       "capability": "Native image binary / imgproxy worker",
       "deployment": "W",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Native in-process bounded image worker with separately admitted source reads/encoding, pixel/allocation budgets and AVIF/WebP reuse. No external imgproxy required.",
+      "evidence": [
+        "resilient-operations.md",
+        "../tests/acceptance.rs"
+      ]
     },
     {
       "id": "F079",
@@ -1341,9 +1346,14 @@
       "capability": "Video transcoding on own server",
       "deployment": "W",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "Optional owner-installed FFmpeg/FFprobe worker, owner-only admin upload and CLI, fixed two-minute/1080p input profile and 720p MP4 output; private/public delivery, recovery and bounded local workers. Host OS codec sandbox/aggregate memory quotas remain operator prerequisites, not an application isolation guarantee.",
+      "evidence": [
+        "resilient-operations.md",
+        "../tests/acceptance.rs"
+      ]
     },
     {
       "id": "F083",
@@ -1977,9 +1987,15 @@
       "capability": "Point-in-time recovery and continuous replication",
       "deployment": "W",
       "milestone": "M7",
-      "status": "planned",
+      "status": "M7-implemented-defined-scope; milestone-incomplete",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
-      "reference": "research/local-first-plugin-and-cms-data.json"
+      "reference": "research/local-first-plugin-and-cms-data.json",
+      "m7_coverage": "PostgreSQL 17 engine archive/restore helpers with authenticated native WAL records and cluster/name binding; real verified base plus continuous WAL to named-point recovery with source removed. Native base protection/chain retention/engine tools and matching media are operator-managed; distributed read replicas remain M9.",
+      "evidence": [
+        "resilient-operations.md",
+        "../scripts/native_pitr_acceptance.py",
+        "../tests/acceptance.rs"
+      ]
     },
     {
       "id": "F123",

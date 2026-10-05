@@ -992,7 +992,7 @@ pub fn safe_filename(name: &str) -> bool {
         return false;
     };
     uuid::Uuid::parse_str(id).is_ok()
-        && ["png", "jpg", "webp", "gif"].contains(&ext)
+        && ["png", "jpg", "webp", "gif", "mp4"].contains(&ext)
         && !name.contains('/')
         && !name.contains('\\')
 }

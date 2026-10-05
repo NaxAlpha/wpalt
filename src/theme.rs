@@ -1325,9 +1325,9 @@ pub async fn context_with_discovery(
     }
     if !media.is_empty() {
         let mut q = QueryBuilder::<Any>::new(if draft {
-            "SELECT id,alt FROM media WHERE id IN ("
+            "SELECT id,alt FROM media WHERE mime<>'video/mp4' AND id IN ("
         } else {
-            "SELECT id,alt FROM media WHERE visibility='public' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='media' AND mr.resource_id=media.id) AND id IN ("
+            "SELECT id,alt FROM media WHERE mime<>'video/mp4' AND visibility='public' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='media' AND mr.resource_id=media.id) AND id IN ("
         });
         let mut list = q.separated(",");
         for id in &media {

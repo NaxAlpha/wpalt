@@ -4056,3 +4056,130 @@ async fn theme_styles_are_template_scoped_and_preserve_reachable_components() {
         site.close().await;
     }
 }
+
+/// Actual native processing, HTTP authority and host-independent recovery. The
+/// optional tool is required in CI, explicit skip only for local installations.
+#[tokio::test]
+async fn local_video_worker_preserves_authority_and_recovers_processed_media() {
+    let ffmpeg = std::env::var("WPALT_TEST_FFMPEG").unwrap_or_else(|_| {
+        if cfg!(target_os = "macos") {
+            "/opt/homebrew/bin/ffmpeg".into()
+        } else {
+            "/usr/bin/ffmpeg".into()
+        }
+    });
+    let ffprobe = std::env::var("WPALT_TEST_FFPROBE").unwrap_or_else(|_| {
+        if cfg!(target_os = "macos") {
+            "/opt/homebrew/bin/ffprobe".into()
+        } else {
+            "/usr/bin/ffprobe".into()
+        }
+    });
+    if !std::path::Path::new(&ffmpeg).exists() || !std::path::Path::new(&ffprobe).exists() {
+        assert!(
+            std::env::var("CI").is_err(),
+            "CI must install the native video fixture tools"
+        );
+        eprintln!("Local optional FFmpeg fixture unavailable; video journey not verified.");
+        return;
+    }
+    let fixture = tempfile::tempdir().unwrap();
+    let source = fixture.path().join("source.mp4");
+    let status = std::process::Command::new(&ffmpeg)
+        .args([
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=green:s=64x48:r=5",
+            "-t",
+            "1",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-threads",
+            "1",
+        ])
+        .arg(&source)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let source = std::fs::read(source).unwrap();
+    for pg in engines() {
+        let mut site = Site::new(pg, true).await;
+        assert!(
+            wpalt::operations::video::transcode(&site.app, &source)
+                .await
+                .is_err(),
+            "disabled worker is inert"
+        );
+        let mut config = (*site.app.config).clone();
+        config.video = wpalt::operations::video::Config {
+            enabled: true,
+            ffmpeg: ffmpeg.clone().into(),
+            ffprobe: ffprobe.clone().into(),
+        };
+        site.app.config = std::sync::Arc::new(config);
+        let mut body=format!("--video-fixture\r\nContent-Disposition: form-data; name=\"csrf\"\r\n\r\n{}\r\n--video-fixture\r\nContent-Disposition: form-data; name=\"file\"; filename=\"short.mp4\"\r\nContent-Type: video/mp4\r\n\r\n",site.session().csrf).into_bytes();
+        body.extend_from_slice(&source);
+        body.extend_from_slice(b"\r\n--video-fixture--\r\n");
+        let (status, _, _) = request(
+            &site.app,
+            "POST",
+            "/admin/media/video",
+            Some(&site.token),
+            "multipart/form-data; boundary=video-fixture",
+            body,
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        let id: String = sqlx::query_scalar("SELECT id FROM media WHERE mime='video/mp4'")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let url = format!("/media/{id}");
+        assert_eq!(get(&site.app, &url, None).await.0, StatusCode::UNAUTHORIZED);
+        let (status, headers, encoded) =
+            request(&site.app, "GET", &url, Some(&site.token), "", vec![]).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers["content-type"], "video/mp4");
+        assert_eq!(&encoded[4..8], b"ftyp");
+        assert!(
+            get(&site.app, "/admin/media", Some(&site.token))
+                .await
+                .1
+                .contains("Open processed video")
+        );
+        let archive = backup::capture(&site.app).await.unwrap();
+        assert!(
+            wpalt::operations::video::transcode(&site.app, b"not-a-video")
+                .await
+                .is_err()
+        );
+        assert!(
+            std::fs::read_dir(&site.app.config.data_dir)
+                .unwrap()
+                .all(|p| !p
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".video-")),
+            "completed and rejected workers leave no private intermediates"
+        );
+        site.close().await;
+        let fresh = Site::new(pg, false).await;
+        backup::restore(&fresh.app, &archive).await.unwrap();
+        let (token, _) = auth::login(&fresh.app, "owner@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let (_, _, restored) = request(&fresh.app, "GET", &url, Some(&token), "", vec![]).await;
+        assert_eq!(restored, encoded);
+        assert_eq!(
+            get(&fresh.app, &url, None).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+        fresh.close().await;
+    }
+}

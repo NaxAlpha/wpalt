@@ -37,6 +37,8 @@ jobs:
       - run: python3 -m unittest discover -s tests/pipeline -v
       - run: cargo fmt --all --check
       - run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Install optional native video fixture tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: cargo test --locked
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()

@@ -82,6 +82,7 @@ pub fn router(app: App) -> Router {
         )
         .route("/admin/preview/{id}", get(preview))
         .route("/admin/media", get(media_list).post(upload))
+        .route("/admin/media/video", post(upload_video))
         .route("/admin/media/{id}", post(update_media))
         .route("/media/{id}", get(media_file))
         .route("/media/{id}/resize/{width}", get(media_derivative))
@@ -1267,7 +1268,7 @@ async fn media_picker(
         return Err(Error::invalid("Invalid media cursor."));
     }
     let rows = sqlx::query(
-        "SELECT id,original_name,alt,visibility FROM media WHERE id>$1 ORDER BY id LIMIT 41",
+        "SELECT id,original_name,alt,visibility FROM media WHERE mime<>'video/mp4' AND id>$1 ORDER BY id LIMIT 41",
     )
     .bind(after)
     .fetch_all(&app.db.pool)
@@ -1283,7 +1284,7 @@ async fn media_picker(
 async fn media_list(State(app): State<App>, headers: HeaderMap) -> Result<Html<String>> {
     let s = admin_session(&app, &headers).await?;
     editor(&s)?;
-    let rows=sqlx::query("SELECT id,original_name,visibility,alt,size FROM media ORDER BY created_at DESC,id DESC LIMIT 100").fetch_all(&app.db.pool).await?;
+    let rows=sqlx::query("SELECT id,original_name,mime,visibility,alt,size FROM media ORDER BY created_at DESC,id DESC LIMIT 100").fetch_all(&app.db.pool).await?;
     Ok(html_page(
         "Media",
         &app.db.settings().await?,
@@ -1291,11 +1292,78 @@ async fn media_list(State(app): State<App>, headers: HeaderMap) -> Result<Html<S
         html! {
             (view::heading("Assets","Media library","Upload images, describe them and choose who can access them. SVG and executable uploads are not accepted."))
             section class="panel" {form method="post" action="/admin/media" enctype="multipart/form-data" {(view::csrf(&s))div class="field-row" {label {"Image" input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/gif" required;}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" {"Public"}option value="private" {"Editors only"}}}}label {"Alternative text" input name="alt" maxlength="500";}button {"Upload image"}}}
-            div class="cards" {@for r in rows {@let id=r.get::<String,_>("id");section class="panel media-card" {img src=(format!("/media/{id}")) alt=(r.get::<String,_>("alt")) loading="lazy";h3 {(r.get::<String,_>("original_name"))}p class="muted" {(r.get::<i64,_>("size")/1024) " KiB"}code {(format!("![description](/media/{id})"))}details {summary {"Optimized image sizes"}p class="muted" {"Original access controls apply to every size. GIF animations retain their original file."}p {a href=(format!("/media/{id}/resize/320")) {"320px WebP"} " · " a href=(format!("/media/{id}/resize/640")) {"640px WebP"} " · " a href=(format!("/media/{id}/resize/1280/avif")) {"1280px AVIF"}}}
+            @if s.is_admin(){section class="panel" {h2 {"Local video processing"}p {"Optional owner-installed FFmpeg. MP4/WebM, two minutes maximum, source up to 1920×1080. Produces a bounded 720p MP4; subtitles and metadata are excluded."}form method="post" action="/admin/media/video" enctype="multipart/form-data" {(view::csrf(&s))label {"Video source" input type="file" name="file" accept="video/mp4,video/webm" required disabled[!app.config.video.enabled];}label {"Video visibility" select name="visibility" {option value="private" {"Editors only"}option value="public" {"Public"}}}button disabled[!app.config.video.enabled] {"Process local video"}} @if !app.config.video.enabled{p class="muted" {"Disabled. Configure absolute ffmpeg/ffprobe paths and enable [video] to use the local worker."}}}}
+            div class="cards" {@for r in rows {@let id=r.get::<String,_>("id");section class="panel media-card" {@if r.get::<String,_>("mime")=="video/mp4" {video controls preload="metadata" {source src=(format!("/media/{id}")) type="video/mp4";}} @else {img src=(format!("/media/{id}")) alt=(r.get::<String,_>("alt")) loading="lazy";}h3 {(r.get::<String,_>("original_name"))}p class="muted" {(r.get::<i64,_>("size")/1024) " KiB"}@if r.get::<String,_>("mime")=="video/mp4"{p {a href=(format!("/media/{id}")) {"Open processed video"}}} @else {code {(format!("![description](/media/{id})"))}details {summary {"Optimized image sizes"}p class="muted" {"Original access controls apply to every size. GIF animations retain their original file."}p {a href=(format!("/media/{id}/resize/320")) {"320px WebP"} " · " a href=(format!("/media/{id}/resize/640")) {"640px WebP"} " · " a href=(format!("/media/{id}/resize/1280/avif")) {"1280px AVIF"}}}}
                 form method="post" action=(format!("/admin/media/{id}")) {(view::csrf(&s))label {"Alternative text" input name="alt" value=(r.get::<String,_>("alt")) maxlength="500";}label {"Visibility" select name="visibility" aria-label="Visibility" {option value="public" selected[r.get::<String,_>("visibility")=="public"] {"Public"}option value="private" selected[r.get::<String,_>("visibility")=="private"] {"Editors only"}}}button class="secondary" {"Save details"}}
             }}}
         },
     ))
+}
+async fn upload_video(
+    State(app): State<App>,
+    headers: HeaderMap,
+    mut form: Multipart,
+) -> Result<Redirect> {
+    let s = admin_session(&app, &headers).await?;
+    admin(&s)?;
+    let mut csrf = String::new();
+    let mut name = String::new();
+    let mut file = None;
+    let mut visibility = "private".to_string();
+    while let Some(field) = form
+        .next_field()
+        .await
+        .map_err(|_| Error::invalid("Invalid video upload."))?
+    {
+        match field.name().unwrap_or("") {
+            "csrf" => {
+                csrf = field
+                    .text()
+                    .await
+                    .map_err(|_| Error::invalid("Invalid video form."))?
+            }
+            "visibility" => {
+                visibility = field
+                    .text()
+                    .await
+                    .map_err(|_| Error::invalid("Invalid visibility."))?
+            }
+            "file" => {
+                if file.is_some() {
+                    return Err(Error::invalid("Upload one video."));
+                }
+                name = field.file_name().unwrap_or("video").to_string();
+                file = Some(
+                    field
+                        .bytes()
+                        .await
+                        .map_err(|_| Error::invalid("Video exceeds request limit."))?,
+                );
+            }
+            _ => return Err(Error::invalid("Unknown video upload field.")),
+        }
+    }
+    auth::csrf(&s, &csrf)?;
+    if name.len() > 255 || !["public", "private"].contains(&visibility.as_str()) {
+        return Err(Error::invalid("Invalid video details."));
+    }
+    let output = crate::operations::video::transcode(
+        &app,
+        &file.ok_or_else(|| Error::invalid("Choose a video."))?,
+    )
+    .await?;
+    let _guard = app.mutation().await;
+    let id = uuid::Uuid::new_v4().to_string();
+    let filename = format!("{id}.mp4");
+    let path = app.config.data_dir.join("media").join(&filename);
+    backup::write_private(&path, &output)
+        .map_err(|_| Error::invalid("Cannot publish private video output."))?;
+    let result=sqlx::query("INSERT INTO media(id,filename,original_name,mime,alt,visibility,size,sha256,created_at) VALUES($1,$2,$3,'video/mp4','',$4,$5,$6,$7)").bind(id).bind(filename).bind(name).bind(visibility).bind(output.len() as i64).bind(auth::digest(&output)).bind(now()).execute(&app.db.pool).await;
+    if let Err(e) = result {
+        let _ = tokio::fs::remove_file(path).await;
+        return Err(e.into());
+    }
+    Ok(Redirect::to("/admin/media"))
 }
 async fn upload(
     State(app): State<App>,
@@ -1546,7 +1614,15 @@ async fn media_file(
         return Err(Error::not_found());
     }
     let mime: String = row.get("mime");
-    if !["image/png", "image/jpeg", "image/webp", "image/gif"].contains(&mime.as_str()) {
+    if ![
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif",
+        "video/mp4",
+    ]
+    .contains(&mime.as_str())
+    {
         return Err(Error::invalid("Unsupported stored media type."));
     }
     use tokio::io::AsyncReadExt;
@@ -1884,7 +1960,7 @@ async fn cleanup_preview(
                 (view::csrf(&s)) input type="hidden" name="hash" value=(plan.hash); input type="hidden" name="cutoff" value=(plan.cutoff);
                 button class="danger" {"Permanently remove listed files and expired sessions"}
             }
-            p {a href="/admin/operations" {"Return to Operations"}}
+            p {a class="button secondary" href="/admin/operations" {"Return to Operations"}}
         },
     ).into_response())
 }
@@ -1908,7 +1984,7 @@ async fn cleanup_execute(
             (view::heading("Operations","Cleanup result","Review completed removal and retryable storage failures."))
             p {(result.removed_files) " files removed · " (result.removed_bytes) " bytes · " (result.removed_sessions) " expired sessions removed"}
             @if !result.pending_files.is_empty() {p class="notice" {"Some files could not be unlinked. Their library entries have been removed; inspect storage permissions and preview again to retry."}ul {@for name in result.pending_files {li {code {(name)}}}}}
-            p {a href="/admin/operations" {"Return to Operations"}}
+            p {a class="button secondary" href="/admin/operations" {"Return to Operations"}}
         },
     ).into_response())
 }

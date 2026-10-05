@@ -14,6 +14,7 @@ pub struct Config {
     pub base_url: String,
     pub debug: bool,
     pub postgres_archive: crate::operations::postgres_archive::Config,
+    pub video: crate::operations::video::Config,
     pub assets: crate::operations::assets::Config,
     pub media: crate::operations::media::Config,
     pub spam: crate::operations::spam::Config,
@@ -47,6 +48,7 @@ impl Default for Config {
             base_url: "http://127.0.0.1:3000".into(),
             debug: false,
             postgres_archive: Default::default(),
+            video: Default::default(),
             assets: Default::default(),
             media: Default::default(),
             spam: Default::default(),
@@ -127,6 +129,7 @@ impl Config {
         self.protection.validate()?;
         self.spam.validate()?;
         self.media.validate()?;
+        self.video.validate()?;
         self.postgres_archive.validate()?;
         self.cache.validate()?;
         self.recovery.validate()?;
