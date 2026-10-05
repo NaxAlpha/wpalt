@@ -1677,14 +1677,14 @@
       "tests": [
         "wordpress_preview_package_recovers_content_without_inventing_private_access_or_payments",
         "scripts/migration_acceptance.py",
-        "scripts/wordpress_migration_reference.py (new gate, pending first CI execution)"
+        "scripts/wordpress_migration_reference.py"
       ],
       "triggers": [
         "affected milestone/release",
         "upstream export/version change",
         "parser or filesystem vulnerability"
       ],
-      "status": "reviewed-current-slice"
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
     },
     {
       "feature_id": "M8-02",
@@ -1722,7 +1722,7 @@
         "upstream ACF storage/registration change",
         "native field/editor numeric contract change"
       ],
-      "status": "implemented selected scalar slice; actual ACF 6.8.10 reference passed at 4419a0e"
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
     },
     {
       "feature_id": "M8-03",
@@ -1751,14 +1751,14 @@
       "tests": [
         "tests/elementor.rs",
         "scripts/migration_acceptance.py",
-        "scripts/wordpress_migration_reference.py (expanded Elementor reference pending)"
+        "scripts/wordpress_migration_reference.py"
       ],
       "triggers": [
         "affected milestone/release",
         "upstream data structure/version change",
         "HTML parser security advisory"
       ],
-      "status": "selected content projection implemented; upstream reference pending; F024 incomplete"
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
     },
     {
       "feature_id": "M8-04",
@@ -1793,7 +1793,7 @@
         "authentication or account contract change",
         "credential security advisory"
       ],
-      "status": "content slice implemented; final-source cumulative and real PostgreSQL verification pending; durable transport remains required"
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
     },
     {
       "feature_id": "M8-05",
@@ -1833,7 +1833,7 @@
         "local inference API/version change",
         "transport or filesystem security change"
       ],
-      "status": "Actual content and bounded native layout proposals verified locally; synthetic sample returned original content unchanged; current-source cumulative/package gates pending, not a general model quality claim"
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
     },
     {
       "feature_id": "M8-06",
@@ -1868,7 +1868,7 @@
         "WPForms data/version change",
         "native form schema or quota changes"
       ],
-      "status": "Connected SQLite recovery and strict Clippy pass; current-head actual free-plugin and PostgreSQL gates pending"
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
     },
     {
       "feature_id": "M8-07",
@@ -1904,7 +1904,7 @@
         "event schema/domain coverage change",
         "transport/checkpoint/recovery change"
       ],
-      "status": "Connected SQLite atomic failure/gap/paging/revocation and actual independent process signed retry/restart checks pass; current full PostgreSQL/package gates pending"
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
     },
     {
       "feature_id": "M8-08",
@@ -1939,7 +1939,7 @@
         "theme grammar, CSS generation or asset boundary change",
         "accessibility or CSP guidance update"
       ],
-      "status": "Nine responsive public-theme measurements, two axe audits, keyboard journey and human desktop/mobile inspection pass locally; current-source full/database/package gates pending"
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
     },
     {
       "feature_id": "M8-09",
@@ -1975,7 +1975,7 @@
         "source plugin API/configuration change",
         "native graph or authority change"
       ],
-      "status": "Selected connected SQLite and CLI projection/recovery checks pass; actual source plugin/PostgreSQL and integrated final gates pending"
+      "status": "Selected contract verified at 738942f / CI 37288548870, including actual PostgreSQL, cumulative browser and clean archive; see m8-verification.md for actual upstream reference and explicit limits."
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

@@ -1,0 +1,69 @@
+{
+  "format": "wpalt-cluster-migration-profile-v1",
+  "binary_sha256": "f33ef39bf93b38db50f4d9babbfa170df557286c69c3afba967e239cc13ab3b8",
+  "machine": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+  "scope": "Fresh-template capture, selected MailPoet contact projection, complete portable graph validation and JSON preview; no restore, network or request throughput. Native child peak RSS includes startup. Three samples per count; synthetic source only.",
+  "profiles": [
+    {
+      "contacts": 100,
+      "input_bytes": 9226,
+      "median_wall_ms": 64.029,
+      "largest_peak_rss_bytes": 36777984,
+      "samples": [
+        {
+          "wall_ms": 64.027,
+          "peak_rss_bytes": 36270080
+        },
+        {
+          "wall_ms": 64.046,
+          "peak_rss_bytes": 36777984
+        },
+        {
+          "wall_ms": 64.029,
+          "peak_rss_bytes": 36401152
+        }
+      ]
+    },
+    {
+      "contacts": 1000,
+      "input_bytes": 92928,
+      "median_wall_ms": 63.967,
+      "largest_peak_rss_bytes": 36347904,
+      "samples": [
+        {
+          "wall_ms": 63.967,
+          "peak_rss_bytes": 36347904
+        },
+        {
+          "wall_ms": 63.959,
+          "peak_rss_bytes": 36245504
+        },
+        {
+          "wall_ms": 63.976,
+          "peak_rss_bytes": 35696640
+        }
+      ]
+    },
+    {
+      "contacts": 10000,
+      "input_bytes": 947930,
+      "median_wall_ms": 114.07,
+      "largest_peak_rss_bytes": 49786880,
+      "samples": [
+        {
+          "wall_ms": 114.051,
+          "peak_rss_bytes": 49786880
+        },
+        {
+          "wall_ms": 114.125,
+          "peak_rss_bytes": 49332224
+        },
+        {
+          "wall_ms": 114.07,
+          "peak_rss_bytes": 49569792
+        }
+      ]
+    }
+  ],
+  "status": "passed"
+}
