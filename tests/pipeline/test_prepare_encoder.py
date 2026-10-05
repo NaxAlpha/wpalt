@@ -51,6 +51,11 @@ class EncoderPreparation(unittest.TestCase):
             with self.subTest(unsafe=unsafe), self.assertRaises(ValueError):
                 encoder.patched_source(data, checksum)
         entries = self.fixture()
+        entries.update({f'extra/{i}': b'' for i in range(2001)})
+        data, checksum = archive(entries)
+        with self.assertRaises(ValueError):
+            encoder.patched_source(data, checksum)
+        entries = self.fixture()
         entries['Cargo.toml'] = b'different upstream dependency'
         data, checksum = archive(entries)
         with self.assertRaises(ValueError):

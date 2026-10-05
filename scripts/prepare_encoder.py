@@ -26,8 +26,12 @@ def patched_source(archive, checksum=SHA256):
         raise ValueError('Encoder archive checksum or size mismatch')
     files = {}
     total = 0
+    entries = 0
     with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as source:
         for member in source:
+            entries += 1
+            if entries > 2000:
+                raise ValueError("Too many encoder archive entries")
             parts = PurePosixPath(member.name).parts
             if (not parts or parts[0] != f'rav1e-{VERSION}' or
                     any(p in ('', '.', '..') for p in member.name.rstrip('/').split('/')) or
