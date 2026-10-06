@@ -860,7 +860,10 @@ pub async fn cancel(app: &App, s: &Session, id: &str, version: i64) -> Result<()
     let _guard = app.mutation().await?;
     customer(app, s).await?;
     let mut tx = app.db.pool.begin().await?;
-    let order = sqlx::query("SELECT * FROM shop_orders WHERE id=$1")
+    // Lock before reading the decision snapshot: SQLite cannot promote a
+    // deferred read after an independent writer commits; PostgreSQL must not
+    // decide cancellation from a row another payment transaction can change.
+    let order = sqlx::query("UPDATE shop_orders SET version=version WHERE id=$1 RETURNING *")
         .bind(id)
         .fetch_optional(&mut *tx)
         .await?
