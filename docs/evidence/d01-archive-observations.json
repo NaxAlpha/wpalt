@@ -1,0 +1,55 @@
+{
+  "application_source": "3c13928e6e331833f2a3e724759383cd2a8f8a60",
+  "date": "2026-10-06",
+  "conditions": "macOS; SQLite and PostgreSQL 17.11; isolated debug in-process HTTP router; 30 sequential samples per engine; no browser/network/production SLO claim",
+  "observations": [
+    {
+      "archive_membership_plan": [
+        "SEARCH t USING INDEX sqlite_autoindex_terms_2 (kind=? AND slug=?)",
+        "SEARCH pt USING COVERING INDEX published_term_posts (term_id=?)"
+      ],
+      "engine": "sqlite",
+      "in_process_debug_router_ms": {
+        "max": 12.159041,
+        "p50": 6.304083,
+        "p95": 10.068417
+      },
+      "limits": "Debug in-process HTTP router, one client, no network/browser timing; timing observations only. Predicate plan is the exact archive membership subquery, not a claim about every query.",
+      "matched": 86,
+      "pages": 5,
+      "posts": 1001,
+      "samples": 30
+    },
+    {
+      "archive_membership_plan": [
+        "Hash Join  (cost=1.06..11.01 rows=101 width=37) (actual time=0.013..0.060 rows=101 loops=1)",
+        "  Hash Cond: (pt.term_id = t.id)",
+        "  Buffers: shared hit=6",
+        "  ->  Seq Scan on published_post_terms pt  (cost=0.00..8.03 rows=303 width=74) (actual time=0.007..0.023 rows=303 loops=1)",
+        "        Buffers: shared hit=5",
+        "  ->  Hash  (cost=1.05..1.05 rows=1 width=37) (actual time=0.004..0.004 rows=1 loops=1)",
+        "        Buckets: 1024  Batches: 1  Memory Usage: 9kB",
+        "        Buffers: shared hit=1",
+        "        ->  Seq Scan on terms t  (cost=0.00..1.05 rows=1 width=37) (actual time=0.002..0.002 rows=1 loops=1)",
+        "              Filter: ((kind = 'category'::text) AND (slug = ANY ('{outdoors,gardens,orchards}'::text[])))",
+        "              Rows Removed by Filter: 2",
+        "              Buffers: shared hit=1",
+        "Planning:",
+        "  Buffers: shared hit=121",
+        "Planning Time: 0.406 ms",
+        "Execution Time: 0.071 ms"
+      ],
+      "engine": "postgres",
+      "in_process_debug_router_ms": {
+        "max": 18.5035,
+        "p50": 7.53775,
+        "p95": 14.16075
+      },
+      "limits": "Debug in-process HTTP router, one client, no network/browser timing; timing observations only. Predicate plan is the exact archive membership subquery, not a claim about every query.",
+      "matched": 86,
+      "pages": 5,
+      "posts": 1001,
+      "samples": 30
+    }
+  ]
+}

@@ -14,9 +14,9 @@ Choose a substantial end-user system from this backlog, reassess against the lat
 
 ### D01 — Content models and taxonomy
 
-Origin: **M1–M2** · Catalog: **F001/F002** · Status: **resumed; implementation and verification in progress**
+Origin: **M1–M2** · Catalog: **F001/F002** · Status: **classified-directory delivery locally verified; final PR gates pending; broader field-family gaps retained**
 
-Active [classified-directory contract](d01-contract.md).
+Active [classified-directory contract](d01-contract.md), [verification ledger](evidence/d01-verification.md), [PR #17](https://github.com/NaxAlpha/wpalt/pull/17).
 
 Hierarchical taxonomy/archives, expanded field families and custom validation/relationships beyond the supported typed grammar.
 
