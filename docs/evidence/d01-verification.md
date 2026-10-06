@@ -1,6 +1,6 @@
 # D01 verification ledger
 
-Date: 2026-10-06 (Tokyo). Delivery [PR #17](https://github.com/NaxAlpha/wpalt/pull/17) remains a draft until current-source gates pass.
+Date: 2026-10-06 (Tokyo). Defined local scope is verified. Delivery readiness and exact current-head checks are recorded on [PR #17](https://github.com/NaxAlpha/wpalt/pull/17); review and merge are separate states.
 
 ## Classified-directory implementation baseline
 
@@ -43,3 +43,11 @@ Application source `3c13928e6e331833f2a3e724759383cd2a8f8a60`: all twelve connec
 An isolated archive observation after build/test/browser work stopped returned all 86 eligible records once over five pages on each engine. Thirty debug in-process router samples: SQLite p50 6.304 ms / p95 10.068 ms; PostgreSQL p50 7.538 ms / p95 14.161 ms. These are observations, with no performance threshold assertion or production latency promise. [Raw conditions and plans](d01-archive-observations.json) preserve the exact scope. SQLite uses its term unique index and covering membership index. PostgreSQL chooses a small sequential/hash plan (303 membership rows, six shared buffer hits, 0.071 ms reported predicate execution); the indexes are available, and forcing them would not establish an optimization. This is not evidence for arbitrary data distributions or complete request execution plans.
 
 Current PR checks run separately from this ledger. Application code is frozen while final browser and CI checks run; future documentation-only commits must not be reported as newly measured executable performance.
+
+## Verified delivery application and artifact
+
+[Run 37477269590](https://github.com/NaxAlpha/wpalt/actions/runs/37477269590) passed all seven required gates: application, clean build, dependency audit, compiler floor, local processes, frontend and native PITR. Its head is `aa2b9877bdb54e7d7dad76ce617f12631c72ad66`; application code matches measured source `3c13928e6e331833f2a3e724759383cd2a8f8a60`. The complete 92 Rust cases pass, including both contention corrections. PR publication is intentionally skipped; optional manual reference workloads are not substitutes for required gates.
+
+The independently downloaded build has PR merge source `9a961c7a181e818c18d2c1fcbe9b4744c166e955`: archive SHA-256 `5de70c11288c0c8523b6bb4cc0d9e964eee5adac1dd67904d555407f1e83f015`; Linux executable SHA-256 `10f7b8b4cc9887e0b5570d5fda0132aaff6eb0bc5a1d654ec05134344b78e2b0`, 34,648,200 bytes. Verification checked source identity, lockfiles, embedded frontend/business assets, safe archive membership and all packaged guides. Later documentation commits receive their own CI/artifact verification, recorded on the PR rather than recursively editing the ledger to reference itself.
+
+The final local optimized executable is 28,433,536 bytes, SHA-256 `481d651e01a000313df80f01ee9e66cab465db869506286079ee6e0f3e0e5e57`. Final native maintenance passes from projected schema 14 and independently retained schema-15 executable on SQLite/PostgreSQL, including fresh rollback. Final local process lifecycle/race checks pass. Both final cumulative Chrome journeys pass: SQLite single-node and PostgreSQL two-node/worker, with explicit commerce POST assertions, actual responsive directory authoring and existing security/UI clusters. No updated instrumented coverage percentage is claimed.

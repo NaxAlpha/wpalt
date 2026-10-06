@@ -1,6 +1,6 @@
 # D01 — Classified content directories
 
-Date: 2026-10-06 (Tokyo). Resumed backlog package; defined directory implementation and connected local checks verified, final delivery gates pending. See [verification ledger](evidence/d01-verification.md) and [PR #17](https://github.com/NaxAlpha/wpalt/pull/17).
+Date: 2026-10-06 (Tokyo). Resumed backlog package; defined directory scope verified; exact current-head delivery/merge state is recorded on the PR. See [verification ledger](evidence/d01-verification.md) and [PR #17](https://github.com/NaxAlpha/wpalt/pull/17).
 
 ## End-user outcome
 

@@ -2135,7 +2135,7 @@
         "reference behavior change",
         "database/browser/toolchain change"
       ],
-      "status": "implementation-in-progress"
+      "status": "verified-defined-local-scope; current-head gates on PR #17"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."
