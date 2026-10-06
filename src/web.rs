@@ -697,6 +697,8 @@ struct ListQuery {
     lang: Option<String>,
     category: Option<String>,
     tag: Option<String>,
+    taxonomy: Option<String>,
+    term: Option<String>,
     after: Option<String>,
 }
 #[derive(Serialize)]
@@ -738,12 +740,34 @@ async fn published_list(app: &App, query: &ListQuery) -> Result<Vec<PublicItem>>
                 .push(")");
         }
     }
-    for (kind, value) in [("category", &query.category), ("tag", &query.tag)] {
+    if query.taxonomy.is_some() != query.term.is_some() {
+        return Err(Error::invalid(
+            "Archive filters require both taxonomy and term.",
+        ));
+    }
+    let filters = [
+        (Some("category"), &query.category),
+        (Some("tag"), &query.tag),
+        (query.taxonomy.as_deref(), &query.term),
+    ];
+    let registry = if filters.iter().any(|(_, v)| v.is_some()) {
+        Some(crate::schema::Registry::load(app).await?)
+    } else {
+        None
+    };
+    for (kind, value) in filters {
         if let Some(value) = value {
-            if value.len() > 120 {
-                return Err(Error::invalid("Term is too long."));
+            let kind = kind.ok_or(Error::invalid("Choose an archive taxonomy."))?;
+            let slugs = registry
+                .as_ref()
+                .ok_or(Error::invalid("Missing archive definitions."))?
+                .archive_slugs(kind, value)?;
+            sql.push(" AND posts.id IN (SELECT pt.post_id FROM terms t JOIN published_post_terms pt ON pt.term_id=t.id WHERE t.kind=").push_bind(kind).push(" AND t.slug IN (");
+            let mut list = sql.separated(",");
+            for slug in slugs {
+                list.push_bind(slug);
             }
-            sql.push(" AND EXISTS(SELECT 1 FROM published_post_terms pt JOIN terms t ON t.id=pt.term_id WHERE pt.post_id=posts.id AND t.kind=").push_bind(kind).push(" AND t.slug=").push_bind(value).push(")");
+            list.push_unseparated("))");
         }
     }
     if let Some(cursor) = &query.after {
@@ -842,6 +866,7 @@ async fn render_home(app: App, query: ListQuery, headers: HeaderMap) -> Result<H
     .await?;
     ctx.root["navigation"] = ctx.root["_discovery"]["navigation"].clone();
     let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))form class="toolbar" method="get" action=(discovery.path(locale,"search")){label for="search"{"Find something"}input id="search" type="search" name="q" value=(search);button{(language.search_label)}}
+    @if let Some(term) = query.term.as_ref().or(query.category.as_ref()).or(query.tag.as_ref()) {p class="eyebrow" {"Archive · " (term.replace('-', " "))}}
     @if items.is_empty(){p class="empty"{"No published content matches yet."}}
     @if items.len()>20{@let last=&items[19];a class="button secondary" href=(format!("{}{}",discovery.path(locale,""),next_url(&query,&format!("{}:{}",last.published_at,last.id)).trim_start_matches('/'))){"Older content →"}}};
     Ok(Html(crate::theme::document(
@@ -854,6 +879,17 @@ async fn render_home(app: App, query: ListQuery, headers: HeaderMap) -> Result<H
         extra,
     )?))
 }
+fn term_archive_url(base: &str, taxonomy: &str, slug: &str) -> String {
+    let mut params = url::form_urlencoded::Serializer::new(String::new());
+    if ["category", "tag"].contains(&taxonomy) {
+        params.append_pair(taxonomy, slug);
+    } else {
+        params
+            .append_pair("taxonomy", taxonomy)
+            .append_pair("term", slug);
+    }
+    format!("{base}?{}", params.finish())
+}
 fn next_url(query: &ListQuery, cursor: &str) -> String {
     let mut params = url::form_urlencoded::Serializer::new(String::new());
     params.append_pair("after", cursor);
@@ -862,6 +898,8 @@ fn next_url(query: &ListQuery, cursor: &str) -> String {
         ("lang", &query.lang),
         ("category", &query.category),
         ("tag", &query.tag),
+        ("taxonomy", &query.taxonomy),
+        ("term", &query.term),
     ] {
         if let Some(value) = value {
             params.append_pair(name, value);
@@ -976,7 +1014,7 @@ async fn render_post(
     )
     .await?;
     ctx.root["navigation"] = ctx.root["_discovery"]["navigation"].clone();
-    let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))            section class="comments" {p class="muted" {@for t in terms {a href=(format!("{}?{}={}",discovery.path(&locale,""),t.get::<String,_>("kind"),t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
+    let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))            section class="comments" {p class="muted" {@for t in terms {a href=(term_archive_url(&discovery.path(&locale,""), &t.get::<String,_>("kind"), &t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
                     h2 {"Conversation"}
                     @for c in comments {article class="comment" {strong {(c.get::<String,_>("name"))}p {(c.get::<String,_>("body"))}}}
                     @if protected == 0 {form method="post" action=(format!("/{slug}/comments")) data-spam-resource=[app.config.spam.enabled.then(||format!("comment:{slug}"))] {

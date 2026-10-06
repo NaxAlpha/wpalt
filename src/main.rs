@@ -1054,7 +1054,7 @@ async fn main() -> anyhow::Result<()> {
         );
         let mut inspection = config.clone();
         inspection.local_processes = false;
-        let app = App::open(inspection).await?;
+        let app = App::open_runtime(inspection).await?;
         let report = wpalt::platform::local_processes::resume(
             &config,
             &app,
@@ -1094,8 +1094,12 @@ async fn main() -> anyhow::Result<()> {
     let runtime = matches!(cli.command, Command::Serve { .. } | Command::Worker { .. });
     let app = if runtime {
         App::open_runtime(config).await?
+    } else if matches!(cli.command, Command::Init { .. } | Command::Restore { .. }) {
+        App::open_installation(config).await?
     } else {
-        App::open(config).await?
+        // Offline lifecycle ownership is already held. Inspection/domain commands
+        // must not implicitly migrate an adopted site's native schema.
+        App::open_runtime(config).await?
     };
     anyhow::ensure!(
         !app.clone_held.load(std::sync::atomic::Ordering::SeqCst)

@@ -62,7 +62,7 @@ pub struct Request<'a> {
     pub acknowledge_source_stopped: bool,
 }
 
-/// Current supported M8 -> M9 maintenance transition. No mixed-version serving.
+/// Supported stopped-site native maintenance. No mixed-version serving.
 pub async fn apply(
     app: &App,
     owner_config: &crate::config::Config,
@@ -83,7 +83,7 @@ pub async fn apply(
     let installed: i64 = sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
         .fetch_one(&app.db.pool)
         .await?;
-    if ![14, crate::db::SCHEMA_VERSION].contains(&installed) {
+    if ![14, 15, crate::db::SCHEMA_VERSION].contains(&installed) {
         return Err(Error::invalid(
             "Unsupported maintenance source; use fresh-target recovery.",
         ));
@@ -91,7 +91,7 @@ pub async fn apply(
     let old_directory: Option<String> = if rebind_origin.is_some() {
         if !app.db.postgres || installed != crate::db::SCHEMA_VERSION {
             return Err(Error::invalid(
-                "Directory rebind supports verified PostgreSQL schema-15 engine recovery only; use portable fresh-target recovery otherwise.",
+                "Directory rebind supports current-schema PostgreSQL engine recovery only; use portable fresh-target recovery otherwise.",
             ));
         }
         if owner_config.data_dir.join(".process-state.json").exists() {

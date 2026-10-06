@@ -307,7 +307,14 @@ impl Package {
         }
         if n.kind == "repeater"
             && let Some(kind) = binding_kind(&json!({"bind":n.source}), r, model, params)
-            && !["repeater", "flexible", "gallery"].contains(&kind.as_str())
+            && ![
+                "repeater",
+                "flexible",
+                "gallery",
+                "relationships",
+                "choices",
+            ]
+            .contains(&kind.as_str())
         {
             return Err(Error::invalid("Repeaters must bind a declared list field."));
         }
@@ -410,6 +417,12 @@ impl Package {
             serde_json::from_str(raw).map_err(|_| Error::invalid("Invalid historical package."))?;
         let mut check = original.clone();
         let mut context = registry.clone();
+        // Historical validation does not execute these bindings. Use a valid
+        // list placeholder so the structural repeater check remains intact.
+        context.common.options.insert(
+            "historical_rows".into(),
+            crate::schema::Field::primitive("gallery"),
+        );
         fn neutralize(n: &mut Node) {
             for value in [&mut n.text, &mut n.href, &mut n.image] {
                 if value.is_object() {
@@ -418,7 +431,7 @@ impl Package {
             }
             n.condition = Value::Null;
             if n.kind == "repeater" {
-                n.source = "site.title".into();
+                n.source = "options.historical_rows".into();
             }
             if n.kind == "collection" {
                 n.source = "listing".into();

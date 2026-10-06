@@ -422,6 +422,26 @@ async function freePort() {
     .getByRole("button", { name: "Add field", exact: true })
     .first()
     .click();
+  // D01 uses the actual model controls, then authors and reloads typed values.
+  async function addDirectoryField(id, kind) {
+    await page.getByLabel("Add field identifier", { exact: true }).first().fill(id);
+    await page.getByRole("button", { name: "Add field", exact: true }).first().click();
+    await page.getByLabel("Type " + id, { exact: true }).selectOption(kind);
+  }
+  await addDirectoryField("rating", "integer");
+  await page.getByText("rating validation", { exact: true }).click();
+  await page.getByLabel("rating min", { exact: true }).fill("1");
+  await page.getByLabel("rating max", { exact: true }).fill("5");
+  await addDirectoryField("contact", "email");
+  await addDirectoryField("opened", "date");
+  await addDirectoryField("level", "choice");
+  await page.getByLabel("Add level choice identifier", { exact: true }).fill("local");
+  await page.getByRole("button", { name: "Add level choice", exact: true }).click();
+  await page.getByLabel("level choice local", { exact: true }).fill("Local");
+  await page.getByText("category hierarchy", { exact: true }).click();
+  await page.getByLabel("Add category child identifier", { exact: true }).fill("gardens");
+  await page.getByRole("button", { name: "Add category child", exact: true }).click();
+  await page.getByLabel("category parent of gardens", { exact: true }).fill("outdoors");
   await page.getByRole("button", { name: "Save model", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Model saved" }).waitFor();
   await page.goto(origin + "/admin/posts/new");
@@ -437,6 +457,11 @@ async function freePort() {
   await page
     .getByLabel("client-name", { exact: true })
     .fill("M2_STRUCTURED_CLIENT");
+  await page.getByLabel("rating", { exact: true }).fill("4");
+  await page.getByLabel("contact", { exact: true }).fill("owner@example.test");
+  await page.getByLabel("opened", { exact: true }).fill("2024-02-29");
+  await page.getByLabel("level", { exact: true }).selectOption("local");
+  await page.getByLabel("Categories", { exact: true }).fill("Gardens");
   await page.getByLabel("Title", { exact: true }).fill("M2 project");
   await page.getByLabel("URL slug", { exact: true }).fill("m2-project");
   await submit(
@@ -459,6 +484,24 @@ async function freePort() {
     await page.getByLabel("client-name", { exact: true }).inputValue(),
     "M2_STRUCTURED_CLIENT",
   );
+  assert.equal(await page.getByLabel("rating", { exact: true }).inputValue(), "4");
+  assert.equal(await page.getByLabel("contact", { exact: true }).inputValue(), "owner@example.test");
+  assert.equal(await page.getByLabel("opened", { exact: true }).inputValue(), "2024-02-29");
+  assert.equal(await page.getByLabel("level", { exact: true }).inputValue(), "local");
+  const archive = await visitor.request.get(origin + "/api/content?category=outdoors");
+  assert.equal(archive.status(), 200);
+  assert((await archive.json()).items.some((item) => item.slug === "m2-project"));
+  // Inspect the populated authoring controls at the narrow supported width.
+  await page.setViewportSize({ width: 320, height: 900 });
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Directory authoring must reflow");
+  for (const label of ["rating", "contact", "opened", "level"]) {
+    const control = page.getByLabel(label, { exact: true });
+    const box = await control.boundingBox();
+    assert(box && box.height >= 43.5 && box.width > 0, "Typed control must preserve usable geometry: " + label);
+  }
+  await page.screenshot({ path: path.join(output, "d01-directory-320.png"), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: path.join(output, "d01-directory-1440.png"), fullPage: true });
   // Progressive widget keyboard behavior uses preloaded panels and local script only.
   const design = await (
     await owner.request.get(origin + "/api/admin/design")
@@ -699,6 +742,7 @@ async function freePort() {
           "parameterized visual composition",
           "private responsive draft preview",
           "typed model authoring",
+          "D01 directory constraints, typed inputs and descendant archives",
           "invalid draft feedback",
           "keyboard tabs",
           "multilingual discovery and RTL",

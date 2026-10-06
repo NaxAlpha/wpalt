@@ -1449,6 +1449,464 @@ async fn typed_models_and_reusable_components_render_only_published_data() {
     }
 }
 
+// D01: a classified directory combines typed authoring, public hierarchy, private
+// relationship boundaries, schema-change safety and fresh-site recovery.
+#[tokio::test]
+async fn classified_directory_preserves_typed_values_archives_and_private_relationships() {
+    use serde_json::json;
+    use wpalt::{schema, theme};
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let definition = json!({"label":"Directory", "taxonomies":{"sector":"Sectors"},
+        "taxonomy_parents":{"sector":{"gardens":"outdoors","orchards":"gardens"}},
+        "fields":{
+            "rating":{"kind":"integer","min":1,"max":5},
+            "contact":{"kind":"email"},"website":{"kind":"url"},"opened":{"kind":"date"},
+            "summary":{"kind":"string","min_length":2,"max_length":20},
+            "level":{"kind":"choice","choices":{"local":"Local","regional":"Regional"}},
+            "services":{"kind":"choices","choices":{"delivery":"Delivery","pickup":"Pickup"},"max_items":2},
+            "partners":{"kind":"relationships","target":"post","max_items":3}
+        }});
+        let model: schema::Model = serde_json::from_value(definition.clone()).unwrap();
+        schema::save_model(&site.app, "directory", model.clone(), 0)
+            .await
+            .unwrap();
+        let mut related = input("public-partner", "publish");
+        related.title = "PUBLIC_PARTNER".into();
+        let public = content::save(&site.app, site.session(), None, related)
+            .await
+            .unwrap();
+        let mut related = input("private-partner", "save");
+        related.title = "PRIVATE_PARTNER".into();
+        let private = content::save(&site.app, site.session(), None, related)
+            .await
+            .unwrap();
+        let mut entry = input("garden-directory", "publish");
+        entry.kind = "directory".into();
+        entry.title = "Garden directory".into();
+        entry.categories.clear();
+        entry.tags.clear();
+        entry.taxonomies = json!({"sector":["Orchards"]}).to_string();
+        entry.fields=json!({"rating":4,"contact":"owner@example.test","website":"https://example.test/garden","opened":"2024-02-29","summary":"é🌿","level":"local","services":["pickup","delivery"],"partners":[private.id,public.id]}).to_string();
+        let saved = content::save(&site.app, site.session(), None, entry.clone())
+            .await
+            .unwrap();
+        let mut stored = theme::load(&site.app, "paper", true).await.unwrap();
+        stored.package.templates.insert("directory".into(),serde_json::from_value(json!({"id":"directory-template","kind":"section","children":[
+            {"id":"directory-title","kind":"heading","text":{"bind":"post.title"}},
+            {"id":"partner-list","kind":"repeater","source":"post.fields.partners","children":[{"id":"partner-title","kind":"text","text":{"bind":"item.title"}}]},
+            {"id":"directory-level","kind":"text","text":{"bind":"post.fields.level"}}
+        ]})).unwrap());
+        theme::save(&site.app, "paper", stored.package, stored.version, true)
+            .await
+            .unwrap();
+        let page = get(&site.app, "/garden-directory", None).await;
+        assert_eq!(page.0, StatusCode::OK);
+        assert!(page.1.contains("PUBLIC_PARTNER"));
+        assert!(!page.1.contains("PRIVATE_PARTNER") && !page.1.contains(&private.id));
+        assert!(page.1.contains("taxonomy=sector&amp;term=orchards"));
+        for root in ["orchards", "gardens", "outdoors"] {
+            let archive = get(
+                &site.app,
+                &format!("/api/content?taxonomy=sector&term={root}"),
+                None,
+            )
+            .await;
+            assert_eq!(archive.0, StatusCode::OK);
+            assert!(archive.1.contains("Garden directory"));
+        }
+        assert!(
+            !get(
+                &site.app,
+                "/api/content?taxonomy=sector&term=unrelated",
+                None
+            )
+            .await
+            .1
+            .contains("Garden directory")
+        );
+        assert_eq!(
+            get(&site.app, "/api/content?taxonomy=sector", None).await.0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert_eq!(
+            get(
+                &site.app,
+                "/api/content?taxonomy=unknown&term=orchards",
+                None
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        assert_eq!(
+            get(
+                &site.app,
+                "/api/content?taxonomy=sector&term=%27%20OR%201=1",
+                None
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        // The server remains authoritative even when native browser checks are bypassed.
+        for (field, value) in [
+            ("rating", json!(2.5)),
+            ("rating", json!(6)),
+            ("contact", json!("bad@")),
+            ("website", json!("javascript:alert(1)")),
+            ("opened", json!("2025-02-29")),
+            ("summary", json!("x")),
+            ("level", json!("invented")),
+            ("services", json!(["pickup", "pickup"])),
+            ("partners", json!([uuid::Uuid::new_v4().to_string()])),
+        ] {
+            let mut invalid = entry.clone();
+            invalid.version = saved.version;
+            invalid.action = "save".into();
+            let mut fields: serde_json::Value = serde_json::from_str(&invalid.fields).unwrap();
+            fields[field] = value;
+            invalid.fields = fields.to_string();
+            assert!(
+                content::save(&site.app, site.session(), Some(&saved.id), invalid)
+                    .await
+                    .is_err(),
+                "Rejected invalid {field} without overwriting the live directory"
+            );
+        }
+        let mut changed = model.clone();
+        changed.fields.get_mut("rating").unwrap().max = Some(3.0);
+        assert!(
+            schema::save_model(&site.app, "directory", changed, 1)
+                .await
+                .is_err(),
+            "Definition changes cannot invalidate existing draft or published values"
+        );
+        let mut changed = model.clone();
+        changed
+            .taxonomy_parents
+            .get_mut("sector")
+            .unwrap()
+            .insert("outdoors".into(), "orchards".into());
+        assert!(
+            schema::save_model(&site.app, "directory", changed, 1)
+                .await
+                .is_err(),
+            "Cycles are rejected before persistence"
+        );
+        let mut changed = model.clone();
+        changed.label = "Updated directory".into();
+        schema::save_model(&site.app, "directory", changed.clone(), 1)
+            .await
+            .unwrap();
+        assert_eq!(
+            schema::save_model(&site.app, "directory", changed, 1)
+                .await
+                .unwrap_err()
+                .0,
+            StatusCode::CONFLICT
+        );
+        // Draft classification remains private until publication.
+        entry.version = saved.version;
+        entry.action = "save".into();
+        entry.taxonomies = json!({"sector":["Private sector"]}).to_string();
+        let draft = content::save(&site.app, site.session(), Some(&saved.id), entry.clone())
+            .await
+            .unwrap();
+        assert!(
+            get(
+                &site.app,
+                "/api/content?taxonomy=sector&term=outdoors",
+                None
+            )
+            .await
+            .1
+            .contains("Garden directory")
+        );
+        assert!(
+            !get(
+                &site.app,
+                "/api/content?taxonomy=sector&term=private-sector",
+                None
+            )
+            .await
+            .1
+            .contains("Garden directory")
+        );
+        let bytes = backup::capture(&site.app).await.unwrap();
+        let fresh = Site::new(pg, false).await;
+        backup::restore(&fresh.app, &bytes).await.unwrap();
+        assert_eq!(
+            content::get(&fresh.app, &saved.id).await.unwrap().fields,
+            draft.fields
+        );
+        assert!(
+            get(
+                &fresh.app,
+                "/api/content?taxonomy=sector&term=outdoors",
+                None
+            )
+            .await
+            .1
+            .contains("Garden directory")
+        );
+        let recovered = get(&fresh.app, "/garden-directory", None).await.1;
+        assert!(recovered.contains("PUBLIC_PARTNER") && !recovered.contains("PRIVATE_PARTNER"));
+        entry.version = draft.version;
+        entry.action = "unpublish".into();
+        content::save(&site.app, site.session(), Some(&saved.id), entry)
+            .await
+            .unwrap();
+        assert!(
+            !get(
+                &site.app,
+                "/api/content?taxonomy=sector&term=outdoors",
+                None
+            )
+            .await
+            .1
+            .contains("Garden directory")
+        );
+        site.close().await;
+        fresh.close().await;
+    }
+}
+
+// D01: populated archive pagination and actual engine plans, with timing observations
+// rather than machine-dependent assertions or per-slug query snapshots.
+#[tokio::test]
+async fn directory_archives_page_all_matches_with_indexed_term_membership() {
+    use serde_json::json;
+    let mut evidence = Vec::new();
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let mut model = wpalt::schema::Model::initial("Posts");
+        model.taxonomy_parents.insert(
+            "category".into(),
+            [
+                ("orchards".into(), "gardens".into()),
+                ("gardens".into(), "outdoors".into()),
+            ]
+            .into(),
+        );
+        wpalt::schema::save_model(&site.app, "post", model, 1)
+            .await
+            .unwrap();
+        let mut base = input("archive-base", "publish");
+        base.categories = "Orchards".into();
+        let base = content::save(&site.app, site.session(), None, base)
+            .await
+            .unwrap();
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        let mut expected = HashSet::from([base.id.clone()]);
+        for n in 0..1000 {
+            let id = uuid::Uuid::new_v4().to_string();
+            let slug = format!("archive-{n}");
+            let matched = n % 10 == 0;
+            let indexed = n % 7 != 0;
+            sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo,document,published_document) SELECT $1,$2,kind,title,body,fields,blocks,status,version,$2,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,$3,$3,document,published_document FROM posts WHERE id=$4")
+                .bind(&id).bind(slug).bind(if indexed {"{}"} else {r#"{"noindex":true}"#}).bind(&base.id).execute(&mut *tx).await.unwrap();
+            if matched {
+                for table in ["post_terms", "published_post_terms"] {
+                    sqlx::query(&format!("INSERT INTO {table}(post_id,term_id) SELECT $1,term_id FROM {table} WHERE post_id=$2"))
+                        .bind(&id).bind(&base.id).execute(&mut *tx).await.unwrap();
+                }
+                if indexed {
+                    expected.insert(id);
+                }
+            }
+        }
+        tx.commit().await.unwrap();
+        if pg {
+            sqlx::query("ANALYZE posts")
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+            sqlx::query("ANALYZE terms")
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+            sqlx::query("ANALYZE published_post_terms")
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+        }
+        let mut seen = HashSet::new();
+        let mut path = Some("/api/content?taxonomy=category&term=outdoors&lang=en".to_owned());
+        let mut pages = 0;
+        while let Some(next) = path {
+            pages += 1;
+            assert!(pages <= 6, "Bounded fixture pagination must terminate");
+            let response = get(&site.app, &next, None).await;
+            assert_eq!(response.0, StatusCode::OK);
+            let value: serde_json::Value = serde_json::from_str(&response.1).unwrap();
+            let items = value["items"].as_array().unwrap();
+            assert!(items.len() <= 20);
+            for item in items {
+                assert!(
+                    seen.insert(item["id"].as_str().unwrap().to_owned()),
+                    "No duplicate keyset records"
+                );
+            }
+            path = value["next_url"].as_str().map(str::to_owned);
+            if let Some(next) = &path {
+                assert!(
+                    next.contains("taxonomy=category")
+                        && next.contains("term=outdoors")
+                        && next.contains("lang=en")
+                );
+            }
+        }
+        assert_eq!(
+            seen, expected,
+            "Every matching indexed publication appears exactly once; unassigned and noindex records stay excluded"
+        );
+        let plan_sql = if pg {
+            "EXPLAIN (ANALYZE,BUFFERS) SELECT pt.post_id FROM terms t JOIN published_post_terms pt ON pt.term_id=t.id WHERE t.kind='category' AND t.slug IN ('outdoors','gardens','orchards')"
+        } else {
+            "EXPLAIN QUERY PLAN SELECT pt.post_id FROM terms t JOIN published_post_terms pt ON pt.term_id=t.id WHERE t.kind='category' AND t.slug IN ('outdoors','gardens','orchards')"
+        };
+        let plan = sqlx::query(plan_sql)
+            .fetch_all(&site.app.db.pool)
+            .await
+            .unwrap()
+            .iter()
+            .map(|r| r.get::<String, _>(if pg { 0 } else { 3 }))
+            .collect::<Vec<_>>();
+        let mut timings = Vec::new();
+        for _ in 0..30 {
+            let start = std::time::Instant::now();
+            assert_eq!(
+                get(
+                    &site.app,
+                    "/api/content?taxonomy=category&term=outdoors&lang=en",
+                    None
+                )
+                .await
+                .0,
+                StatusCode::OK
+            );
+            timings.push(start.elapsed().as_secs_f64() * 1000.0);
+        }
+        timings.sort_by(f64::total_cmp);
+        evidence.push(json!({"engine":if pg {"postgres"}else{"sqlite"},"posts":1001,"matched":seen.len(),"pages":pages,"archive_membership_plan":plan,"in_process_debug_router_ms":{"p50":timings[14],"p95":timings[28],"max":timings[29]},"samples":30,"limits":"Debug in-process HTTP router, one client, no network/browser timing; timing observations only. Predicate plan is the exact archive membership subquery, not a claim about every query."}));
+        site.close().await;
+    }
+    std::fs::create_dir_all("work").unwrap();
+    std::fs::write(
+        "work/d01-archive-volume.json",
+        serde_json::to_vec_pretty(&evidence).unwrap(),
+    )
+    .unwrap();
+}
+
+// D01: executable replacement cannot implicitly upgrade meaningful data through init/restore.
+#[tokio::test]
+async fn installation_and_ordinary_startup_refuse_unreviewed_post_m9_migrations() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let post = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("preserved-before-upgrade", "publish"),
+        )
+        .await
+        .unwrap();
+        for version in [14_i64, 15] {
+            sqlx::query("UPDATE schema_version SET version=$1 WHERE id=1")
+                .bind(version)
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+            assert!(
+                App::open_installation((*site.app.config).clone())
+                    .await
+                    .is_err(),
+                "Init/restore must not migrate an occupied older database"
+            );
+            assert!(App::open_runtime((*site.app.config).clone()).await.is_err());
+            if version == 15 {
+                assert!(
+                    App::open((*site.app.config).clone()).await.is_err(),
+                    "Ordinary post-M9 opening cannot bypass maintenance"
+                );
+            }
+            assert_eq!(
+                sqlx::query_scalar::<_, i64>("SELECT version FROM schema_version WHERE id=1")
+                    .fetch_one(&site.app.db.pool)
+                    .await
+                    .unwrap(),
+                version
+            );
+            assert_eq!(
+                content::get(&site.app, &post.id)
+                    .await
+                    .unwrap()
+                    .published_title,
+                post.published_title
+            );
+        }
+        sqlx::query("UPDATE schema_version SET version=$1 WHERE id=1")
+            .bind(wpalt::db::SCHEMA_VERSION)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        site.close().await;
+    }
+}
+
+// D01: bounded declarative grammar rejects unusable definitions before data exists.
+#[test]
+fn directory_constraints_reject_ambiguous_definitions_and_unbounded_hierarchies() {
+    use serde_json::json;
+    let registry = wpalt::schema::Registry {
+        common: wpalt::schema::Definition::default(),
+        models: [("post".into(), wpalt::schema::Model::initial("Posts"))].into(),
+    };
+    for field in [
+        json!({"kind":"string","min":2}),
+        json!({"kind":"integer","min":5,"max":1}),
+        json!({"kind":"choice","choices":{}}),
+        json!({"kind":"choice","choices":{"__proto__":"bad"}}),
+        json!({"kind":"string","min_length":10,"max_length":2}),
+        json!({"kind":"string","target":"post"}),
+    ] {
+        let mut invalid = registry.clone();
+        invalid
+            .models
+            .get_mut("post")
+            .unwrap()
+            .fields
+            .insert("value".into(), serde_json::from_value(field).unwrap());
+        assert!(invalid.validate().is_err());
+    }
+    let mut deep = registry.clone();
+    let parents = deep
+        .models
+        .get_mut("post")
+        .unwrap()
+        .taxonomy_parents
+        .entry("category".into())
+        .or_default();
+    for i in 0..9 {
+        parents.insert(format!("level-{i}"), format!("level-{}", i + 1));
+    }
+    assert!(deep.validate().is_err());
+    let mut inconsistent = registry.clone();
+    let mut page = wpalt::schema::Model::initial("Pages");
+    page.taxonomy_parents
+        .insert("category".into(), [("child".into(), "one".into())].into());
+    inconsistent
+        .models
+        .get_mut("post")
+        .unwrap()
+        .taxonomy_parents
+        .insert("category".into(), [("child".into(), "two".into())].into());
+    inconsistent.models.insert("page".into(), page);
+    assert!(inconsistent.validate().is_err());
+}
+
 // M2 cluster 2: draft publication, optimistic conflicts and revision restore are distinct operations.
 #[tokio::test]
 async fn theme_drafts_publish_restore_and_switch_without_content_loss() {

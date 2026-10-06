@@ -54,12 +54,17 @@ pub struct App {
 #[derive(Clone, Copy, PartialEq)]
 enum Startup {
     Migrate,
+    Installation,
     Runtime,
     Maintenance,
     RebindMaintenance,
 }
 
 impl App {
+    /// Native init/restore may prepare an empty database, never upgrade old data.
+    pub async fn open_installation(config: config::Config) -> anyhow::Result<Self> {
+        Self::open_checked(config, Startup::Installation).await
+    }
     pub async fn mutation(&self) -> error::Result<operations::cache::Mutation<'_>> {
         if let Some(c) = &self.local_coordinator {
             c.mark_intent()?;
@@ -128,7 +133,7 @@ impl App {
                 .await
                 .map_err(|e| anyhow::anyhow!(e.1))?;
         }
-        if startup_mode != Startup::Migrate {
+        if !matches!(startup_mode, Startup::Migrate | Startup::Installation) {
             let present: i64 = if db.postgres {
                 sqlx::query_scalar(
                     "SELECT CASE WHEN to_regclass('schema_version') IS NULL THEN 0 ELSE 1 END",
@@ -150,10 +155,34 @@ impl App {
                     || (matches!(
                         startup_mode,
                         Startup::Maintenance | Startup::RebindMaintenance
-                    ) && version == 14),
+                    ) && matches!(version, 14 | 15)),
                 "runtime schema is incompatible; stop all nodes and use the documented offline upgrade/recovery path"
             );
         } else {
+            // Pre-adoption fixtures still have explicit one-time migrations.
+            // An adopted site must use reviewed maintenance with a recovery point,
+            // even if the owner accidentally invokes init/restore with an old DB.
+            let present: i64 = if db.postgres {
+                sqlx::query_scalar(
+                    "SELECT CASE WHEN to_regclass('schema_version') IS NULL THEN 0 ELSE 1 END",
+                )
+                .fetch_one(&db.pool)
+                .await?
+            } else {
+                sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_version'").fetch_one(&db.pool).await?
+            };
+            if present == 1 {
+                let version: Option<i64> =
+                    sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
+                        .fetch_optional(&db.pool)
+                        .await?;
+                anyhow::ensure!(
+                    version
+                        .is_none_or(|v| v == db::SCHEMA_VERSION
+                            || (startup_mode == Startup::Migrate && v < 15)),
+                    "adopted schema requires stopped-site reviewed upgrade with a verified recovery point"
+                );
+            }
             db.migrate().await?;
         }
         if !matches!(

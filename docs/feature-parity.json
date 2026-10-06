@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M8 merged and actual-main release independently verified; M9 local-process/configuration implementation under cumulative verification. No blanket premium-plugin or final release claim.",
+  "milestone": "M9 merged as c0f9f40; deferred local backlog resumed autonomously under decision 0015. D01 verification active; defined slices are not blanket plugin parity.",
   "capabilities": [
     {
       "id": "F001",
@@ -17,8 +17,12 @@
         "m2-contract.md",
         "evidence/m2-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d01-contract.md"
+      ],
+      "d01_contract": "d01-contract.md",
+      "d01_status": "implemented; final verification and PR pending",
+      "d01_coverage": "Bounded shared taxonomy hierarchies and descendant archives with preserved publication/privacy/language/cursor filters."
     },
     {
       "id": "F002",
@@ -34,8 +38,12 @@
         "m2-contract.md",
         "evidence/m2-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d01-contract.md"
+      ],
+      "d01_contract": "d01-contract.md",
+      "d01_status": "implemented; final verification and PR pending",
+      "d01_coverage": "Integer/email/HTTP(S)-URL/calendar-date/declared-choice/multiple-choice/ordered-multiple-relationship fields; declarative numeric/text-length constraints; shared authoring, preflight, rendering and recovery. Specialized field families, searchable large selectors and richer relationship policies remain explicit later work."
     },
     {
       "id": "F003",

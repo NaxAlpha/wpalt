@@ -2099,6 +2099,43 @@
         "native publication/translation/integration credential changes"
       ],
       "status": "Native editorial/translation real-engine and independent fleet/worker transport checks pass locally. The 0.6B model failed meaningful translation; actual Qwen3 1.7B synthetic French facts/draft/privacy reference passes with human editing required. Exact-source CI and final M9 resource/capability gates remain active."
+    },
+    {
+      "feature_id": "D01-01",
+      "area": "Classified directories, typed fields and hierarchical archives",
+      "scope": "D01",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developer.wordpress.org/reference/functions/register_taxonomy/",
+        "https://developer.wordpress.org/reference/classes/wp_tax_query/",
+        "https://www.advancedcustomfields.com/resources/relationship/"
+      ],
+      "applicable_versions": [
+        "wpalt native schema 16",
+        "WordPress current developer reference checked 2026-10-06; behavior reference, no installed comparison claim",
+        "ACF current relationship documentation; no paid account verification"
+      ],
+      "last_checked": "2026-10-06",
+      "next_review": "2027-01-04",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Bounded acyclic hierarchy and descendant archives preserve public/private boundaries.",
+        "Declarative constraints, unique ordered selections and batched reference checks; no executable validation.",
+        "Stopped-site migration fences older executables; draft/live values and recovery survive."
+      ],
+      "tests": [
+        "classified_directory_preserves_typed_values_archives_and_private_relationships",
+        "directory_constraints_reject_ambiguous_definitions_and_unbounded_hierarchies",
+        "browser acceptance typed model journey",
+        "maintenance acceptance"
+      ],
+      "triggers": [
+        "affected release",
+        "reference behavior change",
+        "database/browser/toolchain change"
+      ],
+      "status": "implementation-in-progress"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

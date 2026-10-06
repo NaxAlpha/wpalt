@@ -29,11 +29,108 @@ pub struct Field {
     pub variants: BTreeMap<String, String>,
     #[serde(default = "item_limit")]
     pub max_items: usize,
+    #[serde(default)]
+    pub choices: BTreeMap<String, String>,
+    #[serde(default)]
+    pub min: Option<f64>,
+    #[serde(default)]
+    pub max: Option<f64>,
+    #[serde(default)]
+    pub min_length: Option<usize>,
+    #[serde(default)]
+    pub max_length: Option<usize>,
 }
 impl Field {
     pub fn primitive(kind: &str) -> Self {
         serde_json::from_value(json!({"kind":kind})).unwrap()
     }
+    fn validate_rules(&self) -> Result<()> {
+        let numeric = ["number", "integer"].contains(&self.kind.as_str());
+        let text = ["string", "email", "url", "date"].contains(&self.kind.as_str());
+        let selection = ["choice", "choices"].contains(&self.kind.as_str());
+        if (!numeric && (self.min.is_some() || self.max.is_some()))
+            || self.min.into_iter().chain(self.max).any(|n| !n.is_finite())
+            || self.min.zip(self.max).is_some_and(|(min, max)| min > max)
+            || (!text && (self.min_length.is_some() || self.max_length.is_some()))
+            || self
+                .min_length
+                .into_iter()
+                .chain(self.max_length)
+                .any(|n| n > 8000)
+            || self
+                .min_length
+                .zip(self.max_length)
+                .is_some_and(|(min, max)| min > max)
+            || (!selection && !self.choices.is_empty())
+            || (selection && (self.choices.is_empty() || self.choices.len() > 64))
+            || self.choices.iter().any(|(key, label)| {
+                !identifier(key) || label.trim().is_empty() || label.len() > 100
+            })
+            || (!["relationship", "relationships"].contains(&self.kind.as_str())
+                && !self.target.is_empty())
+        {
+            return Err(Error::invalid(
+                "Field constraints need compatible types, ordered bounds and 1–64 safe named choices.",
+            ));
+        }
+        Ok(())
+    }
+    fn validate_constraints(&self, value: &Value) -> Result<()> {
+        if let Some(n) = value.as_f64()
+            && (self.min.is_some_and(|min| n < min) || self.max.is_some_and(|max| n > max))
+        {
+            return Err(Error::invalid(
+                "A numeric field is outside its declared bounds.",
+            ));
+        }
+        if let Some(s) = value.as_str()
+            && ["string", "email", "url", "date"].contains(&self.kind.as_str())
+        {
+            let length = s.chars().count();
+            if s.len() > 8000
+                || self.min_length.is_some_and(|min| length < min)
+                || self.max_length.is_some_and(|max| length > max)
+            {
+                return Err(Error::invalid(
+                    "A text field is outside its declared length bounds.",
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+fn valid_email(value: &str) -> bool {
+    value.len() <= 254 && value.parse::<lettre::Address>().is_ok()
+}
+fn valid_url(value: &str) -> bool {
+    value.len() <= 8000
+        && !value.chars().any(char::is_whitespace)
+        && !value.chars().any(char::is_control)
+        && url::Url::parse(value).is_ok_and(|url| {
+            ["http", "https"].contains(&url.scheme())
+                && url.host_str().is_some()
+                && url.username().is_empty()
+                && url.password().is_none()
+        })
+}
+fn valid_date(value: &str) -> bool {
+    value.len() == 10
+        && !value.starts_with("0000")
+        && value.bytes().enumerate().all(|(i, b)| {
+            if i == 4 || i == 7 {
+                b == b'-'
+            } else {
+                b.is_ascii_digit()
+            }
+        })
+        && chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").is_ok()
+}
+pub fn term_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 120
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -68,6 +165,9 @@ pub struct Model {
     pub fields: BTreeMap<String, Field>,
     #[serde(default)]
     pub taxonomies: BTreeMap<String, String>,
+    /// Shared taxonomy identity; child slug -> parent slug. No runtime code.
+    #[serde(default)]
+    pub taxonomy_parents: BTreeMap<String, BTreeMap<String, String>>,
 }
 impl Model {
     pub fn initial(label: &str) -> Self {
@@ -79,6 +179,7 @@ impl Model {
                 ("tag".into(), "Tags".into()),
             ]
             .into(),
+            taxonomy_parents: BTreeMap::new(),
         }
     }
 }
@@ -97,6 +198,41 @@ pub fn identifier(name: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_' || c == b'-')
 }
 impl Registry {
+    /// Resolve one declared archive into a bounded, deterministic slug set.
+    /// No per-term database fetch and no expansion for unfiltered requests.
+    pub fn archive_slugs(&self, taxonomy: &str, root: &str) -> Result<Vec<String>> {
+        if !term_identifier(root)
+            || !self
+                .models
+                .values()
+                .any(|m| m.taxonomies.contains_key(taxonomy))
+        {
+            return Err(Error::invalid(
+                "Choose a declared taxonomy and safe term slug.",
+            ));
+        }
+        let parents = self
+            .models
+            .values()
+            .filter_map(|m| m.taxonomy_parents.get(taxonomy))
+            .find(|p| !p.is_empty());
+        let mut slugs = std::collections::BTreeSet::from([root.to_owned()]);
+        if let Some(parents) = parents {
+            for _ in 0..8 {
+                let next: Vec<_> = parents
+                    .iter()
+                    .filter(|(_, parent)| slugs.contains(*parent))
+                    .map(|(child, _)| child.clone())
+                    .collect();
+                let old = slugs.len();
+                slugs.extend(next);
+                if old == slugs.len() {
+                    break;
+                }
+            }
+        }
+        Ok(slugs.into_iter().collect())
+    }
     pub async fn load(app: &App) -> Result<Self> {
         // One statement gives a coherent schema snapshot on both engines and
         // avoids loading unrelated site metadata or a second round trip.
@@ -173,6 +309,43 @@ impl Registry {
             }
             let fields = self.fields_for(id)?;
             self.check_fields(&fields, 0, &mut Vec::new(), &mut budget)?;
+            for (taxonomy, parents) in &model.taxonomy_parents {
+                if !model.taxonomies.contains_key(taxonomy) || parents.len() > 128 {
+                    return Err(Error::invalid(
+                        "Hierarchy needs a declared taxonomy and at most 128 parent edges.",
+                    ));
+                }
+                for (child, parent) in parents {
+                    if !term_identifier(child) || !term_identifier(parent) {
+                        return Err(Error::invalid(
+                            "Hierarchy uses lowercase term slugs of at most 120 bytes.",
+                        ));
+                    }
+                    let mut cursor = child;
+                    let mut seen = std::collections::BTreeSet::new();
+                    while let Some(parent) = parents.get(cursor) {
+                        if !seen.insert(cursor) || seen.len() > 8 {
+                            return Err(Error::invalid(
+                                "Taxonomy hierarchy must be acyclic and at most eight edges deep.",
+                            ));
+                        }
+                        cursor = parent;
+                    }
+                }
+                if !parents.is_empty()
+                    && self
+                        .models
+                        .values()
+                        .filter_map(|m| m.taxonomy_parents.get(taxonomy))
+                        .filter(|other| !other.is_empty())
+                        .count()
+                        > 1
+                {
+                    return Err(Error::invalid(
+                        "Define a shared taxonomy hierarchy on one model; other models inherit it.",
+                    ));
+                }
+            }
         }
         Ok(())
     }
@@ -199,9 +372,16 @@ impl Registry {
                 || ![
                     "string",
                     "number",
+                    "integer",
+                    "email",
+                    "url",
+                    "date",
+                    "choice",
+                    "choices",
                     "boolean",
                     "media",
                     "relationship",
+                    "relationships",
                     "object",
                     "group",
                     "repeater",
@@ -214,11 +394,14 @@ impl Registry {
                     "A field identifier, kind, label or item limit is invalid.",
                 ));
             }
-            if field.kind == "relationship" && !self.models.contains_key(&field.target) {
+            if ["relationship", "relationships"].contains(&field.kind.as_str())
+                && !self.models.contains_key(&field.target)
+            {
                 return Err(Error::invalid(
                     "A relationship must name an installed target model.",
                 ));
             }
+            field.validate_rules()?;
             if !field.group.is_empty() {
                 if !["group", "object", "repeater"].contains(&field.kind.as_str())
                     || !field.fields.is_empty()
@@ -325,6 +508,43 @@ impl Registry {
                         v.len() <= 8000 && (!field.required || !v.trim().is_empty())
                     }) => {}
                 "number" if value.is_number() => {}
+                "integer"
+                    if value.as_i64().is_some_and(|n| {
+                        (-9_007_199_254_740_991..=9_007_199_254_740_991).contains(&n)
+                    }) => {}
+                "email" if value.as_str().is_some_and(valid_email) => {}
+                "url" if value.as_str().is_some_and(valid_url) => {}
+                "date" if value.as_str().is_some_and(valid_date) => {}
+                "choice"
+                    if value
+                        .as_str()
+                        .is_some_and(|v| field.choices.contains_key(v)) => {}
+                "choices" | "relationships" => {
+                    let rows = value
+                        .as_array()
+                        .ok_or(Error::invalid("Multiple selections require an array."))?;
+                    let mut seen = std::collections::BTreeSet::new();
+                    if rows.len() > field.max_items
+                        || (field.required && rows.is_empty())
+                        || rows.iter().any(|row| {
+                            row.as_str().is_none_or(|v| {
+                                !seen.insert(v)
+                                    || if field.kind == "choices" {
+                                        !field.choices.contains_key(v)
+                                    } else {
+                                        uuid::Uuid::parse_str(v).is_err()
+                                    }
+                            })
+                        })
+                    {
+                        return Err(Error::invalid(
+                            "Selections need unique declared values within the item limit.",
+                        ));
+                    }
+                    *budget = budget
+                        .checked_sub(rows.len())
+                        .ok_or(Error::invalid("Too many structured values."))?;
+                }
                 "boolean" if value.is_boolean() => {}
                 "media" | "relationship"
                     if value
@@ -381,6 +601,7 @@ impl Registry {
                     ));
                 }
             }
+            field.validate_constraints(value)?;
         }
         Ok(())
     }
@@ -396,15 +617,26 @@ impl Registry {
                 continue;
             };
             match field.kind.as_str() {
-                "relationship" => {
-                    if let Some(id) = value.as_str()
-                        && relations
+                "relationship" | "relationships" => {
+                    let ids: Vec<_> = if field.kind == "relationships" {
+                        value
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .filter_map(Value::as_str)
+                            .collect()
+                    } else {
+                        value.as_str().into_iter().collect()
+                    };
+                    for id in ids {
+                        if relations
                             .insert(id.into(), field.target.clone())
                             .is_some_and(|old| old != field.target)
-                    {
-                        return Err(Error::invalid(
-                            "A record cannot represent two different relationship target models.",
-                        ));
+                        {
+                            return Err(Error::invalid(
+                                "A record cannot represent two different relationship target models.",
+                            ));
+                        }
                     }
                 }
                 "media" => {
