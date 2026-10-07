@@ -200,6 +200,9 @@ enum Command {
     /// Validate a full recovery graph without restoring it.
     RecoveryInspect {
         input: PathBuf,
+        /// Explicit offline validation of a retained v12 recovery point.
+        #[arg(long, default_value_t=13, value_parser=clap::value_parser!(u8).range(12..=13))]
+        source_format: u8,
         #[arg(long)]
         key_file: Option<PathBuf>,
     },
@@ -242,6 +245,13 @@ enum Command {
     },
     /// Migrate an M6 plaintext archive to current format, preserving its data.
     MigrateBackup { input: PathBuf, output: PathBuf },
+    /// Offline v12-to-v13 conversion into a NEW private archive; retains encryption when a key is supplied.
+    MigrateRecoveryV12 {
+        input: PathBuf,
+        output: PathBuf,
+        #[arg(long)]
+        key_file: Option<PathBuf>,
+    },
     /// Preview unused encrypted chunks; --execute requires the preview plan hash.
     RecoveryPrune {
         destination: PathBuf,
@@ -951,14 +961,23 @@ async fn main() -> anyhow::Result<()> {
             println!("Authenticated WAL restored.");
             return Ok(());
         }
-        Command::RecoveryInspect { input, key_file } => {
+        Command::RecoveryInspect {
+            input,
+            key_file,
+            source_format,
+        } => {
             let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
-            println!(
-                "{}",
-                serde_json::to_string_pretty(
-                    &backup::inspect(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?
-                )?
-            );
+            let bytes = if *source_format == 12 {
+                backup::migrate_v12(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?
+            } else {
+                bytes
+            };
+            let mut report = backup::inspect(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?;
+            if *source_format == 12 {
+                report["source_schema"] = 12.into();
+                report["boundary"]="Original v12 validated by explicit offline conversion; ordinary current restore requires a separately converted v13 archive.".into();
+            }
+            println!("{}", serde_json::to_string_pretty(&report)?);
             return Ok(());
         }
         Command::RecoveryFile {
@@ -1016,6 +1035,25 @@ async fn main() -> anyhow::Result<()> {
                 )?;
             }
             println!("{}", serde_json::to_string_pretty(&prepared.report)?);
+            return Ok(());
+        }
+        Command::MigrateRecoveryV12 {
+            input,
+            output,
+            key_file,
+        } => {
+            let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
+            let mut bytes =
+                backup::migrate_v12(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?;
+            if let Some(path) = key_file {
+                let key = wpalt::operations::encryption::read_key(path)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e.1))?;
+                bytes = wpalt::operations::encryption::seal(&key, &bytes)
+                    .map_err(|e| anyhow::anyhow!(e.1))?;
+            }
+            backup::write_private(output, &bytes)?;
+            println!("Converted a new private v13 recovery archive; source retained.");
             return Ok(());
         }
         Command::MigrateBackup { input, output } => {
@@ -1370,7 +1408,8 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
         | Command::RecoveryFile { .. }
         | Command::RecoverySelect { .. }
         | Command::RecoveryClone { .. }
-        | Command::MigrateBackup { .. } => unreachable!(),
+        | Command::MigrateBackup { .. }
+        | Command::MigrateRecoveryV12 { .. } => unreachable!(),
         Command::CloneActivate { review } => {
             wpalt::operations::clone_hold::activate(&app, &review)
                 .await

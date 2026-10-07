@@ -29,6 +29,7 @@ pub fn router(app: App) -> Router {
     };
     Router::new()
         .merge(crate::builder_web::routes())
+        .merge(crate::editorial_web::routes())
         .merge(crate::platform::web::routes())
         .merge(crate::platform::integrations::routes())
         .merge(crate::platform::events::routes())
@@ -1125,7 +1126,7 @@ async fn new_post(State(app): State<App>, headers: HeaderMap) -> Result<Html<Str
         "Create content",
         &app.db.settings().await?,
         Some(&s),
-        html! {(editor_form(&s, None, &input, &[], None, &crate::discovery::load(&app).await?.0))script defer src="/assets/builder.js"{}},
+        html! {(editor_form(&s, None, &input, &[], None, &crate::discovery::load(&app).await?.0, &crate::editorial_web::Panel::load(&app,&s,None,&input.kind).await?))script defer src="/assets/builder.js"{}},
     ))
 }
 fn editor_form(
@@ -1135,6 +1136,7 @@ fn editor_form(
     revisions: &[sqlx::any::AnyRow],
     error: Option<&str>,
     discovery: &crate::discovery::Definition,
+    review: &crate::editorial_web::Panel,
 ) -> Markup {
     let seo = crate::discovery::Seo::parse(&p.seo).unwrap_or_default();
     html! {
@@ -1163,9 +1165,11 @@ fn editor_form(
                 label {"Schedule time" input type="datetime-local" data-schedule-time;small {"Uses your browser's local time. Scheduling removes this item from the live site until publication."}}
                 div class="toolbar" {button name="action" value="save" {"Save draft"}button class="secondary" name="action" value="publish" {"Publish now"}button class="secondary" name="action" value="schedule" {"Schedule"}}
                 @if let Some(id)=id {div class="toolbar" {a class="button secondary" href=(format!("/admin/preview/{id}")) target="_blank" rel="noopener" {"Preview"}button class="secondary" name="action" value="unpublish" {"Unpublish"}}}
+                (review.request_controls())
                 p class="save-status" data-save-status {"Saved working copies do not update the live page."}
             }}
         }
+        (review.decisions(s,id))
         script defer src="/assets/editor.js"{}
         @if let Some(id)=id {section class="panel" {h2 {"Revision history"}p class="muted" {"Restore a previous working copy, then preview and publish it deliberately."}
             @for r in revisions {form class="toolbar" method="post" action=(format!("/admin/posts/{id}/revisions/{}",r.get::<String,_>("id"))) {(view::csrf(s))input type="hidden" name="version" value=(p.version);span {"Revision " (r.get::<i64,_>("version"))}button class="secondary" {"Restore working copy"}}}
@@ -1228,7 +1232,7 @@ async fn edit_post(
         "Edit content",
         &app.db.settings().await?,
         Some(&s),
-        html! {(editor_form(&s, Some(&id), &input, &revisions, None, &crate::discovery::load(&app).await?.0))script defer src="/assets/builder.js"{}},
+        html! {(editor_form(&s, Some(&id), &input, &revisions, None, &crate::discovery::load(&app).await?.0, &crate::editorial_web::Panel::load(&app,&s,Some(&id),&input.kind).await?))script defer src="/assets/builder.js"{}},
     ))
 }
 async fn save_form(
@@ -1236,6 +1240,7 @@ async fn save_form(
     headers: &HeaderMap,
     id: Option<&str>,
     input: PostInput,
+    review: Option<crate::editorial::Request>,
 ) -> Result<Response> {
     let s = admin_session(app, headers).await?;
     auth::csrf(&s, &input.csrf)?;
@@ -1243,11 +1248,12 @@ async fn save_form(
         .get("accept")
         .and_then(|v| v.to_str().ok())
         .is_some_and(|v| v.contains("application/json"));
-    match content::save(app, &s, id, input.clone()).await {
-        Ok(p) => {
+    match content::save_receipt(app, &s, id, input.clone(), review).await {
+        Ok(saved) => {
+            let p = saved.post;
             if json {
                 Ok(
-                    Json(serde_json::json!({"id":p.id,"version":p.version,"status":p.status}))
+                    Json(serde_json::json!({"id":p.id,"version":p.version,"status":p.status,"editorial":saved.editorial}))
                         .into_response(),
                 )
             } else {
@@ -1271,6 +1277,7 @@ async fn save_form(
                             &[],
                             Some(e.1),
                             &crate::discovery::load(app).await?.0,
+                            &crate::editorial_web::Panel::load(app, &s, id, &input.kind).await?,
                         ),
                     ),
                 )
@@ -1281,7 +1288,15 @@ async fn save_form(
 }
 fn native_content_form(
     mut fields: std::collections::BTreeMap<String, String>,
-) -> Result<PostInput> {
+) -> Result<(PostInput, Option<crate::editorial::Request>)> {
+    let reviewer_id = fields.remove("reviewer_id").unwrap_or_default();
+    let notes = fields.remove("review_note").unwrap_or_default();
+    let review = if fields.get("action").is_some_and(|a| a == "request_review") {
+        fields.insert("action".into(), "save".into());
+        Some(crate::editorial::Request { reviewer_id, notes })
+    } else {
+        None
+    };
     if fields.contains_key("seo_title") {
         let seo = crate::discovery::Seo {
             title: fields.remove("seo_title").unwrap_or_default(),
@@ -1295,14 +1310,17 @@ fn native_content_form(
     }
     let encoded =
         serde_urlencoded::to_string(fields).map_err(|_| Error::invalid("Invalid content form."))?;
-    serde_urlencoded::from_str(&encoded).map_err(|_| Error::invalid("Invalid content form."))
+    let input = serde_urlencoded::from_str(&encoded)
+        .map_err(|_| Error::invalid("Invalid content form."))?;
+    Ok((input, review))
 }
 async fn create_post(
     State(app): State<App>,
     headers: HeaderMap,
     Form(fields): Form<std::collections::BTreeMap<String, String>>,
 ) -> Result<Response> {
-    save_form(&app, &headers, None, native_content_form(fields)?).await
+    let (input, review) = native_content_form(fields)?;
+    save_form(&app, &headers, None, input, review).await
 }
 async fn update_post(
     State(app): State<App>,
@@ -1310,7 +1328,8 @@ async fn update_post(
     Path(id): Path<String>,
     Form(fields): Form<std::collections::BTreeMap<String, String>>,
 ) -> Result<Response> {
-    save_form(&app, &headers, Some(&id), native_content_form(fields)?).await
+    let (input, review) = native_content_form(fields)?;
+    save_form(&app, &headers, Some(&id), input, review).await
 }
 async fn create_api(
     State(app): State<App>,

@@ -151,8 +151,36 @@ pub async fn save(
     app: &App,
     session: &Session,
     id: Option<&str>,
-    mut input: PostInput,
+    input: PostInput,
 ) -> Result<Post> {
+    Ok(save_receipt(app, session, id, input, None).await?.post)
+}
+pub struct Saved {
+    pub post: Post,
+    pub editorial: Option<crate::editorial::Work>,
+}
+/// Native authoring saves and requests review atomically, including pending edits.
+pub async fn save_for_review(
+    app: &App,
+    session: &Session,
+    id: Option<&str>,
+    input: PostInput,
+    review: crate::editorial::Request,
+) -> Result<Saved> {
+    if input.action != "save" {
+        return Err(Error::invalid(
+            "Save a working draft when requesting review.",
+        ));
+    }
+    save_receipt(app, session, id, input, Some(review)).await
+}
+pub(crate) async fn save_receipt(
+    app: &App,
+    session: &Session,
+    id: Option<&str>,
+    mut input: PostInput,
+    review: Option<crate::editorial::Request>,
+) -> Result<Saved> {
     if !session.can_edit() {
         return Err(Error::forbidden());
     }
@@ -224,7 +252,7 @@ pub async fn save(
     let mut tx = app.db.pool.begin().await?;
     let old = if let Some(id) = id {
         Some(
-            sqlx::query("SELECT * FROM posts WHERE id=$1")
+            sqlx::query("UPDATE posts SET version=version WHERE id=$1 RETURNING *")
                 .bind(id)
                 .fetch_optional(&mut *tx)
                 .await?
@@ -247,6 +275,16 @@ pub async fn save(
             ));
         }
     }
+    let approved = if let Some(old) = &old {
+        crate::editorial::require_approval(&mut tx, old, &input, &registry).await?
+    } else {
+        if model.review_required && ["publish", "schedule"].contains(&input.action.as_str()) {
+            return Err(Error::invalid(
+                "Save and request review before publication.",
+            ));
+        }
+        None
+    };
     let time = now();
     let mut post = old.clone().unwrap_or_else(|| Post {
         id: uuid::Uuid::new_v4().to_string(),
@@ -300,7 +338,17 @@ pub async fn save(
             post.status = "draft".into();
             post.publish_at = 0;
         }
-        _ => {}
+        _ => {
+            if model.review_required && post.status == "scheduled" {
+                post.status = if post.published_title.is_empty() {
+                    "draft"
+                } else {
+                    "published"
+                }
+                .into();
+                post.publish_at = 0;
+            }
+        }
     }
     if old.is_some() {
         let result=sqlx::query("UPDATE posts SET slug=$1,title=$2,body=$3,fields=$4,blocks=$5,status=$6,version=$7,published_slug=$8,published_title=$9,published_body=$10,published_fields=$11,published_blocks=$12,publish_at=$13,published_at=$14,updated_at=$15,locale=$18,translation_group=$19,seo=$20,published_locale=$21,published_translation_group=$22,published_seo=$23,document=$24,published_document=$25 WHERE id=$16 AND version=$17")
@@ -363,9 +411,22 @@ pub async fn save(
         .execute(&mut *tx)
         .await?;
     crate::platform::events::append(app, &mut tx, &post, &input.action).await?;
+    let mut editorial = crate::editorial::saved(
+        &mut tx,
+        &post,
+        &input,
+        &registry,
+        session,
+        approved.as_ref(),
+    )
+    .await?;
+    if let Some(review) = &review {
+        editorial =
+            Some(crate::editorial::request_tx(&mut tx, &post, &registry, session, review).await?);
+    }
     tx.commit().await?;
     tracing::info!(event="content_saved", content_id=%post.id, version=post.version, action=%input.action);
-    Ok(post)
+    Ok(Saved { post, editorial })
 }
 fn promote(post: &mut Post, time: i64) {
     post.published_locale = post.locale.clone();
@@ -399,33 +460,83 @@ async fn copy_terms(tx: &mut sqlx::Transaction<'_, sqlx::Any>, id: &str) -> Resu
 }
 pub async fn publish_due(app: &App) -> Result<usize> {
     let _guard = app.mutation().await?;
+    let due:Vec<String>=sqlx::query_scalar("SELECT id FROM posts WHERE status='scheduled' AND publish_at<=$1 ORDER BY publish_at,id LIMIT 50").bind(now()).fetch_all(&app.db.pool).await?;
+    if due.is_empty() {
+        return Ok(0);
+    }
+    let registry = crate::schema::Registry::load(app).await?;
     let mut tx = app.db.pool.begin().await?;
-    let rows=sqlx::query("SELECT * FROM posts WHERE status='scheduled' AND publish_at<=$1 ORDER BY publish_at LIMIT 50").bind(now()).fetch_all(&mut *tx).await?;
+    // The first transaction statement acquires bounded write/row locks; workers
+    // must not promote a decision snapshot another writer can invalidate.
+    let mut query = sqlx::QueryBuilder::<sqlx::Any>::new(
+        "UPDATE posts SET version=version WHERE status='scheduled' AND publish_at<=",
+    );
+    query.push_bind(now()).push(" AND id IN (");
+    let mut ids = query.separated(",");
+    for id in &due {
+        ids.push_bind(id);
+    }
+    ids.push_unseparated(") RETURNING *");
+    let mut posts: Vec<_> = crate::db::Db::fetch_builder_in(&mut tx, &mut query)
+        .await?
+        .into_iter()
+        .map(Post::from_row)
+        .collect();
+    posts.sort_by(|a, b| (a.publish_at, &a.id).cmp(&(b.publish_at, &b.id)));
     let mut n = 0;
-    for row in rows {
-        let mut p = Post::from_row(row);
-        promote(&mut p, now());
-        p.version += 1;
-        p.status = "published".into();
-        let result=sqlx::query("UPDATE posts SET status='published',published_slug=slug,published_title=title,published_body=body,published_document=document,published_fields=fields,published_blocks=blocks,published_locale=locale,published_translation_group=translation_group,published_seo=seo,publish_at=0,published_at=$1,version=$2 WHERE id=$3 AND status='scheduled' AND version=$4").bind(p.published_at).bind(p.version).bind(&p.id).bind(p.version-1).execute(&mut *tx).await?;
-        if result.rows_affected() == 1 {
-            copy_terms(&mut tx, &p.id).await?;
-            let terms=sqlx::query("SELECT t.name,t.kind FROM terms t JOIN post_terms pt ON pt.term_id=t.id WHERE pt.post_id=$1 ORDER BY t.name").bind(&p.id).fetch_all(&mut *tx).await?;
-            let names = |kind: &str| {
-                terms
-                    .iter()
-                    .filter(|r| r.get::<String, _>("kind") == kind)
-                    .map(|r| r.get::<String, _>("name"))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            };
-            let mut custom = std::collections::BTreeMap::<String, Vec<String>>::new();
-            for row in &terms {
-                let kind: String = row.get("kind");
-                if !["category", "tag"].contains(&kind.as_str()) {
-                    custom.entry(kind).or_default().push(row.get("name"));
-                }
+    for mut p in posts {
+        let terms=sqlx::query("SELECT t.name,t.kind FROM terms t JOIN post_terms pt ON pt.term_id=t.id WHERE pt.post_id=$1 ORDER BY t.name").bind(&p.id).fetch_all(&mut *tx).await?;
+        let names = |kind: &str| {
+            terms
+                .iter()
+                .filter(|r| r.get::<String, _>("kind") == kind)
+                .map(|r| r.get::<String, _>("name"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let mut custom = std::collections::BTreeMap::<String, Vec<String>>::new();
+        for row in &terms {
+            let kind: String = row.get("kind");
+            if !["category", "tag"].contains(&kind.as_str()) {
+                custom.entry(kind).or_default().push(row.get("name"));
             }
+        }
+        let allowed = crate::editorial::scheduled_allowed(
+            &mut tx,
+            &p,
+            &registry,
+            &names("category"),
+            &names("tag"),
+            &custom,
+        )
+        .await?;
+        if allowed {
+            promote(&mut p, now());
+            p.status = "published".into();
+        } else {
+            p.status = if p.published_title.is_empty() {
+                "draft"
+            } else {
+                "published"
+            }
+            .into();
+            p.publish_at = 0;
+        }
+        p.version += 1;
+        p.updated_at = now();
+        let changed = if allowed {
+            sqlx::query("UPDATE posts SET status='published',published_slug=slug,published_title=title,published_body=body,published_document=document,published_fields=fields,published_blocks=blocks,published_locale=locale,published_translation_group=translation_group,published_seo=seo,publish_at=0,published_at=$1,version=$2,updated_at=$3 WHERE id=$4 AND status='scheduled' AND version=$5")
+                .bind(p.published_at).bind(p.version).bind(p.updated_at).bind(&p.id).bind(p.version-1).execute(&mut *tx).await?.rows_affected()
+        } else {
+            sqlx::query("UPDATE posts SET status=$1,publish_at=0,version=$2,updated_at=$3 WHERE id=$4 AND status='scheduled' AND version=$5")
+                .bind(&p.status).bind(p.version).bind(p.updated_at).bind(&p.id).bind(p.version-1).execute(&mut *tx).await?.rows_affected()
+        };
+        if changed == 1 {
+            if allowed {
+                copy_terms(&mut tx, &p.id).await?;
+                n += 1;
+            }
+            crate::editorial::scheduled_result(&mut tx, &p, allowed).await?;
             let snapshot = serde_json::json!({"post":p,"categories":names("category"),"tags":names("tag"),"taxonomies":custom});
             sqlx::query("INSERT INTO revisions(id,post_id,version,snapshot,created_at) VALUES($1,$2,$3,$4,$5)").bind(uuid::Uuid::new_v4().to_string()).bind(&p.id).bind(p.version).bind(snapshot.to_string()).bind(now()).execute(&mut *tx).await?;
             sqlx::query("DELETE FROM revisions WHERE post_id=$1 AND version<=$2")
@@ -433,8 +544,17 @@ pub async fn publish_due(app: &App) -> Result<usize> {
                 .bind(p.version - app.config.revision_retention)
                 .execute(&mut *tx)
                 .await?;
-            crate::platform::events::append(app, &mut tx, &p, "scheduled_publish").await?;
-            n += 1;
+            crate::platform::events::append(
+                app,
+                &mut tx,
+                &p,
+                if allowed {
+                    "scheduled_publish"
+                } else {
+                    "review_schedule_cancelled"
+                },
+            )
+            .await?;
         }
     }
     tx.commit().await?;

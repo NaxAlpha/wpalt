@@ -2,7 +2,7 @@ use crate::{config::Config, error::Result, model::Settings};
 use sqlx::{Any, AnyPool, ConnectOptions, Execute, QueryBuilder, Row, any::AnyPoolOptions};
 use std::str::FromStr;
 
-pub const SCHEMA_VERSION: i64 = 16;
+pub const SCHEMA_VERSION: i64 = 17;
 
 #[derive(Clone)]
 pub struct Db {
@@ -110,6 +110,7 @@ impl Db {
                     || version == Some(13)
                     || version == Some(14)
                     || version == Some(15)
+                    || version == Some(16)
                     || version == Some(SCHEMA_VERSION),
                 "unsupported schema version; use the documented migration/reset path"
             );
@@ -125,6 +126,9 @@ impl Db {
         }
         let mut tx = self.pool.begin().await?;
         sqlx::raw_sql(SCHEMA).execute(&mut *tx).await?;
+        sqlx::raw_sql(crate::editorial::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
         sqlx::raw_sql(crate::operations::passkeys::SCHEMA)
             .execute(&mut *tx)
             .await?;
@@ -299,6 +303,20 @@ impl Db {
             .map_err(sqlx::Error::Encode)?
             .unwrap_or_default();
         sqlx::query_with(&sql, args).fetch_all(&self.pool).await
+    }
+    /// QueryBuilder<Any> emits anonymous placeholders; normalize these before
+    /// executing inside a transaction, just as the pooled builder path does.
+    pub async fn fetch_builder_in(
+        tx: &mut sqlx::Transaction<'_, Any>,
+        builder: &mut QueryBuilder<'_, Any>,
+    ) -> std::result::Result<Vec<sqlx::any::AnyRow>, sqlx::Error> {
+        let mut query = builder.build();
+        let sql = Self::numbered(query.sql());
+        let args = query
+            .take_arguments()
+            .map_err(sqlx::Error::Encode)?
+            .unwrap_or_default();
+        sqlx::query_with(&sql, args).fetch_all(&mut **tx).await
     }
     pub async fn settings(&self) -> Result<Settings> {
         let r = sqlx::query(

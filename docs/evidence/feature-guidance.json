@@ -2136,6 +2136,40 @@
         "database/browser/toolchain change"
       ],
       "status": "verified-defined-local-scope; current-head gates on PR #17"
+    },
+    {
+      "feature_id": "D02-01",
+      "area": "Editorial review",
+      "scope": "Per-model assigned review, exact canonical document/metadata approval, bounded private history, scheduling rechecks, graph recovery and native authoring queue.",
+      "basis": "Internal product authority contract; WordPress and free PublishPress source are reference semantics, not full parity proof.",
+      "sources": [
+        "https://wordpress.org/documentation/article/post-status/",
+        "https://wordpress.org/documentation/article/roles-and-capabilities/",
+        "https://publishpress.com/knowledge-base/editorial-workflow-contributors-authors-editors/",
+        "https://wordpress.org/plugins/publishpress-statuses/"
+      ],
+      "applicable_versions": [
+        "PublishPress Statuses 1.3.6 source inspection only",
+        "wpalt native schema 17 / portable graph v13 in development"
+      ],
+      "last_checked": "2026-10-06",
+      "next_review": "2027-01-04",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Different active assigned reviewer authorizes exact canonical document and meaningful metadata under current policy.",
+        "Current content/workflow versions and actors rechecked inside mutation boundary; private notes never enter public projection.",
+        "Explicit stopped migration and offline converter retain original pre-change recovery authority."
+      ],
+      "tests": [
+        "assigned_review_binds_material_and_recovers_without_public_note_leaks",
+        "review_schedule_rechecks_revocation_and_parallel_decisions_have_one_winner",
+        "D02 integrated native/browser verification pending"
+      ],
+      "triggers": [
+        "Approval policy, canonical document, actor roles, scheduling, recovery graph or authoritative reference changes"
+      ],
+      "status": "implementation_in_progress"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

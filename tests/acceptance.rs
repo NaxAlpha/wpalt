@@ -4019,6 +4019,14 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let mut payload: serde_json::Value =
             serde_json::from_str(old["payload"].as_str().unwrap()).unwrap();
         payload["schema"] = serde_json::json!(9);
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("editorial_work");
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("editorial_decisions");
         payload.as_object_mut().unwrap().remove("audit_history");
         payload["tables"]
             .as_object_mut()
@@ -4048,7 +4056,7 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let migrated = backup::migrate_m6(&original.app.config, &legacy).unwrap();
         assert_eq!(
             backup::inspect(&original.app.config, &migrated).unwrap()["schema"],
-            12
+            13
         );
         let destination = tempfile::tempdir().unwrap();
         let key = encryption::generate_key();
@@ -7554,6 +7562,496 @@ async fn translation_duplication_and_selected_sync_preserve_reviewed_language_au
             .is_err(),
             "Duplication must not silently lose private-source access rules"
         );
+        site.close().await;
+    }
+}
+
+// D02: approval is private authority over exact material, never a version-only flag.
+#[tokio::test]
+async fn assigned_review_binds_material_and_recovers_without_public_note_leaks() {
+    use wpalt::{editorial, schema};
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        auth::add_user(
+            &site.app,
+            "reviewer@example.test",
+            "Assigned reviewer",
+            "editor",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (_, reviewer) = auth::login(&site.app, "reviewer@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let mut model = schema::Registry::load(&site.app).await.unwrap().models["post"].clone();
+        model.review_required = true;
+        schema::save_model(&site.app, "post", model, 1)
+            .await
+            .unwrap();
+        assert!(
+            content::save(
+                &site.app,
+                site.session(),
+                None,
+                input("reviewed", "publish")
+            )
+            .await
+            .is_err()
+        );
+        let request = editorial::Request {
+            reviewer_id: reviewer.user.id.clone(),
+            notes: "Private initial feedback".into(),
+        };
+        let receipt = content::save_for_review(
+            &site.app,
+            site.session(),
+            None,
+            input("reviewed", "save"),
+            request.clone(),
+        )
+        .await
+        .unwrap();
+        let post = receipt.post;
+        let pending = receipt.editorial.unwrap();
+        assert_eq!(pending.state, "pending");
+        assert!(
+            editorial::decide(
+                &site.app,
+                site.session(),
+                &post.id,
+                post.version,
+                pending.version,
+                "approve",
+                ""
+            )
+            .await
+            .is_err()
+        );
+        let approved = editorial::decide(
+            &site.app,
+            &reviewer,
+            &post.id,
+            post.version,
+            pending.version,
+            "approve",
+            "Private approved feedback",
+        )
+        .await
+        .unwrap();
+        assert_eq!(approved.state, "approved");
+        let owner_export = String::from_utf8(
+            wpalt::operations::privacy::export(&site.app, &site.session().user.id)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        let reviewer_export = String::from_utf8(
+            wpalt::operations::privacy::export(&site.app, &reviewer.user.id)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(!owner_export.contains("Private approved feedback"));
+        assert!(reviewer_export.contains("Private approved feedback"));
+        assert!(
+            editorial::decide(
+                &site.app,
+                &reviewer,
+                &post.id,
+                post.version,
+                pending.version,
+                "approve",
+                ""
+            )
+            .await
+            .is_err()
+        );
+        let mut publish = input("reviewed", "publish");
+        publish.version = post.version;
+        publish.document = post.document.clone();
+        publish.body = post.body.clone();
+        publish.blocks = post.blocks.clone();
+        let mut forged = publish.clone();
+        forged.title = "Changed after approval".into();
+        assert!(
+            content::save(&site.app, site.session(), Some(&post.id), forged)
+                .await
+                .is_err()
+        );
+        let published = content::save(&site.app, site.session(), Some(&post.id), publish.clone())
+            .await
+            .unwrap();
+        assert_eq!(published.status, "published");
+        let public = get(&site.app, "/reviewed", None).await;
+        assert_eq!(public.0, StatusCode::OK);
+        assert!(!public.1.contains("Private approved feedback"));
+        let bytes = backup::capture(&site.app).await.unwrap();
+        assert_eq!(
+            backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
+            13
+        );
+        let recovered = Site::new(pg, false).await;
+        backup::restore(&recovered.app, &bytes).await.unwrap();
+        assert_eq!(
+            editorial::get(&recovered.app, &post.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .notes,
+            "Private approved feedback"
+        );
+        let mut envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let mut graph: serde_json::Value =
+            serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        graph["tables"]["editorial_work"][0]["approved_by"] = site.session().user.id.clone().into();
+        let payload = graph.to_string();
+        envelope["sha256"] = auth::digest(payload.as_bytes()).into();
+        envelope["payload"] = payload.into();
+        assert!(
+            backup::inspect(&site.app.config, &serde_json::to_vec(&envelope).unwrap()).is_err()
+        );
+        let mut edit = publish.clone();
+        edit.action = "save".into();
+        edit.version = published.version;
+        let changed = content::save(&site.app, site.session(), Some(&post.id), edit)
+            .await
+            .unwrap();
+        assert_eq!(
+            editorial::get(&site.app, &post.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .state,
+            "draft"
+        );
+        publish.version = changed.version;
+        assert!(
+            content::save(&site.app, site.session(), Some(&post.id), publish)
+                .await
+                .is_err()
+        );
+        recovered.close().await;
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn review_schedule_rechecks_revocation_and_parallel_decisions_have_one_winner() {
+    use wpalt::{editorial, schema};
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        auth::add_user(
+            &site.app,
+            "reviewer@example.test",
+            "Reviewer",
+            "editor",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (_, reviewer) = auth::login(&site.app, "reviewer@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let mut model = schema::Registry::load(&site.app).await.unwrap().models["post"].clone();
+        model.review_required = true;
+        schema::save_model(&site.app, "post", model, 1)
+            .await
+            .unwrap();
+        for (slug, revoke) in [("scheduled-reviewed", false), ("scheduled-revoked", true)] {
+            let receipt = content::save_for_review(
+                &site.app,
+                site.session(),
+                None,
+                input(slug, "save"),
+                editorial::Request {
+                    reviewer_id: reviewer.user.id.clone(),
+                    notes: "".into(),
+                },
+            )
+            .await
+            .unwrap();
+            let post = receipt.post;
+            let w = receipt.editorial.unwrap();
+            let (a, b) = tokio::join!(
+                editorial::decide(
+                    &site.app,
+                    &reviewer,
+                    &post.id,
+                    post.version,
+                    w.version,
+                    "approve",
+                    ""
+                ),
+                editorial::decide(
+                    &site.app,
+                    &reviewer,
+                    &post.id,
+                    post.version,
+                    w.version,
+                    "changes",
+                    ""
+                )
+            );
+            assert_eq!(
+                usize::from(a.is_ok()) + usize::from(b.is_ok()),
+                1,
+                "Exactly one decision consumes a workflow version"
+            );
+            let w = editorial::get(&site.app, &post.id).await.unwrap().unwrap();
+            if w.state != "approved" {
+                let w = editorial::request(
+                    &site.app,
+                    site.session(),
+                    &post.id,
+                    post.version,
+                    w.version,
+                    &editorial::Request {
+                        reviewer_id: reviewer.user.id.clone(),
+                        notes: "".into(),
+                    },
+                )
+                .await
+                .unwrap();
+                editorial::decide(
+                    &site.app,
+                    &reviewer,
+                    &post.id,
+                    post.version,
+                    w.version,
+                    "approve",
+                    "",
+                )
+                .await
+                .unwrap();
+            }
+            let mut scheduled = input(slug, "schedule");
+            scheduled.version = post.version;
+            scheduled.document = post.document.clone();
+            scheduled.publish_at = wpalt::now() + 60;
+            let scheduled = content::save(&site.app, site.session(), Some(&post.id), scheduled)
+                .await
+                .unwrap();
+            sqlx::query("UPDATE posts SET publish_at=$1 WHERE id=$2")
+                .bind(wpalt::now() - 1)
+                .bind(&post.id)
+                .execute(&site.app.db.pool)
+                .await
+                .unwrap();
+            if revoke {
+                sqlx::query("UPDATE users SET role='disabled' WHERE id=$1")
+                    .bind(&reviewer.user.id)
+                    .execute(&site.app.db.pool)
+                    .await
+                    .unwrap();
+            }
+            assert_eq!(
+                content::publish_due(&site.app).await.unwrap(),
+                usize::from(!revoke)
+            );
+            let now = content::get(&site.app, &post.id).await.unwrap();
+            assert_eq!(now.version, scheduled.version + 1);
+            assert_eq!(now.status, if revoke { "draft" } else { "published" });
+            assert_eq!(now.publish_at, 0);
+            assert_eq!(
+                editorial::get(&site.app, &post.id)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .state,
+                if revoke { "changes" } else { "published" }
+            );
+        }
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn editorial_policy_restoration_and_scheduled_edits_require_fresh_review() {
+    use wpalt::{editorial, schema};
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        auth::add_user(
+            &site.app,
+            "reviewer@example.test",
+            "Reviewer",
+            "editor",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (_, reviewer) = auth::login(&site.app, "reviewer@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let mut model = schema::Registry::load(&site.app).await.unwrap().models["post"].clone();
+        model.review_required = true;
+        schema::save_model(&site.app, "post", model.clone(), 1)
+            .await
+            .unwrap();
+        let self_request = editorial::Request {
+            reviewer_id: site.session().user.id.clone(),
+            notes: "".into(),
+        };
+        assert!(
+            content::save_for_review(
+                &site.app,
+                site.session(),
+                None,
+                input("self-review-refused", "save"),
+                self_request
+            )
+            .await
+            .is_err()
+        );
+        let leaked: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM posts WHERE slug='self-review-refused'")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            leaked, 0,
+            "Failed atomic review request must not save a partial draft"
+        );
+        let request = editorial::Request {
+            reviewer_id: reviewer.user.id.clone(),
+            notes: "Policy-sensitive work".into(),
+        };
+        let receipt = content::save_for_review(
+            &site.app,
+            site.session(),
+            None,
+            input("policy-reviewed", "save"),
+            request.clone(),
+        )
+        .await
+        .unwrap();
+        let post = receipt.post;
+        let w = receipt.editorial.unwrap();
+        editorial::decide(
+            &site.app,
+            &reviewer,
+            &post.id,
+            post.version,
+            w.version,
+            "approve",
+            "",
+        )
+        .await
+        .unwrap();
+        model.label = "Updated editorial definition".into();
+        schema::save_model(&site.app, "post", model, 2)
+            .await
+            .unwrap();
+        let mut publish = input("policy-reviewed", "publish");
+        publish.document = post.document.clone();
+        publish.version = post.version;
+        assert!(
+            content::save(&site.app, site.session(), Some(&post.id), publish.clone())
+                .await
+                .is_err(),
+            "Definition change must invalidate previous approval even without a content version change"
+        );
+        publish.action = "save".into();
+        let receipt = content::save_for_review(
+            &site.app,
+            site.session(),
+            Some(&post.id),
+            publish.clone(),
+            request.clone(),
+        )
+        .await
+        .unwrap();
+        let post = receipt.post;
+        let w = receipt.editorial.unwrap();
+        editorial::decide(
+            &site.app,
+            &reviewer,
+            &post.id,
+            post.version,
+            w.version,
+            "approve",
+            "",
+        )
+        .await
+        .unwrap();
+        publish.action = "publish".into();
+        publish.version = post.version;
+        let live = content::save(&site.app, site.session(), Some(&post.id), publish.clone())
+            .await
+            .unwrap();
+        publish.action = "save".into();
+        publish.version = live.version;
+        let receipt = content::save_for_review(
+            &site.app,
+            site.session(),
+            Some(&post.id),
+            publish.clone(),
+            request,
+        )
+        .await
+        .unwrap();
+        let post = receipt.post;
+        let w = receipt.editorial.unwrap();
+        editorial::decide(
+            &site.app,
+            &reviewer,
+            &post.id,
+            post.version,
+            w.version,
+            "approve",
+            "",
+        )
+        .await
+        .unwrap();
+        publish.action = "schedule".into();
+        publish.version = post.version;
+        publish.publish_at = wpalt::now() + 60;
+        let scheduled = content::save(&site.app, site.session(), Some(&post.id), publish.clone())
+            .await
+            .unwrap();
+        publish.action = "save".into();
+        publish.version = scheduled.version;
+        publish.publish_at = 0;
+        publish.title = "Unreviewed later edit".into();
+        let edited = content::save(&site.app, site.session(), Some(&post.id), publish)
+            .await
+            .unwrap();
+        assert_eq!(edited.status, "published");
+        assert_eq!(edited.publish_at, 0);
+        assert_eq!(edited.published_title, live.published_title);
+        assert_eq!(content::publish_due(&site.app).await.unwrap(), 0);
+        let revision: String = sqlx::query_scalar(
+            "SELECT id FROM revisions WHERE post_id=$1 ORDER BY version LIMIT 1",
+        )
+        .bind(&post.id)
+        .fetch_one(&site.app.db.pool)
+        .await
+        .unwrap();
+        let restored = content::restore_revision(
+            &site.app,
+            site.session(),
+            &post.id,
+            &revision,
+            edited.version,
+        )
+        .await
+        .unwrap();
+        let current = editorial::get(&site.app, &post.id).await.unwrap().unwrap();
+        assert_eq!(current.state, "draft");
+        assert_eq!(current.content_version, restored.version);
+        assert!(current.approved_by.is_empty());
+        assert_ne!(
+            get(&site.app, "/admin/editorial", None).await.0,
+            StatusCode::OK
+        );
+        let queue = get(
+            &site.app,
+            "/admin/editorial?scope=all&state=draft",
+            Some(&site.token),
+        )
+        .await;
+        assert_eq!(queue.0, StatusCode::OK);
+        assert!(queue.1.contains(&post.id));
         site.close().await;
     }
 }

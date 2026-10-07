@@ -34,6 +34,16 @@ if (editor) {
         status.textContent = 'Not saved';
       } else {
         for (const input of document.querySelectorAll('input[name=version]')) input.value = result.version;
+        const workflow=result.editorial;
+        if(workflow) {
+          for(const form of document.querySelectorAll('[data-review-decision]')) {
+            form.elements.content_version.value=result.version;
+            form.elements.workflow_version.value=workflow.version;
+            for(const button of form.querySelectorAll('button')) button.disabled=true;
+          }
+          const label=editor.querySelector('[data-editorial-state]');
+          if(label)label.textContent='Draft changed · request review again';
+        }
         error.hidden = true;
         if (!dirty) editor.dispatchEvent(new Event('wpalt:saved'));
         status.textContent = dirty ? 'Unsaved changes' : 'Draft saved · live page unchanged';
@@ -45,6 +55,9 @@ if (editor) {
       if (dirty && !conflicted) timer = setTimeout(autosave, 5000);
     }
   }
+  for(const form of document.querySelectorAll('[data-review-decision]')) form.addEventListener('submit',event=>{
+    if(dirty||saving||conflicted){event.preventDefault();error.hidden=false;error.textContent='Save or discard your working edits before deciding on the saved review.';}
+  });
   editor.addEventListener('submit', event => {
     clearTimeout(timer);
     if (saving || conflicted) {

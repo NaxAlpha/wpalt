@@ -10,6 +10,8 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 
 const CHILDREN: &[&str] = &[
+    "editorial_work",
+    "editorial_decisions",
     "revisions",
     "comments",
     "post_terms",
@@ -120,10 +122,19 @@ pub fn clone_package(config: &Config, encoded: &[u8], source: &str) -> Result<Pr
     // Password accounts and financial identities remain stable for owner review.
     // Sessions are deliberately excluded from all full-site recovery packages.
     snapshot.tables.get_mut("user_passkeys").unwrap().clear();
+    // Cloned presentation material must earn new approval on its destination.
+    for row in snapshot.tables.get_mut("editorial_work").unwrap() {
+        row.insert("state".into(), "draft".into());
+        row.insert("approved_by".into(), "".into());
+        row.insert(
+            "notes".into(),
+            "Cloned material needs a new review before publication.".into(),
+        );
+    }
     let payload =
         serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot serialize clone."))?;
     let bytes = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v12".into(),
+        format: "wpalt-backup-v13".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -354,7 +365,7 @@ pub fn prepare(config: &Config, encoded: &[u8], requested: &[String]) -> Result<
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Cannot serialize selected recovery graph."))?;
     let bytes = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v12".into(),
+        format: "wpalt-backup-v13".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })

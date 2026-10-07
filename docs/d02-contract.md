@@ -1,6 +1,6 @@
 # D02 — Reviewed publication and editorial assignments
 
-Date: 2026-10-06 (Tokyo). Active autonomous package after the verified D01 delivery. Implementation has not yet passed its delivery gates. This is a separate PR dependent on PR #17 until that PR is merged.
+Date: 2026-10-06 (Tokyo). Active autonomous package after the verified D01 delivery. Implementation has not yet passed its delivery gates. This is a separate PR following D01 PR #17, merged on 2026-10-07 as `051d319`. The owner authorizes merge when current-source delivery gates pass.
 
 ## End-user outcome
 

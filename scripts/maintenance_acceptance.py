@@ -5,7 +5,7 @@ The optional schema-14 fixture removes M9 deployment authority from a current se
 """
 import argparse, hashlib, json, os, socket, time, urllib.request, secrets, shutil, sqlite3, subprocess, tempfile, urllib.parse
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--binary',required=True);p.add_argument('--source-binary');p.add_argument('--source-schema',type=int,choices=[14,15],default=14);p.add_argument('--psql',default=shutil.which('psql'));a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--binary',required=True);p.add_argument('--source-binary');p.add_argument('--source-schema',type=int,choices=[14,15,16],default=14);p.add_argument('--psql',default=shutil.which('psql'));a=p.parse_args()
 binary=str(Path(a.binary).resolve());source_binary=str(Path(a.source_binary).resolve()) if a.source_binary else binary;env={k:v for k,v in os.environ.items() if not k.startswith('WPALT_')}
 root_url=os.environ.get('TEST_DATABASE_URL');schemas=[]
 def pg(statement,url=root_url):
@@ -31,7 +31,7 @@ try:
    assert sql('SELECT version FROM schema_version')==str(a.source_schema), 'Independent source must match the explicitly selected native schema'
    before=sql('SELECT COUNT(*) FROM posts');products=sql('SELECT COUNT(*) FROM shop_products')
    run('serve','--external-worker',ok=False);run('job-history',ok=False);assert sql('SELECT version FROM schema_version')==str(a.source_schema)
-   preview=json.loads(run('upgrade').stdout);assert preview['source_schema']==a.source_schema and preview['target_schema']==16 and not preview['executed']
+   preview=json.loads(run('upgrade').stdout);assert preview['source_schema']==a.source_schema and preview['target_schema']==17 and not preview['executed']
    assert sql('SELECT version FROM schema_version')==str(a.source_schema)
    key=root/'recovery.key';run('recovery-key',key)
    point=root/'point.enc';sql("UPDATE settings SET description='Changed after review'")
@@ -40,13 +40,17 @@ try:
    run('upgrade','--execute',preview['plan'],'--recovery-output',point,'--key-file',key,ok=False);assert point.read_bytes()==b'Owner record' and sql('SELECT version FROM schema_version')==str(a.source_schema);point.unlink()
    result=json.loads(run('upgrade','--execute',preview['plan'],'--recovery-output',point,'--key-file',key).stdout)
    assert result['executed'] and result['recovery_sha256']==hashlib.sha256(point.read_bytes()).hexdigest()
-   assert point.stat().st_mode&0o077==0 and sql('SELECT version FROM schema_version')=='16' and sql('SELECT COUNT(*) FROM process_authority')=='1'
+   assert point.stat().st_mode&0o077==0 and sql('SELECT version FROM schema_version')=='17' and sql('SELECT COUNT(*) FROM process_authority')=='1'
    assert sql('SELECT COUNT(*) FROM posts')==before and sql('SELECT COUNT(*) FROM shop_products')==products and sql('SELECT description FROM settings')=='Changed after review'
-   run('recovery-inspect',point,'--key-file',key)
+   run('recovery-inspect',point,'--key-file',key,'--source-format','12')
    # Interruption/retry: a failed precondition preserves schema/data and an exact
    # subsequent review succeeds. No old executable may open upgraded data.
    fresh_url=database(root,'restored',postgres);fresh=root/'restored.toml';fresh.write_text(f'database_url={json.dumps(fresh_url)}\ndata_dir={json.dumps(str(root/"restored"))}\n');fresh.chmod(0o600)
-   run('restore',point,'--key-file',key,config=fresh,executable=source_binary)
+   restore_point=point
+   if not a.source_binary:
+    restore_point=root/'converted.enc'
+    run('migrate-recovery-v12',point,restore_point,'--key-file',key)
+   run('restore',restore_point,'--key-file',key,config=fresh,executable=source_binary)
    recovered=root/'recovered.json';run('backup',recovered,config=fresh,executable=source_binary)
    graph=json.loads(json.loads(recovered.read_text())['payload'])
    assert len(graph['tables']['posts'])==int(before) and len(graph['tables']['shop_products'])==int(products)
