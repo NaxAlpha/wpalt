@@ -159,7 +159,28 @@ async fn render(
     };
     let copy = |p: &Post| -> Markup {
         let language = d.language(&p.locale).ok();
-        html! {section class="panel" lang=(p.locale) dir=(language.map(|l|l.direction.as_str()).unwrap_or("ltr")){h2 {(language.map(|l|l.label.as_str()).unwrap_or(p.locale.as_str()))}p {bdi {(p.status)} " · " (p.version)}h3 {(p.title)}pre class="translation-copy" {(crate::document::Document::parse(&p.document).map(|d|d.markdown()).unwrap_or_else(|_|p.body.clone()))}a class="button secondary" href=(format!("/admin/posts/{}",p.id)){"Edit this variant"}}}
+        let copied = p.id != source.id && p.document == source.document && p.title == source.title;
+        let text_locale = if copied { &source.locale } else { &p.locale };
+        let text_direction = d
+            .language(text_locale)
+            .map(|l| l.direction.as_str())
+            .unwrap_or("ltr");
+        let text = crate::document::Document::parse(&p.document)
+            .map(|d| d.markdown())
+            .unwrap_or_else(|_| p.body.clone());
+        let long = text.chars().count() > 600;
+        html! {section class="panel" lang=(p.locale) dir=(language.map(|l|l.direction.as_str()).unwrap_or("ltr")){
+            h2 {(language.map(|l|l.label.as_str()).unwrap_or(p.locale.as_str()))}
+            p lang="en" dir="ltr" {bdi {(p.status)} " · " (p.version)}
+            h3 lang=(text_locale) dir=(text_direction) {(p.title)}
+            @if copied {p class="notice" lang="en" dir="ltr" {"This draft still contains source-language text. Translate and review it before publishing."}}
+            div lang=(text_locale) dir=(text_direction) {
+                @if long {pre class="translation-copy" {(text.chars().take(320).collect::<String>()) "…"}
+                    details {summary lang="en" dir="ltr" {"Read complete saved document"}pre class="translation-copy" {(text)}}
+                } @else {pre class="translation-copy" {(text)}}
+            }
+            a class="button secondary" lang="en" dir="ltr" href=(format!("/admin/posts/{}",p.id)){"Edit this variant"}
+        }}
     };
     let body = html! {
     (view::heading("Publishing","Compare language variants","Each language publishes and earns editorial approval independently. Compare saved content before creating or updating a draft."))

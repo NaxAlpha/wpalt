@@ -7,6 +7,7 @@ pub mod elementor;
 pub mod events;
 pub mod fleet;
 mod html;
+pub mod i18n;
 pub mod integration_web;
 pub mod integrations;
 pub mod language_web;

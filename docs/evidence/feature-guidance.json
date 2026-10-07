@@ -2170,6 +2170,40 @@
         "Approval policy, canonical document, actor roles, scheduling, recovery graph or authoritative reference changes"
       ],
       "status": "verified-defined-local-scope; exact-head delivery gates on PR18"
+    },
+    {
+      "feature_id": "D03-01",
+      "area": "Connected language workspace and local interface catalogs",
+      "scope": "Exact source/target review, protected field synchronization, bounded bundled message catalogs and separate interface/content language authorities; persistence and model evaluation still in progress.",
+      "basis": "Primary W3C language guidance and internal authority contract; free plugin static inspection is reference semantics only.",
+      "sources": [
+        "https://www.w3.org/International/questions/qa-html-language-declarations.html",
+        "https://polylang.pro/documentation/support/guides/synchronize-metadatas-between-translations/",
+        "https://downloads.wordpress.org/plugin/polylang.3.8.10.zip"
+      ],
+      "applicable_versions": [
+        "Polylang 3.8.10 static source inspection only",
+        "wpalt native schema 17 / portable graph v13; D03 development in progress",
+        "Bundled interface catalog v1"
+      ],
+      "last_checked": "2026-10-07",
+      "next_review": "2027-01-05",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Current writer authority and exact saved material under a shared mutation boundary; private source cannot weaken target access policy.",
+        "Content language/direction remains independent of interface preference; untranslated sections retain their actual language.",
+        "Bounded local catalogs use stable IDs, English fallback and escaped user parameters."
+      ],
+      "tests": [
+        "language_workspace_requires_current_actor_and_exact_protected_review",
+        "translation_duplication_and_selected_sync_preserve_reviewed_language_authority",
+        "interface_catalog_preserves_safe_fallback_and_language_grammar; additional connected/browser/recovery/model tests pending"
+      ],
+      "triggers": [
+        "Affected language, catalog, access, canonical document, plugin source or authoritative guidance changes"
+      ],
+      "status": "reviewed-in-development; not complete localization or parity evidence"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."
