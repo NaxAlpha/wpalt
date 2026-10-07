@@ -13,7 +13,9 @@ async function geometry(page) {
   await page.waitForLoadState("load");
   await page.evaluate(async () => {
     await document.fonts.ready;
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
   });
   return page.evaluate((c) => {
     const failures = [],
@@ -114,12 +116,15 @@ async function geometry(page) {
         const rtl = document.documentElement.dir === "rtl";
         check(
           rtl
-            ? near(rect(main).x, 0) && near(rect(main).x + rect(main).width, rect(side).x)
+            ? near(rect(main).x, 0) &&
+                near(rect(main).x + rect(main).width, rect(side).x)
             : near(rect(main).x, rect(side).x + rect(side).width),
           "workspace/sidebar overlap",
         );
         check(
-          rtl ? near(rect(side).x + rect(side).width, innerWidth) : near(rect(side).x, 0),
+          rtl
+            ? near(rect(side).x + rect(side).width, innerWidth)
+            : near(rect(side).x, 0),
           "sidebar direction placement drift",
         );
       }

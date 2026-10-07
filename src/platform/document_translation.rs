@@ -55,7 +55,7 @@ fn visit(node: &Node, path: &str, protected: bool, out: &mut Vec<Segment>) {
         protected || node.kind == "code_block" || node.marks.iter().any(|m| m.kind == "code");
     if !protected
         && let Some(text) = &node.text
-        && !text.trim().is_empty()
+        && text.chars().any(char::is_alphabetic)
     {
         for (part, text) in chunks(text).into_iter().enumerate() {
             out.push(Segment {
@@ -101,10 +101,12 @@ pub fn replace(document: &Document, replacements: &[Segment]) -> Result<Document
             ));
         }
         let path = source.id.rsplit_once(':').unwrap().0;
-        by_path
-            .entry(path.into())
-            .or_default()
-            .push_str(&replacement.text);
+        let value = by_path.entry(path.into()).or_default();
+        let leading = source.text.len() - source.text.trim_start().len();
+        let trailing = source.text.trim_end().len();
+        value.push_str(&source.text[..leading]);
+        value.push_str(replacement.text.trim());
+        value.push_str(&source.text[trailing..]);
     }
     fn apply(node: &mut Node, path: &str, values: &BTreeMap<String, String>) {
         if let Some(value) = values.get(path) {

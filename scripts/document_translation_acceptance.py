@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'examples/integrations'))
 from local_ai_worker import request, canonical, digest
+from document_translation_worker import proposal
 parser=argparse.ArgumentParser();parser.add_argument('--binary',default='target/debug/wpalt');parser.add_argument('--ollama');parser.add_argument('--model',default='qwen3:1.7b');parser.add_argument('--output',default='work/d03-document-translation-reference.json');args=parser.parse_args()
 binary=Path(args.binary).resolve()
 # Synthetic publication, no private reference content. Facts recur in distinct contexts.
@@ -43,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-canonical-translation-') as tmp:
     if fail_once[0]:
      fail_once[0]=False;self.send_response(503);self.end_headers();return
     assert not self.headers.get('Authorization');data=json.loads(self.rfile.read(int(self.headers['Content-Length'])));observed.append(data);assert data['think'] is False and data['stream'] is False
-    text=data['prompt'].split('\nText: ',1)[1];self.reply({'response':json.dumps({'text':'Traduction '+text}), 'done_reason':'stop','eval_count':1})
+    text=data['prompt'].split('\nText: ',1)[1];self.reply({'response':json.dumps({'text':'Traduction '+text}), 'done':True,'done_reason':'stop','eval_count':1})
   model_server=ThreadingHTTPServer(('127.0.0.1',0),Model);threading.Thread(target=model_server.serve_forever,daemon=True).start();ai=f'http://127.0.0.1:{model_server.server_port}'
  else:ai=args.ollama
  workspace=root/'proposal';worker=ROOT/'examples/integrations/document_translation_worker.py'
@@ -67,8 +68,19 @@ with tempfile.TemporaryDirectory(prefix='wpalt-canonical-translation-') as tmp:
   external('resume',workspace)
   state=json.loads((workspace/'state.json').read_text());assert all(state['completed'][k]==v for k,v in first.items());assert len(state['completed'])==len(state['source']['segments'])
   inspected=json.loads(external('inspect',workspace).stdout);assert len(inspected['plan'])==64
+  payload=proposal(state)
+  def denied(payload,credential=token,extra=None,status=403):
+   headers={'Authorization':'Bearer '+credential,'Content-Type':'application/json'};headers.update(extra or {})
+   req=urllib.request.Request(site+'/api/v1/translations',data=canonical(payload),headers=headers)
+   try:urllib.request.urlopen(req,timeout=10);raise AssertionError('Unsafe proposal admitted')
+   except urllib.error.HTTPError as error:assert error.code==status,(error.code,status)
+  denied(payload,credential='0'*64)
+  denied(payload,extra={'Cookie':'wpalt_session=forged'})
+  denied(payload,extra={'Origin':'https://foreign.example'})
+  denied({**payload,'segments':[]},status=422)
+  denied({**payload,'action':'publish'},status=422)
   assert (workspace/'state.json').stat().st_mode&0o077==0
-  html=Path(inspected['review']).read_text();assert '<script' not in html and '<pre>' in html
+  html=Path(inspected['review']).read_text();assert '<script' not in html and '<pre lang=' in html
   external('apply',workspace,'--execute','0'*64,ok=False)
   applied=json.loads(external('apply',workspace,'--execute',inspected['plan']).stdout);assert applied['status']=='draft'
   external('apply',workspace,'--execute',inspected['plan'],ok=False)
@@ -85,7 +97,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-canonical-translation-') as tmp:
   generated='\n'.join(s['text'] for s in [{'text':state['title']},*[{'text':state['completed'][s['id']]} for s in state['source']['segments']]])
   facts=['ABC-123','09:30','17:00','10:15','24','120','MAP-2026-A','12:00','4.50','RAIN-17','08:45','TOOL-204','GARDEN-2026-10']
   missing=[fact for fact in facts if fact not in generated]
-  output={'format':'wpalt-canonical-translation-reference-v1','actual_model':bool(args.ollama),'binary_sha256':digest(binary.read_bytes()),'model':{'name':args.model,'digest':state['model_digest']},'source_bytes':len(body.encode()),'source_segments':len(state['source']['segments']),'generation_seconds':time.perf_counter()-start,'model_metrics':state['metrics'],'missing_exact_fact_markers':missing,'synthetic_translated_title':state['title'],'synthetic_translated_segments':[{'id':s['id'],'source':s['text'],'translation':state['completed'][s['id']]} for s in state['source']['segments']],'assertions':['resumable checkpoints retained','incomplete and changed plans refused','source unchanged','reviewed private draft','canonical structure code and references preserved','duplicate retry refused'],'quality_boundary':'Exact marker preservation is a limited diagnostic, not fluent or factual translation certification. Human review remains mandatory.'}
+  output={'format':'wpalt-canonical-translation-reference-v1','actual_model':bool(args.ollama),'binary_sha256':digest(binary.read_bytes()),'model':{'name':args.model,'digest':state['model_digest']},'source_bytes':len(body.encode()),'source_segments':len(state['source']['segments']),'generation_seconds':time.perf_counter()-start,'model_metrics':state['metrics'],'missing_exact_fact_markers':missing,'synthetic_translated_title':state['title'],'synthetic_translated_segments':[{'id':s['id'],'source':s['text'],'translation':state['completed'][s['id']]} for s in state['source']['segments']],'assertions':['resumable checkpoints retained','incomplete and changed plans refused','source unchanged','reviewed private draft','canonical structure code and references preserved','duplicate retry refused','invalid credentials cookie foreign origin incomplete set and publication escalation refused'],'quality_boundary':'Exact marker preservation is a limited diagnostic, not fluent or factual translation certification. Human review remains mandatory.'}
   Path(args.output).parent.mkdir(parents=True,exist_ok=True);Path(args.output).write_text(json.dumps(output,ensure_ascii=False,indent=2));print(json.dumps({'pass':True,'actual_model':bool(args.ollama),'source_bytes':len(body.encode()),'segments':len(state['source']['segments']),'missing_exact_fact_markers':missing,'output':args.output}))
  finally:
   server.terminate();server.wait(timeout=15);logfile.close()

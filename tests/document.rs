@@ -163,6 +163,24 @@ fn long_document_translation_preserves_structure_and_requires_complete_text_revi
     );
     proposed[0].text = "x".repeat(8193);
     assert!(replace(&document, &proposed).is_err());
+    let boundaries = wpalt::document::import("Read [the map](/map). At `09:30`.", "[]").unwrap();
+    let mut replacements = segments(&boundaries).unwrap();
+    assert!(
+        replacements
+            .iter()
+            .all(|s| s.text.chars().any(char::is_alphabetic))
+    );
+    for item in &mut replacements {
+        item.text = match item.text.trim() {
+            "Read" => "Lire",
+            "the map" => "le plan",
+            ". At" => ". À",
+            _ => panic!("Unexpected model authority: {}", item.text),
+        }
+        .into();
+    }
+    let projected = replace(&boundaries, &replacements).unwrap().markdown();
+    assert_eq!(projected.trim(), "Lire [le plan](/map). À `09:30`.");
     let huge = wpalt::document::import(&"文".repeat(50_000), "[]").unwrap();
     assert!(segments(&huge).is_err());
 }

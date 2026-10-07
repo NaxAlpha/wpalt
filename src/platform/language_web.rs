@@ -79,7 +79,7 @@ async fn index(
     let body = html! {(localized_heading(catalog,"language.title","Compare language variants and review deliberate draft duplication or shared-value synchronization."))
     form method="get" class="toolbar" {label {"Content language" select name="locale" {option value="" lang=(catalog.locale()) {(catalog.text("language.all"))}@for l in &d.languages{option value=(l.code) selected[filter.locale==l.code] {(l.label)}}}}button class="secondary" {"Show content"}}
     p lang=(catalog.locale()) dir=(catalog.direction()) {(catalog.content_count(rows.len().min(40) as u64))}
-    section class="panel" {@if rows.is_empty(){p {(t("language.empty"))}}@for r in rows.iter().take(40){article {h2 {a href=(format!("/admin/languages/{}",r.get::<String,_>("id"))) {(r.get::<String,_>("title"))}}p {bdi {(r.get::<String,_>("locale"))} " · " (r.get::<String,_>("status"))}p class="muted" {(if r.get::<String,_>("translation_group").is_empty(){"Save a translation group in the editor to connect variants."}else{"Open to compare linked variants."})}}}}
+    section class="panel" {@if rows.is_empty(){p {(t("language.empty"))}}@for r in rows.iter().take(40){article {@let content_locale=r.get::<String,_>("locale");@let direction=d.language(&content_locale).map_or("ltr",|l|l.direction.as_str());h2 lang=(content_locale) dir=(direction) {a href=(format!("/admin/languages/{}",r.get::<String,_>("id"))) {(r.get::<String,_>("title"))}}p {bdi {(r.get::<String,_>("locale"))} " · " (r.get::<String,_>("status"))}p class="muted" {(if r.get::<String,_>("translation_group").is_empty(){"Save a translation group in the editor to connect variants."}else{"Open to compare linked variants."})}}}}
     @if rows.len()>40{@let r=&rows[39];a class="button secondary" href=(format!("/admin/languages?locale={}&after={}:{}",filter.locale,r.get::<i64,_>("updated_at"),r.get::<String,_>("id"))) {(t("language.older"))}}
     };
     Ok(Html(view::layout(
@@ -164,7 +164,16 @@ async fn render(
     };
     let copy = |p: &Post| -> Markup {
         let language = d.language(&p.locale).ok();
-        let copied = p.id != source.id && p.document == source.document && p.title == source.title;
+        let copied = p.id != source.id && p.document == source.document;
+        let copied_title = p.id != source.id && p.title == source.title;
+        let title_locale = if copied_title {
+            &source.locale
+        } else {
+            &p.locale
+        };
+        let title_direction = d
+            .language(title_locale)
+            .map_or("ltr", |l| l.direction.as_str());
         let text_locale = if copied { &source.locale } else { &p.locale };
         let text_direction = d
             .language(text_locale)
@@ -177,8 +186,8 @@ async fn render(
         html! {section class="panel" lang=(p.locale) dir=(language.map(|l|l.direction.as_str()).unwrap_or("ltr")){
             h2 {(language.map(|l|l.label.as_str()).unwrap_or(p.locale.as_str()))}
             p lang="en" dir="ltr" {bdi {(p.status)} " · " (p.version)}
-            h3 lang=(text_locale) dir=(text_direction) {(p.title)}
-            @if copied {p class="notice" lang="en" dir="ltr" {"This draft still contains source-language text. Translate and review it before publishing."}}
+            h3 lang=(title_locale) dir=(title_direction) {(p.title)}
+            @if copied || copied_title {p class="notice" lang="en" dir="ltr" {"The title or document still matches the source. Review its language before publishing."}}
             div lang=(text_locale) dir=(text_direction) {
                 @if long {pre class="translation-copy" {(text.chars().take(320).collect::<String>()) "…"}
                     details {summary lang="en" dir="ltr" {"Read complete saved document"}pre class="translation-copy" {(text)}}

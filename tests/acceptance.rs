@@ -7697,8 +7697,34 @@ async fn assigned_review_binds_material_and_recovers_without_public_note_leaks()
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
             14
         );
+        // The explicit previous graph conversion retains meaningful private review history.
+        let mut previous: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let mut old_graph: serde_json::Value =
+            serde_json::from_str(previous["payload"].as_str().unwrap()).unwrap();
+        assert!(
+            !old_graph["tables"]["editorial_decisions"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        let decisions = old_graph["tables"]["editorial_decisions"].clone();
+        old_graph["schema"] = 13.into();
+        old_graph["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("user_preferences");
+        let encoded = old_graph.to_string();
+        previous["format"] = "wpalt-backup-v13".into();
+        previous["sha256"] = auth::digest(encoded.as_bytes()).into();
+        previous["payload"] = encoded.into();
+        let converted =
+            backup::migrate_v13(&site.app.config, &serde_json::to_vec(&previous).unwrap()).unwrap();
+        let converted_envelope: serde_json::Value = serde_json::from_slice(&converted).unwrap();
+        let converted_graph: serde_json::Value =
+            serde_json::from_str(converted_envelope["payload"].as_str().unwrap()).unwrap();
+        assert_eq!(converted_graph["tables"]["editorial_decisions"], decisions);
         let recovered = Site::new(pg, false).await;
-        backup::restore(&recovered.app, &bytes).await.unwrap();
+        backup::restore(&recovered.app, &converted).await.unwrap();
         assert_eq!(
             editorial::get(&recovered.app, &post.id)
                 .await
@@ -8673,6 +8699,32 @@ async fn canonical_translation_drafts_are_atomic_private_and_recoverable() {
             .await
             .is_err()
         );
+        let policy_id = uuid::Uuid::new_v4().to_string();
+        sqlx::query("INSERT INTO member_policies(id,title,entitlement) VALUES($1,'Protected source','canonical-member')").bind(&policy_id).execute(&site.app.db.pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('post',$1,$2)",
+        )
+        .bind(&source.id)
+        .bind(&policy_id)
+        .execute(&site.app.db.pool)
+        .await
+        .unwrap();
+        let mut restricted = proposal.clone();
+        restricted["slug"] = "restricted-canonical-french".into();
+        assert!(
+            translations::apply(
+                &site.app,
+                &actor,
+                serde_json::from_value(restricted).unwrap()
+            )
+            .await
+            .is_err()
+        );
+        sqlx::query("DELETE FROM member_resources WHERE resource_id=$1")
+            .bind(&source.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
         let bytes = backup::capture(&site.app).await.unwrap();
         let fresh = Site::new(pg, false).await;
         backup::restore(&fresh.app, &bytes).await.unwrap();

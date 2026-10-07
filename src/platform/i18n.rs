@@ -30,6 +30,7 @@ fn bundle() -> &'static Bundle {
             assert!(l.messages.len() <= 512);
             for (id, text) in &l.messages {
                 assert!(id.len() <= 80 && text.len() <= 4096);
+                assert!(text.matches("{value}").count() <= 1);
                 let literal = text.replace("{value}", "");
                 assert!(!literal.contains(['{', '}']));
             }

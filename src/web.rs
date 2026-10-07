@@ -311,8 +311,8 @@ async fn security_and_trace_inner(
         && auth::same_origin(&app, request.headers()).is_err()
         && !capability_navigation(&route, request.headers())
         && !(method == axum::http::Method::POST && route == "/commerce/stripe/webhook")
-        && !((route == "/api/v1/content" && method == axum::http::Method::POST)
-            || (route == "/api/v1/translations" && method == axum::http::Method::POST)
+        && !((matches!(route.as_str(), "/api/v1/content" | "/api/v1/translations")
+            && method == axum::http::Method::POST)
             || (route == "/api/v1/content/{id}" && method == axum::http::Method::PUT))
     {
         Error::forbidden().into_response()
