@@ -9,6 +9,7 @@ pub mod fleet;
 mod html;
 pub mod integration_web;
 pub mod integrations;
+pub mod language_web;
 pub mod local_processes;
 pub mod modules;
 pub mod translations;

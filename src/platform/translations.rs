@@ -18,8 +18,33 @@ pub struct Request<'a> {
 }
 
 /// CLI owns the exclusive stopped-site lifecycle lock. Existing native save owns validation,
-/// version conflicts, revisions and events. No server API calls this offline workflow.
+/// version conflicts, revisions and events. HTTP uses prepare_as with its actual session.
 pub async fn prepare(app: &App, request: Request<'_>) -> Result<Value> {
+    let owner = sqlx::query(
+        "SELECT id,email,name,role FROM users WHERE role='admin' ORDER BY created_at,id LIMIT 1",
+    )
+    .fetch_optional(&app.db.pool)
+    .await?
+    .ok_or_else(Error::forbidden)?;
+    let session = Session {
+        user: User {
+            id: owner.get("id"),
+            email: owner.get("email"),
+            name: owner.get("name"),
+            role: owner.get("role"),
+        },
+        csrf: String::new(),
+        hash: String::new(),
+    };
+    prepare_as(app, &session, request).await
+}
+/// Browser workflows use the actual current session, never the stopped CLI owner.
+pub async fn prepare_as(app: &App, session: &Session, request: Request<'_>) -> Result<Value> {
+    let guard = app.mutation().await?;
+    auth::current_editor(app, session).await?;
+    if session.hash.starts_with("integration:") {
+        return Err(Error::forbidden());
+    }
     let Request {
         source,
         locale,
@@ -58,6 +83,16 @@ pub async fn prepare(app: &App, request: Request<'_>) -> Result<Value> {
         if restricted != 0 {
             return Err(Error::invalid(
                 "Restricted-source duplication requires an explicitly provisioned target access policy; create the protected target first and synchronize selected fields.",
+            ));
+        }
+    }
+    // Synchronization must not transfer protected fields into a weaker target policy.
+    if let Some(existing) = &existing {
+        let missing: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM member_resources source WHERE source.kind='post' AND source.resource_id=$1 AND NOT EXISTS(SELECT 1 FROM member_resources target WHERE target.kind='post' AND target.resource_id=$2 AND target.policy_id=source.policy_id)")
+            .bind(&source.id).bind(&existing.id).fetch_one(&app.db.pool).await?;
+        if missing != 0 {
+            return Err(Error::invalid(
+                "Provision every source access policy on the target before synchronizing protected values.",
             ));
         }
     }
@@ -144,25 +179,16 @@ pub async fn prepare(app: &App, request: Request<'_>) -> Result<Value> {
             .map_err(|_| Error::invalid("Cannot review translation plan."))?,
     );
     let mut report = json!({"format":"wpalt-translation-plan-v1","plan":plan,"source_id":source.id,"source_version":source.version,"target_id":target,"locale":locale,"slug":slug,"selected_fields":fields,"executed":false,
-        "boundary":"Stopped-site exact review. Duplication creates an unscheduled draft with untranslated source text; translated SEO must be authored separately. Synchronization copies only explicitly named fields, preserving translated text, slug, SEO, taxonomy, publication and access rules. No background overwrite or automatic publication."});
+        "boundary":"Exact source/target review under one mutation boundary. Duplication creates an unscheduled draft with untranslated source text; translated SEO must be authored separately. Synchronization copies only explicitly named fields, preserving translated text, slug, SEO, taxonomy, publication and access rules. No background overwrite or automatic publication."});
     if let Some(reviewed) = execute {
         if reviewed != plan {
             return Err(Error::invalid(
                 "Source, target or selection changed; review a fresh translation plan.",
             ));
         }
-        let owner=sqlx::query("SELECT id,email,name,role FROM users WHERE role='admin' ORDER BY created_at,id LIMIT 1").fetch_optional(&app.db.pool).await?.ok_or_else(Error::forbidden)?;
-        let session = Session {
-            user: User {
-                id: owner.get("id"),
-                email: owner.get("email"),
-                name: owner.get("name"),
-                role: owner.get("role"),
-            },
-            csrf: String::new(),
-            hash: String::new(),
-        };
-        let result = content::save(app, &session, target, input).await?;
+        let result = content::save_guarded(app, session, target, input, None, &guard)
+            .await?
+            .post;
         report["executed"] = true.into();
         report["result"] = json!({"id":result.id,"version":result.version,"status":result.status});
     }

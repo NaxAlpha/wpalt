@@ -8190,3 +8190,180 @@ async fn populated_editorial_queue_pages_every_assignment_with_bounded_history_a
     )
     .unwrap();
 }
+
+/// Connected translation review uses the current writer, exact versions, and protected access.
+#[tokio::test]
+async fn language_workspace_requires_current_actor_and_exact_protected_review() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        multilingual(&site).await;
+        auth::add_user(
+            &site.app,
+            "writer@example.test",
+            "Language writer",
+            "editor",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (token, writer) = auth::login(&site.app, "writer@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let mut source_input = input("connected-source", "publish");
+        source_input.translation_group = "connected-family".into();
+        let source = content::save(&site.app, site.session(), None, source_input.clone())
+            .await
+            .unwrap();
+        let path = format!("/api/admin/translations/{}", source.id);
+        let mut operation =
+            serde_json::json!({"csrf":writer.csrf,"locale":"fr","slug":"connected-fr"});
+        let (status, _, bytes) = request(
+            &site.app,
+            "POST",
+            &path,
+            Some(&token),
+            "application/json",
+            serde_json::to_vec(&operation).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let preview: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        operation["execute"] = preview["plan"].clone();
+        let (status, _, bytes) = request(
+            &site.app,
+            "POST",
+            &path,
+            Some(&token),
+            "application/json",
+            serde_json::to_vec(&operation).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let created: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let target = content::get(&site.app, created["result"]["id"].as_str().unwrap())
+            .await
+            .unwrap();
+        assert_eq!(
+            target.author_id, writer.user.id,
+            "HTTP must not impersonate the CLI owner"
+        );
+        assert_eq!(target.status, "draft");
+        assert_eq!(
+            get(&site.app, "/fr/connected-fr", None).await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert_ne!(
+            request(
+                &site.app,
+                "POST",
+                &path,
+                Some(&token),
+                "application/json",
+                serde_json::to_vec(&operation).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::OK,
+            "A reviewed new-draft plan cannot create duplicates"
+        );
+        let (status, html) = get(
+            &site.app,
+            &format!("/admin/languages/{}?target={}", source.id, target.id),
+            Some(&token),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains("Compare language variants") && html.contains("lang=\"fr\""));
+        let mut sync = serde_json::json!({"csrf":writer.csrf,"locale":"fr","slug":target.slug,"target":target.id,"fields":["featured"]});
+        let (status, _, bytes) = request(
+            &site.app,
+            "POST",
+            &path,
+            Some(&token),
+            "application/json",
+            serde_json::to_vec(&sync).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        sync["execute"] =
+            serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()["plan"].clone();
+        source_input.version = source.version;
+        source_input.action = "save".into();
+        source_input.body = "A new source revision invalidates the reviewed plan.".into();
+        content::save(&site.app, site.session(), Some(&source.id), source_input)
+            .await
+            .unwrap();
+        assert_ne!(
+            request(
+                &site.app,
+                "POST",
+                &path,
+                Some(&token),
+                "application/json",
+                serde_json::to_vec(&sync).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        assert_eq!(
+            content::get(&site.app, &target.id).await.unwrap().version,
+            target.version
+        );
+        sync.as_object_mut().unwrap().remove("execute");
+        sqlx::query(
+            "INSERT INTO member_policies(id,title) VALUES('language-policy','Protected original')",
+        )
+        .execute(&site.app.db.pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('post',$1,'language-policy')").bind(&source.id).execute(&site.app.db.pool).await.unwrap();
+        assert_ne!(
+            request(
+                &site.app,
+                "POST",
+                &path,
+                Some(&token),
+                "application/json",
+                serde_json::to_vec(&sync).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::OK,
+            "Protected fields cannot flow to an unprotected target"
+        );
+        sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('post',$1,'language-policy')").bind(&target.id).execute(&site.app.db.pool).await.unwrap();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &path,
+                Some(&token),
+                "application/json",
+                serde_json::to_vec(&sync).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        sqlx::query("UPDATE users SET role='subscriber' WHERE id=$1")
+            .bind(&writer.user.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &path,
+                Some(&token),
+                "application/json",
+                serde_json::to_vec(&sync).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        site.close().await;
+    }
+}

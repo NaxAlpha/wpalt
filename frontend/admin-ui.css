@@ -838,3 +838,11 @@ body.admin .media-card video {
 .admin .migration-review {
   overflow-wrap: anywhere;
 }
+
+/* Saved language comparison preserves reflow without interpreting user text. */
+.admin .translation-copy {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  max-width: 100%;
+}
