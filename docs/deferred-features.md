@@ -24,11 +24,11 @@ Verifiable future outcome: Create hierarchical content, edit typed values and pr
 
 ### D02 — Editorial workflow
 
-Origin: **M1–M2** · Catalog: **F007/F021** · Status: **resumed; implementation and verification pending**
+Origin: **M1–M2** · Catalog: **F007/F021** · Status: **defined assigned-review system locally verified; final delivery gates on PR #18**
 
-Active [editorial-workflow contract](d02-contract.md), [approval decision](decisions/0016-editorial-approval-boundary.md) and [free reference investigation](evidence/d02-reference.md).
+Active [editorial-workflow contract](d02-contract.md), [approval decision](decisions/0016-editorial-approval-boundary.md) and [free reference investigation](evidence/d02-reference.md), [verification](evidence/d02-verification.md) and [PR #18](https://github.com/NaxAlpha/wpalt/pull/18).
 
-Explicit review/approval states, richer assignments/notifications and role-specific publication transitions beyond safe drafts/private response notes.
+Assigned exact-material review, private actionable queue/notes, bounded history and publication/schedule authority are verified in D02. Configurable multi-stage/multi-approver policy, large-team reviewer search and custom contributor capabilities remain explicit future breadth; external email transport is optional owner configuration.
 
 Verifiable future outcome: An author requests review; an authorized reviewer approves/rejects; stale approval cannot publish changed work.
 

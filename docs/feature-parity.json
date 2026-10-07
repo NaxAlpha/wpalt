@@ -132,8 +132,14 @@
         "m2-contract.md",
         "evidence/m2-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d02-contract.md",
+        "evidence/d02-progress.md",
+        "../src/editorial.rs",
+        "../scripts/editorial_acceptance.cjs",
+        "evidence/d02-verification.md"
+      ],
+      "d02_coverage": "Per-model assigned review of exact canonical content/metadata under current schema policy; atomic save/request, private indexed queue/notes, bounded decision history, version conflicts, current-participant rechecks, schedule cancellation, portable recovery and explicit native maintenance. Defined local journeys verified; final-head delivery/merge status on PR #18; not custom contributor roles, universal multi-stage approval or paid-plugin parity."
     },
     {
       "id": "F008",
@@ -370,8 +376,14 @@
         "../tests/business_rules.rs",
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
-        "../scripts/workflows_acceptance.cjs"
-      ]
+        "../scripts/workflows_acceptance.cjs",
+        "d02-contract.md",
+        "evidence/d02-progress.md",
+        "../src/editorial.rs",
+        "../scripts/editorial_acceptance.cjs",
+        "evidence/d02-verification.md"
+      ],
+      "d02_coverage": "Per-model assigned review of exact canonical content/metadata under current schema policy; atomic save/request, private indexed queue/notes, bounded decision history, version conflicts, current-participant rechecks, schedule cancellation, portable recovery and explicit native maintenance. Defined local journeys verified; final-head delivery/merge status on PR #18; not custom contributor roles, universal multi-stage approval or paid-plugin parity."
     },
     {
       "id": "F022",
@@ -950,7 +962,7 @@
       "status": "verified-local-defined-M5-scope; exact-CI-and-artifact-status-on-PR-10",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2–8 choices), 1–10 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
+      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2\u20138 choices), 1\u201310 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
       "evidence": [
         "m5-contract.md",
         "membership-learning.md",
@@ -1253,7 +1265,7 @@
       "status": "M7-verified-defined-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0–3600 seconds, default revalidation. Private/publication browser responses no-store.",
+      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0\u20133600 seconds, default revalidation. Private/publication browser responses no-store.",
       "evidence": [
         "resilient-operations.md",
         "../tests/acceptance.rs",

@@ -50,6 +50,25 @@ module.exports=async(owner,publicContext,origin,output)=>{
   await submit(page,page.getByRole('button',{name:'Save draft',exact:true}));
   const postId=editorUrl.split('/').pop();response=await owner.request.get(origin+'/api/admin/editorial/'+postId);assert.equal(response.status(),200);assert.equal((await response.json()).state,'draft');
   response=await publicContext.request.get(origin+'/reviewed-editorial-story');const stillLive=await response.text();assert(stillLive.includes('EDITORIAL_EXACT_WORKING_COPY'));assert(!stillLive.includes('EDITORIAL_UNREVIEWED_NEW_WORK'));
+  // Native forms remain usable without the rich editor or autosave scripts.
+  const nativeContext=await owner.browser().newContext({javaScriptEnabled:false,storageState:await owner.storageState(),viewport:{width:320,height:1000}});
+  try {
+    const native=await nativeContext.newPage();await native.goto(origin+'/admin/posts/new');
+    await native.getByLabel('Title',{exact:true}).fill('Native reviewed story');
+    await native.getByLabel('URL slug',{exact:true}).fill('native-reviewed-story');
+    await native.getByRole('textbox',{name:'Content',exact:true}).fill('NATIVE_REVIEW_DOCUMENT');
+    await native.locator('[data-editorial-pane] summary').click();
+    await native.getByLabel('Reviewer',{exact:true}).selectOption(reviewer);
+    await native.getByLabel('Private review note',{exact:true}).fill('NATIVE_PRIVATE_REVIEW');
+    await submit(native,native.getByRole('button',{name:'Save & request review',exact:true}));
+    const nativeId=native.url().split('/').pop();const receipt=await owner.request.get(origin+'/api/admin/editorial/'+nativeId);
+    assert.equal(receipt.status(),200);assert.equal((await receipt.json()).state,'pending');
+    assert.equal((await publicContext.request.get(origin+'/native-reviewed-story')).status(),404);
+    await review.goto(origin+'/admin/posts/'+nativeId);await review.getByText('NATIVE_PRIVATE_REVIEW',{exact:true}).first().waitFor();
+    await submit(review,review.getByRole('button',{name:'Approve saved content',exact:true}));
+    await native.reload();await submit(native,native.getByRole('button',{name:'Publish now',exact:true}));
+    const published=await publicContext.request.get(origin+'/native-reviewed-story');assert.equal(published.status(),200);const body=await published.text();assert(body.includes('NATIVE_REVIEW_DOCUMENT'));assert(!body.includes('NATIVE_PRIVATE_REVIEW'));
+  } finally {await nativeContext.close();}
   assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);
   fs.writeFileSync(path.join(output,'d02-editorial-measurements.json'),JSON.stringify({browser:owner.browser().version(),measurements,accessibility,errors,remote},null,2));
   console.log('PASS: assigned editorial review, exact live projection, private feedback, approval invalidation and responsive queue/decision controls');

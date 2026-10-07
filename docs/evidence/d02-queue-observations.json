@@ -1,0 +1,48 @@
+[
+  {
+    "debug_in_process_router_ms": {
+      "max": 7.920625,
+      "p50": 5.046333,
+      "p95": 5.846625
+    },
+    "engine": "sqlite",
+    "limits": "Single-client debug in-process router; timings are observations, not network/browser/production SLOs. Actual engine plans may choose a small-table scan.",
+    "matching": 101,
+    "pages": 3,
+    "plan": [
+      "SEARCH w USING INDEX editorial_assignment (assigned_to=? AND state=?)",
+      "SEARCH p USING INDEX sqlite_autoindex_posts_1 (id=?)"
+    ],
+    "records": 1001,
+    "retained_decisions": 20
+  },
+  {
+    "debug_in_process_router_ms": {
+      "max": 6.511417000000001,
+      "p50": 5.735083,
+      "p95": 6.372458999999999
+    },
+    "engine": "postgres",
+    "limits": "Single-client debug in-process router; timings are observations, not network/browser/production SLOs. Actual engine plans may choose a small-table scan.",
+    "matching": 101,
+    "pages": 3,
+    "plan": [
+      "Limit  (cost=0.55..16.61 rows=1 width=176) (actual time=0.009..0.099 rows=41 loops=1)",
+      "  Buffers: shared hit=167",
+      "  ->  Nested Loop  (cost=0.55..16.61 rows=1 width=176) (actual time=0.009..0.097 rows=41 loops=1)",
+      "        Buffers: shared hit=167",
+      "        ->  Index Scan Backward using editorial_assignment on editorial_work w  (cost=0.28..8.30 rows=1 width=112) (actual time=0.005..0.030 rows=41 loops=1)",
+      "              Index Cond: ((assigned_to = '<isolated-reviewer-id>'::text) AND (state = 'pending'::text))",
+      "              Buffers: shared hit=44",
+      "        ->  Index Scan using posts_pkey on posts p  (cost=0.28..8.29 rows=1 width=96) (actual time=0.001..0.001 rows=1 loops=41)",
+      "              Index Cond: (id = w.post_id)",
+      "              Buffers: shared hit=123",
+      "Planning:",
+      "  Buffers: shared hit=4",
+      "Planning Time: 0.114 ms",
+      "Execution Time: 0.108 ms"
+    ],
+    "records": 1001,
+    "retained_decisions": 20
+  }
+]

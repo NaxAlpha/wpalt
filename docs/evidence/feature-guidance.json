@@ -2150,7 +2150,7 @@
       ],
       "applicable_versions": [
         "PublishPress Statuses 1.3.6 source inspection only",
-        "wpalt native schema 17 / portable graph v13 in development"
+        "wpalt native schema 17 / portable graph v13"
       ],
       "last_checked": "2026-10-06",
       "next_review": "2027-01-04",
@@ -2162,14 +2162,14 @@
         "Explicit stopped migration and offline converter retain original pre-change recovery authority."
       ],
       "tests": [
-        "assigned_review_binds_material_and_recovers_without_public_note_leaks",
-        "review_schedule_rechecks_revocation_and_parallel_decisions_have_one_winner",
-        "D02 integrated native/browser verification pending"
+        "Four D02 SQLite/PostgreSQL approval, race, policy/revision/schedule and populated queue clusters",
+        "96 cumulative Rust cases, 11 pipeline cases, CLI and actual old-executable maintenance",
+        "Native/rich editorial and cumulative single-node/two-node Chrome journeys; docs/evidence/d02-verification.md"
       ],
       "triggers": [
         "Approval policy, canonical document, actor roles, scheduling, recovery graph or authoritative reference changes"
       ],
-      "status": "implementation_in_progress"
+      "status": "verified-defined-local-scope; exact-head delivery gates on PR18"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."
