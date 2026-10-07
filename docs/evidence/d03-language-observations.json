@@ -1,0 +1,293 @@
+{
+  "binary_sha256": "a556902c7d64f4b5a5801acbdb171a63961420093e77d6806addcb9c6a1f6a1b",
+  "production_source_sha256": "751db4f3c57d28fc16c3f1ae82043c1526a63fa7b6d846bed1247d9a1ca84377",
+  "results": [
+    {
+      "engine": "sqlite",
+      "fixture_posts": 1500,
+      "matching_posts": 750,
+      "pages": 19,
+      "page_limit": 40,
+      "plans": [
+        {
+          "label": "all",
+          "query": "SELECT id,title,locale,translation_group,status,updated_at FROM posts WHERE 1=1 ORDER BY updated_at DESC,id DESC LIMIT 41",
+          "plan": [
+            "SCAN posts USING INDEX language_workspace_all"
+          ]
+        },
+        {
+          "label": "filtered",
+          "query": "SELECT id,title,locale,translation_group,status,updated_at FROM posts WHERE 1=1 AND locale='fr' ORDER BY updated_at DESC,id DESC LIMIT 41",
+          "plan": [
+            "SEARCH posts USING INDEX language_workspace_cursor (locale=?)"
+          ]
+        },
+        {
+          "label": "filtered cursor",
+          "query": "SELECT id,title,locale,translation_group,status,updated_at FROM posts WHERE 1=1 AND locale='fr' AND (updated_at,id)<(9223372036854775807,'ffffffff-ffff-ffff-ffff-ffffffffffff') ORDER BY updated_at DESC,id DESC LIMIT 41",
+          "plan": [
+            "SEARCH posts USING INDEX language_workspace_cursor (locale=? AND (updated_at,id)<(?,?))"
+          ]
+        }
+      ],
+      "plan_engine": "Python SQLite 3.53.3",
+      "http_samples": 44,
+      "http_p50_ms": 5.378707777708769,
+      "http_p95_ms": 13.17266607657075,
+      "process_rss_bytes": 66076672,
+      "fixture_local_file_bytes": 30993446,
+      "boundary": "Debug native executable; one sequential localhost client, warmed fixture, authentication included per request; no production throughput claim. PostgreSQL server files/RSS and optional model resources excluded."
+    },
+    {
+      "engine": "postgres",
+      "fixture_posts": 1500,
+      "matching_posts": 750,
+      "pages": 19,
+      "page_limit": 40,
+      "plans": [
+        {
+          "label": "all",
+          "query": "SELECT id,title,locale,translation_group,status,updated_at FROM posts WHERE 1=1 ORDER BY updated_at DESC,id DESC LIMIT 41",
+          "plan": [
+            {
+              "Plan": {
+                "Node Type": "Limit",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 0.28,
+                "Total Cost": 55.89,
+                "Plan Rows": 41,
+                "Plan Width": 94,
+                "Actual Startup Time": 0.033,
+                "Actual Total Time": 0.197,
+                "Actual Rows": 41,
+                "Actual Loops": 1,
+                "Shared Hit Blocks": 61,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Scan Direction": "Forward",
+                    "Index Name": "language_workspace_all",
+                    "Relation Name": "posts",
+                    "Alias": "posts",
+                    "Startup Cost": 0.28,
+                    "Total Cost": 2036.11,
+                    "Plan Rows": 1501,
+                    "Plan Width": 94,
+                    "Actual Startup Time": 0.032,
+                    "Actual Total Time": 0.192,
+                    "Actual Rows": 41,
+                    "Actual Loops": 1,
+                    "Shared Hit Blocks": 61,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0
+                  }
+                ]
+              },
+              "Planning": {
+                "Shared Hit Blocks": 443,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              },
+              "Planning Time": 2.665,
+              "Triggers": [],
+              "Execution Time": 0.252
+            }
+          ]
+        },
+        {
+          "label": "filtered",
+          "query": "SELECT id,title,locale,translation_group,status,updated_at FROM posts WHERE 1=1 AND locale='fr' ORDER BY updated_at DESC,id DESC LIMIT 41",
+          "plan": [
+            {
+              "Plan": {
+                "Node Type": "Limit",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 0.28,
+                "Total Cost": 58.48,
+                "Plan Rows": 41,
+                "Plan Width": 94,
+                "Actual Startup Time": 0.015,
+                "Actual Total Time": 0.059,
+                "Actual Rows": 41,
+                "Actual Loops": 1,
+                "Shared Hit Blocks": 36,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Scan Direction": "Forward",
+                    "Index Name": "language_workspace_cursor",
+                    "Relation Name": "posts",
+                    "Alias": "posts",
+                    "Startup Cost": 0.28,
+                    "Total Cost": 1064.96,
+                    "Plan Rows": 750,
+                    "Plan Width": 94,
+                    "Actual Startup Time": 0.015,
+                    "Actual Total Time": 0.056,
+                    "Actual Rows": 41,
+                    "Actual Loops": 1,
+                    "Index Cond": "(locale = 'fr'::text)",
+                    "Rows Removed by Index Recheck": 0,
+                    "Shared Hit Blocks": 36,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0
+                  }
+                ]
+              },
+              "Planning": {
+                "Shared Hit Blocks": 450,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              },
+              "Planning Time": 1.005,
+              "Triggers": [],
+              "Execution Time": 0.07
+            }
+          ]
+        },
+        {
+          "label": "filtered cursor",
+          "query": "SELECT id,title,locale,translation_group,status,updated_at FROM posts WHERE 1=1 AND locale='fr' AND (updated_at,id)<(9223372036854775807,'ffffffff-ffff-ffff-ffff-ffffffffffff') ORDER BY updated_at DESC,id DESC LIMIT 41",
+          "plan": [
+            {
+              "Plan": {
+                "Node Type": "Limit",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 0.28,
+                "Total Cost": 58.58,
+                "Plan Rows": 41,
+                "Plan Width": 94,
+                "Actual Startup Time": 0.018,
+                "Actual Total Time": 0.064,
+                "Actual Rows": 41,
+                "Actual Loops": 1,
+                "Shared Hit Blocks": 36,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Scan Direction": "Forward",
+                    "Index Name": "language_workspace_cursor",
+                    "Relation Name": "posts",
+                    "Alias": "posts",
+                    "Startup Cost": 0.28,
+                    "Total Cost": 1066.84,
+                    "Plan Rows": 750,
+                    "Plan Width": 94,
+                    "Actual Startup Time": 0.017,
+                    "Actual Total Time": 0.06,
+                    "Actual Rows": 41,
+                    "Actual Loops": 1,
+                    "Index Cond": "((locale = 'fr'::text) AND (ROW(updated_at, id) < ROW('9223372036854775807'::bigint, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::text)))",
+                    "Rows Removed by Index Recheck": 0,
+                    "Shared Hit Blocks": 36,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0
+                  }
+                ]
+              },
+              "Planning": {
+                "Shared Hit Blocks": 449,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              },
+              "Planning Time": 1.104,
+              "Triggers": [],
+              "Execution Time": 0.082
+            }
+          ]
+        }
+      ],
+      "plan_engine": "17.11 (Homebrew)",
+      "http_samples": 44,
+      "http_p50_ms": 6.503062788397074,
+      "http_p95_ms": 9.89399990066886,
+      "process_rss_bytes": 56131584,
+      "fixture_local_file_bytes": 183159,
+      "boundary": "Debug native executable; one sequential localhost client, warmed fixture, authentication included per request; no production throughput claim. PostgreSQL server files/RSS and optional model resources excluded."
+    }
+  ],
+  "build_profile": "debug",
+  "scope": "Native authenticated localhost HTTP observations with required real database engines; supplementary Python SQLite plans are separately identified."
+}

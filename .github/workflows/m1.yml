@@ -107,6 +107,15 @@ jobs:
         run: python3 scripts/integration_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
       - name: Verify resumable canonical translation proposals
         run: python3 scripts/document_translation_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --output work/d03-document-synthetic-reference.json
+      - name: Observe populated language pagination with the clean release executable
+        run: python3 scripts/language_workspace_reference.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --build-profile release --output work/d03-clean-release-language-reference.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d03-clean-release-language-evidence
+          path: work/d03-clean-release-language-reference.json
+          if-no-files-found: warn
+          retention-days: 30
       - name: Verify explicit private configuration transfer
         run: python3 scripts/config_transfer_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
       - name: Verify independent native fleet observation and credential isolation

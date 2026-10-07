@@ -3,7 +3,7 @@
 import argparse, hashlib, http.cookiejar, html, json, os, re, secrets, socket, sqlite3, statistics, subprocess, tempfile, time, urllib.parse, urllib.request, uuid
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser();p.add_argument('--binary',default='target/debug/wpalt');p.add_argument('--postgres',default=os.environ.get('TEST_DATABASE_URL'));p.add_argument('--psql',default='/opt/homebrew/opt/postgresql@17/bin/psql');p.add_argument('--output',default='work/d03-language-reference.json');args=p.parse_args();binary=Path(args.binary).resolve()
+p=argparse.ArgumentParser();p.add_argument('--binary',default='target/debug/wpalt');p.add_argument('--build-profile',choices=['debug','release','unknown'],default='unknown');p.add_argument('--postgres',default=os.environ.get('TEST_DATABASE_URL'));p.add_argument('--psql',default='/opt/homebrew/opt/postgresql@17/bin/psql');p.add_argument('--output',default='work/d03-language-reference.json');args=p.parse_args();binary=Path(args.binary).resolve()
 source=(ROOT/'src/platform/language_web.rs').read_text()
 base=re.search(r'"(SELECT id,title,locale,translation_group,status,updated_at FROM posts WHERE 1=1)"',source).group(1)
 end=re.search(r'q.push\("( ORDER BY updated_at DESC,id DESC LIMIT 41)"\)',source).group(1)
@@ -65,7 +65,7 @@ for engine in (['sqlite','postgres'] if args.postgres else ['sqlite']):
    try:rss=int(subprocess.check_output(['ps','-o','rss=','-p',str(server.pid)],text=True).strip())*1024
    except Exception:pass
    disk=sum(f.stat().st_size for f in root.rglob('*') if f.is_file())
-   report.append({'engine':engine,'fixture_posts':1500,'matching_posts':750,'pages':pages,'page_limit':40,'plans':plans,'plan_engine':('Python SQLite '+sqlite3.sqlite_version if connection else pg('SHOW server_version')),'http_samples':len(samples),'http_p50_ms':statistics.median(samples),'http_p95_ms':samples[min(len(samples)-1,int(len(samples)*.95))],'process_rss_bytes':rss,'fixture_local_file_bytes':disk,'boundary':'Debug native executable; one sequential localhost client, warmed fixture, authentication included per request; no production throughput claim. PostgreSQL server files/RSS and optional model resources excluded.'})
+   report.append({'engine':engine,'fixture_posts':1500,'matching_posts':750,'pages':pages,'page_limit':40,'plans':plans,'plan_engine':('Python SQLite '+sqlite3.sqlite_version if connection else pg('SHOW server_version')),'http_samples':len(samples),'http_p50_ms':statistics.median(samples),'http_p95_ms':samples[min(len(samples)-1,int(len(samples)*.95))],'process_rss_bytes':rss,'fixture_local_file_bytes':disk,'build_profile':args.build_profile,'boundary':'Debug request logging enabled; declared build profile '+args.build_profile+'; one sequential localhost client, warmed fixture, authentication included per request; no production throughput claim. PostgreSQL server files/RSS and optional model resources excluded.'})
   finally:
    if server:server.terminate();server.wait(timeout=15);logfile.close()
    if connection:connection.close()
