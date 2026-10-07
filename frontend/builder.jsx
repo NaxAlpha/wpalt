@@ -25,9 +25,16 @@ const kinds = [
 const fieldKinds = [
   "string",
   "number",
+  "integer",
+  "email",
+  "url",
+  "date",
+  "choice",
+  "choices",
   "boolean",
   "media",
   "relationship",
+  "relationships",
   "object",
   "group",
   "repeater",
@@ -232,7 +239,7 @@ function Fields({ definition, onChange, groups, models }) {
             />{" "}
             Required
           </label>
-          {f.kind === "relationship" && (
+          {["relationship", "relationships"].includes(f.kind) && (
             <label>
               Target model
               <select
@@ -250,6 +257,88 @@ function Fields({ definition, onChange, groups, models }) {
                 ))}
               </select>
             </label>
+          )}
+          {["string", "email", "url", "date", "number", "integer"].includes(
+            f.kind,
+          ) && (
+            <Disclosure
+              summary={`${id} validation`}
+              initialOpen={["min", "max", "min_length", "max_length"].some(
+                (key) => f[key] != null,
+              )}
+            >
+              <div class="grid">
+                {(["number", "integer"].includes(f.kind)
+                  ? ["min", "max"]
+                  : ["min_length", "max_length"]
+                ).map((key) => (
+                  <Scalar
+                    label={`${id} ${key.replaceAll("_", " ")}`}
+                    type="number"
+                    value={f[key]}
+                    onChange={(v) =>
+                      onChange({
+                        ...definition,
+                        [id]: { ...f, [key]: v === "" ? null : Number(v) },
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            </Disclosure>
+          )}
+          {["choices", "relationships"].includes(f.kind) && (
+            <Scalar
+              label={`${id} maximum selections`}
+              type="number"
+              min="1"
+              max="50"
+              value={f.max_items ?? 20}
+              onChange={(v) =>
+                onChange({
+                  ...definition,
+                  [id]: { ...f, max_items: Number(v) },
+                })
+              }
+            />
+          )}
+          {["choice", "choices"].includes(f.kind) && (
+            <fieldset>
+              <legend>{id} choices</legend>
+              {Object.entries(f.choices || {}).map(([key, label]) => (
+                <div class="toolbar">
+                  <Scalar
+                    label={`${id} choice ${key}`}
+                    value={label}
+                    onChange={(v) =>
+                      onChange({
+                        ...definition,
+                        [id]: { ...f, choices: { ...f.choices, [key]: v } },
+                      })
+                    }
+                  />
+                  <Button
+                    variant="quiet"
+                    onClick={() => {
+                      const choices = { ...f.choices };
+                      delete choices[key];
+                      onChange({ ...definition, [id]: { ...f, choices } });
+                    }}
+                  >
+                    Remove choice {key}
+                  </Button>
+                </div>
+              ))}
+              <AddName
+                label={`Add ${id} choice`}
+                onAdd={(key) =>
+                  onChange({
+                    ...definition,
+                    [id]: { ...f, choices: { ...f.choices, [key]: key } },
+                  })
+                }
+              />
+            </fieldset>
           )}
           {["object", "repeater"].includes(f.kind) && (
             <Fields
@@ -419,6 +508,73 @@ function Values({ fields, value, onChange, state, groups }) {
                   ))}
                 </select>
               </label>
+            ) : f.kind === "choice" ? (
+              <SelectField
+                label={label}
+                value={v || ""}
+                required={f.required}
+                onChange={(e) => change(e.currentTarget.value || null)}
+              >
+                <option value="">Choose…</option>
+                {Object.entries(f.choices || {}).map(([id, label]) => (
+                  <option value={id}>{label}</option>
+                ))}
+              </SelectField>
+            ) : ["choices", "relationships"].includes(f.kind) ? (
+              <fieldset>
+                <legend>{label}</legend>
+                {(v || []).map((selected, index) => (
+                  <div class="toolbar">
+                    <span>
+                      {f.kind === "choices"
+                        ? f.choices[selected]
+                        : state.posts.find((p) => p.id === selected)?.title ||
+                          selected}
+                    </span>
+                    <Button
+                      variant="quiet"
+                      onClick={() => change(v.filter((_, i) => i !== index))}
+                    >
+                      Remove {label} selection {index + 1}
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      disabled={index === 0}
+                      onClick={() => {
+                        const rows = [...v];
+                        [rows[index - 1], rows[index]] = [
+                          rows[index],
+                          rows[index - 1],
+                        ];
+                        change(rows);
+                      }}
+                    >
+                      Move {label} selection {index + 1} up
+                    </Button>
+                  </div>
+                ))}
+                <SelectField
+                  label={`Add ${label}`}
+                  value=""
+                  disabled={(v || []).length >= (f.max_items ?? 20)}
+                  onChange={(e) =>
+                    e.currentTarget.value &&
+                    change([...(v || []), e.currentTarget.value])
+                  }
+                >
+                  <option value="">Choose…</option>
+                  {(f.kind === "choices"
+                    ? Object.entries(f.choices || {})
+                    : state.posts
+                        .filter((p) => p.kind === f.target)
+                        .map((p) => [p.id, `${p.title} (${p.status})`])
+                  )
+                    .filter(([id]) => !(v || []).includes(id))
+                    .map(([id, label]) => (
+                      <option value={id}>{label}</option>
+                    ))}
+                </SelectField>
+              </fieldset>
             ) : ["object", "group"].includes(f.kind) ? (
               <fieldset>
                 <legend>{label}</legend>
@@ -538,11 +694,31 @@ function Values({ fields, value, onChange, state, groups }) {
               <Scalar
                 label={label}
                 value={v}
-                type={f.kind === "number" ? "number" : "text"}
+                type={
+                  ["number", "integer"].includes(f.kind)
+                    ? "number"
+                    : ["email", "url", "date"].includes(f.kind)
+                      ? f.kind
+                      : "text"
+                }
+                min={f.min ?? undefined}
+                max={f.max ?? undefined}
+                step={f.kind === "integer" ? "1" : "any"}
+                description={
+                  f.min_length != null || f.max_length != null
+                    ? `${Array.from(v || "").length} characters; allowed ${f.min_length ?? 0}–${f.max_length ?? 8000}.`
+                    : undefined
+                }
                 required={f.required}
                 onChange={(v) =>
                   change(
-                    f.kind === "number" ? (v === "" ? null : Number(v)) : v,
+                    ["number", "integer"].includes(f.kind)
+                      ? v === ""
+                        ? null
+                        : Number(v)
+                      : v === "" && !f.required
+                        ? null
+                        : v,
                   )
                 }
               />
@@ -1276,6 +1452,85 @@ function App() {
                 })
               }
             />
+          ))}
+          {Object.keys(models[model].taxonomies).map((taxonomy) => (
+            <Disclosure
+              summary={`${taxonomy} hierarchy`}
+              initialOpen={
+                Object.keys(models[model].taxonomy_parents?.[taxonomy] || {})
+                  .length > 0
+              }
+            >
+              <p class="muted">
+                Define this shared tree on one model; other models inherit it.
+                Child and parent use term URL slugs. Parent archives include
+                descendants; at most eight levels.
+              </p>
+              {Object.entries(
+                models[model].taxonomy_parents?.[taxonomy] || {},
+              ).map(([child, parent]) => (
+                <div class="toolbar">
+                  <Scalar
+                    label={`${taxonomy} parent of ${child}`}
+                    value={parent}
+                    onChange={(v) =>
+                      setModels({
+                        ...models,
+                        [model]: {
+                          ...models[model],
+                          taxonomy_parents: {
+                            ...models[model].taxonomy_parents,
+                            [taxonomy]: {
+                              ...models[model].taxonomy_parents[taxonomy],
+                              [child]: v,
+                            },
+                          },
+                        },
+                      })
+                    }
+                  />
+                  <Button
+                    variant="quiet"
+                    onClick={() => {
+                      const parents = {
+                        ...models[model].taxonomy_parents[taxonomy],
+                      };
+                      delete parents[child];
+                      setModels({
+                        ...models,
+                        [model]: {
+                          ...models[model],
+                          taxonomy_parents: {
+                            ...models[model].taxonomy_parents,
+                            [taxonomy]: parents,
+                          },
+                        },
+                      });
+                    }}
+                  >
+                    Remove parent of {child}
+                  </Button>
+                </div>
+              ))}
+              <AddName
+                label={`Add ${taxonomy} child`}
+                onAdd={(child) =>
+                  setModels({
+                    ...models,
+                    [model]: {
+                      ...models[model],
+                      taxonomy_parents: {
+                        ...models[model].taxonomy_parents,
+                        [taxonomy]: {
+                          ...models[model].taxonomy_parents?.[taxonomy],
+                          [child]: "",
+                        },
+                      },
+                    },
+                  })
+                }
+              />
+            </Disclosure>
           ))}
           <AddName
             label="Add taxonomy"

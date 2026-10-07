@@ -994,16 +994,24 @@ async fn attachments_follow_up_and_search_remain_private_and_survive_fresh_resto
                 .is_err(),
             "An attachment capability belongs to one accepted entry."
         );
-        entries::follow_up(
+        let snapshot_guard = app.mutations.lock().await;
+        let follow_up = entries::follow_up(
             &app,
             &form,
             &entry,
             1,
             "Needs a follow-up",
             &session.user.id,
-        )
-        .await
-        .unwrap();
+        );
+        tokio::pin!(follow_up);
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(50), &mut follow_up)
+                .await
+                .is_err(),
+            "Response follow-up must wait for the shared snapshot/write boundary."
+        );
+        drop(snapshot_guard);
+        follow_up.await.unwrap();
         assert!(
             entries::follow_up(&app, &form, &entry, 1, "stale overwrite", "")
                 .await

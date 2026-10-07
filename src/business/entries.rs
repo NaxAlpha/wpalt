@@ -16,6 +16,7 @@ pub async fn follow_up(
     notes: &str,
     assignee: &str,
 ) -> Result<()> {
+    let _guard = app.mutation().await?;
     if notes.len() > 8000 || version < 1 {
         return Err(Error::invalid("Notes are limited to 8,000 bytes."));
     }
@@ -30,6 +31,11 @@ pub async fn follow_up(
         })?;
     }
     let mut tx = app.db.pool.begin().await?;
+    // Acquire the write boundary before reading. A deferred SQLite read
+    // transaction cannot safely upgrade a snapshot after another writer commits.
+    // The SELECT also prevents creating a workflow for an unrelated form.
+    sqlx::query("INSERT INTO form_entry_workflows(entry_id,updated_at) SELECT id,$1 FROM form_entries WHERE id=$2 AND form_id=$3 ON CONFLICT(entry_id) DO NOTHING")
+        .bind(now()).bind(entry).bind(form).execute(&mut *tx).await?;
     let valid: Option<String> =
         sqlx::query_scalar("SELECT id FROM form_entries WHERE id=$1 AND form_id=$2")
             .bind(entry)
@@ -37,7 +43,6 @@ pub async fn follow_up(
             .fetch_optional(&mut *tx)
             .await?;
     valid.ok_or_else(Error::not_found)?;
-    sqlx::query("INSERT INTO form_entry_workflows(entry_id,updated_at) VALUES($1,$2) ON CONFLICT(entry_id) DO NOTHING").bind(entry).bind(now()).execute(&mut *tx).await?;
     if sqlx::query("UPDATE form_entry_workflows SET notes=$1,assignee=$2,version=version+1,updated_at=$3 WHERE entry_id=$4 AND version=$5").bind(notes).bind(assignee).bind(now()).bind(entry).bind(version).execute(&mut *tx).await?.rows_affected()!=1{return Err(Error::conflict());}
     tx.commit().await?;
     Ok(())

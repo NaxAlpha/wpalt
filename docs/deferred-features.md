@@ -8,13 +8,15 @@ Companions: [catalog matrix](feature-parity.json), [full reconciliation](evidenc
 
 ## How to resume
 
-Choose a substantial end-user system from this backlog, reassess against the latest code and current primary guidance, define concrete functional and failure journeys, then implement/verify/optimize it and deliver a separate PR. Source versions and paid/free access determine what can actually be compared. Do not count historical M1 limits as still missing where a later milestone already supplies them. Use each later contract/matrix coverage field as the starting evidence. Performance, security, recovery, migration and UI gates apply to every resumed feature. No priority/date or additional paid provider integration has been approved by this deferral.
+Choose a substantial end-user system from this backlog, reassess against the latest code and current primary guidance, define concrete functional and failure journeys, then implement/verify/optimize it and deliver a separate PR. Source versions and paid/free access determine what can actually be compared. Do not count historical M1 limits as still missing where a later milestone already supplies them. Use each later contract/matrix coverage field as the starting evidence. Performance, security, recovery, migration and UI gates apply to every resumed feature. The owner subsequently authorized autonomous dependency-ordered resumption on 2026-10-06; see [decision 0015](decisions/0015-resume-local-backlog.md). External accounts/keys and owner-only adoption decisions remain separate. No new paid-provider purchase is authorized.
 
 ## Concrete deferred work
 
 ### D01 — Content models and taxonomy
 
-Origin: **M1–M2** · Catalog: **F001/F002** · Status: **deferred by owner**
+Origin: **M1–M2** · Catalog: **F001/F002** · Status: **classified-directory scope verified in PR #17; broader field-family gaps retained**
+
+Active [classified-directory contract](d01-contract.md), [verification ledger](evidence/d01-verification.md), [PR #17](https://github.com/NaxAlpha/wpalt/pull/17).
 
 Hierarchical taxonomy/archives, expanded field families and custom validation/relationships beyond the supported typed grammar.
 

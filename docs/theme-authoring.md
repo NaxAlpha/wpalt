@@ -39,6 +39,35 @@ Current graph ceilings: 32 models/themes/components, 512 unique definition nodes
 
 The `form` node takes a literal published form UUID in `text`. The visual builder offers a published-form picker. Saving verifies referenced forms with a bounded batched query; arbitrary URLs or visitor-selected destinations are not accepted. Public output uses a same-origin iframe with only the form, shared styles and automatic value-free sizing. Theme draft previews show a placeholder. Canonical body documents can also contain form blocks; email projects them to absolute links.
 
+## Classified directories and typed validation (D01)
+
+Studio → models defines the shared schema; Content → Typed fields & composition authors the values. Existing stored values are checked before any definition change. An incompatible change leaves the original definitions and content intact; migrate values explicitly rather than deleting them implicitly.
+
+New kinds are `integer`, `email`, `url`, `date`, `choice`, `choices`, and `relationships`. Integers use JavaScript's exact safe-integer range. `min`/`max` constrain number/integer fields; `min_length`/`max_length` constrain text/email/URL/date by Unicode scalar count, with an independent 8,000-byte text ceiling. Server validation remains authoritative. Email syntax does not verify identity. URLs admit HTTP(S) without embedded credentials or whitespace; storing a URL does not fetch it. Dates use real calendar dates in `YYYY-MM-DD`, years 0001–9999.
+
+Choices map stable lowercase identifiers to display labels, with at most 64 choices. `choices` and `relationships` preserve selection order, reject duplicates and enforce `max_items` (1–50, default 20). Multiple relationships name one installed target model. They use the existing 128-distinct-reference record ceiling and bulk loading; private/unpublished targets remain absent from visitor output. Selectors currently expose the latest 128 records/media; larger searchable selectors remain a later usability improvement. A template can use a `repeater` with `source: "post.fields.partners"` and child text bound to `item.title` to display authorized related records.
+
+Example model definition for the existing owner API `POST /api/admin/models/directory` (envelope: `csrf`, reviewed `version`, `definition`; version 0 creates a model):
+
+```json
+{
+  "label": "Directory",
+  "fields": {
+    "rating": {"kind": "integer", "min": 1, "max": 5},
+    "contact": {"kind": "email"},
+    "opened": {"kind": "date"},
+    "level": {"kind": "choice", "choices": {"local": "Local", "regional": "Regional"}},
+    "partners": {"kind": "relationships", "target": "post", "max_items": 10}
+  },
+  "taxonomies": {"sector": "Sectors"},
+  "taxonomy_parents": {"sector": {"orchards": "gardens", "gardens": "outdoors"}}
+}
+```
+
+Hierarchy edges use term URL slugs, not names or IDs. Define each shared taxonomy tree on one model; other models declaring the same taxonomy inherit it. Parents can be declared before any content is assigned. Maps have at most 128 edges, eight-edge paths and no cycles. Setting a parent does not assign a draft term to public content. Parent archives include published descendants through `/?taxonomy=sector&term=outdoors` or `/api/content?taxonomy=sector&term=outdoors`; language routes and cursor links retain filters. Existing `?category=`/`?tag=` URLs continue to work and include descendants. Publication, access and noindex filters still apply. These are faceted listing URLs under the current discovery policy, not a new promise of dedicated taxonomy sitemap/SEO pages.
+
+Use the schema-16 executable for these definitions. Stop all processes and execute the reviewed upgrade with an encrypted pre-change recovery point when upgrading native schema 14/15. Ordinary runtime and inspection/domain CLI commands refuse an older native schema. The portable table envelope is still v12; older executables reject the expanded definition grammar. Roll back using the pre-change recovery point and retained old executable into a fresh target. No old feature runtime or vendor account is required.
+
 
 ## Independent authoring and bounded local layout proposals (M8)
 

@@ -17,8 +17,17 @@ module.exports = async (owner, origin, output) => {
     script_errors: [],
     remote_requests: [],
   };
-  const submit = async (p, button) =>
-    Promise.all([p.waitForNavigation({ waitUntil: "load" }), button.click()]);
+  const submit = async (p, button) => {
+    const [response] = await Promise.all([
+      p.waitForResponse((r) => r.request().method() === "POST"),
+      p.waitForNavigation({ waitUntil: "load" }),
+      button.click(),
+    ]);
+    assert(
+      response.status() < 400,
+      `Commerce action ${new URL(response.url()).pathname} returned ${response.status()}`,
+    );
+  };
   const measure = async (p, name) => {
     for (const width of [320, 768, 1440]) {
       await p.setViewportSize({ width, height: 1000 });

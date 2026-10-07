@@ -1392,7 +1392,24 @@ async fn commerce_protected_download_authority_quota_and_late_money_remain_safe(
         let (_, physical) = product(&site, "physical", 700, 1, "").await;
         let input = cart(&site, &buyer, &physical, "", 1).await;
         let held = orders::checkout(&site.app, &buyer, &input).await.unwrap();
-        orders::cancel(&site.app, &buyer, &held, 1).await.unwrap();
+        {
+            let mut writer = site.app.db.pool.begin().await.unwrap();
+            sqlx::query("UPDATE shop_orders SET version=version WHERE id=$1")
+                .bind(&held)
+                .execute(&mut *writer)
+                .await
+                .unwrap();
+            let cancellation = orders::cancel(&site.app, &buyer, &held, 1);
+            tokio::pin!(cancellation);
+            assert!(
+                tokio::time::timeout(std::time::Duration::from_millis(50), &mut cancellation)
+                    .await
+                    .is_err(),
+                "Cancellation must wait for an independent payment writer, not fail promoting a stale read snapshot."
+            );
+            writer.commit().await.unwrap();
+            cancellation.await.unwrap();
+        }
         orders::confirm_payment(
             &site.app,
             &orders::Payment {

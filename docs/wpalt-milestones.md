@@ -318,3 +318,8 @@ User approved PR #14 merge, completed as `c12c6894f5c7969344a74e67cd742f971db381
 ## Owner-approved delivery boundary — 2026-10-06
 
 The owner explicitly directed remaining missing feature breadth across all milestones into [the deferred backlog](deferred-features.md), authorized readiness and merge of M9 PR #16, and retained the complete product goal for future staged work. [Decision 0014](decisions/0014-deferred-parity-release.md) records this alignment. The verified current native/local-process scope is accepted for delivery; it is not universal plugin parity, a public production-support policy or a license selection. Deferred scope/adoption choices do not block this authorized merge.
+
+
+## Post-M9 backlog resumption — 2026-10-06
+
+The owner authorized autonomous work through the deferred local capabilities in dependency order. Deliver each substantial package with its own contract, meaningful real-engine/UI/failure evidence and PR. D01 starts with [classified content directories](d01-contract.md); [decision 0015](decisions/0015-resume-local-backlog.md) preserves account/access and adoption boundaries. M1–M9 remain the cumulative baseline; later work is not retroactive proof of full parity.
