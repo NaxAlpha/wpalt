@@ -18,7 +18,7 @@ wpalt --config node-a.toml worker
 
 Requests and worker cycles serialize under a host-owned admission lock. This protects existing domain/permission boundaries and shared temporary security state. Adding processes does not promise write-throughput scaling. Waits are bounded to ten seconds and each process retains finite admission/request budgets; HTTP timeouts remain configured separately. Shared state is capped at 4 MiB and stored privately; temporary passkey state never goes to the client or portable backups. Do not manually remove or replace coordination/lifecycle files while processes are running.
 
-All servers/workers hold a shared lifecycle lock. Ordinary offline CLI changes, snapshots, restoration and reconciliation require the exclusive lock and therefore all nodes stopped. Runtime checks native schema 16 before serving and does not migrate it automatically. The database binds to one canonical site-directory digest; a second directory for the same database is rejected before migration or runtime admission. Moving to another directory requires fresh-target database/media recovery, rather than creating an independent host lock for existing authority. `/health` checks readiness; request diagnostics and `x-wpalt-node` identify an opaque node UUID without disclosing hostnames or credentials. Operations displays the current local-process boundary and node identity. `coordinated_request_completed` records admission wait, state finalization and total coordinated duration under the same request identity as native handler diagnostics; native handler duration alone excludes those phases. Refusal reasons are static codes, never raw server state or tokens.
+All servers/workers hold a shared lifecycle lock. Ordinary offline CLI changes, snapshots, restoration and reconciliation require the exclusive lock and therefore all nodes stopped. Runtime checks native schema 17 before serving and does not migrate it automatically. The database binds to one canonical site-directory digest; a second directory for the same database is rejected before migration or runtime admission. Moving to another directory requires fresh-target database/media recovery, rather than creating an independent host lock for existing authority. `/health` checks readiness; request diagnostics and `x-wpalt-node` identify an opaque node UUID without disclosing hostnames or credentials. Operations displays the current local-process boundary and node identity. `coordinated_request_completed` records admission wait, state finalization and total coordinated duration under the same request identity as native handler diagnostics; native handler duration alone excludes those phases. Refusal reasons are static codes, never raw server state or tokens.
 
 ## Interrupted operations and resume
 
@@ -54,7 +54,7 @@ For an owner-controlled move, explicitly use `config-export transfer.json --incl
 
 ## Supported maintenance upgrade
 
-Normal `serve`/`worker` startup refuses older native schemas. For supported native schema 14/15 to schema 16 transitions, stop every node/worker, retain the old executable/private configuration and independent recovery key, then run `wpalt --config site.toml upgrade`. Preview opens the supported graph without migrations and binds the exact data/configuration and target executable. Create or independently retain a key using `recovery-key` before execution.
+Normal `serve`/`worker` startup refuses older native schemas. For supported native schema 14/15/16 to schema 17 transitions, stop every node/worker, retain the old executable/private configuration and independent recovery key, then run `wpalt --config site.toml upgrade`. Preview opens the supported graph without migrations and binds the exact data/configuration and target executable. Create or independently retain a key using `recovery-key` before execution.
 
 ```sh
 wpalt --config site.toml upgrade --execute REVIEWED_PLAN --recovery-output NEW_POINT.enc --key-file recovery.key
@@ -75,3 +75,17 @@ Execute the fresh plan with `--recovery-output NEW_POINT.enc --key-file recovery
 `wpalt fleet-inspect PRIVATE_MANIFEST.json` runs independently without opening a default CMS database or site. Its private JSON manifest uses `{"format":"wpalt-fleet-v1","nodes":[{"name":"blog-a","origin":"https://blog.example","token_file":"blog-a.token"}]}`. Token paths resolve beside the manifest; create per-site native content-read grants through the existing stopped-site `integration create` workflow. No draft-write grant is required. These grants can read private metadata; the inspector uses only one bounded metadata page and never includes that metadata, token, endpoint or raw transport errors in its report. There is no new unrestricted administrator credential.
 
 Files must be private regular files without symlinks or hard links. Only HTTPS or literal loopback HTTP origins are admitted. Redirects and ambient proxies are disabled. At most 32 unique nodes, four concurrent observations, five-second per-request deadlines and one-MiB response budgets isolate unavailable origins. JSON reports distinguish each ready node from unavailable/unauthorized nodes; any unhealthy observation produces a nonzero command exit. Run it on an independently available owner host/OS scheduler to observe outages. It does not send alerts or mutate/update/repair sites; origin-local health cannot detect its own complete host outage. Bulk fleet changes remain separate, explicitly reviewed maintenance operations.
+
+
+## Editorial graph migration (D02)
+
+Current native schema 17 adds the local review queue/history; current full portable archives use v13. Stopped upgrades from 14–16 capture and verify an original v12 pre-change archive before migrating. Retain its key, source executable and private configuration for fresh-target rollback. The original archive remains usable by its source executable; it is never silently rewritten.
+
+For recovery with the new executable, run the explicit offline converter into a **new** output:
+
+```sh
+wpalt --config site.toml migrate-recovery-v12 old.enc converted.enc --key-file recovery.key
+wpalt --config site.toml recovery-inspect converted.enc --key-file recovery.key
+```
+
+The converter preserves encryption when a key is supplied, validates the complete new graph, and adds empty editorial tables without inventing approval. Ordinary restore accepts v13 only. `recovery-inspect old.enc --key-file recovery.key --source-format 12` explicitly validates an older point through offline conversion without modifying it; it is not permission to restore v12 directly with the new executable. The compatibility register defines retirement review. No mixed-version serving is supported.

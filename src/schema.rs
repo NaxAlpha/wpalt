@@ -161,6 +161,9 @@ impl Definition {
 #[serde(deny_unknown_fields)]
 pub struct Model {
     pub label: String,
+    /// Publication requires an assigned, current review of this exact material.
+    #[serde(default)]
+    pub review_required: bool,
     #[serde(default)]
     pub fields: BTreeMap<String, Field>,
     #[serde(default)]
@@ -173,6 +176,7 @@ impl Model {
     pub fn initial(label: &str) -> Self {
         Self {
             label: label.into(),
+            review_required: false,
             fields: BTreeMap::new(),
             taxonomies: [
                 ("category".into(), "Categories".into()),

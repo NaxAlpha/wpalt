@@ -83,7 +83,7 @@ pub async fn apply(
     let installed: i64 = sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
         .fetch_one(&app.db.pool)
         .await?;
-    if ![14, 15, crate::db::SCHEMA_VERSION].contains(&installed) {
+    if ![14, 15, 16, crate::db::SCHEMA_VERSION].contains(&installed) {
         return Err(Error::invalid(
             "Unsupported maintenance source; use fresh-target recovery.",
         ));
@@ -135,8 +135,8 @@ pub async fn apply(
     } else {
         None
     };
-    let bytes = backup::capture(app).await?;
-    let graph = backup::inspect(&app.config, &bytes)?;
+    let bytes = backup::capture_maintenance(app).await?;
+    let graph = backup::inspect_maintenance(&app.config, &bytes)?;
     let mut envelope: serde_json::Value = serde_json::from_slice(&bytes)
         .map_err(|_| Error::invalid("Invalid maintenance recovery graph."))?;
     let mut payload: serde_json::Value = serde_json::from_str(
@@ -201,7 +201,7 @@ pub async fn apply(
         )
         .await?;
         let opened = super::encryption::open(&key, &stored, app.config.max_backup_bytes)?;
-        backup::inspect(&app.config, &opened)?;
+        backup::inspect_maintenance(&app.config, &opened)?;
         if opened != bytes {
             return Err(Error::invalid("Maintenance recovery verification failed."));
         }

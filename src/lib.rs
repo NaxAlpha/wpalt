@@ -7,6 +7,8 @@ pub mod config;
 pub mod content;
 pub mod db;
 pub mod discovery;
+pub mod editorial;
+pub mod editorial_web;
 pub mod error;
 pub mod membership;
 pub mod migrations;
@@ -155,7 +157,7 @@ impl App {
                     || (matches!(
                         startup_mode,
                         Startup::Maintenance | Startup::RebindMaintenance
-                    ) && matches!(version, 14 | 15)),
+                    ) && matches!(version, 14..=16)),
                 "runtime schema is incompatible; stop all nodes and use the documented offline upgrade/recovery path"
             );
         } else {

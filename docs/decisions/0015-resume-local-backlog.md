@@ -8,4 +8,4 @@ This supersedes the backlog's earlier absence of sequencing authorization. It do
 
 D01 starts with a usable classified-directory system: richer typed values/constraints, ordered multiple relationships and hierarchical archives in the existing shared definitions and authoring experience. See [contract](../d01-contract.md). New definition grammar receives a native schema-16 fence and stopped-site migration; no compatibility runtime is introduced.
 
-Each package updates the matrix/backlog with verified coverage and remaining concrete work. Preparing a PR does not itself authorize merging future PRs; preserve review and distinguish ready, reviewed and merged states.
+Each package updates the matrix/backlog with verified coverage and remaining concrete work. On 2026-10-07 the owner explicitly authorized merging each PR once ready. Verify all applicable current-head gates and independent artifacts before merging; distinguish implementation, ready and merged states. PR #17 merged as `051d319c72510c5a61f8bd1b927a7e0e4d525df6`. Account/access and adoption boundaries remain unchanged.

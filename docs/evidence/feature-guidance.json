@@ -2136,6 +2136,40 @@
         "database/browser/toolchain change"
       ],
       "status": "verified-defined-local-scope; current-head gates on PR #17"
+    },
+    {
+      "feature_id": "D02-01",
+      "area": "Editorial review",
+      "scope": "Per-model assigned review, exact canonical document/metadata approval, bounded private history, scheduling rechecks, graph recovery and native authoring queue.",
+      "basis": "Internal product authority contract; WordPress and free PublishPress source are reference semantics, not full parity proof.",
+      "sources": [
+        "https://wordpress.org/documentation/article/post-status/",
+        "https://wordpress.org/documentation/article/roles-and-capabilities/",
+        "https://publishpress.com/knowledge-base/editorial-workflow-contributors-authors-editors/",
+        "https://wordpress.org/plugins/publishpress-statuses/"
+      ],
+      "applicable_versions": [
+        "PublishPress Statuses 1.3.6 source inspection only",
+        "wpalt native schema 17 / portable graph v13"
+      ],
+      "last_checked": "2026-10-06",
+      "next_review": "2027-01-04",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Different active assigned reviewer authorizes exact canonical document and meaningful metadata under current policy.",
+        "Current content/workflow versions and actors rechecked inside mutation boundary; private notes never enter public projection.",
+        "Explicit stopped migration and offline converter retain original pre-change recovery authority."
+      ],
+      "tests": [
+        "Four D02 SQLite/PostgreSQL approval, race, policy/revision/schedule and populated queue clusters",
+        "96 cumulative Rust cases, 11 pipeline cases, CLI and actual old-executable maintenance",
+        "Native/rich editorial and cumulative single-node/two-node Chrome journeys; docs/evidence/d02-verification.md"
+      ],
+      "triggers": [
+        "Approval policy, canonical document, actor roles, scheduling, recovery graph or authoritative reference changes"
+      ],
+      "status": "verified-defined-local-scope; exact-head delivery gates on PR18"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

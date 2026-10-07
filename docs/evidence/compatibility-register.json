@@ -1,5 +1,15 @@
 {
   "schema": 1,
-  "layers": [],
+  "layers": [
+    {
+      "id": "d02-offline-recovery-v12",
+      "owner": "wpalt maintainers",
+      "reason": "Adopted schema 14\u201316 archives must remain recoverable across the explicit editorial table-graph migration; ordinary runtime/restore has no legacy branch.",
+      "supported_versions": "Native schemas 14\u201316, portable graph v12; schema 17 / graph v13 target",
+      "migration_path": "Stopped upgrade retains original encrypted v12 bytes for old-executable fresh rollback. Explicit migrate-recovery-v12 creates a separately validated new v13 archive; no source overwrite.",
+      "removal_release": "First adopted release after a documented supported-source retirement decision and verified replacement recovery path",
+      "review_deadline": "2027-01-04"
+    }
+  ],
   "policy": "No legacy runtime shims before M9. Add any temporary bridge with version range, owner, migration path and removal deadline."
 }

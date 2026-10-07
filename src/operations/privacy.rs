@@ -254,6 +254,12 @@ const EXPORTS: &[(&str, &str, &str)] = &[
         "author_id",
         "id,slug,title,body,document,fields,status,updated_at",
     ),
+    // Only the subject's own authored decisions, never other reviewers' notes.
+    (
+        "editorial_decisions",
+        "actor_id",
+        "id,post_id,action,notes,created_at",
+    ),
     ("member_profiles", "user_id", "user_id,biography,version"),
     (
         "member_grants",

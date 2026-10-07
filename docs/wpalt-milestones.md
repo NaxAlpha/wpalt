@@ -323,3 +323,11 @@ The owner explicitly directed remaining missing feature breadth across all miles
 ## Post-M9 backlog resumption — 2026-10-06
 
 The owner authorized autonomous work through the deferred local capabilities in dependency order. Deliver each substantial package with its own contract, meaningful real-engine/UI/failure evidence and PR. D01 starts with [classified content directories](d01-contract.md); [decision 0015](decisions/0015-resume-local-backlog.md) preserves account/access and adoption boundaries. M1–M9 remain the cumulative baseline; later work is not retroactive proof of full parity.
+
+### D01 verified delivery; D02 active — 2026-10-06
+
+D01's defined classified-directory system passes connected local and all seven application-source CI gates, with independent clean-artifact verification in its ledger; exact final-head readiness/review/merge state is on PR #17. Broader field-family/picker gaps remain visible. Autonomous work now proceeds under the D02 editorial contract and ADR 0016. Until PR #17 is merged, D02 is a dependent branch/PR rather than an unauthorized merge. Remaining backlog packages are queued for dependency-ordered autonomous resumption; account/infrastructure/adoption boundaries remain separate.
+
+### D01 merged; D02 defined-scope verification — 2026-10-07
+
+D01 PR #17 merged as `051d319`; actual-main clean artifact independently verified and release gates tracked separately. D02 [verification](evidence/d02-verification.md) records 96 cumulative real-engine cases, native/Chrome workflows, actual schema-16 recovery, bounded queue/index measurements and explicit retained limits. [PR #18](https://github.com/NaxAlpha/wpalt/pull/18) determines final-head readiness/merge status. Owner now authorizes automatic merge of ready PRs; subsequent local work continues autonomously, preserving account/access/adoption boundaries.

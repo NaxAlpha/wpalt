@@ -24,15 +24,17 @@ Verifiable future outcome: Create hierarchical content, edit typed values and pr
 
 ### D02 — Editorial workflow
 
-Origin: **M1–M2** · Catalog: **F007/F021** · Status: **deferred by owner**
+Origin: **M1–M2** · Catalog: **F007/F021** · Status: **defined assigned-review system locally verified; final delivery gates on PR #18**
 
-Explicit review/approval states, richer assignments/notifications and role-specific publication transitions beyond safe drafts/private response notes.
+Active [editorial-workflow contract](d02-contract.md), [approval decision](decisions/0016-editorial-approval-boundary.md) and [free reference investigation](evidence/d02-reference.md), [verification](evidence/d02-verification.md) and [PR #18](https://github.com/NaxAlpha/wpalt/pull/18).
+
+Assigned exact-material review, private actionable queue/notes, bounded history and publication/schedule authority are verified in D02. Configurable multi-stage/multi-approver policy, large-team reviewer search and custom contributor capabilities remain explicit future breadth; external email transport is optional owner configuration.
 
 Verifiable future outcome: An author requests review; an authorized reviewer approves/rejects; stale approval cannot publish changed work.
 
 ### D03 — Languages and owner usability
 
-Origin: **M1–M3** · Catalog: **F008–F011** · Status: **deferred by owner**
+Origin: **M1–M3** · Catalog: **F008–F011** · Status: **queued for dependency-ordered autonomous resumption**
 
 Administration localization, richer translation UI, long-document translation/protected-content workflow and model/language quality evaluation beyond short reviewed CLI drafts.
 
@@ -40,7 +42,7 @@ Verifiable future outcome: Edit and compare language variants in the UI; no tran
 
 ### D04 — Theme composition and assets
 
-Origin: **M2/M8** · Catalog: **F016/F019** · Status: **deferred by owner**
+Origin: **M2/M8** · Catalog: **F016/F019** · Status: **queued for dependency-ordered autonomous resumption**
 
 Hierarchical/mega navigation, expanded trusted-owner CSS/font/asset contracts and richer native layout/component authoring beyond bounded styles and pinned consent scripts.
 
@@ -48,7 +50,7 @@ Verifiable future outcome: An independent theme preserves responsive/accessibili
 
 ### D05 — Elementor compatibility
 
-Origin: **M8** · Catalog: **F024** · Status: **deferred by owner**
+Origin: **M8** · Catalog: **F024** · Status: **queued for dependency-ordered autonomous resumption**
 
 Full template/widget/style/dynamic/display-condition mapping and rendered-output compatibility. Current heading/text projection plus explicit losses remains supported.
 
@@ -56,7 +58,7 @@ Verifiable future outcome: Selected real free/premium source fixtures preserve r
 
 ### D06 — SEO previews and sitemap extensions
 
-Origin: **M3** · Catalog: **F025/F027** · Status: **deferred by owner**
+Origin: **M3** · Catalog: **F025/F027** · Status: **queued for dependency-ordered autonomous resumption**
 
 Social image/SERP-preview management and image/video/news sitemap extensions.
 
@@ -64,7 +66,7 @@ Verifiable future outcome: Published/private boundaries, latest primary guidance
 
 ### D07 — Structured data and locations
 
-Origin: **M3** · Catalog: **F028/F029** · Status: **deferred by owner**
+Origin: **M3** · Catalog: **F028/F029** · Status: **queued for dependency-ordered autonomous resumption**
 
 Custom schema graph builder, richer supported rich-result types and multiple business locations.
 
@@ -72,7 +74,7 @@ Verifiable future outcome: Owner-authored visible entities produce validated pub
 
 ### D08 — Redirects and link analysis
 
-Origin: **M3** · Catalog: **F030/F032** · Status: **deferred by owner**
+Origin: **M3** · Catalog: **F030/F032** · Status: **queued for dependency-ordered autonomous resumption**
 
 Bounded regex rules, safe automatic slug redirects, actionable 404 reporting and graph coverage of theme/navigation/raw HTML/dynamic links.
 
@@ -80,7 +82,7 @@ Verifiable future outcome: Preview loops/conflicts and work budgets; a complete 
 
 ### D09 — Editorial tooling
 
-Origin: **M3/M9** · Catalog: **F031/F034** · Status: **deferred by owner**
+Origin: **M3/M9** · Catalog: **F031/F034** · Status: **queued for dependency-ordered autonomous resumption**
 
 Administration screens for native link/orphan/text/keyword tools, richer language-aware advisory analysis and larger incremental graph workloads.
 
@@ -88,7 +90,7 @@ Verifiable future outcome: An editor reviews useful suggestions alongside conten
 
 ### D10 — Advanced forms and surveys
 
-Origin: **M4** · Catalog: **F038/F042/F044** · Status: **deferred by owner**
+Origin: **M4** · Catalog: **F038/F042/F044** · Status: **queued for dependency-ordered autonomous resumption**
 
 Richer declarative conditional/calculation grammar and specialized survey reporting beyond bounded presence/equality/sum/product/choice score.
 
@@ -96,7 +98,7 @@ Verifiable future outcome: Server and UI agree on calculations and visibility; e
 
 ### D11 — Attachment and signature workflows
 
-Origin: **M4** · Catalog: **F041/F043** · Status: **deferred by owner**
+Origin: **M4** · Catalog: **F041/F043** · Status: **queued for dependency-ordered autonomous resumption**
 
 Optional isolated malware scanning, cryptographic signature/identity integrations and generated signed-document artifacts.
 
@@ -104,7 +106,7 @@ Verifiable future outcome: Untrusted files remain private/quarantined; identity 
 
 ### D12 — Offline and resumable workflows
 
-Origin: **M4** · Catalog: **F045/F046** · Status: **deferred by owner**
+Origin: **M4** · Catalog: **F045/F046** · Status: **queued for dependency-ordered autonomous resumption**
 
 Broader offline site navigation/synchronization and explicit consented abandonment workflows beyond already-loaded form retry and partial drafts.
 
@@ -112,7 +114,7 @@ Verifiable future outcome: Conflict-aware online reconciliation preserves origin
 
 ### D13 — Custom authorization
 
-Origin: **M5** · Catalog: **F051** · Status: **deferred by owner**
+Origin: **M5** · Catalog: **F051** · Status: **queued for dependency-ordered autonomous resumption**
 
 Owner-authored roles/capabilities with consistent administrative/API/content/worker policy enforcement.
 
@@ -120,7 +122,7 @@ Verifiable future outcome: Least-privilege custom roles cannot bypass direct-res
 
 ### D14 — Learning and community breadth
 
-Origin: **M5** · Catalog: **F055/F056/F058** · Status: **deferred by owner**
+Origin: **M5** · Catalog: **F055/F056/F058** · Status: **queued for dependency-ordered autonomous resumption**
 
 Broader assessments/assignment attachment/editor workflows, richer course administration and community features beyond versioned multiple-choice/text/private discussion.
 
@@ -128,7 +130,7 @@ Verifiable future outcome: Edition changes preserve historical progress; prerequ
 
 ### D15 — Affiliate attribution
 
-Origin: **M5–M6** · Catalog: **F059** · Status: **deferred by owner**
+Origin: **M5–M6** · Catalog: **F059** · Status: **queued for dependency-ordered autonomous resumption**
 
 Automatic reviewed purchase-linked commissions and payout bookkeeping beyond local referral counts/manual commissions.
 
@@ -136,7 +138,7 @@ Verifiable future outcome: Idempotent orders/refunds/reversals reconcile commiss
 
 ### D16 — Commerce breadth
 
-Origin: **M6** · Catalog: **F060–F069** · Status: **deferred by owner**
+Origin: **M6** · Catalog: **F060–F069** · Status: **queued for dependency-ordered autonomous resumption**
 
 Guest checkout, additional currencies/pricing/shipping/tax models, richer refund/fulfillment/provider workflows and broader booking calendars beyond current defined store scope.
 
@@ -144,7 +146,7 @@ Verifiable future outcome: Concurrent stock/capacity, checked money, stale total
 
 ### D17 — Provider certification
 
-Origin: **M6** · Catalog: **F069** · Status: **deferred by owner**
+Origin: **M6** · Catalog: **F069** · Status: **queued for dependency-ordered autonomous resumption**
 
 Actual merchant-account sandbox/end-to-end payment verification; current HTTPS Stripe adapter fixture is not an actual Stripe-account certification.
 
@@ -152,7 +154,7 @@ Verifiable future outcome: Real authorized test account records verify payment/s
 
 ### D18 — Analytics and funnels
 
-Origin: **M4/M6** · Catalog: **F085/F086** · Status: **deferred by owner**
+Origin: **M4/M6** · Catalog: **F085/F086** · Status: **queued for dependency-ordered autonomous resumption**
 
 Arbitrary native funnel builder, purchase/conversion joins and expanded retained-data reporting.
 
@@ -160,7 +162,7 @@ Verifiable future outcome: Consent, withdrawal and authoritative purchase facts 
 
 ### D19 — Engagement breadth
 
-Origin: **M4** · Catalog: **F089/F091** · Status: **deferred by owner**
+Origin: **M4** · Catalog: **F089/F091** · Status: **queued for dependency-ordered autonomous resumption**
 
 Exit-intent triggering, richer campaign UI and explicitly reviewed offer presentation/redemption workflows beyond accessible native targeted dialogs and current claims.
 
@@ -168,7 +170,7 @@ Verifiable future outcome: Keyboard/assistive-device behavior and delayed withdr
 
 ### D20 — Campaign automation
 
-Origin: **M4** · Catalog: **F098** · Status: **deferred by owner**
+Origin: **M4** · Catalog: **F098** · Status: **queued for dependency-ordered autonomous resumption**
 
 General visual automation graph and broader queue/segment workflow controls beyond confirmation/manual/scheduled templates.
 
@@ -176,7 +178,7 @@ Verifiable future outcome: Versioned consent/revocation and durable receiver-awa
 
 ### D21 — Shared cache and replicas
 
-Origin: **M7** · Catalog: **F074/F122** · Status: **deferred by owner**
+Origin: **M7** · Catalog: **F074/F122** · Status: **queued for dependency-ordered autonomous resumption**
 
 Optional external shared object-cache and explicit read-replica consistency/route policy.
 
@@ -184,7 +186,7 @@ Verifiable future outcome: Revoked/private/withdrawn data cannot reappear under 
 
 ### D22 — Maintenance and media isolation
 
-Origin: **M7** · Catalog: **F080/F082/F106** · Status: **deferred by owner**
+Origin: **M7** · Catalog: **F080/F082/F106** · Status: **queued for dependency-ordered autonomous resumption**
 
 Explicit safe database compaction, broader bounded video profiles and stronger owner-hosted codec/signature isolation and resource accounting.
 
@@ -192,7 +194,7 @@ Verifiable future outcome: Interruption retains source/history; resource pressur
 
 ### D23 — Privacy breadth
 
-Origin: **M7** · Catalog: **F109/F110/F111** · Status: **deferred by owner**
+Origin: **M7** · Catalog: **F109/F110/F111** · Status: **queued for dependency-ordered autonomous resumption**
 
 More explicit consent categories/script contracts, independently verified anonymous/outside-data requests and wider finite site scanning.
 
@@ -200,7 +202,7 @@ Verifiable future outcome: GPC/DNT/withdrawal, exact purpose/version grants and 
 
 ### D24 — Migration breadth
 
-Origin: **M8** · Catalog: **F001–F132 adapters** · Status: **deferred by owner**
+Origin: **M8** · Catalog: **F001–F132 adapters** · Status: **queued for dependency-ordered autonomous resumption**
 
 Expand selected WordPress/plugin export adapters and media/style/relationship mappings; stronger resumable assessment tools and reviewed larger source workloads.
 
@@ -208,7 +210,7 @@ Verifiable future outcome: Use actual versioned source fixtures; report losses; 
 
 ### D25 — Extensions and snippets
 
-Origin: **M9** · Catalog: **F124/F129** · Status: **deferred by owner**
+Origin: **M9** · Catalog: **F124/F129** · Status: **queued for dependency-ordered autonomous resumption**
 
 Broader developer-hook API/ABI and an explicit isolated approved-snippet/runtime contract. Dynamic module loading/unloading is an option to evaluate, not an existing supported feature.
 
@@ -216,7 +218,7 @@ Verifiable future outcome: Versioned grants and revocation work under resource l
 
 ### D26 — Versioned lifecycle
 
-Origin: **M9** · Catalog: **F125/F128** · Status: **deferred by owner**
+Origin: **M9** · Catalog: **F125/F128** · Status: **queued for dependency-ordered autonomous resumption**
 
 More supported configuration/schema/theme/integration upgrade paths, executable replacement orchestration and compatibility-removal automation.
 
@@ -224,7 +226,7 @@ Verifiable future outcome: Old meaningful data migrates or fresh rollback recove
 
 ### D27 — Fleet operations
 
-Origin: **M9** · Catalog: **F126/F127/F130** · Status: **deferred by owner**
+Origin: **M9** · Catalog: **F126/F127/F130** · Status: **queued for dependency-ordered autonomous resumption**
 
 Bulk reviewed fleet upgrade/repair, durable external scheduling/alerts and independent fleet operator UI beyond the read-only native inspector.
 
@@ -232,7 +234,7 @@ Verifiable future outcome: A failed origin does not hide others; least-privilege
 
 ### D28 — Deployment
 
-Origin: **M9** · Catalog: **F074/F122/F126–F130** · Status: **deferred by owner**
+Origin: **M9** · Catalog: **F074/F122/F126–F130** · Status: **queued for dependency-ordered autonomous resumption**
 
 Physical multi-host operation, shared storage/fencing, horizontal throughput and automated failover/rolling strategy.
 
@@ -240,7 +242,7 @@ Verifiable future outcome: Run genuinely separate hosts, partition/kill ownershi
 
 ### D29 — Frontend/accessibility
 
-Origin: **M3.5/M9** · Catalog: **Editor/core/frontend** · Status: **deferred by owner**
+Origin: **M3.5/M9** · Catalog: **Editor/core/frontend** · Status: **queued for dependency-ordered autonomous resumption**
 
 Broader browser/device/IME/assistive-technology and large-document support beyond tested Chromium geometry/keyboard/text-spacing/RTL journeys. Real-time coediting and Notion database/workspace parity need a separate product decision.
 
@@ -248,7 +250,7 @@ Verifiable future outcome: Record actual device/browser/AT evidence; use underst
 
 ### D30 — Adoption
 
-Origin: **M9** · Catalog: **Release/core** · Status: **deferred by owner**
+Origin: **M9** · Catalog: **Release/core** · Status: **queued for dependency-ordered autonomous resumption**
 
 Public license, version/support/deprecation policy, release signing/SBOM and comprehensive instrumented frontend/CLI coverage if adopted.
 

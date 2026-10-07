@@ -1422,6 +1422,21 @@ function App() {
               setModel(name);
             }}
           />
+          <Field
+            label="Require assigned review before publication"
+            type="checkbox"
+            checked={!!models[model].review_required}
+            description="Another active editor must approve the exact working copy before it can publish or be scheduled."
+            onChange={(e) =>
+              setModels({
+                ...models,
+                [model]: {
+                  ...models[model],
+                  review_required: e.currentTarget.checked,
+                },
+              })
+            }
+          />
           <Scalar
             label="Model label"
             value={models[model].label}
@@ -1738,7 +1753,13 @@ if (form) {
           return () => form.removeEventListener("wpalt:recovery", recovered);
         }, []);
         useEffect(() => {
-          const fn = () => setKind(select.value);
+          const fn = () => {
+            setKind(select.value);
+            const pane = form.querySelector("[data-editorial-pane]");
+            if (pane)
+              pane.hidden =
+                !state.registry.models[select.value].review_required;
+          };
           select.addEventListener("change", fn);
           fn();
           return () => select.removeEventListener("change", fn);
