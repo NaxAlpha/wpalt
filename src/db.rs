@@ -2,7 +2,7 @@ use crate::{config::Config, error::Result, model::Settings};
 use sqlx::{Any, AnyPool, ConnectOptions, Execute, QueryBuilder, Row, any::AnyPoolOptions};
 use std::str::FromStr;
 
-pub const SCHEMA_VERSION: i64 = 17;
+pub const SCHEMA_VERSION: i64 = 18;
 
 #[derive(Clone)]
 pub struct Db {
@@ -111,6 +111,7 @@ impl Db {
                     || version == Some(14)
                     || version == Some(15)
                     || version == Some(16)
+                    || version == Some(17)
                     || version == Some(SCHEMA_VERSION),
                 "unsupported schema version; use the documented migration/reset path"
             );
@@ -126,6 +127,9 @@ impl Db {
         }
         let mut tx = self.pool.begin().await?;
         sqlx::raw_sql(SCHEMA).execute(&mut *tx).await?;
+        sqlx::raw_sql(crate::platform::interface_web::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
         sqlx::raw_sql(crate::editorial::SCHEMA)
             .execute(&mut *tx)
             .await?;

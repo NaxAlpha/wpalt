@@ -1,5 +1,5 @@
 //! Connected manual language workflows; private variants remain draft/review authority.
-use super::translations;
+use super::{i18n::Catalog, translations};
 use crate::{
     App, auth, content, discovery,
     error::{Error, Result},
@@ -46,6 +46,8 @@ async fn index(
     Query(filter): Query<Filter>,
 ) -> Result<Html<String>> {
     let s = editor(&app, &headers).await?;
+    let catalog = Catalog::select(&s.interface_locale).unwrap_or(Catalog::english());
+    let t = |id| html! {span lang=(catalog.locale()) dir=(catalog.direction()){(catalog.text(id))}};
     let d = discovery::load(&app).await?.0;
     if !filter.locale.is_empty() {
         d.language(&filter.locale)?;
@@ -74,10 +76,11 @@ async fn index(
     }
     q.push(" ORDER BY updated_at DESC,id DESC LIMIT 41");
     let rows = app.db.fetch_builder(&mut q).await?;
-    let body = html! {(view::heading("Publishing","Language workspace","Compare language variants and review deliberate draft duplication or shared-value synchronization."))
-    form method="get" class="toolbar" {label {"Content language" select name="locale" {option value="" {"All languages"}@for l in &d.languages{option value=(l.code) selected[filter.locale==l.code] {(l.label)}}}}button class="secondary" {"Show content"}}
-    section class="panel" {@if rows.is_empty(){p {"No content in this language."}}@for r in rows.iter().take(40){article {h2 {a href=(format!("/admin/languages/{}",r.get::<String,_>("id"))) {(r.get::<String,_>("title"))}}p {bdi {(r.get::<String,_>("locale"))} " · " (r.get::<String,_>("status"))}p class="muted" {(if r.get::<String,_>("translation_group").is_empty(){"Save a translation group in the editor to connect variants."}else{"Open to compare linked variants."})}}}}
-    @if rows.len()>40{@let r=&rows[39];a class="button secondary" href=(format!("/admin/languages?locale={}&after={}:{}",filter.locale,r.get::<i64,_>("updated_at"),r.get::<String,_>("id"))) {"Older content →"}}
+    let body = html! {(localized_heading(catalog,"language.title","Compare language variants and review deliberate draft duplication or shared-value synchronization."))
+    form method="get" class="toolbar" {label {"Content language" select name="locale" {option value="" lang=(catalog.locale()) {(catalog.text("language.all"))}@for l in &d.languages{option value=(l.code) selected[filter.locale==l.code] {(l.label)}}}}button class="secondary" {"Show content"}}
+    p lang=(catalog.locale()) dir=(catalog.direction()) {(catalog.content_count(rows.len().min(40) as u64))}
+    section class="panel" {@if rows.is_empty(){p {(t("language.empty"))}}@for r in rows.iter().take(40){article {h2 {a href=(format!("/admin/languages/{}",r.get::<String,_>("id"))) {(r.get::<String,_>("title"))}}p {bdi {(r.get::<String,_>("locale"))} " · " (r.get::<String,_>("status"))}p class="muted" {(if r.get::<String,_>("translation_group").is_empty(){"Save a translation group in the editor to connect variants."}else{"Open to compare linked variants."})}}}}
+    @if rows.len()>40{@let r=&rows[39];a class="button secondary" href=(format!("/admin/languages?locale={}&after={}:{}",filter.locale,r.get::<i64,_>("updated_at"),r.get::<String,_>("id"))) {(t("language.older"))}}
     };
     Ok(Html(view::layout(
         "Language workspace",
@@ -119,6 +122,8 @@ async fn render(
         return Err(Error::invalid("Choose a valid language variant."));
     }
     let source = content::get(app, id).await?;
+    let catalog = Catalog::select(&s.interface_locale).unwrap_or(Catalog::english());
+    let t = |id| html! {span lang=(catalog.locale()) dir=(catalog.direction()){(catalog.text(id))}};
     let d = discovery::load(app).await?.0;
     let registry = schema::Registry::load(app).await?;
     let variants = if source.translation_group.is_empty() {
@@ -179,22 +184,22 @@ async fn render(
                     details {summary lang="en" dir="ltr" {"Read complete saved document"}pre class="translation-copy" {(text)}}
                 } @else {pre class="translation-copy" {(text)}}
             }
-            a class="button secondary" lang="en" dir="ltr" href=(format!("/admin/posts/{}",p.id)){"Edit this variant"}
+            a class="button secondary" lang="en" dir="ltr" href=(format!("/admin/posts/{}",p.id)){(t("language.edit"))}
         }}
     };
     let body = html! {
-    (view::heading("Publishing","Compare language variants","Each language publishes and earns editorial approval independently. Compare saved content before creating or updating a draft."))
+    (localized_heading(catalog,"language.compare","Each language publishes and earns editorial approval independently. Compare saved content before creating or updating a draft."))
     p {a href="/admin/languages" {"All language content"}}
     nav aria-label="Related language variants" {@for r in variants.iter().filter(|r|r.get::<String,_>("id")!=source.id){a class="button secondary" href=(format!("/admin/languages/{id}?target={}",r.get::<String,_>("id"))){(r.get::<String,_>("locale")) " · " (r.get::<String,_>("status"))}}}
     div class="split" {(copy(&source))@if let Some(target)=&target{(copy(target))}@else{section class="panel" {h2 {"New translation draft"}p {"The source document is copied without automatic translation. Edit its language before requesting review or publication. Protected source duplication requires an explicitly provisioned protected target."}}}}
     @if source.translation_group.is_empty(){p class="notice" {"Assign a translation group in the source editor and save before connecting a different language."}}
     @else if !d.languages.iter().any(|l|l.code!=source.locale){p class="notice" {"Configure another site language before creating a translation."}}
     @else{form method="post" action=(format!("/admin/languages/{id}")) class="panel" {(view::csrf(s))input type="hidden" name="target" value=(selection.target);h2 {(if target.is_some(){"Review shared-value synchronization"}else{"Review a translation draft"})}
-    label {"Target language" select name="locale" aria-label="Target language" {@for l in d.languages.iter().filter(|l|l.code!=source.locale){option value=(l.code) selected[l.code==locale] {(l.label)}}}}
-    label {"Target URL slug" input name="slug" aria-label="Target URL slug" value=(slug) pattern="[a-z0-9-]+" maxlength="120" required;}
+    label lang=(catalog.locale()) dir=(catalog.direction()) {(catalog.text("language.target")) select name="locale" aria-label=(catalog.text("language.target")) {@for l in d.languages.iter().filter(|l|l.code!=source.locale){option value=(l.code) selected[l.code==locale] {(l.label)}}}}
+    label lang=(catalog.locale()) dir=(catalog.direction()) {(catalog.text("language.slug")) input name="slug" dir="ltr" aria-label=(catalog.text("language.slug")) value=(slug) pattern="[a-z0-9-]+" maxlength="120" required;}
     @if target.is_some(){fieldset {legend {"Shared values to copy"}p {"Only checked values are copied. Translated document, title, URL, discovery, classification, publication and access remain independently authored."}@for (name,_) in registry.fields_for(&source.kind)?{label {input type="checkbox" name=(format!("sync_{name}")) value="true" checked[fields.contains(&name)];(name)}}}}
-    @if let Some(report)=report{p class="notice" {"Review this exact saved source, target and selection. Changes before execution require a new preview."}p {"Source revision " (report["source_version"].as_i64().unwrap_or(0))}input type="hidden" name="execute" value=(report["plan"].as_str().unwrap_or(""));button {(if target.is_some(){"Apply reviewed shared values"}else{"Create reviewed draft"})}}
-    @else{button {"Preview language operation"}}
+    @if let Some(report)=report{p class="notice" {"Review this exact saved source, target and selection. Changes before execution require a new preview."}p lang=(catalog.locale()) dir=(catalog.direction()) {(catalog.value("language.saved_revision",&catalog.number(report["source_version"].as_u64().unwrap_or(0))))}input type="hidden" name="execute" value=(report["plan"].as_str().unwrap_or(""));button {(t(if target.is_some(){"language.sync"}else{"language.create"}))}}
+    @else{button {(t("language.preview"))}}
     }}
     };
     Ok(Html(view::layout(
@@ -289,4 +294,8 @@ async fn api(
         )
         .await?,
     ))
+}
+
+fn localized_heading(catalog: Catalog, key: &str, description: &str) -> Markup {
+    html! {header class="page-heading" {p class="eyebrow" {"Publishing"}h1 lang=(catalog.locale()) dir=(catalog.direction()) {(catalog.text(key))}p {(description)}}}
 }

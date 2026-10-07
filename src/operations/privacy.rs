@@ -261,6 +261,7 @@ const EXPORTS: &[(&str, &str, &str)] = &[
         "id,post_id,action,notes,created_at",
     ),
     ("member_profiles", "user_id", "user_id,biography,version"),
+    ("user_preferences", "user_id", "user_id,locale,version"),
     (
         "member_grants",
         "user_id",
@@ -532,6 +533,10 @@ async fn erase_account(
             .execute(&mut *tx)
             .await?;
     }
+    sqlx::query("DELETE FROM user_preferences WHERE user_id=$1")
+        .bind(&subject)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM member_profiles WHERE user_id=$1")
         .bind(&subject)
         .execute(&mut *tx)

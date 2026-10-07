@@ -31,6 +31,7 @@ pub fn router(app: App) -> Router {
         .merge(crate::builder_web::routes())
         .merge(crate::editorial_web::routes())
         .merge(crate::platform::language_web::routes())
+        .merge(crate::platform::interface_web::routes())
         .merge(crate::platform::web::routes())
         .merge(crate::platform::integrations::routes())
         .merge(crate::platform::events::routes())
@@ -311,6 +312,7 @@ async fn security_and_trace_inner(
         && !capability_navigation(&route, request.headers())
         && !(method == axum::http::Method::POST && route == "/commerce/stripe/webhook")
         && !((route == "/api/v1/content" && method == axum::http::Method::POST)
+            || (route == "/api/v1/translations" && method == axum::http::Method::POST)
             || (route == "/api/v1/content/{id}" && method == axum::http::Method::PUT))
     {
         Error::forbidden().into_response()

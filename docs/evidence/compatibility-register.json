@@ -2,13 +2,13 @@
   "schema": 1,
   "layers": [
     {
-      "id": "d02-offline-recovery-v12",
+      "id": "d03-offline-recovery-v12-v13",
       "owner": "wpalt maintainers",
-      "reason": "Adopted schema 14\u201316 archives must remain recoverable across the explicit editorial table-graph migration; ordinary runtime/restore has no legacy branch.",
-      "supported_versions": "Native schemas 14\u201316, portable graph v12; schema 17 / graph v13 target",
-      "migration_path": "Stopped upgrade retains original encrypted v12 bytes for old-executable fresh rollback. Explicit migrate-recovery-v12 creates a separately validated new v13 archive; no source overwrite.",
+      "reason": "Native schemas 14–17 archives must remain recoverable across explicit editorial/preference graph migrations; ordinary runtime/restore has no legacy branch.",
+      "supported_versions": "Native schemas 14–17, portable v12/v13; schema 18 / graph v14 target",
+      "migration_path": "Stopped upgrade retains original encrypted v12 (14–16) or v13 (17) bytes for old-executable fresh rollback. Explicit migrate-recovery-v12/v13 create separately validated new v14 archives without source overwrite.",
       "removal_release": "First adopted release after a documented supported-source retirement decision and verified replacement recovery path",
-      "review_deadline": "2027-01-04"
+      "review_deadline": "2027-01-05"
     }
   ],
   "policy": "No legacy runtime shims before M9. Add any temporary bridge with version range, owner, migration path and removal deadline."

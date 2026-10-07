@@ -83,7 +83,7 @@ pub async fn apply(
     let installed: i64 = sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
         .fetch_one(&app.db.pool)
         .await?;
-    if ![14, 15, 16, crate::db::SCHEMA_VERSION].contains(&installed) {
+    if ![14, 15, 16, 17, crate::db::SCHEMA_VERSION].contains(&installed) {
         return Err(Error::invalid(
             "Unsupported maintenance source; use fresh-target recovery.",
         ));

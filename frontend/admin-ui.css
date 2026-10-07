@@ -846,3 +846,29 @@ body.admin .media-card video {
   font: inherit;
   max-width: 100%;
 }
+
+/* Interface direction changes the shell; content keeps its independently declared direction. */
+html[dir="rtl"] .admin .sidebar {
+  left: auto;
+  right: 0;
+}
+html[dir="rtl"] .admin .workspace {
+  margin-left: 0;
+  margin-right: var(--ui-size-sidebar);
+}
+html[dir="rtl"] .admin .sidebar nav a[aria-current="page"] {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+html[dir="rtl"] .admin .skip {
+  left: auto;
+  right: 15px;
+}
+@media (--ui-mobile) {
+  html[dir="rtl"] .admin .sidebar {
+    left: auto;
+    right: auto;
+  }
+  html[dir="rtl"] .admin .workspace {
+    margin-right: 0;
+  }
+}

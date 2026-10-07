@@ -134,7 +134,7 @@ pub fn clone_package(config: &Config, encoded: &[u8], source: &str) -> Result<Pr
     let payload =
         serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot serialize clone."))?;
     let bytes = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v13".into(),
+        format: "wpalt-backup-v14".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -365,7 +365,7 @@ pub fn prepare(config: &Config, encoded: &[u8], requested: &[String]) -> Result<
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Cannot serialize selected recovery graph."))?;
     let bytes = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v13".into(),
+        format: "wpalt-backup-v14".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })

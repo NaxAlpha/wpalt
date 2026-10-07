@@ -268,6 +268,7 @@ pub async fn authenticate_finish(app: &App, input: Authentication) -> Result<(St
         .await?;
     let token = auth::random_token();
     let s = Session {
+        interface_locale: "en".into(),
         user: User {
             id: user,
             email: account.get("email"),

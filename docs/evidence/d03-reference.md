@@ -17,3 +17,9 @@ Inspected `src/modules/sync/sync-post-metas.php`, `sync-metas.php` and `settings
 ## Initial catalog scope
 
 The bundled catalog covers selected navigation, interface preference and language-workspace messages in English/French/Japanese/Arabic. It is an authored initial translation set, not professionally certified localization. Other screens retain English until their connected states are translated and verified. Stable IDs, escaped parameter text, bounded immutable local loading, English fallback, localized integer formatting and count grammar are code boundaries to verify; they do not establish translation quality or universal locale coverage.
+
+## Model transport and integer language grammar
+
+Checked 2026-10-07: [Ollama generation API](https://docs.ollama.com/api/generate) describes non-streamed responses, schema-constrained `format`, `think`, `keep_alive`, completion reasons and nanosecond/token metrics. The worker requests a bounded JSON text result and rejects output-budget exhaustion; schema-valid text remains untrusted translation requiring human review. The separately installed model digest is bound to resumable work. No hosted inference is inferred from literal-loopback availability.
+
+[Unicode CLDR 48 cardinal language rules](https://www.unicode.org/cldr/charts/48/supplemental/language_plural_rules.html) ground the scoped integer-count English/French/Japanese/Arabic catalog behavior. Decimal/ordinal/currency/date formatting is outside this initial integer message contract. Authored wording still needs human language review; matching a category is not professionally certified localization.

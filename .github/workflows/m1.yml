@@ -105,6 +105,8 @@ jobs:
         run: python3 scripts/migration_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
       - name: Verify scoped external integrations through the clean executable
         run: python3 scripts/integration_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
+      - name: Verify resumable canonical translation proposals
+        run: python3 scripts/document_translation_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --output work/d03-document-synthetic-reference.json
       - name: Verify explicit private configuration transfer
         run: python3 scripts/config_transfer_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
       - name: Verify independent native fleet observation and credential isolation

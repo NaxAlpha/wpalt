@@ -133,6 +133,10 @@ pub(crate) const TABLES: &[(&str, &[(&str, bool)])] = &[
         ],
     ),
     (
+        "user_preferences",
+        &[("user_id", false), ("locale", false), ("version", true)],
+    ),
+    (
         "posts",
         &[
             ("id", false),
@@ -1055,16 +1059,26 @@ pub fn safe_filename(name: &str) -> bool {
         && !name.contains('\\')
 }
 pub async fn capture(app: &App) -> Result<Vec<u8>> {
-    capture_format(app, false).await
+    capture_format(app, 14).await
 }
 /// Only the stopped maintenance path may capture the original pre-change graph.
 pub(crate) async fn capture_maintenance(app: &App) -> Result<Vec<u8>> {
     let installed: i64 = sqlx::query_scalar("SELECT version FROM schema_version WHERE id=1")
         .fetch_one(&app.db.pool)
         .await?;
-    capture_format(app, installed < 17).await
+    capture_format(
+        app,
+        if installed < 17 {
+            12
+        } else if installed < 18 {
+            13
+        } else {
+            14
+        },
+    )
+    .await
 }
-async fn capture_format(app: &App, legacy: bool) -> Result<Vec<u8>> {
+async fn capture_format(app: &App, graph: i64) -> Result<Vec<u8>> {
     let _guard = app.mutation().await?;
     let mut tx = app.db.pool.begin().await?;
     if app.db.postgres {
@@ -1075,7 +1089,9 @@ async fn capture_format(app: &App, legacy: bool) -> Result<Vec<u8>> {
     let mut tables = BTreeMap::new();
     let mut budget = 0_usize;
     for (name, columns) in TABLES {
-        if legacy && ["editorial_work", "editorial_decisions"].contains(name) {
+        if (graph < 13 && ["editorial_work", "editorial_decisions"].contains(name))
+            || (graph < 14 && *name == "user_preferences")
+        {
             continue;
         }
         let sql = format!(
@@ -1169,7 +1185,7 @@ async fn capture_format(app: &App, legacy: bool) -> Result<Vec<u8>> {
     let snapshot = Snapshot {
         audit_history,
         private_files,
-        schema: if legacy { 12 } else { 13 },
+        schema: graph,
         created_at: crate::now(),
         tables,
         files,
@@ -1177,12 +1193,7 @@ async fn capture_format(app: &App, legacy: bool) -> Result<Vec<u8>> {
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Backup serialization failed."))?;
     let encoded = serde_json::to_vec(&Envelope {
-        format: if legacy {
-            "wpalt-backup-v12"
-        } else {
-            "wpalt-backup-v13"
-        }
-        .into(),
+        format: format!("wpalt-backup-v{graph}"),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -1199,14 +1210,14 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v13"
+    if envelope.format != "wpalt-backup-v14"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 13
+    if snapshot.schema != 14
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -1330,6 +1341,20 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
         {
             return Err(Error::invalid("Invalid authenticator recovery graph."));
         }
+    }
+    let mut preference_users = HashSet::new();
+    for row in &snapshot.tables["user_preferences"] {
+        let user = row["user_id"].as_str().unwrap();
+        if !user_ids.contains(user)
+            || !preference_users.insert(user)
+            || !(1..=crate::platform::interface_web::MAX_VERSION)
+                .contains(&row["version"].as_i64().unwrap())
+        {
+            return Err(Error::invalid(
+                "Invalid account interface preference graph.",
+            ));
+        }
+        crate::platform::i18n::Catalog::select(row["locale"].as_str().unwrap())?;
     }
     for row in &snapshot.tables["users"] {
         crate::auth::valid_user(
@@ -1981,12 +2006,14 @@ pub fn migrate_m6(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<
         || snapshot.tables.contains_key("recovery_mode")
         || snapshot.tables.contains_key("editorial_work")
         || snapshot.tables.contains_key("editorial_decisions")
+        || snapshot.tables.contains_key("user_preferences")
     {
         return Err(Error::invalid(
             "Archive is not an unmigrated M6 recovery point.",
         ));
     }
-    snapshot.schema = 13;
+    snapshot.schema = 14;
+    snapshot.tables.insert("user_preferences".into(), vec![]);
     snapshot.tables.insert("editorial_work".into(), vec![]);
     snapshot.tables.insert("editorial_decisions".into(), vec![]);
     snapshot.tables.insert("privacy_requests".into(), vec![]);
@@ -1996,7 +2023,7 @@ pub fn migrate_m6(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Archive migration failed."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v13".into(),
+        format: "wpalt-backup-v14".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2020,13 +2047,16 @@ pub fn migrate_v12(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid v12 graph."))?;
     if snapshot.schema != 12
-        || snapshot.tables.len() != TABLES.len() - 2
+        || snapshot.tables.len() != TABLES.len() - 3
         || TABLES
             .iter()
-            .filter(|(n, _)| !["editorial_work", "editorial_decisions"].contains(n))
+            .filter(|(n, _)| {
+                !["editorial_work", "editorial_decisions", "user_preferences"].contains(n)
+            })
             .any(|(n, _)| !snapshot.tables.contains_key(*n))
         || snapshot.tables.contains_key("editorial_work")
         || snapshot.tables.contains_key("editorial_decisions")
+        || snapshot.tables.contains_key("user_preferences")
     {
         return Err(Error::invalid("Unsupported v12 table set."));
     }
@@ -2044,13 +2074,50 @@ pub fn migrate_v12(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
             ));
         }
     }
-    snapshot.schema = 13;
+    snapshot.schema = 14;
+    snapshot.tables.insert("user_preferences".into(), vec![]);
     snapshot.tables.insert("editorial_work".into(), vec![]);
     snapshot.tables.insert("editorial_decisions".into(), vec![]);
     let payload =
         serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot convert archive."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v13".into(),
+        format: "wpalt-backup-v14".into(),
+        sha256: digest(payload.as_bytes()),
+        payload,
+    })
+    .map_err(|_| Error::invalid("Cannot convert archive."))?;
+    validate(config, &output)?;
+    Ok(output)
+}
+pub fn migrate_v13(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<u8>> {
+    if encoded.len() > config.max_backup_bytes {
+        return Err(Error::invalid("Archive exceeds configured budget."));
+    }
+    let envelope: Envelope =
+        serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid v13 envelope."))?;
+    if envelope.format != "wpalt-backup-v13"
+        || digest(envelope.payload.as_bytes()) != envelope.sha256
+    {
+        return Err(Error::invalid("Invalid v13 format/checksum."));
+    }
+    let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
+        .map_err(|_| Error::invalid("Invalid v13 graph."))?;
+    if snapshot.schema != 13
+        || snapshot.tables.len() != TABLES.len() - 1
+        || snapshot.tables.contains_key("user_preferences")
+        || TABLES
+            .iter()
+            .filter(|(name, _)| *name != "user_preferences")
+            .any(|(name, _)| !snapshot.tables.contains_key(*name))
+    {
+        return Err(Error::invalid("Unsupported v13 table set."));
+    }
+    snapshot.schema = 14;
+    snapshot.tables.insert("user_preferences".into(), vec![]);
+    let payload =
+        serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot convert archive."))?;
+    let output = serde_json::to_vec(&Envelope {
+        format: "wpalt-backup-v14".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2061,18 +2128,27 @@ pub fn migrate_v12(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
 pub(crate) fn inspect_maintenance(config: &crate::config::Config, encoded: &[u8]) -> Result<Value> {
     let envelope: Envelope = serde_json::from_slice(encoded)
         .map_err(|_| Error::invalid("Invalid maintenance graph."))?;
-    if envelope.format == "wpalt-backup-v12" {
-        let mut report = inspect(config, &migrate_v12(config, encoded)?)?;
-        report["schema"] = 12.into();
-        if let Some(tables) = report["tables"].as_object_mut() {
+    let source = match envelope.format.as_str() {
+        "wpalt-backup-v12" => 12,
+        "wpalt-backup-v13" => 13,
+        _ => return inspect(config, encoded),
+    };
+    let converted = if source == 12 {
+        migrate_v12(config, encoded)?
+    } else {
+        migrate_v13(config, encoded)?
+    };
+    let mut report = inspect(config, &converted)?;
+    report["schema"] = source.into();
+    if let Some(tables) = report["tables"].as_object_mut() {
+        tables.remove("user_preferences");
+        if source == 12 {
             tables.remove("editorial_work");
             tables.remove("editorial_decisions");
         }
-        report["boundary"] =
-            "Original v12 bytes retained; full validation through explicit offline v13 conversion."
-                .into();
-        Ok(report)
-    } else {
-        inspect(config, encoded)
     }
+    report["boundary"] =
+        "Original source bytes retained; full validation through explicit offline v14 conversion."
+            .into();
+    Ok(report)
 }

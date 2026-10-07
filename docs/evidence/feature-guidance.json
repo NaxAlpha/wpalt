@@ -2179,12 +2179,16 @@
       "sources": [
         "https://www.w3.org/International/questions/qa-html-language-declarations.html",
         "https://polylang.pro/documentation/support/guides/synchronize-metadatas-between-translations/",
-        "https://downloads.wordpress.org/plugin/polylang.3.8.10.zip"
+        "https://downloads.wordpress.org/plugin/polylang.3.8.10.zip",
+        "https://www.unicode.org/cldr/charts/48/supplemental/language_plural_rules.html",
+        "https://docs.ollama.com/api/generate"
       ],
       "applicable_versions": [
         "Polylang 3.8.10 static source inspection only",
-        "wpalt native schema 17 / portable graph v13; D03 development in progress",
-        "Bundled interface catalog v1"
+        "wpalt native schema 18 / portable graph v14; D03 development in progress",
+        "Bundled interface catalog v1",
+        "Unicode CLDR 48 integer cardinal scope",
+        "Ollama local generation API; actual installed runtime/model evaluation pending"
       ],
       "last_checked": "2026-10-07",
       "next_review": "2027-01-05",
@@ -2198,7 +2202,11 @@
       "tests": [
         "language_workspace_requires_current_actor_and_exact_protected_review",
         "translation_duplication_and_selected_sync_preserve_reviewed_language_authority",
-        "interface_catalog_preserves_safe_fallback_and_language_grammar; additional connected/browser/recovery/model tests pending"
+        "interface_catalog_preserves_safe_fallback_and_language_grammar; additional connected/browser/recovery/model tests pending",
+        "account_interface_preferences_recover_without_changing_content_authority",
+        "canonical_translation_drafts_are_atomic_private_and_recoverable",
+        "long_document_translation_preserves_structure_and_requires_complete_text_review",
+        "scripts/document_translation_acceptance.py"
       ],
       "triggers": [
         "Affected language, catalog, access, canonical document, plugin source or authoritative guidance changes"

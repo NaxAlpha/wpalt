@@ -112,3 +112,57 @@ fn image_dimensions_and_priority_are_bounded_and_external_preloads_are_excluded(
     value["root"]["content"][0]["content"][0]["attrs"]["loading"] = "execute".into();
     assert!(Document::parse(&value.to_string()).is_err());
 }
+
+#[test]
+fn long_document_translation_preserves_structure_and_requires_complete_text_review() {
+    use wpalt::platform::document_translation::{replace, segments};
+    let source = format!(
+        "# Garden ABC-123\n\n{}\n\nA [safe link](/stable?q=1) and `do_not_translate()` remain.\n\n```rust\nlet key = \"fixed\";\n```",
+        "A meaningful sentence about local gardening. ".repeat(200)
+    );
+    let document = wpalt::document::import(&source, "[]").unwrap();
+    let extracted = segments(&document).unwrap();
+    assert!(extracted.len() > 4);
+    assert!(extracted.iter().all(|s| s.text.len() <= 2048
+        && !s.text.contains("do_not_translate")
+        && !s.text.contains("let key")));
+    let mut proposed = extracted.clone();
+    for segment in &mut proposed {
+        segment.text = format!("Traduit {}", segment.text);
+    }
+    let output = replace(&document, &proposed).unwrap();
+    let rendered = output.html();
+    assert!(rendered.contains("href=\"/stable?q=1\""));
+    assert!(rendered.contains("do_not_translate()") && rendered.contains("fixed"));
+    // Remove only translatable text when comparing; every other canonical field must match.
+    fn skeleton(n: &mut serde_json::Value) {
+        if n["type"] == "text" {
+            n.as_object_mut().unwrap().remove("text");
+        }
+        if let Some(children) = n["content"].as_array_mut() {
+            for child in children {
+                skeleton(child);
+            }
+        }
+    }
+    let mut before: serde_json::Value = serde_json::from_str(&document.encode()).unwrap();
+    let mut after: serde_json::Value = serde_json::from_str(&output.encode()).unwrap();
+    skeleton(&mut before["root"]);
+    skeleton(&mut after["root"]);
+    assert_eq!(before, after);
+    assert!(replace(&document, &proposed[..proposed.len() - 1]).is_err());
+    proposed.swap(0, 1);
+    assert!(replace(&document, &proposed).is_err());
+    proposed.swap(0, 1);
+    proposed[0].text = "<script>attack()</script>".into();
+    assert!(
+        !replace(&document, &proposed)
+            .unwrap()
+            .html()
+            .contains("<script>")
+    );
+    proposed[0].text = "x".repeat(8193);
+    assert!(replace(&document, &proposed).is_err());
+    let huge = wpalt::document::import(&"文".repeat(50_000), "[]").unwrap();
+    assert!(segments(&huge).is_err());
+}

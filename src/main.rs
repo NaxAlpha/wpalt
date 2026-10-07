@@ -200,8 +200,8 @@ enum Command {
     /// Validate a full recovery graph without restoring it.
     RecoveryInspect {
         input: PathBuf,
-        /// Explicit offline validation of a retained v12 recovery point.
-        #[arg(long, default_value_t=13, value_parser=clap::value_parser!(u8).range(12..=13))]
+        /// Explicit offline validation of a retained v12/v13 recovery point.
+        #[arg(long, default_value_t=14, value_parser=clap::value_parser!(u8).range(12..=14))]
         source_format: u8,
         #[arg(long)]
         key_file: Option<PathBuf>,
@@ -245,8 +245,15 @@ enum Command {
     },
     /// Migrate an M6 plaintext archive to current format, preserving its data.
     MigrateBackup { input: PathBuf, output: PathBuf },
-    /// Offline v12-to-v13 conversion into a NEW private archive; retains encryption when a key is supplied.
+    /// Offline v12-to-current conversion into a NEW private archive; retains encryption when a key is supplied.
     MigrateRecoveryV12 {
+        input: PathBuf,
+        output: PathBuf,
+        #[arg(long)]
+        key_file: Option<PathBuf>,
+    },
+    /// Offline v13-to-current conversion into a NEW private archive; preserves supplied encryption.
+    MigrateRecoveryV13 {
         input: PathBuf,
         output: PathBuf,
         #[arg(long)]
@@ -387,6 +394,7 @@ async fn shop_command(app: &App, command: ShopCommand) -> wpalt::error::Result<(
     .await?
     .ok_or_else(Error::not_found)?;
     let s = Session {
+        interface_locale: "en".into(),
         user: User {
             id: r.get("id"),
             email: r.get("email"),
@@ -967,15 +975,15 @@ async fn main() -> anyhow::Result<()> {
             source_format,
         } => {
             let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
-            let bytes = if *source_format == 12 {
-                backup::migrate_v12(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?
-            } else {
-                bytes
+            let bytes = match *source_format {
+                12 => backup::migrate_v12(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
+                13 => backup::migrate_v13(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
+                _ => bytes,
             };
             let mut report = backup::inspect(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?;
-            if *source_format == 12 {
-                report["source_schema"] = 12.into();
-                report["boundary"]="Original v12 validated by explicit offline conversion; ordinary current restore requires a separately converted v13 archive.".into();
+            if *source_format < 14 {
+                report["source_schema"] = (*source_format).into();
+                report["boundary"]="Original source validated by explicit offline conversion; ordinary restore requires a separately converted v14 archive.".into();
             }
             println!("{}", serde_json::to_string_pretty(&report)?);
             return Ok(());
@@ -1041,10 +1049,19 @@ async fn main() -> anyhow::Result<()> {
             input,
             output,
             key_file,
+        }
+        | Command::MigrateRecoveryV13 {
+            input,
+            output,
+            key_file,
         } => {
             let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
-            let mut bytes =
-                backup::migrate_v12(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?;
+            let mut bytes = if matches!(&cli.command, Command::MigrateRecoveryV13 { .. }) {
+                backup::migrate_v13(&config, &bytes)
+            } else {
+                backup::migrate_v12(&config, &bytes)
+            }
+            .map_err(|e| anyhow::anyhow!(e.1))?;
             if let Some(path) = key_file {
                 let key = wpalt::operations::encryption::read_key(path)
                     .await
@@ -1053,7 +1070,7 @@ async fn main() -> anyhow::Result<()> {
                     .map_err(|e| anyhow::anyhow!(e.1))?;
             }
             backup::write_private(output, &bytes)?;
-            println!("Converted a new private v13 recovery archive; source retained.");
+            println!("Converted a new private v14 recovery archive; source retained.");
             return Ok(());
         }
         Command::MigrateBackup { input, output } => {
@@ -1234,6 +1251,7 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             .await?
             .ok_or_else(|| anyhow::anyhow!("Initialize an owner account first."))?;
             let owner = Session {
+                interface_locale: "en".into(),
                 user: User {
                     id: row.get("id"),
                     email: row.get("email"),
@@ -1409,7 +1427,8 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
         | Command::RecoverySelect { .. }
         | Command::RecoveryClone { .. }
         | Command::MigrateBackup { .. }
-        | Command::MigrateRecoveryV12 { .. } => unreachable!(),
+        | Command::MigrateRecoveryV12 { .. }
+        | Command::MigrateRecoveryV13 { .. } => unreachable!(),
         Command::CloneActivate { review } => {
             wpalt::operations::clone_hold::activate(&app, &review)
                 .await
@@ -1792,6 +1811,7 @@ async fn seed(app: &App, count: u32) -> anyhow::Result<()> {
     .fetch_one(&app.db.pool)
     .await?;
     let s = Session {
+        interface_locale: "en".into(),
         user: User {
             id: r.get("id"),
             email: r.get("email"),

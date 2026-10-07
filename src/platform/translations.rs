@@ -27,6 +27,7 @@ pub async fn prepare(app: &App, request: Request<'_>) -> Result<Value> {
     .await?
     .ok_or_else(Error::forbidden)?;
     let session = Session {
+        interface_locale: "en".into(),
         user: User {
             id: owner.get("id"),
             email: owner.get("email"),

@@ -28,7 +28,25 @@
         "language.slug": "Target URL slug",
         "language.older": "Older content",
         "language.saved_revision": "Saved revision {value}",
-        "language.policy_help": "Provision every source access policy on the target before copying protected values."
+        "language.policy_help": "Provision every source access policy on the target before copying protected values.",
+        "nav.admin": "Administration",
+        "nav.hint": "Your site. Your server.",
+        "nav.forms": "Forms",
+        "nav.audience": "Audience",
+        "nav.mail": "Mail",
+        "nav.engagement": "Engagement",
+        "nav.members": "Members",
+        "nav.courses": "Courses",
+        "nav.commerce": "Commerce",
+        "nav.comments": "Comments",
+        "nav.studio": "Design studio",
+        "nav.discovery": "Discovery",
+        "nav.settings": "Site settings",
+        "nav.operations": "Operations",
+        "nav.interface": "Interface language",
+        "nav.skip": "Skip to content",
+        "interface.kicker": "Account",
+        "interface.conflict": "Your interface preference changed elsewhere. Review the current choice and save again."
       }
     },
     "fr": {
@@ -56,7 +74,25 @@
         "language.target": "Langue cible",
         "language.slug": "Identifiant de l’URL cible",
         "language.older": "Contenu plus ancien",
-        "language.saved_revision": "Révision enregistrée {value}"
+        "language.saved_revision": "Révision enregistrée {value}",
+        "nav.admin": "Administration",
+        "nav.hint": "Votre site. Votre serveur.",
+        "nav.forms": "Formulaires",
+        "nav.audience": "Audience",
+        "nav.mail": "Courrier",
+        "nav.engagement": "Engagement",
+        "nav.members": "Membres",
+        "nav.courses": "Cours",
+        "nav.commerce": "Commerce",
+        "nav.comments": "Commentaires",
+        "nav.studio": "Studio de conception",
+        "nav.discovery": "Découverte",
+        "nav.settings": "Réglages du site",
+        "nav.operations": "Opérations",
+        "nav.interface": "Langue de l’interface",
+        "nav.skip": "Aller au contenu",
+        "interface.kicker": "Compte",
+        "interface.conflict": "Votre langue d’interface a été modifiée ailleurs. Vérifiez le choix actuel, puis enregistrez à nouveau."
       }
     },
     "ja": {
@@ -84,7 +120,25 @@
         "language.target": "翻訳先の言語",
         "language.slug": "翻訳先のURLスラッグ",
         "language.older": "以前のコンテンツ",
-        "language.saved_revision": "保存済みリビジョン {value}"
+        "language.saved_revision": "保存済みリビジョン {value}",
+        "nav.admin": "管理",
+        "nav.hint": "あなたのサイト。あなたのサーバー。",
+        "nav.forms": "フォーム",
+        "nav.audience": "読者",
+        "nav.mail": "メール",
+        "nav.engagement": "エンゲージメント",
+        "nav.members": "メンバー",
+        "nav.courses": "コース",
+        "nav.commerce": "コマース",
+        "nav.comments": "コメント",
+        "nav.studio": "デザインスタジオ",
+        "nav.discovery": "ディスカバリー",
+        "nav.settings": "サイト設定",
+        "nav.operations": "運用",
+        "nav.interface": "表示言語",
+        "nav.skip": "コンテンツに移動",
+        "interface.kicker": "アカウント",
+        "interface.conflict": "表示言語が別の場所で変更されました。現在の設定を確認して、もう一度保存してください。"
       }
     },
     "ar": {
@@ -112,7 +166,25 @@
         "language.target": "اللغة المستهدفة",
         "language.slug": "مسار الرابط المستهدف",
         "language.older": "المحتوى الأقدم",
-        "language.saved_revision": "المراجعة المحفوظة {value}"
+        "language.saved_revision": "المراجعة المحفوظة {value}",
+        "nav.admin": "الإدارة",
+        "nav.hint": "موقعك. خادمك.",
+        "nav.forms": "النماذج",
+        "nav.audience": "الجمهور",
+        "nav.mail": "البريد",
+        "nav.engagement": "التفاعل",
+        "nav.members": "الأعضاء",
+        "nav.courses": "الدورات",
+        "nav.commerce": "التجارة",
+        "nav.comments": "التعليقات",
+        "nav.studio": "استوديو التصميم",
+        "nav.discovery": "الاكتشاف",
+        "nav.settings": "إعدادات الموقع",
+        "nav.operations": "العمليات",
+        "nav.interface": "لغة الواجهة",
+        "nav.skip": "الانتقال إلى المحتوى",
+        "interface.kicker": "الحساب",
+        "interface.conflict": "تغيرت لغة الواجهة في مكان آخر. راجع الاختيار الحالي واحفظه مجددًا."
       }
     }
   }

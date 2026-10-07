@@ -108,6 +108,7 @@ async fn lookup(app: &App, hash: &str, draft: bool) -> Result<(Session, String)>
     }
     Ok((
         Session {
+            interface_locale: "en".into(),
             user: User {
                 id: r.get("id"),
                 email: r.get("email"),
@@ -162,6 +163,14 @@ pub fn routes() -> Router<App> {
     Router::new()
         .route("/api/v1/content", get(list).post(create))
         .route("/api/v1/content/{id}", get(detail).put(update))
+        .route(
+            "/api/v1/content/{id}/translation",
+            get(translation_manifest),
+        )
+        .route(
+            "/api/v1/translations",
+            axum::routing::post(translation_apply),
+        )
         .layer(DefaultBodyLimit::max(1024 * 1024))
 }
 #[derive(Default, Deserialize)]
@@ -227,4 +236,27 @@ async fn update(
 ) -> Result<Json<Value>> {
     uuid::Uuid::parse_str(&id).map_err(|_| Error::not_found())?;
     write(&app, &headers, Some(&id), input).await
+}
+
+async fn translation_manifest(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Value>> {
+    authenticate(&app, &headers, false).await?;
+    uuid::Uuid::parse_str(&id).map_err(|_| Error::not_found())?;
+    Ok(Json(super::document_translation::manifest(
+        &crate::content::get(&app, &id).await?,
+    )?))
+}
+async fn translation_apply(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Json(proposal): Json<super::document_translation::Proposal>,
+) -> Result<Json<Value>> {
+    let actor = authenticate(&app, &headers, true).await?;
+    let post = super::document_translation::apply(&app, &actor, proposal).await?;
+    Ok(Json(
+        json!({"api_version":1,"id":post.id,"status":post.status,"version":post.version}),
+    ))
 }
