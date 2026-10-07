@@ -34,7 +34,9 @@ Verifiable future outcome: An author requests review; an authorized reviewer app
 
 ### D03 — Languages and owner usability
 
-Origin: **M1–M3** · Catalog: **F008–F011** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M1–M3** · Catalog: **F008–F011** · Status: **active language-workspace contract; implementation pending**
+
+[D03 contract](d03-contract.md) defines the connected translation/localization system.
 
 Administration localization, richer translation UI, long-document translation/protected-content workflow and model/language quality evaluation beyond short reviewed CLI drafts.
 
