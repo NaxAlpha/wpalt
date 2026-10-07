@@ -8055,3 +8055,138 @@ async fn editorial_policy_restoration_and_scheduled_edits_require_fresh_review()
         site.close().await;
     }
 }
+
+#[tokio::test]
+async fn populated_editorial_queue_pages_every_assignment_with_bounded_history_and_indexed_work() {
+    use serde_json::json;
+    use wpalt::{editorial, schema};
+    let mut evidence = Vec::new();
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        auth::add_user(
+            &site.app,
+            "reviewer@example.test",
+            "Reviewer",
+            "editor",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (token, reviewer) = auth::login(&site.app, "reviewer@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let mut model = schema::Registry::load(&site.app).await.unwrap().models["post"].clone();
+        model.review_required = true;
+        schema::save_model(&site.app, "post", model, 1)
+            .await
+            .unwrap();
+        let receipt = content::save_for_review(
+            &site.app,
+            site.session(),
+            None,
+            input("queue-base", "save"),
+            editorial::Request {
+                reviewer_id: reviewer.user.id.clone(),
+                notes: "Private queue note".into(),
+            },
+        )
+        .await
+        .unwrap();
+        let base = receipt.post;
+        let mut expected = HashSet::from([base.id.clone()]);
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        for n in 0..1000 {
+            let id = uuid::Uuid::new_v4().to_string();
+            sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo,document,published_document) SELECT $1,$2,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo,document,published_document FROM posts WHERE id=$3").bind(&id).bind(format!("queue-{n}")).bind(&base.id).execute(&mut *tx).await.unwrap();
+            sqlx::query("INSERT INTO editorial_work(post_id,content_version,version,state,edited_by,assigned_to,requested_by,approved_by,fingerprint,policy,notes,requested_at,decided_at,updated_at) SELECT $1,content_version,version,$2,edited_by,assigned_to,requested_by,approved_by,fingerprint,policy,notes,requested_at,decided_at,updated_at FROM editorial_work WHERE post_id=$3").bind(&id).bind(if n%10==0{"pending"}else{"changes"}).bind(&base.id).execute(&mut *tx).await.unwrap();
+            if n % 10 == 0 {
+                expected.insert(id);
+            }
+        }
+        tx.commit().await.unwrap();
+        let mut path = "/admin/editorial".to_owned();
+        let mut seen = HashSet::new();
+        let mut pages = 0;
+        loop {
+            let (status, html) = get(&site.app, &path, Some(&token)).await;
+            assert_eq!(status, StatusCode::OK);
+            pages += 1;
+            for part in html.split("href=\"/admin/posts/").skip(1) {
+                let id = part.split('"').next().unwrap();
+                assert!(
+                    seen.insert(id.to_owned()),
+                    "An assignment must appear only once"
+                );
+            }
+            if let Some(link) = html
+                .split("href=\"/admin/editorial?")
+                .skip(1)
+                .find(|s| s.contains("after="))
+            {
+                path = format!(
+                    "/admin/editorial?{}",
+                    link.split('"').next().unwrap().replace("&amp;", "&")
+                );
+            } else {
+                break;
+            }
+            assert!(pages <= 3);
+        }
+        assert_eq!(seen, expected);
+        assert_eq!(pages, 3);
+        let mut w = editorial::get(&site.app, &base.id).await.unwrap().unwrap();
+        for _ in 0..25 {
+            w = editorial::request(
+                &site.app,
+                site.session(),
+                &base.id,
+                base.version,
+                w.version,
+                &editorial::Request {
+                    reviewer_id: reviewer.user.id.clone(),
+                    notes: "Replacement assignment".into(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        let retained: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM editorial_decisions WHERE post_id=$1")
+                .bind(&base.id)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(retained, 20);
+        let sql = if pg {
+            "EXPLAIN (ANALYZE,BUFFERS) SELECT w.post_id,w.state,w.notes,w.requested_at,w.version,p.title,p.kind FROM editorial_work w JOIN posts p ON p.id=w.post_id WHERE w.state='pending' AND w.assigned_to=$1 ORDER BY w.requested_at DESC,w.post_id DESC LIMIT 41"
+        } else {
+            "EXPLAIN QUERY PLAN SELECT w.post_id,w.state,w.notes,w.requested_at,w.version,p.title,p.kind FROM editorial_work w JOIN posts p ON p.id=w.post_id WHERE w.state='pending' AND w.assigned_to=$1 ORDER BY w.requested_at DESC,w.post_id DESC LIMIT 41"
+        };
+        let rows = sqlx::query(sql)
+            .bind(&reviewer.user.id)
+            .fetch_all(&site.app.db.pool)
+            .await
+            .unwrap();
+        let plan: Vec<String> = rows.iter().map(|r| r.get(if pg { 0 } else { 3 })).collect();
+        if !pg {
+            assert!(plan.iter().any(|r| r.contains("editorial_assignment")));
+        }
+        let mut ms = Vec::new();
+        for _ in 0..30 {
+            let start = std::time::Instant::now();
+            assert_eq!(
+                get(&site.app, "/admin/editorial", Some(&token)).await.0,
+                StatusCode::OK
+            );
+            ms.push(start.elapsed().as_secs_f64() * 1000.);
+        }
+        ms.sort_by(f64::total_cmp);
+        evidence.push(json!({"engine":if pg{"postgres"}else{"sqlite"},"records":1001,"matching":seen.len(),"pages":pages,"retained_decisions":retained,"plan":plan,"debug_in_process_router_ms":{"p50":ms[14],"p95":ms[28],"max":ms[29]},"limits":"Single-client debug in-process router; timings are observations, not network/browser/production SLOs. Actual engine plans may choose a small-table scan."}));
+        site.close().await;
+    }
+    std::fs::write(
+        "work/d02-queue-observations.json",
+        serde_json::to_vec_pretty(&evidence).unwrap(),
+    )
+    .unwrap();
+}
