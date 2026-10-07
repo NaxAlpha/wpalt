@@ -2174,7 +2174,7 @@
     {
       "feature_id": "D03-01",
       "area": "Connected language workspace and local interface catalogs",
-      "scope": "Exact source/target review, protected field synchronization, bounded bundled message catalogs and separate interface/content language authorities; persistence and model evaluation still in progress.",
+      "scope": "Exact source/target review, protected field synchronization, bounded bundled message catalogs and separate interface/content language authorities; durable preferences and actual model evaluation verified within the defined scope.",
       "basis": "Primary W3C language guidance and internal authority contract; free plugin static inspection is reference semantics only.",
       "sources": [
         "https://www.w3.org/International/questions/qa-html-language-declarations.html",
@@ -2185,10 +2185,10 @@
       ],
       "applicable_versions": [
         "Polylang 3.8.10 static source inspection only",
-        "wpalt native schema 18 / portable graph v14; D03 development in progress",
+        "wpalt native schema 18 / portable graph v14; D03 PR19 merged",
         "Bundled interface catalog v1",
         "Unicode CLDR 48 integer cardinal scope",
-        "Ollama local generation API; actual installed runtime/model evaluation pending"
+        "Ollama 0.35.1 / Qwen3 1.7B actual evaluation: protocol passed, French editorial quality failed"
       ],
       "last_checked": "2026-10-07",
       "next_review": "2027-01-05",
@@ -2202,7 +2202,7 @@
       "tests": [
         "language_workspace_requires_current_actor_and_exact_protected_review",
         "translation_duplication_and_selected_sync_preserve_reviewed_language_authority",
-        "interface_catalog_preserves_safe_fallback_and_language_grammar; additional connected/browser/recovery/model tests pending",
+        "interface_catalog_preserves_safe_fallback_and_language_grammar; connected/browser/recovery/model workflows verified",
         "account_interface_preferences_recover_without_changing_content_authority",
         "canonical_translation_drafts_are_atomic_private_and_recoverable",
         "long_document_translation_preserves_structure_and_requires_complete_text_review",
@@ -2211,7 +2211,7 @@
       "triggers": [
         "Affected language, catalog, access, canonical document, plugin source or authoritative guidance changes"
       ],
-      "status": "reviewed-in-development; not complete localization or parity evidence"
+      "status": "verified-defined-local-scope; PR19 merged; not complete localization or parity evidence"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M9 merged; D01 PR #17 and D02 PR #18 merged with independently verified actual-main artifacts. D03 language workspace development and verification active; defined slices are not blanket plugin parity.",
+  "milestone": "M9 and D01–D03 merged; D03 PR #19 passes all seven final-head gates and independent clean archive verification. Actual-main D03 release verification pending; D04 contract preparation active. Defined slices are not blanket plugin parity.",
   "capabilities": [
     {
       "id": "F001",
@@ -982,7 +982,7 @@
       "status": "verified-local-defined-M5-scope; exact-CI-and-artifact-status-on-PR-10",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2\u20138 choices), 1\u201310 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
+      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2–8 choices), 1–10 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
       "evidence": [
         "m5-contract.md",
         "membership-learning.md",
@@ -1285,7 +1285,7 @@
       "status": "M7-verified-defined-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0\u20133600 seconds, default revalidation. Private/publication browser responses no-store.",
+      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0–3600 seconds, default revalidation. Private/publication browser responses no-store.",
       "evidence": [
         "resilient-operations.md",
         "../tests/acceptance.rs",

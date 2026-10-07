@@ -34,17 +34,19 @@ Verifiable future outcome: An author requests review; an authorized reviewer app
 
 ### D03 — Languages and owner usability
 
-Origin: **M1–M3** · Catalog: **F008–F011** · Status: **active language-workspace implementation; integrated verification and actual model quality findings in progress**
+Origin: **M1–M3** · Catalog: **F008–F011** · Status: **defined language-workspace delivery merged in PR #19; broader localization/model quality remains**
 
 [D03 contract](d03-contract.md) defines the connected translation/localization system.
 
-Administration localization, richer translation UI, long-document translation/protected-content workflow and model/language quality evaluation beyond short reviewed CLI drafts.
+D03 delivers scoped durable interface languages, connected saved-variant comparison/copy/synchronization and source-bound resumable canonical text proposals. Complete professional screen catalogs, arbitrary locale/format breadth, provisioned protected-target model application and demonstrated high-quality translation remain. Actual Qwen French quality fails editorial review; generated output remains a private draft requiring correction.
 
 Verifiable future outcome: Edit and compare language variants in the UI; no translated publication, privacy rule or source edit is overwritten silently.
 
 ### D04 — Theme composition and assets
 
-Origin: **M2/M8** · Catalog: **F016/F019** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M2/M8** · Catalog: **F016/F019** · Status: **contract preparation active; implementation follows D03 release verification**
+
+[D04 contract](d04-contract.md) governs composed publication and local asset authority.
 
 Hierarchical/mega navigation, expanded trusted-owner CSS/font/asset contracts and richer native layout/component authoring beyond bounded styles and pinned consent scripts.
 
