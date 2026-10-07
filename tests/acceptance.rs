@@ -2836,6 +2836,8 @@ async fn schema_two_upgrade_preserves_publication_and_restorable_editor_history(
             "translation_drafts",
             "translation_live",
             "indexable_identity",
+            "language_workspace_cursor",
+            "language_workspace_all",
         ] {
             sqlx::query(&format!("DROP INDEX IF EXISTS {index}"))
                 .execute(&site.app.db.pool)
@@ -4022,6 +4024,10 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         payload["tables"]
             .as_object_mut()
             .unwrap()
+            .remove("user_preferences");
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
             .remove("editorial_work");
         payload["tables"]
             .as_object_mut()
@@ -4056,7 +4062,7 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let migrated = backup::migrate_m6(&original.app.config, &legacy).unwrap();
         assert_eq!(
             backup::inspect(&original.app.config, &migrated).unwrap()["schema"],
-            13
+            14
         );
         let destination = tempfile::tempdir().unwrap();
         let key = encryption::generate_key();
@@ -7689,10 +7695,36 @@ async fn assigned_review_binds_material_and_recovers_without_public_note_leaks()
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            13
+            14
         );
+        // The explicit previous graph conversion retains meaningful private review history.
+        let mut previous: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let mut old_graph: serde_json::Value =
+            serde_json::from_str(previous["payload"].as_str().unwrap()).unwrap();
+        assert!(
+            !old_graph["tables"]["editorial_decisions"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        let decisions = old_graph["tables"]["editorial_decisions"].clone();
+        old_graph["schema"] = 13.into();
+        old_graph["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("user_preferences");
+        let encoded = old_graph.to_string();
+        previous["format"] = "wpalt-backup-v13".into();
+        previous["sha256"] = auth::digest(encoded.as_bytes()).into();
+        previous["payload"] = encoded.into();
+        let converted =
+            backup::migrate_v13(&site.app.config, &serde_json::to_vec(&previous).unwrap()).unwrap();
+        let converted_envelope: serde_json::Value = serde_json::from_slice(&converted).unwrap();
+        let converted_graph: serde_json::Value =
+            serde_json::from_str(converted_envelope["payload"].as_str().unwrap()).unwrap();
+        assert_eq!(converted_graph["tables"]["editorial_decisions"], decisions);
         let recovered = Site::new(pg, false).await;
-        backup::restore(&recovered.app, &bytes).await.unwrap();
+        backup::restore(&recovered.app, &converted).await.unwrap();
         assert_eq!(
             editorial::get(&recovered.app, &post.id)
                 .await
@@ -8189,4 +8221,543 @@ async fn populated_editorial_queue_pages_every_assignment_with_bounded_history_a
         serde_json::to_vec_pretty(&evidence).unwrap(),
     )
     .unwrap();
+}
+
+/// Connected translation review uses the current writer, exact versions, and protected access.
+#[tokio::test]
+async fn language_workspace_requires_current_actor_and_exact_protected_review() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        multilingual(&site).await;
+        auth::add_user(
+            &site.app,
+            "writer@example.test",
+            "Language writer",
+            "editor",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (token, writer) = auth::login(&site.app, "writer@example.test", PASSWORD)
+            .await
+            .unwrap();
+        let mut source_input = input("connected-source", "publish");
+        source_input.translation_group = "connected-family".into();
+        let source = content::save(&site.app, site.session(), None, source_input.clone())
+            .await
+            .unwrap();
+        let path = format!("/api/admin/translations/{}", source.id);
+        let mut operation =
+            serde_json::json!({"csrf":writer.csrf,"locale":"fr","slug":"connected-fr"});
+        let (status, _, bytes) = request(
+            &site.app,
+            "POST",
+            &path,
+            Some(&token),
+            "application/json",
+            serde_json::to_vec(&operation).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let preview: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        operation["execute"] = preview["plan"].clone();
+        let (status, _, bytes) = request(
+            &site.app,
+            "POST",
+            &path,
+            Some(&token),
+            "application/json",
+            serde_json::to_vec(&operation).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let created: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let target = content::get(&site.app, created["result"]["id"].as_str().unwrap())
+            .await
+            .unwrap();
+        assert_eq!(
+            target.author_id, writer.user.id,
+            "HTTP must not impersonate the CLI owner"
+        );
+        assert_eq!(target.status, "draft");
+        assert_eq!(
+            get(&site.app, "/fr/connected-fr", None).await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert_ne!(
+            request(
+                &site.app,
+                "POST",
+                &path,
+                Some(&token),
+                "application/json",
+                serde_json::to_vec(&operation).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::OK,
+            "A reviewed new-draft plan cannot create duplicates"
+        );
+        let (status, html) = get(
+            &site.app,
+            &format!("/admin/languages/{}?target={}", source.id, target.id),
+            Some(&token),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains("Compare language variants") && html.contains("lang=\"fr\""));
+        let mut sync = serde_json::json!({"csrf":writer.csrf,"locale":"fr","slug":target.slug,"target":target.id,"fields":["featured"]});
+        let (status, _, bytes) = request(
+            &site.app,
+            "POST",
+            &path,
+            Some(&token),
+            "application/json",
+            serde_json::to_vec(&sync).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        sync["execute"] =
+            serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()["plan"].clone();
+        source_input.version = source.version;
+        source_input.action = "save".into();
+        source_input.body = "A new source revision invalidates the reviewed plan.".into();
+        content::save(&site.app, site.session(), Some(&source.id), source_input)
+            .await
+            .unwrap();
+        assert_ne!(
+            request(
+                &site.app,
+                "POST",
+                &path,
+                Some(&token),
+                "application/json",
+                serde_json::to_vec(&sync).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        assert_eq!(
+            content::get(&site.app, &target.id).await.unwrap().version,
+            target.version
+        );
+        sync.as_object_mut().unwrap().remove("execute");
+        sqlx::query(
+            "INSERT INTO member_policies(id,title) VALUES('language-policy','Protected original')",
+        )
+        .execute(&site.app.db.pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('post',$1,'language-policy')").bind(&source.id).execute(&site.app.db.pool).await.unwrap();
+        assert_ne!(
+            request(
+                &site.app,
+                "POST",
+                &path,
+                Some(&token),
+                "application/json",
+                serde_json::to_vec(&sync).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::OK,
+            "Protected fields cannot flow to an unprotected target"
+        );
+        sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('post',$1,'language-policy')").bind(&target.id).execute(&site.app.db.pool).await.unwrap();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &path,
+                Some(&token),
+                "application/json",
+                serde_json::to_vec(&sync).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        sqlx::query("UPDATE users SET role='subscriber' WHERE id=$1")
+            .bind(&writer.user.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &path,
+                Some(&token),
+                "application/json",
+                serde_json::to_vec(&sync).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        site.close().await;
+    }
+}
+
+/// Account language is durable private preference, not content or permission authority.
+#[tokio::test]
+async fn account_interface_preferences_recover_without_changing_content_authority() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let post = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("interface-independent", "publish"),
+        )
+        .await
+        .unwrap();
+        let change = |locale, version| {
+            vec![
+                ("csrf", site.session().csrf.as_str()),
+                ("locale", locale),
+                ("version", version),
+            ]
+        };
+        assert_eq!(
+            form(
+                &site.app,
+                "/account/interface",
+                Some(&site.token),
+                &[("csrf", "wrong"), ("locale", "ar"), ("version", "0")]
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            form(
+                &site.app,
+                "/account/interface",
+                Some(&site.token),
+                &change("ar", "0")
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        let (status, html) = get(&site.app, "/account/interface", Some(&site.token)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains("lang=\"ar\" dir=\"rtl\""));
+        assert!(html.contains("حفظ لغة الواجهة"));
+        let (_, new_login) = auth::login(&site.app, "owner@example.test", PASSWORD)
+            .await
+            .unwrap();
+        assert_eq!(new_login.interface_locale, "ar");
+        let unchanged = content::get(&site.app, &post.id).await.unwrap();
+        assert_eq!(unchanged.version, post.version);
+        assert_eq!(unchanged.locale, "en");
+        assert_eq!(unchanged.published_document, post.published_document);
+        let french_change = change("fr", "1");
+        let japanese_change = change("ja", "1");
+        let (left, right) = tokio::join!(
+            form(
+                &site.app,
+                "/account/interface",
+                Some(&site.token),
+                &french_change
+            ),
+            form(
+                &site.app,
+                "/account/interface",
+                Some(&site.token),
+                &japanese_change
+            )
+        );
+        assert_eq!(
+            [left.0, right.0]
+                .into_iter()
+                .filter(|s| *s == StatusCode::SEE_OTHER)
+                .count(),
+            1
+        );
+        assert_eq!(
+            [left.0, right.0]
+                .into_iter()
+                .filter(|s| *s == StatusCode::CONFLICT)
+                .count(),
+            1
+        );
+        assert_eq!(
+            form(
+                &site.app,
+                "/account/interface",
+                Some(&site.token),
+                &change("unknown", "2")
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        auth::add_user(
+            &site.app,
+            "reader@example.test",
+            "Independent reader",
+            "subscriber",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (reader_token, reader) = auth::login(&site.app, "reader@example.test", PASSWORD)
+            .await
+            .unwrap();
+        assert_eq!(reader.interface_locale, "en");
+        assert_eq!(
+            form(
+                &site.app,
+                "/account/interface",
+                Some(&reader_token),
+                &[
+                    ("csrf", reader.csrf.as_str()),
+                    ("locale", "ja"),
+                    ("version", "0")
+                ]
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        assert_eq!(
+            get(&site.app, "/admin/posts", Some(&reader_token)).await.0,
+            StatusCode::FORBIDDEN
+        );
+        let exported: serde_json::Value = serde_json::from_slice(
+            &wpalt::operations::privacy::export(&site.app, &reader.user.id)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            exported["account_linked_records"]["user_preferences"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            exported["account_linked_records"]["user_preferences"][0]["user_id"],
+            reader.user.id
+        );
+        let bytes = backup::capture(&site.app).await.unwrap();
+        assert_eq!(
+            backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
+            14
+        );
+        let restored = Site::new(pg, false).await;
+        backup::restore(&restored.app, &bytes).await.unwrap();
+        let (_, restored_reader) = auth::login(&restored.app, "reader@example.test", PASSWORD)
+            .await
+            .unwrap();
+        assert_eq!(restored_reader.interface_locale, "ja");
+        // A valid checksum cannot authorize a preference version that will overflow future saves.
+        let mut invalid: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let mut graph: serde_json::Value =
+            serde_json::from_str(invalid["payload"].as_str().unwrap()).unwrap();
+        graph["tables"]["user_preferences"][0]["version"] = i64::MAX.into();
+        let encoded = graph.to_string();
+        invalid["sha256"] = auth::digest(encoded.as_bytes()).into();
+        invalid["payload"] = encoded.into();
+        assert!(backup::inspect(&site.app.config, &serde_json::to_vec(&invalid).unwrap()).is_err());
+        // Explicit old-graph conversion defaults absent preferences without inventing authority.
+        let mut envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let mut payload: serde_json::Value =
+            serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        payload["schema"] = 13.into();
+        payload["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("user_preferences");
+        let text = payload.to_string();
+        envelope["format"] = "wpalt-backup-v13".into();
+        envelope["sha256"] = auth::digest(text.as_bytes()).into();
+        envelope["payload"] = text.into();
+        let old = serde_json::to_vec(&envelope).unwrap();
+        assert!(backup::inspect(&site.app.config, &old).is_err());
+        let converted = backup::migrate_v13(&site.app.config, &old).unwrap();
+        assert_eq!(
+            backup::inspect(&site.app.config, &converted).unwrap()["tables"]["user_preferences"],
+            0
+        );
+        sqlx::query("UPDATE users SET role='disabled' WHERE id=$1")
+            .bind(&reader.user.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            form(
+                &site.app,
+                "/account/interface",
+                Some(&reader_token),
+                &[
+                    ("csrf", reader.csrf.as_str()),
+                    ("locale", "fr"),
+                    ("version", "1")
+                ]
+            )
+            .await
+            .0,
+            StatusCode::UNAUTHORIZED
+        );
+        restored.close().await;
+        site.close().await;
+    }
+}
+
+/// Review binds a complete canonical proposal to source material and current authority.
+#[tokio::test]
+async fn canonical_translation_drafts_are_atomic_private_and_recoverable() {
+    use wpalt::platform::{document_translation as translations, integrations};
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let (mut settings, version) = wpalt::discovery::load(&site.app).await.unwrap();
+        settings.languages.push(wpalt::discovery::Language {
+            code: "fr".into(),
+            label: "Français".into(),
+            ..Default::default()
+        });
+        settings.validate().unwrap();
+        sqlx::query("UPDATE discovery_settings SET definition=$1,version=version+1 WHERE id=1 AND version=$2")
+            .bind(serde_json::to_string(&settings).unwrap()).bind(version).execute(&site.app.db.pool).await.unwrap();
+        let mut source_input = input("canonical-source", "save");
+        source_input.translation_group = "canonical-language-family".into();
+        source_input.body = format!(
+            "# Garden ABC-123\n\n{}\n\nVisit [the garden](/garden) at 09:30. `fixed_code()`",
+            "The local garden opens on Saturday. ".repeat(150)
+        );
+        let source = content::save(&site.app, site.session(), None, source_input)
+            .await
+            .unwrap();
+        let issued = integrations::issue(
+            &site.app,
+            site.session(),
+            &site.session().user.email,
+            "Translation worker",
+            true,
+            7,
+        )
+        .await
+        .unwrap();
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(
+            "authorization",
+            format!("Bearer {}", issued.token).parse().unwrap(),
+        );
+        let actor = integrations::authenticate(&site.app, &headers, true)
+            .await
+            .unwrap();
+        let manifest = translations::manifest(&source).unwrap();
+        let mut proposal = manifest.clone();
+        proposal.as_object_mut().unwrap().retain(|key, _| {
+            [
+                "source_id",
+                "source_version",
+                "source_document_sha256",
+                "segments",
+            ]
+            .contains(&key.as_str())
+        });
+        proposal["locale"] = "fr".into();
+        proposal["slug"] = "canonical-french".into();
+        proposal["title"] = "Le jardin".into();
+        for segment in proposal["segments"].as_array_mut().unwrap() {
+            segment["text"] = format!("Traduction {}", segment["text"].as_str().unwrap()).into();
+        }
+        let draft = translations::apply(
+            &site.app,
+            &actor,
+            serde_json::from_value(proposal.clone()).unwrap(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(draft.status, "draft");
+        assert_eq!(draft.locale, "fr");
+        assert_eq!(draft.publish_at, 0);
+        assert!(draft.published_document.contains("paragraph") && draft.published_body.is_empty());
+        assert!(
+            wpalt::document::Document::parse(&draft.document)
+                .unwrap()
+                .html()
+                .contains("href=\"/garden\"")
+        );
+        assert_eq!(
+            get(&site.app, "/fr/canonical-french", None).await.0,
+            StatusCode::NOT_FOUND
+        );
+        // Duplicate completion cannot create another draft under the same slug.
+        assert!(
+            translations::apply(
+                &site.app,
+                &actor,
+                serde_json::from_value(proposal.clone()).unwrap()
+            )
+            .await
+            .is_err()
+        );
+        let policy_id = uuid::Uuid::new_v4().to_string();
+        sqlx::query("INSERT INTO member_policies(id,title,entitlement) VALUES($1,'Protected source','canonical-member')").bind(&policy_id).execute(&site.app.db.pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('post',$1,$2)",
+        )
+        .bind(&source.id)
+        .bind(&policy_id)
+        .execute(&site.app.db.pool)
+        .await
+        .unwrap();
+        let mut restricted = proposal.clone();
+        restricted["slug"] = "restricted-canonical-french".into();
+        assert!(
+            translations::apply(
+                &site.app,
+                &actor,
+                serde_json::from_value(restricted).unwrap()
+            )
+            .await
+            .is_err()
+        );
+        sqlx::query("DELETE FROM member_resources WHERE resource_id=$1")
+            .bind(&source.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let bytes = backup::capture(&site.app).await.unwrap();
+        let fresh = Site::new(pg, false).await;
+        backup::restore(&fresh.app, &bytes).await.unwrap();
+        assert_eq!(
+            content::get(&fresh.app, &draft.id).await.unwrap().document,
+            draft.document
+        );
+        let mut edited = input("canonical-source", "save");
+        edited.version = source.version;
+        edited.translation_group = source.translation_group.clone();
+        edited.body = "Changed source.".into();
+        content::save(&site.app, site.session(), Some(&source.id), edited)
+            .await
+            .unwrap();
+        proposal["slug"] = "stale-canonical-french".into();
+        assert!(
+            translations::apply(
+                &site.app,
+                &actor,
+                serde_json::from_value(proposal.clone()).unwrap()
+            )
+            .await
+            .is_err()
+        );
+        integrations::revoke(&site.app, site.session(), &issued.id)
+            .await
+            .unwrap();
+        assert!(
+            translations::apply(&site.app, &actor, serde_json::from_value(proposal).unwrap())
+                .await
+                .is_err()
+        );
+        fresh.close().await;
+        site.close().await;
+    }
 }

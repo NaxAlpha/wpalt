@@ -24,7 +24,7 @@ Verifiable future outcome: Create hierarchical content, edit typed values and pr
 
 ### D02 — Editorial workflow
 
-Origin: **M1–M2** · Catalog: **F007/F021** · Status: **defined assigned-review system locally verified; final delivery gates on PR #18**
+Origin: **M1–M2** · Catalog: **F007/F021** · Status: **defined assigned-review system merged in PR #18; actual-main release independently verified**
 
 Active [editorial-workflow contract](d02-contract.md), [approval decision](decisions/0016-editorial-approval-boundary.md) and [free reference investigation](evidence/d02-reference.md), [verification](evidence/d02-verification.md) and [PR #18](https://github.com/NaxAlpha/wpalt/pull/18).
 
@@ -34,7 +34,9 @@ Verifiable future outcome: An author requests review; an authorized reviewer app
 
 ### D03 — Languages and owner usability
 
-Origin: **M1–M3** · Catalog: **F008–F011** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M1–M3** · Catalog: **F008–F011** · Status: **active language-workspace implementation; integrated verification and actual model quality findings in progress**
+
+[D03 contract](d03-contract.md) defines the connected translation/localization system.
 
 Administration localization, richer translation UI, long-document translation/protected-content workflow and model/language quality evaluation beyond short reviewed CLI drafts.
 

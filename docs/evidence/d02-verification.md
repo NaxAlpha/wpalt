@@ -52,3 +52,13 @@ Current editor/admin roles retain broad content access. D02 is not restricted-co
 ## Delivery provenance
 
 D01 PR #17 merged as `051d319c72510c5a61f8bd1b927a7e0e4d525df6`. Its actual-main clean artifact was independently verified against exact source/assets/lockfile/guides: archive SHA-256 `4678321c7ce3d41f51bf3b25637f2b3802609f1a21c79916bea347e65c8e0521`, Linux executable SHA-256 `10f7b8b4cc9887e0b5570d5fda0132aaff6eb0bc5a1d654ec05134344b78e2b0`, 34,648,200 bytes. Main run 37553889290 determines release publication separately. D02 exact final-head checks/artifact and merge receipt are attached to PR #18 to avoid self-referential evidence commits. [Development ledger](d02-progress.md) retains discovered failures and corrections.
+
+## Final-head delivery and automatic merge
+
+All seven required jobs passed on [run 37554698723](https://github.com/NaxAlpha/wpalt/actions/runs/37554698723), head `29f9384ec39a5b594931bfb181a9007846fe46fd`: compiler floor, dependency audit, application, clean build, native PITR, frontend and local processes. Optional reference workloads were skipped according to their workflow conditions; they are not claimed as rerun results.
+
+The independently downloaded clean archive verifies GitHub's PR merge source `3030e67201a57bf924d1dea807c44cac0392b32f`, locked dependencies/frontend assets and exact packaged operating guides. Archive SHA-256 `1856305f9bade54816a0bbd95399916ee4e28f0a6526fb11496e543d2771a1d9`; executable SHA-256 `b5e66956b358306fb2c731e86e1af9ea482f355586962be65a3baa162f63188f`, 34,964,808 bytes (Linux x86-64).
+
+[PR #18](https://github.com/NaxAlpha/wpalt/pull/18) merged at 2026-10-07T01:08:05Z as `eaddaca4b768ea4a83ae55e003bb76029f7d265c`, under the owner's ready-PR automatic-merge authorization. [Actual-main run 37555571713](https://github.com/NaxAlpha/wpalt/actions/runs/37555571713) is a separate release gate; publication and independent main-archive verification remain pending until that run completes.
+
+The actual-main run completed successfully, including all seven required jobs and release publication. [nightly-202610070108-eaddaca4b768](https://github.com/NaxAlpha/wpalt/releases/tag/nightly-202610070108-eaddaca4b768) is a published development prerelease. Both the main clean-build artifact and separately downloaded public release archive were independently verified against `eaddaca4b768ea4a83ae55e003bb76029f7d265c`. Main archive SHA-256 `ec8f28432d612b0da4db5d73950133a920e0fc2d7a1245b464a7c26c82d77446`; Linux executable SHA-256 and size match the independently verified PR executable above. Publication is confirmed, rather than inferred from a successful PR build.

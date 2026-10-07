@@ -331,3 +331,8 @@ D01's defined classified-directory system passes connected local and all seven a
 ### D01 merged; D02 defined-scope verification — 2026-10-07
 
 D01 PR #17 merged as `051d319`; actual-main clean artifact independently verified and release gates tracked separately. D02 [verification](evidence/d02-verification.md) records 96 cumulative real-engine cases, native/Chrome workflows, actual schema-16 recovery, bounded queue/index measurements and explicit retained limits. [PR #18](https://github.com/NaxAlpha/wpalt/pull/18) determines final-head readiness/merge status. Owner now authorizes automatic merge of ready PRs; subsequent local work continues autonomously, preserving account/access/adoption boundaries.
+
+
+### D02 merged; D03 integrated language work — 2026-10-07
+
+D02 PR #18 merged as `eaddaca4b768`; actual-main release `nightly-202610070108-eaddaca4b768` is independently verified. D03 adds separate durable account language, scoped local catalogs, native grouped comparison/copy/synchronization, and complete source-bound canonical text proposals under its active contract. Actual model quality is evaluated separately from protocol/structure: initial Qwen French phrasing fails editorial quality and requires human correction. Cumulative final-head, optimized query/recovery/browser evidence and exact-source delivery gates remain required before ready/automatic merge.

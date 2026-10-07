@@ -135,6 +135,8 @@ async function freePort() {
     page.getByRole("button", { name: "Sign in", exact: true }),
   );
   await page.waitForURL(origin + "/admin");
+  if (process.env.WPALT_INTERFACE_ONLY) { await require('./interface_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
+  if (process.env.WPALT_LANGUAGE_ONLY) { await require('./language_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_EDITORIAL_ONLY) { await require('./editorial_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_THEME_ONLY) { await require("./independent_theme_acceptance.cjs")(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_INTEGRATION_ONLY) { await require("./integration_acceptance.cjs")(owner,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
@@ -717,6 +719,8 @@ async function freePort() {
   await require("./integration_acceptance.cjs")(owner,origin,output);
   await require("./independent_theme_acceptance.cjs")(owner,publicContext,origin,output);
   await require("./editorial_acceptance.cjs")(owner,publicContext,origin,output);
+  await require("./language_acceptance.cjs")(owner,publicContext,origin,output);
+  await require("./interface_acceptance.cjs")(owner,publicContext,origin,output);
   await require("./operations_acceptance.cjs")(owner, origin, output, password);
   if (localFixture) {
     const registration = passkeyNodes.filter(r=>r.route.startsWith("/account/passkeys/"));

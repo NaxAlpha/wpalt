@@ -178,13 +178,26 @@ pub(crate) async fn save_receipt(
     app: &App,
     session: &Session,
     id: Option<&str>,
+    input: PostInput,
+    review: Option<crate::editorial::Request>,
+) -> Result<Saved> {
+    let guard = app.mutation().await?;
+    save_guarded(app, session, id, input, review, &guard).await
+}
+/// Shared content admission after a caller has validated a connected operation
+/// under the same mutation boundary. The guard argument prevents accidental
+/// unguarded translation/import reuse and avoids recursive mutex acquisition.
+pub(crate) async fn save_guarded(
+    app: &App,
+    session: &Session,
+    id: Option<&str>,
     mut input: PostInput,
     review: Option<crate::editorial::Request>,
+    _guard: &crate::operations::cache::Mutation<'_>,
 ) -> Result<Saved> {
     if !session.can_edit() {
         return Err(Error::forbidden());
     }
-    let _guard = app.mutation().await?;
     crate::auth::current_editor(app, session).await?;
     if session.hash.starts_with("integration:") && (input.action != "save" || input.publish_at != 0)
     {

@@ -106,6 +106,7 @@ pub struct User {
 }
 #[derive(Clone, Debug)]
 pub struct Session {
+    pub interface_locale: String,
     pub user: User,
     pub csrf: String,
     pub hash: String,

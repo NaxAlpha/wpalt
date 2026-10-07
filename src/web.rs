@@ -30,6 +30,8 @@ pub fn router(app: App) -> Router {
     Router::new()
         .merge(crate::builder_web::routes())
         .merge(crate::editorial_web::routes())
+        .merge(crate::platform::language_web::routes())
+        .merge(crate::platform::interface_web::routes())
         .merge(crate::platform::web::routes())
         .merge(crate::platform::integrations::routes())
         .merge(crate::platform::events::routes())
@@ -309,7 +311,8 @@ async fn security_and_trace_inner(
         && auth::same_origin(&app, request.headers()).is_err()
         && !capability_navigation(&route, request.headers())
         && !(method == axum::http::Method::POST && route == "/commerce/stripe/webhook")
-        && !((route == "/api/v1/content" && method == axum::http::Method::POST)
+        && !((matches!(route.as_str(), "/api/v1/content" | "/api/v1/translations")
+            && method == axum::http::Method::POST)
             || (route == "/api/v1/content/{id}" && method == axum::http::Method::PUT))
     {
         Error::forbidden().into_response()
@@ -1146,6 +1149,7 @@ fn editor_form(
             (view::csrf(s)) input type="hidden" name="version" value=(p.version);input type="hidden" name="publish_at" value=(p.publish_at);
             div class="split" {section class="panel" {label {"Title" input name="title" value=(p.title) required maxlength="300";}input type="hidden" name="document" value=(if p.document.is_empty(){crate::document::import(&p.body,&p.blocks).map(|d|d.encode()).unwrap_or_else(|_|crate::document::empty())}else{p.document.clone()});div data-writing-canvas hidden {}label {"Content" textarea class="editor-body" name="body" aria-label="Content" maxlength="524288" {(p.body)}small {"Markdown import replaces the rich document. Select replacement below to apply edits; use the direct editor to preserve rich blocks."}}label data-markdown-replacement {input type="checkbox" name="import_markdown" value="true" checked[p.document.is_empty()];"Replace content using Markdown"}
                 details {summary {"Language & discovery"}
+                    @if let Some(id)=id{p {a href=(format!("/admin/languages/{id}")){"Compare language variants"}}}
                     label {"Language" select name="locale" aria-label="Language" {@for l in &discovery.languages {option value=(l.code) selected[p.locale==l.code] {(l.label)}}}}
                     label {"Translation group" input name="translation_group" aria-label="Translation group" value=(p.translation_group) maxlength="80";small {"Use the same short identifier for related translations. Each language publishes independently."}}
                     input type="hidden" name="seo" value=(p.seo) data-seo-json;

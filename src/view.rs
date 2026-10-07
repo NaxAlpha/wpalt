@@ -2,10 +2,19 @@ use crate::model::{NavItem, Post, Session, Settings};
 use maud::{DOCTYPE, Markup, PreEscaped, html};
 
 pub fn layout(title: &str, settings: &Settings, session: Option<&Session>, body: Markup) -> String {
-    layout_inner(title, settings, session, body, false)
+    layout_inner(title, settings, session, body, false, None)
 }
 pub fn member_layout(title: &str, settings: &Settings, body: Markup) -> String {
-    layout_inner(title, settings, None, body, true)
+    layout_inner(title, settings, None, body, true, None)
+}
+pub fn localized_layout(
+    title: &str,
+    settings: &Settings,
+    session: &Session,
+    body: Markup,
+    locale: &str,
+) -> String {
+    layout_inner(title, settings, Some(session), body, false, Some(locale))
 }
 fn layout_inner(
     title: &str,
@@ -13,34 +22,44 @@ fn layout_inner(
     session: Option<&Session>,
     body: Markup,
     member: bool,
+    body_locale: Option<&str>,
 ) -> String {
     let admin = session.is_some();
+    let catalog = session
+        .and_then(|s| crate::platform::i18n::Catalog::select(&s.interface_locale).ok())
+        .unwrap_or(crate::platform::i18n::Catalog::english());
+    let content_locale = body_locale.unwrap_or("en");
+    let content_direction = if body_locale.is_some() {
+        catalog.direction()
+    } else {
+        "ltr"
+    };
     let nav: Vec<NavItem> = serde_json::from_str(&settings.navigation).unwrap_or_default();
-    html! { (DOCTYPE) html lang="en" { head {
+    html! { (DOCTYPE) html lang=(catalog.locale()) dir=(catalog.direction()) { head {
         meta charset="utf-8"; meta name="viewport" content="width=device-width, initial-scale=1";
-        title {(title) " · " (settings.title)}
+        title lang=(content_locale) {(title) " · " (settings.title)}
         meta name="description" content=(settings.description);
         link rel="stylesheet" href="/assets/app.css";
         @if admin || member || title == "Sign in" {link rel="stylesheet" href="/assets/admin-ui.css";}
         @if admin {script defer src="/assets/admin.js" {}}
         link rel="alternate" type="application/rss+xml" title=(settings.title) href="/feed.xml";
     } body class=(if admin{"admin"}else if member{"member"}else if title == "Sign in" {"auth"}else{settings.theme.as_str()}) {
-        a class="skip" href="#main" {"Skip to content"}
+        a class="skip" href="#main" {(catalog.text("nav.skip"))}
         @if let Some(s)=session {
             aside class="sidebar" {
                 a class="brand" href="/admin" {span class="brand-mark" {"w"} "wpalt"}
-                p class="sidebar-note" {"Your site. Your server."}
-                nav aria-label="Administration" {
-                    a href="/admin" {"Overview"}
-                    @if s.can_edit() {a href="/admin/posts" {"Content"} a href="/admin/editorial" {"Editorial queue"} a href="/admin/media" {"Media library"} @if settings.business_enabled {a href="/admin/forms" {"Forms"} a href="/admin/audience" {"Audience"} a href="/admin/mail" {"Mail"} @if settings.engagement_available && s.is_admin() {a href="/admin/engagement" {"Engagement"}}}}
-                    @if s.is_admin() && settings.membership_enabled {a href="/admin/members" {"Members"}a href="/admin/courses" {"Courses"}}
-                    @if s.is_admin() && settings.commerce_enabled {a href="/admin/shop" {"Commerce"}}
-                    @if s.can_moderate() {a href="/admin/comments" {"Comments"}}
-                    @if s.is_admin() {a href="/admin/builder" {"Design studio"} a href="/admin/discovery" {"Discovery"} a href="/admin/settings" {"Site settings"} a href="/admin/operations" {"Operations"}}
-                    a href="/account/security" {"Account security"}a href="/" {"View website ↗"}
+                p class="sidebar-note" {(catalog.text("nav.hint"))}
+                nav aria-label=(catalog.text("nav.admin")) {
+                    a href="/admin" {(catalog.text("nav.overview"))}
+                    @if s.can_edit() {a href="/admin/posts" {(catalog.text("nav.content"))} a href="/admin/editorial" {(catalog.text("nav.editorial"))} a href="/admin/languages" {(catalog.text("nav.languages"))} a href="/admin/media" {(catalog.text("nav.media"))} @if settings.business_enabled {a href="/admin/forms" {(catalog.text("nav.forms"))} a href="/admin/audience" {(catalog.text("nav.audience"))} a href="/admin/mail" {(catalog.text("nav.mail"))} @if settings.engagement_available && s.is_admin() {a href="/admin/engagement" {(catalog.text("nav.engagement"))}}}}
+                    @if s.is_admin() && settings.membership_enabled {a href="/admin/members" {(catalog.text("nav.members"))}a href="/admin/courses" {(catalog.text("nav.courses"))}}
+                    @if s.is_admin() && settings.commerce_enabled {a href="/admin/shop" {(catalog.text("nav.commerce"))}}
+                    @if s.can_moderate() {a href="/admin/comments" {(catalog.text("nav.comments"))}}
+                    @if s.is_admin() {a href="/admin/builder" {(catalog.text("nav.studio"))} a href="/admin/discovery" {(catalog.text("nav.discovery"))} a href="/admin/settings" {(catalog.text("nav.settings"))} a href="/admin/operations" {(catalog.text("nav.operations"))}}
+                    a href="/account/security" {(catalog.text("nav.account"))} a href="/account/interface" {(catalog.text("nav.interface"))}a href="/" {(catalog.text("nav.site"))}
                 }
-                div class="account" {strong {(s.user.name)} span {(s.user.role)}
-                    form method="post" action="/logout" {input type="hidden" name="csrf" value=(s.csrf);button class="quiet" {"Sign out"}}
+                div class="account" {strong {bdi {(s.user.name)}} span lang="en" dir="ltr" {(s.user.role)}
+                    form method="post" action="/logout" {input type="hidden" name="csrf" value=(s.csrf);button class="quiet" {(catalog.text("account.sign_out"))}}
                 }
             }
         } @else {
@@ -49,7 +68,7 @@ fn layout_inner(
                 a href="/search" {"Search"}
             }}
         }
-        main id="main" class=(if admin || member{"workspace"}else{"site-main"}) {(body)}
+        main id="main" lang=(content_locale) dir=(content_direction) class=(if admin || member{"workspace"}else{"site-main"}) {(body)}
         @if !admin {footer class="site-footer" {span {(settings.description)} a href=(if member {"/account"}else{"/login"}) {(if member {"Account"}else{"Manage site"})}}}
     }} }.into_string()
 }

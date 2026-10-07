@@ -158,7 +158,7 @@ pub async fn login_with_code(
     }
     let key = digest(email.as_bytes());
     app.login_limits.lock().await.check(&key, now())?;
-    let row = sqlx::query("SELECT id,email,name,role,password_hash FROM users WHERE email=$1")
+    let row = sqlx::query("SELECT u.id,u.email,u.name,u.role,u.password_hash,COALESCE(p.locale,'en') AS interface_locale FROM users u LEFT JOIN user_preferences p ON p.user_id=u.id WHERE u.email=$1")
         .bind(&email)
         .fetch_optional(&app.db.pool)
         .await?;
@@ -207,6 +207,7 @@ pub async fn login_with_code(
     let r = row.unwrap();
     let token = random_token();
     let session = Session {
+        interface_locale: r.get("interface_locale"),
         user: User {
             id: r.get("id"),
             email: r.get("email"),
@@ -274,8 +275,9 @@ pub async fn session(app: &App, headers: &HeaderMap) -> Result<Session> {
         .filter(|v| v.len() == 64 && v.chars().all(|c| c.is_ascii_hexdigit()))
         .ok_or(Error(StatusCode::UNAUTHORIZED, "Sign in to continue."))?;
     let hash = digest(token.as_bytes());
-    let r=sqlx::query("SELECT u.id,u.email,u.name,u.role,s.csrf FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>$2 AND u.role<>'disabled'").bind(&hash).bind(now()).fetch_optional(&app.db.pool).await?.ok_or(Error(StatusCode::UNAUTHORIZED,"Your session expired. Sign in again."))?;
+    let r=sqlx::query("SELECT u.id,u.email,u.name,u.role,s.csrf,COALESCE(p.locale,'en') AS interface_locale FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN user_preferences p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND u.role<>'disabled'").bind(&hash).bind(now()).fetch_optional(&app.db.pool).await?.ok_or(Error(StatusCode::UNAUTHORIZED,"Your session expired. Sign in again."))?;
     Ok(Session {
+        interface_locale: r.get("interface_locale"),
         user: User {
             id: r.get("id"),
             email: r.get("email"),

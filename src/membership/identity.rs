@@ -328,6 +328,7 @@ pub async fn identity_session(app: &App, issuer: &str, subject: &str) -> Result<
     let r=sqlx::query("SELECT u.id,u.email,u.name,u.role FROM member_identities i JOIN users u ON u.id=i.user_id WHERE i.issuer=$1 AND i.subject=$2 AND u.role<>'disabled'").bind(issuer).bind(subject).fetch_optional(&app.db.pool).await?.ok_or_else(Error::forbidden)?;
     let token = auth::random_token();
     let session = Session {
+        interface_locale: "en".into(),
         user: User {
             id: r.get("id"),
             email: r.get("email"),

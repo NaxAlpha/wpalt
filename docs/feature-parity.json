@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M9 merged as c0f9f40; deferred local backlog resumed autonomously under decision 0015. D01 verification active; defined slices are not blanket plugin parity.",
+  "milestone": "M9 merged; D01 PR #17 and D02 PR #18 merged with independently verified actual-main artifacts. D03 language workspace development and verification active; defined slices are not blanket plugin parity.",
   "capabilities": [
     {
       "id": "F001",
@@ -156,8 +156,13 @@
         "discovery.md",
         "evidence/m3-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d03-contract.md",
+        "evidence/d03-progress.md",
+        "evidence/d03-reference.md"
+      ],
+      "d03_contract": "d03-contract.md",
+      "d03_status": "in-development; final-head delivery verification pending"
     },
     {
       "id": "F009",
@@ -172,9 +177,14 @@
       "m9_coverage": "Stopped-site exact-plan grouped draft duplication and explicitly selected field synchronization, preserving canonical translated document/publication/access; no unattended overwrite.",
       "evidence": [
         "discovery.md",
-        "../src/platform/translations.rs"
+        "../src/platform/translations.rs",
+        "d03-contract.md",
+        "evidence/d03-progress.md",
+        "evidence/d03-reference.md"
       ],
-      "deferred_work": "deferred-features.md"
+      "deferred_work": "deferred-features.md",
+      "d03_contract": "d03-contract.md",
+      "d03_status": "in-development; final-head delivery verification pending"
     },
     {
       "id": "F010",
@@ -189,8 +199,13 @@
       "m9_coverage": "Configured language slugs, publication-only localized canonical/hreflang, reciprocal published variants and draft exclusion; no automatic translation claim.",
       "evidence": [
         "../tests/acceptance.rs",
-        "m3-contract.md"
-      ]
+        "m3-contract.md",
+        "d03-contract.md",
+        "evidence/d03-progress.md",
+        "evidence/d03-reference.md"
+      ],
+      "d03_contract": "d03-contract.md",
+      "d03_status": "in-development; final-head delivery verification pending"
     },
     {
       "id": "F011",
@@ -205,9 +220,14 @@
       "m9_coverage": "Independent loopback model title/body proposals for short passages, native configured-language grouped unscheduled drafts and source-bound review. Actual Qwen3 1.7B synthetic fact-preservation sample passed with editing still required; no universal accuracy claim.",
       "evidence": [
         "discovery.md",
-        "../examples/integrations/local_ai_worker.py"
+        "../examples/integrations/local_ai_worker.py",
+        "d03-contract.md",
+        "evidence/d03-progress.md",
+        "evidence/d03-reference.md"
       ],
-      "deferred_work": "deferred-features.md"
+      "deferred_work": "deferred-features.md",
+      "d03_contract": "d03-contract.md",
+      "d03_status": "in-development; final-head delivery verification pending"
     },
     {
       "id": "F012",

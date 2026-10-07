@@ -1,0 +1,232 @@
+{
+  "format": "wpalt-canonical-translation-reference-v1",
+  "actual_model": true,
+  "binary_sha256": "a556902c7d64f4b5a5801acbdb171a63961420093e77d6806addcb9c6a1f6a1b",
+  "model": {
+    "name": "qwen3:1.7b",
+    "digest": "8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7"
+  },
+  "source_bytes": 4652,
+  "source_segments": 14,
+  "generation_seconds": 94.85607241699472,
+  "model_metrics": [
+    {
+      "eval_count": 17,
+      "eval_duration": 445345000,
+      "id": "__title",
+      "load_duration": 8124906958,
+      "prompt_eval_count": 84,
+      "total_duration": 8782000833
+    },
+    {
+      "eval_count": 17,
+      "eval_duration": 434825000,
+      "id": "root/0/0:0",
+      "load_duration": 1314368750,
+      "prompt_eval_count": 84,
+      "total_duration": 1945066458
+    },
+    {
+      "eval_count": 163,
+      "eval_duration": 5513927000,
+      "id": "root/1/0:0",
+      "load_duration": 1049601416,
+      "prompt_eval_count": 183,
+      "total_duration": 6943925708
+    },
+    {
+      "eval_count": 156,
+      "eval_duration": 4820242000,
+      "id": "root/2/0:0",
+      "load_duration": 1905438750,
+      "prompt_eval_count": 172,
+      "total_duration": 7178781375
+    },
+    {
+      "eval_count": 151,
+      "eval_duration": 4122100000,
+      "id": "root/3/0:0",
+      "load_duration": 1069039167,
+      "prompt_eval_count": 174,
+      "total_duration": 5546577292
+    },
+    {
+      "eval_count": 159,
+      "eval_duration": 4168555000,
+      "id": "root/4/0:0",
+      "load_duration": 3075663333,
+      "prompt_eval_count": 172,
+      "total_duration": 7605628500
+    },
+    {
+      "eval_count": 171,
+      "eval_duration": 4343341000,
+      "id": "root/5/0:0",
+      "load_duration": 4840124083,
+      "prompt_eval_count": 167,
+      "total_duration": 9561303292
+    },
+    {
+      "eval_count": 155,
+      "eval_duration": 4233237000,
+      "id": "root/6/0:0",
+      "load_duration": 1331173250,
+      "prompt_eval_count": 167,
+      "total_duration": 5936138125
+    },
+    {
+      "eval_count": 151,
+      "eval_duration": 4179892000,
+      "id": "root/7/0:0",
+      "load_duration": 2604377167,
+      "prompt_eval_count": 161,
+      "total_duration": 7175565834
+    },
+    {
+      "eval_count": 172,
+      "eval_duration": 4605208000,
+      "id": "root/8/0:0",
+      "load_duration": 5234223959,
+      "prompt_eval_count": 178,
+      "total_duration": 10211826834
+    },
+    {
+      "eval_count": 164,
+      "eval_duration": 4572090000,
+      "id": "root/9/0:0",
+      "load_duration": 1823719875,
+      "prompt_eval_count": 171,
+      "total_duration": 6765453125
+    },
+    {
+      "eval_count": 8,
+      "eval_duration": 210010000,
+      "id": "root/10/0:0",
+      "load_duration": 1871099458,
+      "prompt_eval_count": 78,
+      "total_duration": 2286137250
+    },
+    {
+      "eval_count": 8,
+      "eval_duration": 212498000,
+      "id": "root/10/1:0",
+      "load_duration": 1855810833,
+      "prompt_eval_count": 78,
+      "total_duration": 2293960666
+    },
+    {
+      "eval_count": 9,
+      "eval_duration": 236255000,
+      "id": "root/12/0:0",
+      "load_duration": 3442479667,
+      "prompt_eval_count": 78,
+      "total_duration": 3913668792
+    },
+    {
+      "eval_count": 18,
+      "eval_duration": 460714000,
+      "id": "root/12/2:0",
+      "load_duration": 4890009375,
+      "prompt_eval_count": 82,
+      "total_duration": 5578449375
+    }
+  ],
+  "missing_exact_fact_markers": [
+    "09:30",
+    "17:00",
+    "10:15",
+    "12:00",
+    "4.50",
+    "08:45"
+  ],
+  "synthetic_translated_title": "Garden ABC-123 événement guide",
+  "synthetic_translated_segments": [
+    {
+      "id": "root/0/0:0",
+      "source": "Garden ABC-123 event guide",
+      "translation": "Garden ABC-123 événement guide"
+    },
+    {
+      "id": "root/1/0:0",
+      "source": "On Saturday 12 October, Garden ABC-123 opens at 09:30 and closes at 17:00. Entry is free. Bring your own refillable bottle. Children must remain with an adult. The northern gate is closed; enter through the south gate. The information desk is beside the greenhouse. This timetable applies only to the demonstration event, not to every future opening day. The gardener Maya answers questions at the desk and will explain the site map before visitors enter the growing beds.",
+      "translation": "Le 12 octobre samedi, le jardin ABC-123 ouvre à 09h30 et se ferme à 17h00. L'entrée est gratuite. Présentez votre propre bouteille réutilisable. Les enfants doivent rester avec un adulte. Le portail nord est fermé ; entrez par le portail sud. La table de consultation se trouve à côté du greenhouse. Ce calendrier s'applique uniquement à l'événement de démonstration, pas à toutes les journées futures. La gardienne Maya répond aux questions à la table et expliquera la carte du site avant que les visiteurs ne pénètrent dans les zones de culture."
+    },
+    {
+      "id": "root/2/0:0",
+      "source": "The seed workshop begins at 10:15 and has 24 places. Registration is required before entry to the workshop even though garden admission is free. Participants receive one paper envelope and three tomato seeds. The workshop does not promise a harvest. Keep the envelope dry, label it with the planting date, and ask the gardener if your growing space gets less than six hours of sunlight. Visitors who do not join the workshop may still walk around the public demonstration beds.",
+      "translation": "Le atelier de semis commence à 10h15 et dispose de 24 places. La registration est requise avant l'entrée dans l'atelier, même si l'accès au jardin est gratuit. Les participants reçoivent un enveloppe papier et trois semis de tomates. L'atelier ne promet pas de récolte. Maintenez l'enveloppe sec, étiquetez-la avec la date de plantation, et demandez au jardinier si votre espace de culture obtient moins de six heures de lumière solaire. Les visiteurs qui ne rejoignent pas l'atelier peuvent encore marcher autour des berceaux de démonstration publique."
+    },
+    {
+      "id": "root/3/0:0",
+      "source": "The accessible path is 120 metres long and starts at the south gate. The path has benches at two marked resting points. Ask Maya for the accessible route rather than taking the steps beside the greenhouse. Dogs must stay on a lead. Assistance dogs are welcome. The map uses the identifier MAP-2026-A; this identifier must remain unchanged when the map description is translated. The walking route ends at the same south gate and does not require crossing the closed northern entrance.",
+      "translation": "Le chemin accessible mesure 120 mètres de long et commence à la porte sud. Le chemin dispose de bancs à deux points de repos marqués. Il est recommandé de demander la route accessible à Maya plutôt que d'emprunter les marches près du greenhouse. Les chiens doivent rester sur un leash. Les chiens d'aide sont bienvenus. Le carte utilise l'identifiant MAP-2026-A ; ce identifiant doit rester inchangé lors de la traduction de la description de la carte. Le chemin de marche se termine à la même porte sud et ne nécessite pas de traverser l'entrée nord fermée."
+    },
+    {
+      "id": "root/4/0:0",
+      "source": "At 12:00, the community kitchen offers soup while supplies last. A bowl costs EUR 4.50; this is separate from free garden admission. Ingredients are listed at the kitchen counter. Tell staff about allergies before ordering. The kitchen cannot guarantee that every dish is free from cross contamination. Visitors may bring their own lunch and use the marked picnic area. Empty packaging belongs in the sorting bins, and reusable dishes must be returned to the counter after lunch.",
+      "translation": "À 12h, la cuisine communautaire propose des soupes tandis que les provisions sont limitées. Un bol coûte 4,50 euros ; cela est séparé des entrées gratuites du jardin. Les ingrédients sont listés sur la contre-taureau. Informez le personnel des allergies avant de commander. La cuisine ne peut pas garantir que chaque plat soit libre de contamination cross. Les visiteurs peuvent apporter leur propre repas et utiliser l'espace de pique-nique marqué. Les emballages vides doivent être placés dans les boîtes de tri, et les plats réutilisables doivent être rendus à la contre-taureau après le repas."
+    },
+    {
+      "id": "root/5/0:0",
+      "source": "The rain procedure is specific: if staff announce heavy rain, the seed workshop moves to the covered greenhouse, but outdoor demonstrations stop. Garden entry does not become a paid ticket because of rain. Listen for staff instructions and keep the path clear. The event code RAIN-17 identifies this procedure and should not be translated into another code. The demonstration organisers will publish a separate update if the whole event is cancelled; this article does not itself announce cancellation.",
+      "translation": "La procédure de pluie est spécifique : si le personnel annonce un pluie intense, le atelier de semis se déplace dans le greenhouse couvert, mais les démonstrations en dehors sont arrêtées. L'entrée du jardin ne devient pas un billet payant en raison du pluie. Écoutez les instructions du personnel et maintenez le chemin libre. Le code d'événement RAIN-17 identifie cette procédure et ne devrait pas être traduit en code autre. Les organisateurs des démonstrations publieront une mise à jour séparée si l'ensemble de l'événement est annulé ; cet article ne déclare pas par lui-même l'annulation."
+    },
+    {
+      "id": "root/6/0:0",
+      "source": "Volunteers meet Maya at 08:45, before public admission starts. Volunteer sign-in is at the greenhouse desk. Each volunteer checks the task list, receives gloves, and returns borrowed tools before leaving. Do not operate powered equipment without the designated supervisor. The code TOOL-204 belongs to the inventory and stays unchanged in translations. No reader is being granted permission to work merely by reading these instructions; the supervisor assigns each task in person.",
+      "translation": "Les volontaires se rencontrent avec Maya à 08h45, avant le début de l'entrée publique. Le sign-in des volontaires se fait à la table des plantes. Chaque volontaire vérifie la liste des tâches, reçoit des gants et retourne les outils empruntés avant de quitter. Il ne faut pas utiliser l'équipement électrique sans le superviseur désigné. Le code TOOL-204 appartient à l'inventaire et reste inchangé dans les traductions. Aucun lecteur n'est autorisé à travailler simplement en lisant ces instructions ; le superviseur assigne chaque tâche en personne."
+    },
+    {
+      "id": "root/7/0:0",
+      "source": "Photography is permitted in the public beds, but ask permission before photographing identifiable visitors. Do not photograph private registration sheets or children without guardian permission. The garden keeps no public list of attendees. Report a lost item at the information desk; staff describe the item privately to its owner. These instructions protect visitors while allowing ordinary pictures of plants. They are specific event instructions rather than a legal guarantee about every future use of a photograph.",
+      "translation": "La photographie est autorisée dans les lits publics, mais il faut demander l'autorisation avant de prendre des photos des visiteurs identifiables. Il ne faut pas prendre de photos des feuilles de registre privées ou des enfants sans permission de leur tuteur. Le jardin ne conserve aucun liste publique des participants. Reportez un objet perdu à la devanture ; les employés décrivent l'objet privé à son propriétaire. Ces instructions protègent les visiteurs tout en permettant des photographies ordinaires des plantes. Elles sont des instructions spécifiques d'événement plutôt qu'une garantie légale concernant l'utilisation future d'une photo."
+    },
+    {
+      "id": "root/8/0:0",
+      "source": "At closing time, volunteers check that borrowed tools are returned and public gates are secured. Visitors leave through the south gate by 17:00. Staff keep the accessible exit available during this check. The archive reference GARDEN-2026-10 remains attached to the event report. Tomorrow's work schedule is a separate document; do not infer another free event or another workshop from this closing routine. The final announcement thanks visitors and asks them to check the next dated notice before returning.",
+      "translation": "À la fin du temps, les volontaires vérifient que les outils empris sont rendus et que les portes publiques sont sécurisées. Les visiteurs quittent par la porte sud à 17h. Les employés conservent l'issue accessible disponible pendant cette vérification. Le référencement de l'archive GARDEN-2026-10 reste attaché au rapport de l'événement. Le calendrier de travaux demain est un document séparé ; ne pas inférer d'autres événements libres ou d'autres ateliers à partir de cette routine de fermeture. L'annonce finale remercie les visiteurs et les demande de vérifier la prochaine notice datée avant de rentrer."
+    },
+    {
+      "id": "root/9/0:0",
+      "source": "Translations should preserve the distinction between free entry and paid soup, the need to register for the seed workshop, and the limits of the rain procedure. A machine-generated draft is reviewed before publication. Reviewers compare times, counts, codes, names, and the direction of the entrance route against this source. Links point to their original destinations, code samples stay unchanged, and the photographs and registration form retain their original references. The local application does not silently publish a generated translation.",
+      "translation": "Les traductions doivent préserver la distinction entre l'accès gratuit et le soup payant, la nécessité de s'inscrire pour le atelier de graines, et les limites du procédé de pluie. Un draft généré par une machine est examiné avant la publication. Les révisateurs comparent les heures, les quantités, les codes, les noms et la direction de la route d'entrée par rapport à ce document source. Les liens pointent vers leurs destinations d'origine, les exemples de codes restent inchangés, et les photos et le formulaire de registration conservent leurs références d'origine. L'application locale ne publie pas automatiquement une traduction générée."
+    },
+    {
+      "id": "root/10/0:0",
+      "source": "Read ",
+      "translation": "Lire"
+    },
+    {
+      "id": "root/10/1:0",
+      "source": "the map",
+      "translation": "le plan"
+    },
+    {
+      "id": "root/12/0:0",
+      "source": "Use ",
+      "translation": "Utilisez "
+    },
+    {
+      "id": "root/12/2:0",
+      "source": " in the integration example.",
+      "translation": "dans l'exemple d'intégration."
+    }
+  ],
+  "assertions": [
+    "resumable checkpoints retained",
+    "incomplete and changed plans refused",
+    "source unchanged",
+    "reviewed private draft",
+    "canonical structure code and references preserved",
+    "duplicate retry refused",
+    "invalid credentials cookie foreign origin incomplete set and publication escalation refused"
+  ],
+  "quality_boundary": "Exact marker preservation is a limited diagnostic, not fluent or factual translation certification. Human review remains mandatory.",
+  "editorial_quality": "failed; human correction required",
+  "review_findings": [
+    "Standalone punctuation no longer receives model-generated text. Canonical link/code spacing is retained by the server.",
+    "French time and decimal localization explains absent exact byte markers; markers alone do not certify facts.",
+    "English terms and poor French phrasing remain; counter is mistranslated.",
+    "One synthetic article/model/language is not evidence of universal accuracy."
+  ]
+}
