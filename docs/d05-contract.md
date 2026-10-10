@@ -1,6 +1,6 @@
 # D05 — Reviewed Elementor design migration into native composition
 
-Date: 2026-10-10 (Tokyo). Active preparation follows D04 PR #20 merged as `f22cef1422b58ba59bc6101de285af84f086e274`; its actual-main publication is verified separately. The full F024 compatibility goal remains tracked. This contract adds editable design migration to M8's explicit heading/text content projection; it does not remove unsupported source breadth or imply PHP runtime compatibility.
+Date: 2026-10-10 (Tokyo). Active preparation follows D04 PR #20 merged as `f22cef1422b58ba59bc6101de285af84f086e274`; actual-main run 38058137896 passed all seven application gates plus publication. The clean-build archive and independently downloaded [public nightly](https://github.com/NaxAlpha/wpalt/releases/tag/nightly-202610101403-f22cef1422b5) both verified source/locks/assets/guides and SHA-256 `b3b854dda4d501fc9978354ee2a5ad1b6def4ee696c526faddf29017bd0ca919`; executable 36,206,152 bytes, SHA-256 `d41c1daef31aa20675d852bbdaabcf9ceb36b8efb2319be75c191df0885f5148`. The full F024 compatibility goal remains tracked. This contract adds editable design migration to M8's explicit heading/text content projection; it does not remove unsupported source breadth or imply PHP runtime compatibility.
 
 ## End-user outcome
 

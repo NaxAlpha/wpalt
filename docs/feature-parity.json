@@ -451,12 +451,20 @@
       "capability": "Exact Elementor template/widget compatibility",
       "deployment": "L",
       "milestone": "M8",
-      "status": "verified-selected-M8-import-scope; full-compatibility-deferred-by-owner",
+      "status": "D05 implemented; integrated verification in progress; full source compatibility remains tracked",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "sequencing_reason": "Local AI worker integrations and Elementor import/output mapping belong to extensibility/migration; no PHP plugin runtime compatibility is assumed. Requirement retained for explicit reconciliation.",
-      "implementation": "src/platform/elementor.rs; explicit WXR --elementor-content; actual free Elementor 4.3.3 saved document/export reconciliation passed at 17fb901; unimplemented widgets/style details remain explicit losses",
-      "deferred_work": "deferred-features.md#d05--elementor-compatibility"
+      "implementation": "Existing explicit content projection plus src/platform/elementor_design.rs and elementor_design_web.rs, Studio review/private import and CLI reviewed plans. Legacy layout/content/image/link/selected interactive structures, typed atomic content/layout and owner-mapped global styles; unknown source settings/styles/interactions are reported. No PHP runtime or blanket widget/rendered-output parity.",
+      "deferred_work": "deferred-features.md#d05--elementor-compatibility",
+      "evidence": [
+        "d05-contract.md",
+        "research/d05-elementor-inventory.json",
+        "tests/elementor.rs",
+        "tests/acceptance.rs::reviewed_elementor_design_preserves_live_pages_and_exact_owner_review",
+        "scripts/elementor_design_acceptance.cjs",
+        "scripts/elementor_design_reference.py"
+      ]
     },
     {
       "id": "F025",

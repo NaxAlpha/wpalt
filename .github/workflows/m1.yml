@@ -116,6 +116,14 @@ jobs:
           path: work/d03-clean-release-language-reference.json
           if-no-files-found: warn
           retention-days: 30
+      - name: Observe the reviewed design workflow with the clean release executable
+        run: python3 scripts/elementor_design_benchmark.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --profile release --output work/d05-clean-release-design-observations.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d05-clean-release-design-evidence
+          path: work/d05-clean-release-design-observations.json
+          retention-days: 30
       - name: Verify explicit private configuration transfer
         run: python3 scripts/config_transfer_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
       - name: Verify independent native fleet observation and credential isolation
@@ -194,6 +202,8 @@ jobs:
       - run: python3 scripts/release_build.py --directory work/distribution --source "$GITHUB_SHA" --extract work/verified-build
       - run: frontend/node_modules/.bin/playwright install --with-deps chromium
       - run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Verify reviewed editable Elementor imports
+        run: WPALT_ELEMENTOR_DESIGN_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Verify local font bundles, grouped navigation and native typography
         run: WPALT_THEME_ASSETS_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_SCRIPTS_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
@@ -270,6 +280,24 @@ jobs:
             work/m8-wordpress-reference.json
             work/m8-migration-profile.json
             work/m8-cluster-migration-profile.json
+  elementor-reference:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/d05-elementor-compatibility'
+    needs: clean-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: wpalt-clean-linux-x86_64-${{ github.sha }}
+          path: work/distribution
+      - run: python3 scripts/release_build.py --directory work/distribution --source "$GITHUB_SHA" --extract work/verified-build
+      - run: python3 scripts/elementor_design_reference.py --binary "$PWD/work/verified-build/wpalt"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d05-elementor-reference
+          path: work/d05-elementor-reference.json
   local-processes:
     needs: clean-build
     runs-on: ubuntu-24.04
@@ -329,6 +357,11 @@ jobs:
         env:
           WPALT_LOCAL_PROCESSES: '1'
           WPALT_THEME_ASSETS_ONLY: '1'
+        run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Verify reviewed design imports across local processes
+        env:
+          WPALT_LOCAL_PROCESSES: '1'
+          WPALT_ELEMENTOR_DESIGN_ONLY: '1'
         run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()

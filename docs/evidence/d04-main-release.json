@@ -1,0 +1,9 @@
+{
+  "source_commit": "f22cef1422b58ba59bc6101de285af84f086e274",
+  "tag": "nightly-202610101403-f22cef1422b5",
+  "archive": "wpalt-x86_64-unknown-linux-gnu-f22cef1422b5.tar.gz",
+  "archive_sha256": "b3b854dda4d501fc9978354ee2a5ad1b6def4ee696c526faddf29017bd0ca919",
+  "binary_sha256": "d41c1daef31aa20675d852bbdaabcf9ceb36b8efb2319be75c191df0885f5148",
+  "binary_bytes": 36206152,
+  "timestamp_basis": "commit time, UTC"
+}

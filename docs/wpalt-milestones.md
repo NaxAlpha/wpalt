@@ -348,3 +348,7 @@ D02 PR #18 merged as `eaddaca4b768`; actual-main release `nightly-202610070108-e
 ### D04 merged; D05 preparation — 2026-10-10
 
 [D04 PR #20](https://github.com/NaxAlpha/wpalt/pull/20) merged as `f22cef1422b58ba59bc6101de285af84f086e274` after all seven corrected-final-head gates and independent exact-parent clean archive verification. Native schema 19 / portable v15 / theme package 2 supplies its defined local composition/assets system; remaining breadth stays in the backlog. Actual-main publication is checked separately. [D05 contract](d05-contract.md) starts reviewed editable Elementor design migration, with current free 4.3.4 legacy/atomic references and explicit source/loss boundaries.
+
+### D05 native implementation and verification — 2026-10-10
+
+Reviewed Elementor data now compiles to shared editable native composition through Studio and stopped CLI, with explicit placements, admitted local dependencies/global-style mappings, source loss accounting and exact private-draft CAS. Selected atomic content/layout properties are separate from raw source styles/interactions. Connected SQLite/PostgreSQL import/race/publication/isolation/recovery and scoped macOS browser/UI checks pass; current-head cumulative checks, actual current-free Linux comparison and clean artifact/release gates remain distinct. No new persisted format or source PHP runtime is introduced. Full F024 breadth remains visible.

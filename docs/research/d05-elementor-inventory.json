@@ -6,237 +6,671 @@
   "elements": [
     {
       "name": "column",
+      "declaration": "get_name",
       "path": "includes/elements/column.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "column",
+      "declaration": "get_type",
+      "path": "includes/elements/column.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "container",
+      "declaration": "get_type",
       "path": "includes/elements/container.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "container",
+      "declaration": "get_name",
+      "path": "includes/elements/container.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "repeater-",
+      "declaration": "get_name",
       "path": "includes/elements/repeater.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "repeater",
+      "declaration": "get_type",
+      "path": "includes/elements/repeater.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "section",
+      "declaration": "get_type",
       "path": "includes/elements/section.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "section",
+      "declaration": "get_name",
+      "path": "includes/elements/section.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "accordion",
+      "declaration": "get_name",
       "path": "includes/widgets/accordion.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "alert",
+      "declaration": "get_name",
       "path": "includes/widgets/alert.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "audio",
+      "declaration": "get_name",
       "path": "includes/widgets/audio.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "button",
+      "declaration": "get_name",
       "path": "includes/widgets/button.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "common-base",
+      "declaration": "get_name",
       "path": "includes/widgets/common-base.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "common-optimized",
+      "declaration": "get_name",
       "path": "includes/widgets/common-optimized.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "common",
+      "declaration": "get_name",
       "path": "includes/widgets/common.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "counter",
+      "declaration": "get_name",
       "path": "includes/widgets/counter.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "divider",
+      "declaration": "get_name",
       "path": "includes/widgets/divider.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "google_maps",
+      "declaration": "get_name",
       "path": "includes/widgets/google-maps.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "heading",
+      "declaration": "get_name",
       "path": "includes/widgets/heading.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "html",
+      "declaration": "get_name",
       "path": "includes/widgets/html.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "icon-box",
+      "declaration": "get_name",
       "path": "includes/widgets/icon-box.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "icon-list",
+      "declaration": "get_name",
       "path": "includes/widgets/icon-list.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "icon",
+      "declaration": "get_name",
       "path": "includes/widgets/icon.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "image-box",
+      "declaration": "get_name",
       "path": "includes/widgets/image-box.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "image-carousel",
+      "declaration": "get_name",
       "path": "includes/widgets/image-carousel.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "image-gallery",
+      "declaration": "get_name",
       "path": "includes/widgets/image-gallery.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "image",
+      "declaration": "get_name",
       "path": "includes/widgets/image.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "section",
+      "declaration": "get_type",
+      "path": "includes/widgets/inner-section.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "inner-section",
+      "declaration": "get_name",
       "path": "includes/widgets/inner-section.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "menu-anchor",
+      "declaration": "get_name",
       "path": "includes/widgets/menu-anchor.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "progress",
+      "declaration": "get_name",
       "path": "includes/widgets/progress.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "rating",
+      "declaration": "get_name",
       "path": "includes/widgets/rating.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "read-more",
+      "declaration": "get_name",
       "path": "includes/widgets/read-more.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "shortcode",
+      "declaration": "get_name",
       "path": "includes/widgets/shortcode.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "sidebar",
+      "declaration": "get_name",
       "path": "includes/widgets/sidebar.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "social-icons",
+      "declaration": "get_name",
       "path": "includes/widgets/social-icons.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "spacer",
+      "declaration": "get_name",
       "path": "includes/widgets/spacer.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "star-rating",
+      "declaration": "get_name",
       "path": "includes/widgets/star-rating.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "tabs",
+      "declaration": "get_name",
       "path": "includes/widgets/tabs.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "testimonial",
+      "declaration": "get_name",
       "path": "includes/widgets/testimonial.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "text-editor",
+      "declaration": "get_name",
       "path": "includes/widgets/text-editor.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "toggle",
+      "declaration": "get_name",
       "path": "includes/widgets/toggle.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     },
     {
       "name": "video",
+      "declaration": "get_name",
       "path": "includes/widgets/video.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
     },
     {
       "name": "wp-widget-",
+      "declaration": "get_name",
       "path": "includes/widgets/wordpress.php",
-      "basis": "pinned PHP declaration, not runtime registration",
-      "status": "inventory; mapping verification pending"
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "accordion-items",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/controls/types/elements/accordion-items-control.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "list-items",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/controls/types/elements/list-items-control.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "tabs",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/controls/types/elements/tabs-control.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "e-accordion",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-accordion/atomic-accordion.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-accordion",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-accordion/atomic-accordion.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-background-video-content",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-background-video/atomic-background-video-content/atomic-background-video-content.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-background-video-content",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-background-video/atomic-background-video-content/atomic-background-video-content.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-background-video-controls",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-background-video/atomic-background-video-controls/atomic-background-video-controls.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-background-video-controls",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-background-video/atomic-background-video-controls/atomic-background-video-controls.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-background-video-pause",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-background-video/atomic-background-video-pause/atomic-background-video-pause.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-background-video-pause",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-background-video/atomic-background-video-pause/atomic-background-video-pause.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-background-video-play",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-background-video/atomic-background-video-play/atomic-background-video-play.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-background-video-play",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-background-video/atomic-background-video-play/atomic-background-video-play.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-background-video",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-background-video/atomic-background-video.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-background-video",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-background-video/atomic-background-video.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-button",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-button/atomic-button.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "e-collection-loop",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-collection-loop/collection-loop-promotion.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-divider",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-divider/atomic-divider.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-form",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-form/atomic-form-promotion.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-form",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-form/atomic-form.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-form-error-message",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-form/form-error-message/form-error-message.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-form-error-message",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-form/form-error-message/form-error-message.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-form-success-message",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-form/form-success-message/form-success-message.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-form-success-message",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-form/form-success-message/form-success-message.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-heading",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-heading/atomic-heading.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "e-image",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-image/atomic-image.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "e-list",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-list/atomic-list/atomic-list.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-list-item",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-list/atomic-list-item/atomic-list-item.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-list-item-content",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-list/atomic-list-item-content/atomic-list-item-content.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-list-item-marker",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-list/atomic-list-item-marker/atomic-list-item-marker.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-list",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-list/atomic-list.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-paragraph",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-paragraph/atomic-paragraph.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "e-self-hosted-video",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-self-hosted-video/atomic-self-hosted-video.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-svg",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-svg/atomic-svg.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-tab",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-tabs/atomic-tab/atomic-tab.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-tab",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-tabs/atomic-tab/atomic-tab.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-tab-content",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-tabs/atomic-tab-content/atomic-tab-content.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-tab-content",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-tabs/atomic-tab-content/atomic-tab-content.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-tabs",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-tabs/atomic-tabs/atomic-tabs.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-tabs",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-tabs/atomic-tabs/atomic-tabs.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-tabs-content-area",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-tabs/atomic-tabs-content-area/atomic-tabs-content-area.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-tabs-content-area",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-tabs/atomic-tabs-content-area/atomic-tabs-content-area.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-tabs-menu",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/atomic-tabs/atomic-tabs-menu/atomic-tabs-menu.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-tabs-menu",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-tabs/atomic-tabs-menu/atomic-tabs-menu.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-youtube",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/atomic-youtube/atomic-youtube.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "retained source breadth; report unsupported element and independently map nested children"
+    },
+    {
+      "name": "e-div-block",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/div-block/div-block.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "e-div-block",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/div-block/div-block.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "e-flexbox",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/flexbox/flexbox.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "e-flexbox",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/flexbox/flexbox.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "e-grid",
+      "declaration": "get_type",
+      "path": "modules/atomic-widgets/elements/grid/grid.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
+    },
+    {
+      "name": "e-grid",
+      "declaration": "get_element_type",
+      "path": "modules/atomic-widgets/elements/grid/grid.php",
+      "basis": "pinned declaration; runtime registration is verified separately",
+      "status": "selected native mapping; source settings/behavior outside the implemented subset are reported"
     }
-  ]
+  ],
+  "primary_atomic_structure": "https://developers.elementor.com/docs/data-structure/atomic-elements/",
+  "wordpress_reference": "https://wordpress.org/documentation/wordpress-version/version-7.1.3/",
+  "verification_boundary": "Declarations are not runtime widget counts. Current-free source execution is pending the dedicated Linux gate; Pro is inaccessible without owner-provisioned licensed fixtures."
 }
