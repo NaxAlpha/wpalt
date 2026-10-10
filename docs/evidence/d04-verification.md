@@ -38,3 +38,7 @@ An unauthenticated preview assertion initially expected 401 instead of the estab
 ## Retained breadth
 
 Overlay mega-menu templates, WOFF/WOFF2/CFF/variable/color/SVG font support, arbitrary raw CSS/executable insertion, configurable font storage ceilings, manual revision pruning, full Elementor adaptation and universal assistive-technology validation remain explicit backlog work. Existing content/media/form dependencies are required for theme-only bundles; full-site recovery moves the whole graph. Published font caches cannot erase already delivered bytes. Default admin system typography stays unchanged.
+
+## Final readiness and merge — 2026-10-10
+
+All seven exact-final-head gates pass in run [38057356395](https://github.com/NaxAlpha/wpalt/actions/runs/38057356395) for `941e0fd1326aea5198ced68fc30dfdedd20567bc`. Independently downloaded merge-ref `660be3a596a6640c2ddb23e6fda504fda2584153` has exact parents `4ab84e49b595` + `941e0fd1326a`; verified archive SHA-256 `f9968c129e3916229b8b1803a715a57d86d32059c1a5f1f1316f81e9205427bb`, executable SHA-256 `d41c1daef31aa20675d852bbdaabcf9ceb36b8efb2319be75c191df0885f5148`, **36,206,152 bytes**. PR #20 was marked ready and merged as `f22cef1422b58ba59bc6101de285af84f086e274` at 2026-10-10T14:03:53Z under standing authorization. Actual-main run 38058137896 and public release remain a separate verification step. These facts supersede earlier development checkpoints without deleting their failure history.

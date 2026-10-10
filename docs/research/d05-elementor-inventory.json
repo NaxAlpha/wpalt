@@ -1,0 +1,242 @@
+{
+  "version": "4.3.4",
+  "commit": "840f5f54b774b8a04587501d9cd23706dc700024",
+  "checked": "2026-10-10",
+  "scope": "Free source declarations only. Common base classes may not be user widgets. Pro unavailable; no runtime/full parity claim.",
+  "elements": [
+    {
+      "name": "column",
+      "path": "includes/elements/column.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "container",
+      "path": "includes/elements/container.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "repeater-",
+      "path": "includes/elements/repeater.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "section",
+      "path": "includes/elements/section.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "accordion",
+      "path": "includes/widgets/accordion.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "alert",
+      "path": "includes/widgets/alert.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "audio",
+      "path": "includes/widgets/audio.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "button",
+      "path": "includes/widgets/button.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "common-base",
+      "path": "includes/widgets/common-base.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "common-optimized",
+      "path": "includes/widgets/common-optimized.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "common",
+      "path": "includes/widgets/common.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "counter",
+      "path": "includes/widgets/counter.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "divider",
+      "path": "includes/widgets/divider.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "google_maps",
+      "path": "includes/widgets/google-maps.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "heading",
+      "path": "includes/widgets/heading.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "html",
+      "path": "includes/widgets/html.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "icon-box",
+      "path": "includes/widgets/icon-box.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "icon-list",
+      "path": "includes/widgets/icon-list.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "icon",
+      "path": "includes/widgets/icon.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "image-box",
+      "path": "includes/widgets/image-box.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "image-carousel",
+      "path": "includes/widgets/image-carousel.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "image-gallery",
+      "path": "includes/widgets/image-gallery.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "image",
+      "path": "includes/widgets/image.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "inner-section",
+      "path": "includes/widgets/inner-section.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "menu-anchor",
+      "path": "includes/widgets/menu-anchor.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "progress",
+      "path": "includes/widgets/progress.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "rating",
+      "path": "includes/widgets/rating.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "read-more",
+      "path": "includes/widgets/read-more.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "shortcode",
+      "path": "includes/widgets/shortcode.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "sidebar",
+      "path": "includes/widgets/sidebar.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "social-icons",
+      "path": "includes/widgets/social-icons.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "spacer",
+      "path": "includes/widgets/spacer.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "star-rating",
+      "path": "includes/widgets/star-rating.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "tabs",
+      "path": "includes/widgets/tabs.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "testimonial",
+      "path": "includes/widgets/testimonial.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "text-editor",
+      "path": "includes/widgets/text-editor.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "toggle",
+      "path": "includes/widgets/toggle.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "video",
+      "path": "includes/widgets/video.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    },
+    {
+      "name": "wp-widget-",
+      "path": "includes/widgets/wordpress.php",
+      "basis": "pinned PHP declaration, not runtime registration",
+      "status": "inventory; mapping verification pending"
+    }
+  ]
+}

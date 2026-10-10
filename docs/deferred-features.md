@@ -44,7 +44,7 @@ Verifiable future outcome: Edit and compare language variants in the UI; no tran
 
 ### D04 — Theme composition and assets
 
-Origin: **M2/M8** · Catalog: **F016/F019** · Status: **defined local theme system implemented; final delivery gates pending**
+Origin: **M2/M8** · Catalog: **F016/F019** · Status: **defined local theme delivery merged in PR #20; actual-main release verification separate**
 
 [D04 contract](d04-contract.md) governs composed publication and local asset authority.
 
@@ -54,9 +54,9 @@ Verifiable future outcome: An independent theme preserves responsive/accessibili
 
 ### D05 — Elementor compatibility
 
-Origin: **M8** · Catalog: **F024** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M8** · Catalog: **F024** · Status: **active source/reference and native design-migration preparation**
 
-Full template/widget/style/dynamic/display-condition mapping and rendered-output compatibility. Current heading/text projection plus explicit losses remains supported.
+[D05 contract](d05-contract.md) governs reviewed editable native design migration and separate legacy/atomic/source-version coverage. Full template/widget/style/dynamic/display-condition mapping and rendered-output compatibility remain the goal; current heading/text projection plus explicit losses remains supported.
 
 Verifiable future outcome: Selected real free/premium source fixtures preserve reviewed layout/content; unsupported widgets and migration losses remain inspectable. No PHP runtime parity is assumed.
 
