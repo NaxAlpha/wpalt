@@ -116,3 +116,9 @@ wpalt --config destination.toml theme publish imported-theme
 Export files are created privately and exclusively. A bundle is limited to 24 MiB; each font to 2 MiB, eight faces per theme, and the shared store to 128 unique fonts / 16 MiB. These are current hard limits. Assets referenced by retained history cannot be deleted; revision retention prunes references alongside the existing 50-plus-live/draft history policy. Explicit manual revision pruning, more font containers, overlay mega-menu templates and unrestricted CSS remain retained breadth.
 
 Bundle HTTP import requires `application/json`. Owner authentication precedes body reading; parsing/inspection uses finite blocking-work admission, and imported canonical theme packages remain limited to 256 KiB inside the 24 MiB bundle envelope. A request timeout does not release inspection capacity until any already-started blocking work finishes.
+
+## Reviewed Elementor design migration
+
+Studio can review a bounded Elementor 0.4 export, report exact losses, map local images/font faces/global styles and import an editable reusable component as a private draft. Choose its placement explicitly; importing one content item preserves other items' old model template. Preview and publication remain separate. No source PHP/raw CSS/scripts or remote-resource fetch is enabled. Full free/Pro compatibility remains tracked; supported source/native graph bounds can refuse large designs.
+
+CLI: `theme elementor-review paper request.json review.json`, then `theme elementor-apply paper review.json --acknowledge-losses`. The exact reviewed source/mappings/destination/base must match. Keep the source and review every loss. See the bundled `elementor-design-import.md` for request fields and limitations.

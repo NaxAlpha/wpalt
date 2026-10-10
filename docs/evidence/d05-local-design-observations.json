@@ -1,0 +1,105 @@
+{
+  "profile": "debug",
+  "binary_sha256": "e8cd402404bd1bc0a17dd04850d1f38c79b25935d0f01947e9172a1d023e665f",
+  "compiler_source_sha256": "b94d3022b2e8409d712dc57465ec3fca756142d6ce8fcc18c44641a85f86eb07",
+  "scope": "1500 published posts plus 310-element design; 5 warmup and 30 serial loopback samples per path, full HTTP review then explicit private apply/publication; warm application RSS is not peak or PostgreSQL engine memory; database scopes differ. No TLS/throughput/CWV/WordPress efficiency comparison.",
+  "observations": [
+    {
+      "engine": "sqlite",
+      "published_posts": 1500,
+      "source_elements": 310,
+      "request_bytes": 44740,
+      "package_bytes": 141222,
+      "review_response_bytes": 189894,
+      "public_response_bytes": 29198,
+      "warm_process_rss_bytes": 72794112,
+      "database_observation_bytes": 28517224,
+      "database_scope": "SQLite DB/WAL/SHM files",
+      "review": {
+        "samples": 30,
+        "p50_ms": 73.375,
+        "p95_ms": 75.022
+      },
+      "public": {
+        "samples": 30,
+        "p50_ms": 10.969,
+        "p95_ms": 11.132
+      },
+      "theme_load_query": "SELECT draft AS package,version,published_version FROM themes WHERE id=$1",
+      "theme_load_plan": [
+        "SEARCH themes USING INDEX sqlite_autoindex_themes_1 (id=?)"
+      ]
+    },
+    {
+      "engine": "postgres",
+      "published_posts": 1500,
+      "source_elements": 310,
+      "request_bytes": 44740,
+      "package_bytes": 141222,
+      "review_response_bytes": 189894,
+      "public_response_bytes": 29198,
+      "warm_process_rss_bytes": 68075520,
+      "database_observation_bytes": 90112,
+      "database_scope": "PostgreSQL themes table including indexes; engine memory and other relations excluded",
+      "review": {
+        "samples": 30,
+        "p50_ms": 74.015,
+        "p95_ms": 77.78
+      },
+      "public": {
+        "samples": 30,
+        "p50_ms": 11.956,
+        "p95_ms": 12.29
+      },
+      "theme_load_query": "SELECT draft AS package,version,published_version FROM themes WHERE id=$1",
+      "theme_load_plan": [
+        {
+          "Plan": {
+            "Node Type": "Index Scan",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Scan Direction": "Forward",
+            "Index Name": "themes_pkey",
+            "Relation Name": "themes",
+            "Alias": "themes",
+            "Startup Cost": 0.15,
+            "Total Cost": 8.17,
+            "Plan Rows": 1,
+            "Plan Width": 48,
+            "Actual Startup Time": 0.008,
+            "Actual Total Time": 0.008,
+            "Actual Rows": 1,
+            "Actual Loops": 1,
+            "Index Cond": "(id = 'paper'::text)",
+            "Rows Removed by Index Recheck": 0,
+            "Shared Hit Blocks": 2,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning": {
+            "Shared Hit Blocks": 84,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.193,
+          "Triggers": [],
+          "Execution Time": 0.023
+        }
+      ]
+    }
+  ]
+}

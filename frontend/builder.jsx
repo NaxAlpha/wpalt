@@ -3,6 +3,7 @@ import { NavigationFamilies } from "./navigation.jsx";
 import { FontFaces } from "./fonts.jsx";
 import { CompositionStyle } from "./styles.jsx";
 import { ThemePortability } from "./portability.jsx";
+import { ElementorImport } from "./elementor.jsx";
 import { useState, useEffect, useRef } from "preact/hooks";
 import { Button, Field, Notice, Disclosure, SelectField } from "./ui.jsx";
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -929,6 +930,18 @@ function App() {
           />
         </label>
       </div>
+      <ElementorImport
+        key={id}
+        id={id}
+        version={version.current}
+        pkg={pkg}
+        state={state}
+        dirty={dirty}
+        busy={busy}
+        api={api}
+        action={action}
+        reload={reload}
+      />
       <ThemePortability
         id={id}
         dirty={dirty}

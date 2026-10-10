@@ -344,3 +344,11 @@ D02 PR #18 merged as `eaddaca4b768`; actual-main release `nightly-202610070108-e
 ### D04 integrated local verification — 2026-10-10
 
 [D04](d04-contract.md) now supplies bounded hierarchical/grouped language-aware navigation, reusable typography/styles, owner-local static TrueType assets and atomic private bundles. Native acceptance (104 Rust cases, real SQLite/PostgreSQL), actual schema-18 stopped upgrade/fresh rollback and cumulative operations pass. The [ledger](evidence/d04-verification.md) records pending final browser/CI/archive/release gates and retained breadth. D05 remains the next dependency-ordered package after D04 readiness and merge.
+
+### D04 merged; D05 preparation — 2026-10-10
+
+[D04 PR #20](https://github.com/NaxAlpha/wpalt/pull/20) merged as `f22cef1422b58ba59bc6101de285af84f086e274` after all seven corrected-final-head gates and independent exact-parent clean archive verification. Native schema 19 / portable v15 / theme package 2 supplies its defined local composition/assets system; remaining breadth stays in the backlog. Actual-main publication is checked separately. [D05 contract](d05-contract.md) starts reviewed editable Elementor design migration, with current free 4.3.4 legacy/atomic references and explicit source/loss boundaries.
+
+### D05 native implementation and verification — 2026-10-10
+
+Reviewed Elementor data now compiles to shared editable native composition through Studio and stopped CLI, with explicit placements, admitted local dependencies/global-style mappings, source loss accounting and exact private-draft CAS. Selected atomic content/layout properties are separate from raw source styles/interactions. Connected SQLite/PostgreSQL import/race/publication/isolation/recovery and scoped macOS browser/UI checks pass; current-head cumulative checks, actual current-free Linux comparison and clean artifact/release gates remain distinct. No new persisted format or source PHP runtime is introduced. Full F024 breadth remains visible.

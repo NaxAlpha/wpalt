@@ -9274,3 +9274,178 @@ async fn local_fonts_follow_live_publication_and_recover_shared_bytes() {
         site.close().await;
     }
 }
+
+/// An imported page stays private until publication and cannot change other pages.
+#[tokio::test]
+async fn reviewed_elementor_design_preserves_live_pages_and_exact_owner_review() {
+    use serde_json::{Value, json};
+    use wpalt::theme;
+    for postgres in engines() {
+        let site = Site::new(postgres, true).await;
+        let selected = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("selected-design-page", "publish"),
+        )
+        .await
+        .unwrap();
+        content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("unrelated-design-page", "publish"),
+        )
+        .await
+        .unwrap();
+        let stored = theme::load(&site.app, "paper", true).await.unwrap();
+        let source = json!({"version":"0.4","title":"Imported design","type":"page","page_settings":[],"content":[{"id":"hero","elType":"container","settings":{"flex_direction":"column"},"elements":[{"id":"title","elType":"widget","widgetType":"heading","settings":{"title":"IMPORTED_PRIVATE_HERO","header_size":"h1","custom_css":"unsafe ignored"},"elements":[]}]}]});
+        let mut envelope = json!({"csrf":site.session().csrf,"version":stored.version,"request":{"source":source,"component":"migration-hero","target":"content","content_id":selected.id,"content_kind":"post"}});
+        let review_path = "/api/admin/design/paper/elementor/review";
+        let apply_path = "/api/admin/design/paper/elementor/apply";
+        let denied = request(
+            &site.app,
+            "POST",
+            review_path,
+            None,
+            "application/json",
+            b"{malformed".to_vec(),
+        )
+        .await;
+        assert_ne!(denied.0, StatusCode::OK);
+        let reviewed = request(
+            &site.app,
+            "POST",
+            review_path,
+            Some(&site.token),
+            "application/json",
+            serde_json::to_vec(&envelope).unwrap(),
+        )
+        .await;
+        assert_eq!(
+            reviewed.0,
+            StatusCode::OK,
+            "{}",
+            String::from_utf8_lossy(&reviewed.2)
+        );
+        assert!(
+            reviewed.1["cache-control"]
+                .to_str()
+                .unwrap()
+                .contains("no-store")
+        );
+        let review: Value = serde_json::from_slice(&reviewed.2).unwrap();
+        assert!(!review["report"]["losses"].as_array().unwrap().is_empty());
+        assert_eq!(
+            theme::load(&site.app, "paper", true).await.unwrap().version,
+            stored.version,
+            "Review is read-only."
+        );
+        envelope["fingerprint"] = review["fingerprint"].clone();
+        let no_ack = request(
+            &site.app,
+            "POST",
+            apply_path,
+            Some(&site.token),
+            "application/json",
+            serde_json::to_vec(&envelope).unwrap(),
+        )
+        .await;
+        assert_ne!(no_ack.0, StatusCode::OK);
+        envelope["acknowledge_losses"] = true.into();
+        let mut tampered = envelope.clone();
+        tampered["request"]["target"] = "home".into();
+        assert_ne!(
+            request(
+                &site.app,
+                "POST",
+                apply_path,
+                Some(&site.token),
+                "application/json",
+                serde_json::to_vec(&tampered).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        let bytes = serde_json::to_vec(&envelope).unwrap();
+        let (a, b) = tokio::join!(
+            request(
+                &site.app,
+                "POST",
+                apply_path,
+                Some(&site.token),
+                "application/json",
+                bytes.clone()
+            ),
+            request(
+                &site.app,
+                "POST",
+                apply_path,
+                Some(&site.token),
+                "application/json",
+                bytes
+            )
+        );
+        assert_eq!(
+            [a.0, b.0].iter().filter(|s| **s == StatusCode::OK).count(),
+            1,
+            "Only one exact-base import wins."
+        );
+        assert!(
+            !get(&site.app, "/selected-design-page", None)
+                .await
+                .1
+                .contains("IMPORTED_PRIVATE_HERO")
+        );
+        let private = get(
+            &site.app,
+            &format!(
+                "/admin/design/paper/preview?template=post&post={}",
+                selected.id
+            ),
+            Some(&site.token),
+        )
+        .await;
+        assert_eq!(private.0, StatusCode::OK);
+        assert!(private.1.contains("IMPORTED_PRIVATE_HERO"));
+        assert!(!private.1.contains("unsafe ignored"));
+        let current = theme::load(&site.app, "paper", true).await.unwrap();
+        theme::save_as(
+            &site.app,
+            site.session(),
+            "paper",
+            current.package,
+            current.version,
+            true,
+        )
+        .await
+        .unwrap();
+        assert!(
+            get(&site.app, "/selected-design-page", None)
+                .await
+                .1
+                .contains("IMPORTED_PRIVATE_HERO")
+        );
+        let unrelated = get(&site.app, "/unrelated-design-page", None).await.1;
+        assert!(!unrelated.contains("IMPORTED_PRIVATE_HERO"));
+        assert!(unrelated.contains("A quiet garden"));
+        let snapshot = backup::capture(&site.app).await.unwrap();
+        let restored = Site::new(postgres, false).await;
+        backup::restore(&restored.app, &snapshot).await.unwrap();
+        assert!(
+            get(&restored.app, "/selected-design-page", None)
+                .await
+                .1
+                .contains("IMPORTED_PRIVATE_HERO")
+        );
+        assert!(
+            !get(&restored.app, "/unrelated-design-page", None)
+                .await
+                .1
+                .contains("IMPORTED_PRIVATE_HERO")
+        );
+        restored.close().await;
+        site.close().await;
+    }
+}

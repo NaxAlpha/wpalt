@@ -5,6 +5,8 @@ pub mod config_transfer;
 pub mod content_audit;
 pub mod document_translation;
 pub mod elementor;
+pub mod elementor_design;
+pub mod elementor_design_web;
 pub mod events;
 pub mod fleet;
 mod html;
