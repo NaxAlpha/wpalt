@@ -679,7 +679,7 @@ pub async fn prepare_with_adapters(
     snapshot["audit_history"] = json!([]);
     let payload = serde_json::to_string(&snapshot).map_err(|_| invalid())?;
     let bytes = serde_json::to_vec(
-        &json!({"format":"wpalt-backup-v14","sha256":digest(payload.as_bytes()),"payload":payload}),
+        &json!({"format":"wpalt-backup-v15","sha256":digest(payload.as_bytes()),"payload":payload}),
     )
     .map_err(|_| invalid())?;
     crate::backup::inspect(&app.config, &bytes)?;

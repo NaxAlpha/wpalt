@@ -68,3 +68,9 @@ The final application source is frozen for cumulative Rust/lint, native CLI, act
 ## Final CI schema assertion correction
 
 Run 37563507171 at head 819dd31 passes application, compiler-floor and dependency-audit gates. Clean-build fails at the external-integration acceptance script because its final SQLite assertion still expects schema 17 rather than D03 schema 18; dependent artifact/browser/recovery gates are skipped. The assertion is updated to require 18, retaining the same recovery, credential and redaction checks. The unchanged native executable passes the corrected integration journey, WXR migration, private configuration transfer, fleet outage/revocation and protocol freshness checks. The cumulative two-process Chrome workflow also passes locally. D03 remains a draft pending all final-head CI gates and independent clean-artifact verification.
+
+## D03 ready and merged
+
+All seven final-head gates pass in run 37564549614. Independent exact-source clean archive verification passes for 080e356dd83308455b84fc245329604e43c0c892. PR #19 merged at 2026-10-07T03:08:15Z as 4ab84e49b5951d3065ef2e77cb19965da4d1db7b. Actual-main release run 37565341571 remains pending. The separate native two-process acceptance journey passes in 138.337 seconds. A native schema-18 macOS debug executable is preserved locally for the next actual upgrade/fresh rollback test (SHA-256 a556902c7d64f4b5a5801acbdb171a63961420093e77d6806addcb9c6a1f6a1b, 106,924,872 bytes); it is not the Linux optimized release size.
+
+Actual-main run 37565341571 passes every applicable gate and release. The independently downloaded clean/public archives match exact source 4ab84e49b595 and SHA-256 65da6e7fc02b0d592ef4a4a84c57b9613b0e0da01165aa4d840d3c90e0d9c13b. Published nightly-202610070308-4ab84e49b595 is a non-draft prerelease. D04 implementation can proceed from this verified base.

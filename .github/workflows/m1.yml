@@ -120,6 +120,14 @@ jobs:
         run: python3 scripts/config_transfer_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
       - name: Verify independent native fleet observation and credential isolation
         run: python3 scripts/fleet_acceptance.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt"
+      - name: Observe shared local font storage and release requests
+        run: python3 scripts/theme_assets_reference.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --build-profile release --output work/d04-clean-release-theme-reference.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d04-clean-release-theme-evidence
+          path: work/d04-clean-release-theme-reference.json
+          retention-days: 30
       - name: Package source identity, executable and checksums
         run: python3 scripts/package_build.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --target x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -186,6 +194,8 @@ jobs:
       - run: python3 scripts/release_build.py --directory work/distribution --source "$GITHUB_SHA" --extract work/verified-build
       - run: frontend/node_modules/.bin/playwright install --with-deps chromium
       - run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Verify local font bundles, grouped navigation and native typography
+        run: WPALT_THEME_ASSETS_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_SCRIPTS_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_CLONE_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_SPAM_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
@@ -300,11 +310,25 @@ jobs:
           python3 work/m8-release-verifier.py --directory work/m8-runtime-reference --source c12c6894f5c7969344a74e67cd742f971db381d5 --extract work/m8-runtime-app
           python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/m8-runtime-app/wpalt"
       - run: python3 scripts/module_acceptance.py --binary "$PWD/work/verified-build/wpalt"
+      - name: Verify actual D03 upgrade and fresh old-runtime rollback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --depth=1 origin 4ab84e49b5951d3065ef2e77cb19965da4d1db7b
+          gh release download nightly-202610070308-4ab84e49b595 --pattern '*.tar.gz' --pattern SHA256SUMS --dir work/d03-runtime-reference
+          git show 4ab84e49b5951d3065ef2e77cb19965da4d1db7b:scripts/release_build.py > work/d03-release-verifier.py
+          python3 work/d03-release-verifier.py --directory work/d03-runtime-reference --source 4ab84e49b5951d3065ef2e77cb19965da4d1db7b --extract work/d03-runtime-app
+          python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d03-runtime-app/wpalt" --source-schema 18
       - run: python3 scripts/local_process_acceptance.py --binary "$PWD/work/verified-build/wpalt"
       - run: frontend/node_modules/.bin/playwright install --with-deps chromium
       - name: Cumulative browser journeys across two processes and one worker
         env:
           WPALT_LOCAL_PROCESSES: '1'
+        run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Verify composed font/theme journeys across local processes
+        env:
+          WPALT_LOCAL_PROCESSES: '1'
+          WPALT_THEME_ASSETS_ONLY: '1'
         run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()

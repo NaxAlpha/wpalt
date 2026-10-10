@@ -250,6 +250,41 @@ pub async fn configure(app: &App, d: Definition, version: i64) -> Result<i64> {
             "A language still used by content cannot be removed.",
         ));
     }
+    // Current drafts and live snapshots may depend on language-specific navigation.
+    // Historical revisions remain recoverable drafts, subject to current validation.
+    let themes = sqlx::query("SELECT draft,live FROM themes ORDER BY id LIMIT 33")
+        .fetch_all(&mut *tx)
+        .await?;
+    if themes.len() > 32 {
+        return Err(Error::invalid(
+            "Theme count exceeds the supported language review budget.",
+        ));
+    }
+    for row in themes {
+        for column in ["draft", "live"] {
+            let raw: String = row.get(column);
+            if raw.is_empty() {
+                continue;
+            }
+            let package: crate::theme::Package = serde_json::from_str(&raw).map_err(|_| {
+                Error::invalid(
+                    "Repair the current theme graph before changing language configuration.",
+                )
+            })?;
+            for navigation in package.navigations.values() {
+                if d.language(&navigation.language)?.direction != navigation.direction
+                    || navigation.languages.iter().any(|(code, variant)| {
+                        d.language(code)
+                            .map_or(true, |language| language.direction != variant.direction)
+                    })
+                {
+                    return Err(Error::invalid(
+                        "A language/direction still used by current theme navigation cannot be removed or changed.",
+                    ));
+                }
+            }
+        }
+    }
     for language in &d.languages {
         let collision: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM posts WHERE slug=$1 OR published_slug=$1")

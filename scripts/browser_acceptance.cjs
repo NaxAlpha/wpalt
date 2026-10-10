@@ -138,6 +138,7 @@ async function freePort() {
   if (process.env.WPALT_INTERFACE_ONLY) { await require('./interface_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_LANGUAGE_ONLY) { await require('./language_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_EDITORIAL_ONLY) { await require('./editorial_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
+  if (process.env.WPALT_THEME_ASSETS_ONLY) { await require('./theme_assets_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d04-theme-assets.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }
   if (process.env.WPALT_THEME_ONLY) { await require("./independent_theme_acceptance.cjs")(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_INTEGRATION_ONLY) { await require("./integration_acceptance.cjs")(owner,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_MIGRATION_ONLY) { await require("./migration_acceptance.cjs")(owner,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
@@ -779,15 +780,9 @@ async function freePort() {
         });
         console.error(
           "UI status:",
-          await p
-            .locator("[data-save-status]")
-            .textContent()
-            .catch(() => ""),
+          await p.locator("[data-save-status]").allTextContents(),
           "UI error:",
-          await p
-            .locator("[data-editor-error]")
-            .textContent()
-            .catch(() => ""),
+          await p.locator("[data-editor-error]").allTextContents(),
         );
       }
     }

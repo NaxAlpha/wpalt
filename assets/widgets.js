@@ -34,3 +34,17 @@ for (const group of document.querySelectorAll("[data-tabs]")) {
   });
   activate(0);
 }
+// Ordinary navigation keeps native lists/disclosures. Escape closes the nearest
+// open group and returns focus to its summary; Tab remains normal document flow.
+for (const navigation of document.querySelectorAll(".theme-navigation")) {
+  navigation.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const group = event.target.closest("details[open]");
+    if (!group || !navigation.contains(group)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    for (const nested of group.querySelectorAll("details[open]")) nested.open = false;
+    group.open = false;
+    group.querySelector(":scope > summary")?.focus();
+  });
+}

@@ -30,6 +30,7 @@ pub fn routes() -> Router<App> {
         .route("/admin/design/{id}/style.css", get(draft_css))
         .route("/themes/{id}/{version}/style.css", get(live_css))
         .layer(DefaultBodyLimit::max(320 * 1024))
+        .merge(crate::theme::asset_web::routes())
 }
 async fn owner(
     app: &App,
@@ -132,6 +133,25 @@ async fn state(
         out["revisions"]=json!(revisions.iter().map(|r|json!({"theme":r.get::<String,_>("theme_id"),"version":r.get::<i64,_>("version"),"published":r.get::<i64,_>("published")})).collect::<Vec<_>>());
         out["design"] = json!({"version":design.get::<i64,_>("version"),"published_version":design.get::<i64,_>("published_version"),"draft_options":serde_json::from_str::<Value>(&design.get::<String,_>("draft_options")).unwrap_or(Value::Null)});
         out["active"] = json!(active);
+        let fonts = sqlx::query("SELECT id,definition FROM theme_assets ORDER BY id LIMIT 129")
+            .fetch_all(&app.db.pool)
+            .await?;
+        if fonts.len() > 128 {
+            return Err(Error::invalid(
+                "Local font inventory exceeds its supported budget.",
+            ));
+        }
+        let mut inventory = Vec::new();
+        for row in fonts {
+            let id: String = row.get("id");
+            let metadata =
+                crate::theme::assets::Definition::parse(&row.get::<String, _>("definition"))?;
+            inventory
+                .push(json!({"id":id,"label":metadata.label,"inspection":metadata.inspection}));
+        }
+        out["fonts"] = inventory.into();
+        out["languages"] = serde_json::to_value(crate::discovery::load(&app).await?.0.languages)
+            .map_err(|_| Error::invalid("Invalid configured languages."))?;
     }
     Ok(Json(out))
 }
@@ -150,8 +170,16 @@ async fn save(
     Path(id): Path<String>,
     Json(input): Json<Edit>,
 ) -> Result<Json<Value>> {
-    owner(&app, &headers, Some(&input.csrf)).await?;
-    let v = theme::save(&app, &id, input.package, input.version, input.publish).await?;
+    let actor = owner(&app, &headers, Some(&input.csrf)).await?;
+    let v = theme::save_as(
+        &app,
+        &actor,
+        &id,
+        input.package,
+        input.version,
+        input.publish,
+    )
+    .await?;
     Ok(Json(json!({"version":v})))
 }
 #[derive(Deserialize)]
@@ -165,8 +193,8 @@ async fn activate(
     Path(id): Path<String>,
     Json(input): Json<Token>,
 ) -> Result<Json<Value>> {
-    owner(&app, &headers, Some(&input.csrf)).await?;
-    theme::activate(&app, &id).await?;
+    let actor = owner(&app, &headers, Some(&input.csrf)).await?;
+    theme::activate_as(&app, &actor, &id).await?;
     Ok(Json(json!({"active":id})))
 }
 async fn restore(
@@ -175,7 +203,7 @@ async fn restore(
     Path((id, version)): Path<(String, i64)>,
     Json(input): Json<Versioned>,
 ) -> Result<Json<Value>> {
-    owner(&app, &headers, Some(&input.csrf)).await?;
+    let actor = owner(&app, &headers, Some(&input.csrf)).await?;
     let raw: String =
         sqlx::query_scalar("SELECT package FROM theme_revisions WHERE theme_id=$1 AND version=$2")
             .bind(&id)
@@ -185,7 +213,7 @@ async fn restore(
             .ok_or_else(Error::not_found)?;
     let package = theme::Package::parse(&raw, &schema::Registry::load(&app).await?)?;
     Ok(Json(
-        json!({"version":theme::save(&app,&id,package,input.version,false).await?}),
+        json!({"version":theme::save_as(&app,&actor,&id,package,input.version,false).await?}),
     ))
 }
 #[derive(Deserialize)]

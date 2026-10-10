@@ -1,4 +1,10 @@
 //! Bounded declarative composition shared by live pages and authenticated previews.
+pub mod asset_web;
+pub mod assets;
+pub mod bundle;
+pub mod font;
+pub mod navigation;
+
 use crate::{
     App, content,
     error::{Error, Result},
@@ -16,11 +22,41 @@ pub struct Package {
     pub format: u32,
     pub name: String,
     pub tokens: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub navigations: BTreeMap<String, navigation::Navigation>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub fonts: BTreeMap<String, FontFace>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub styles: BTreeMap<String, Style>,
     #[serde(default)]
     pub components: BTreeMap<String, Component>,
     pub header: Node,
     pub footer: Node,
     pub templates: BTreeMap<String, Node>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FontFace {
+    pub asset: String,
+    pub weight: u16,
+    pub style: String,
+    pub display: String,
+    pub fallback: String,
+}
+impl FontFace {
+    fn validate(&self) -> Result<()> {
+        if !assets::valid_id(&self.asset)
+            || !(1..=1000).contains(&self.weight)
+            || !["normal", "italic"].contains(&self.style.as_str())
+            || !["swap", "optional"].contains(&self.display.as_str())
+            || !["system", "serif", "mono"].contains(&self.fallback.as_str())
+        {
+            return Err(Error::invalid(
+                "Choose an admitted local font with explicit weight, style, loading and fallback.",
+            ));
+        }
+        Ok(())
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -58,6 +94,8 @@ pub struct Node {
     pub condition: Value,
     #[serde(default)]
     pub style: Style,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub style_ref: String,
 }
 fn lazy_loading(value: &str) -> bool {
     value == "lazy"
@@ -71,7 +109,7 @@ fn heading_level() -> u8 {
 fn limit() -> usize {
     12
 }
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Style {
     #[serde(default)]
@@ -92,6 +130,23 @@ pub struct Style {
     pub color: String,
     #[serde(default)]
     pub align: String,
+    #[serde(default)]
+    pub font: String,
+    #[serde(default)]
+    pub font_size: u8,
+    #[serde(default)]
+    pub font_weight: u16,
+    /// Percentage of font size, zero inherits.
+    #[serde(default)]
+    pub line_height: u16,
+    #[serde(default)]
+    pub margin_block: u8,
+    #[serde(default)]
+    pub border_width: u8,
+    #[serde(default)]
+    pub border_color: String,
+    #[serde(default)]
+    pub radius: u8,
 }
 fn color(s: &str) -> bool {
     s.len() == 7 && s.starts_with('#') && s[1..].bytes().all(|b| b.is_ascii_hexdigit())
@@ -107,7 +162,7 @@ impl Package {
         Ok(p)
     }
     pub fn validate(&self, registry: &Registry) -> Result<()> {
-        if self.format != 1
+        if self.format != 2
             || self.name.trim().is_empty()
             || self.name.len() > 100
             || self.components.len() > 32
@@ -117,6 +172,37 @@ impl Package {
                 "Unsupported theme format or package limits.",
             ));
         }
+        if self.navigations.len() > 8 {
+            return Err(Error::invalid(
+                "A theme permits at most eight navigation families.",
+            ));
+        }
+        for (name, nav) in &self.navigations {
+            if !crate::schema::identifier(name) {
+                return Err(Error::invalid("Navigation names must be identifiers."));
+            }
+            nav.validate()?;
+        }
+        if self.fonts.len() > 8 {
+            return Err(Error::invalid(
+                "A theme permits at most eight local font faces.",
+            ));
+        }
+        for (name, face) in &self.fonts {
+            if !crate::schema::identifier(name) {
+                return Err(Error::invalid("Font face names must be identifiers."));
+            }
+            face.validate()?;
+        }
+        if self.styles.len() > 32 {
+            return Err(Error::invalid("A theme allows 32 reusable styles."));
+        }
+        for (name, style) in &self.styles {
+            if !crate::schema::identifier(name) {
+                return Err(Error::invalid("Reusable style names must be identifiers."));
+            }
+            self.validate_style(style)?;
+        }
         for key in ["background", "panel", "text", "muted", "accent"] {
             if !self.tokens.get(key).is_some_and(|s| color(s)) {
                 return Err(Error::invalid(
@@ -125,13 +211,14 @@ impl Package {
             }
         }
         if self.tokens.len() != 6
-            || !self
-                .tokens
-                .get("font")
-                .is_some_and(|s| ["system", "serif", "mono"].contains(&s.as_str()))
+            || !self.tokens.get("font").is_some_and(|s| {
+                ["system", "serif", "mono"].contains(&s.as_str())
+                    || s.strip_prefix("local:")
+                        .is_some_and(|name| self.fonts.contains_key(name))
+            })
         {
             return Err(Error::invalid(
-                "Choose system, serif or mono font and the five color tokens.",
+                "Choose system, serif, mono or an admitted local font and the five color tokens.",
             ));
         }
         for key in ["home", "search", "content"] {
@@ -261,19 +348,12 @@ impl Package {
         {
             return Err(Error::invalid("Image loading must be lazy or eager."));
         }
-        let s = &n.style;
-        if !["", "grid", "row", "stack"].contains(&s.layout.as_str())
-            || s.columns > 6
-            || s.mobile_columns > 3
-            || s.gap > 64
-            || s.padding > 96
-            || s.width > 1600
-            || !["", "left", "center", "right"].contains(&s.align.as_str())
-            || (!s.background.is_empty() && !color(&s.background))
-            || (!s.color.is_empty() && !color(&s.color))
-        {
-            return Err(Error::invalid("Invalid responsive style values."));
+        if !n.style_ref.is_empty() && n.style != Style::default() {
+            return Err(Error::invalid(
+                "Detach a reusable style before adding independent node styles.",
+            ));
         }
+        self.validate_style(self.node_style(n)?)?;
         if n.limit == 0 || n.limit > 50 || n.arguments.len() > 16 || n.children.len() > 50 {
             return Err(Error::invalid("Composition item limit must be 1–50."));
         }
@@ -354,6 +434,14 @@ impl Package {
         } else if !n.component.is_empty() || !n.arguments.is_empty() {
             return Err(Error::invalid(
                 "Component arguments belong on component nodes.",
+            ));
+        }
+        if n.kind == "navigation"
+            && !n.source.is_empty()
+            && !self.navigations.contains_key(&n.source)
+        {
+            return Err(Error::invalid(
+                "Choose an installed theme navigation family.",
             ));
         }
         if n.kind == "collection" && n.source != "listing" && !r.models.contains_key(&n.source) {
@@ -463,6 +551,45 @@ impl Package {
         check.validate(&context)?;
         Ok(original)
     }
+    fn node_style<'a>(&'a self, node: &'a Node) -> Result<&'a Style> {
+        if node.style_ref.is_empty() {
+            Ok(&node.style)
+        } else {
+            self.styles
+                .get(&node.style_ref)
+                .ok_or_else(|| Error::invalid("Unknown reusable style."))
+        }
+    }
+    fn validate_style(&self, s: &Style) -> Result<()> {
+        if !["", "grid", "row", "stack"].contains(&s.layout.as_str())
+            || s.columns > 6
+            || s.mobile_columns > 3
+            || s.gap > 64
+            || s.padding > 96
+            || s.width > 1600
+            || !["", "left", "center", "right", "start", "end"].contains(&s.align.as_str())
+            || (!s.background.is_empty() && !color(&s.background))
+            || (!s.color.is_empty() && !color(&s.color))
+            || (!s.border_color.is_empty() && !color(&s.border_color))
+            || (s.font_size != 0 && !(12..=96).contains(&s.font_size))
+            || (s.font_weight != 0 && !(100..=900).contains(&s.font_weight))
+            || (s.line_height != 0 && !(100..=240).contains(&s.line_height))
+            || s.margin_block > 96
+            || s.border_width > 8
+            || s.radius > 48
+            || (!s.font.is_empty()
+                && !["system", "serif", "mono"].contains(&s.font.as_str())
+                && !s
+                    .font
+                    .strip_prefix("local:")
+                    .is_some_and(|name| self.fonts.contains_key(name)))
+        {
+            return Err(Error::invalid(
+                "Invalid bounded typography or responsive style values.",
+            ));
+        }
+        Ok(())
+    }
     pub fn css(&self) -> String {
         self.css_scope(None)
     }
@@ -476,10 +603,22 @@ impl Package {
         Ok(self.css_scope(Some(template)))
     }
     fn css_scope(&self, template: Option<&str>) -> String {
+        fn fallback(name: &str) -> &'static str {
+            match name {
+                "serif" => "Georgia,serif",
+                "mono" => "ui-monospace,monospace",
+                _ => "system-ui,sans-serif",
+            }
+        }
+        let local_family = self.tokens["font"].strip_prefix("local:").and_then(|name| {
+            self.fonts
+                .get(name)
+                .map(|face| format!("wpaltfont_{name},{}", fallback(&face.fallback)))
+        });
         let font = match self.tokens["font"].as_str() {
             "serif" => "Georgia,serif",
             "mono" => "ui-monospace,monospace",
-            _ => "system-ui,sans-serif",
+            _ => local_family.as_deref().unwrap_or("system-ui,sans-serif"),
         };
         let mut out = format!(
             "body.theme-site{{--bg:{};--ink:{};--accent:{};--panel:{};--muted:{};background:var(--bg);color:var(--ink);font-family:{font};font-size:16px;line-height:1.6}}.theme-site :is(input,button,select){{font-size:16px;min-height:44px;border-radius:6px}}.theme-site :is(a,input,button,select):focus-visible{{outline:3px solid var(--accent);outline-offset:3px}}a{{color:{}}}.theme-shell{{max-width:1200px;margin:auto;padding:24px}}.theme-node{{min-width:0;overflow-wrap:anywhere}}.theme-node img{{max-width:100%;height:auto}}.theme-grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}}.theme-row{{display:flex;flex-wrap:wrap;gap:24px}}.theme-card{{padding:24px;background:{};border-radius:12px}}@media(max-width:700px){{.theme-grid{{grid-template-columns:1fr}}}}",
@@ -491,12 +630,17 @@ impl Package {
             self.tokens["accent"],
             self.tokens["panel"]
         );
-        fn add(n: &Node, out: &mut String) {
-            let s = &n.style;
+        for (name, face) in &self.fonts {
+            out.push_str(&format!("@font-face{{font-family:wpaltfont_{name};src:url('/theme-assets/{}') format('truetype');font-weight:{};font-style:{};font-display:{}}}",face.asset,face.weight,face.style,face.display));
+        }
+        out.push_str(".theme-navigation{flex:1;min-width:0}.theme-navigation ul{list-style:none;padding-inline-start:0;margin:0}.theme-navigation>ul{display:flex;flex-wrap:wrap;gap:8px 24px}.theme-navigation li{min-width:0;overflow-wrap:anywhere}.theme-navigation :is(a,summary){display:block;min-height:44px;padding:8px 4px;box-sizing:border-box}.theme-navigation summary{cursor:pointer;display:list-item;list-style-position:inside}.theme-navigation details>ul{padding-inline-start:20px}.theme-navigation>ul>li:has(>details[open]){flex:1 1 18rem}.theme-nav-columns>ul>li>details>ul{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px}.theme-nav-columns>ul>li:has(>details[open]){flex-basis:32rem}.theme-nav-description{display:block;font-size:14px;color:var(--muted);max-width:36ch}.theme-nav-overview{font-weight:600}@media(max-width:700px){.theme-navigation>ul{display:block}.theme-navigation{width:100%}.theme-nav-columns>ul>li>details>ul{grid-template-columns:1fr}}@media(prefers-reduced-motion:reduce){.theme-navigation *{scroll-behavior:auto;transition:none}}");
+        fn add(p: &Package, n: &Node, out: &mut String) {
+            let s = p.node_style(n).expect("validated style");
             out.push_str(&format!(".n-{}{{", n.id));
             match s.layout.as_str() {
                 "grid" => out.push_str("display:grid;"),
                 "row" => out.push_str("display:flex;flex-wrap:wrap;"),
+                "stack" => out.push_str("display:flex;flex-direction:column;"),
                 _ => {}
             }
             if s.columns > 0 {
@@ -523,12 +667,50 @@ impl Package {
             if !s.align.is_empty() {
                 out.push_str(&format!("text-align:{};", s.align))
             }
+            if !s.font.is_empty() {
+                let family = match s.font.as_str() {
+                    "system" => "system-ui,sans-serif".into(),
+                    "serif" => "Georgia,serif".into(),
+                    "mono" => "ui-monospace,monospace".into(),
+                    local => {
+                        let name = local.strip_prefix("local:").expect("validated face");
+                        format!("wpaltfont_{name},{}", fallback(&p.fonts[name].fallback))
+                    }
+                };
+                out.push_str(&format!("font-family:{family};"));
+            }
+            if s.font_size > 0 {
+                out.push_str(&format!("font-size:{}px;", s.font_size));
+            }
+            if s.font_weight > 0 {
+                out.push_str(&format!("font-weight:{};", s.font_weight));
+            }
+            if s.line_height > 0 {
+                out.push_str(&format!("line-height:{}%;", s.line_height));
+            }
+            if s.margin_block > 0 {
+                out.push_str(&format!("margin-block:{}px;", s.margin_block));
+            }
+            if s.border_width > 0 {
+                out.push_str(&format!(
+                    "border:{}px solid {};",
+                    s.border_width,
+                    if s.border_color.is_empty() {
+                        "currentColor"
+                    } else {
+                        &s.border_color
+                    }
+                ));
+            }
+            if s.radius > 0 {
+                out.push_str(&format!("border-radius:{}px;", s.radius));
+            }
             out.push('}');
             if s.mobile_columns > 0 {
                 out.push_str(&format!("@media(max-width:700px){{.n-{}{{grid-template-columns:repeat({},minmax(0,1fr))}}}}",n.id,s.mobile_columns))
             }
             for c in &n.children {
-                add(c, out)
+                add(p, c, out)
             }
         }
         fn reachable<'a>(
@@ -559,7 +741,7 @@ impl Package {
             roots.extend(self.components.values().map(|c| &c.root));
         }
         for n in roots {
-            add(n, &mut out);
+            add(self, n, &mut out);
         }
         out
     }
@@ -897,6 +1079,72 @@ pub async fn load(app: &App, id: &str, draft: bool) -> Result<Stored> {
     })
 }
 pub async fn validate_literal_references(app: &App, package: &Package) -> Result<()> {
+    validate_references(app, package, &[]).await
+}
+async fn validate_references(
+    app: &App,
+    package: &Package,
+    staged: &[bundle::Admitted],
+) -> Result<()> {
+    if !package.fonts.is_empty() {
+        let mut q =
+            QueryBuilder::<Any>::new("SELECT id,definition FROM theme_assets WHERE id IN (");
+        let ids: BTreeSet<_> = package
+            .fonts
+            .values()
+            .map(|face| face.asset.as_str())
+            .collect();
+        let mut list = q.separated(",");
+        for id in &ids {
+            list.push_bind(*id);
+        }
+        list.push_unseparated(")");
+        let rows = app.db.fetch_builder(&mut q).await?;
+        let mut definitions = BTreeMap::new();
+        for row in rows {
+            let id: String = row.get("id");
+            let metadata = assets::Definition::parse(&row.get::<String, _>("definition"))?;
+            if metadata.inspection.sha256 != id {
+                return Err(Error::invalid("Stored font identity mismatch."));
+            }
+            definitions.insert(id, metadata);
+        }
+        for font in staged {
+            definitions
+                .entry(font.definition.inspection.sha256.clone())
+                .or_insert_with(|| font.definition.clone());
+        }
+        for face in package.fonts.values() {
+            let metadata = definitions.get(&face.asset).ok_or_else(|| {
+                Error::invalid("Upload each local font before using its face in a theme.")
+            })?;
+            if face.weight != metadata.inspection.weight
+                || (face.style == "italic") != metadata.inspection.italic
+            {
+                return Err(Error::invalid(
+                    "Local font descriptors must match the inspected asset.",
+                ));
+            }
+        }
+    }
+
+    if !package.navigations.is_empty() {
+        let (discovery, _) = crate::discovery::load(app).await?;
+        for navigation in package.navigations.values() {
+            if discovery.language(&navigation.language)?.direction != navigation.direction {
+                return Err(Error::invalid(
+                    "Navigation direction must match its configured language.",
+                ));
+            }
+            for (locale, variant) in &navigation.languages {
+                if discovery.language(locale)?.direction != variant.direction {
+                    return Err(Error::invalid(
+                        "Navigation variant direction must match its configured language.",
+                    ));
+                }
+            }
+        }
+    }
     fn gather(
         p: &Package,
         n: &Node,
@@ -984,18 +1232,81 @@ pub async fn save(
     version: i64,
     publish: bool,
 ) -> Result<i64> {
+    save_checked(app, id, package, version, publish, None, &[]).await
+}
+pub async fn save_as(
+    app: &App,
+    actor: &crate::model::Session,
+    id: &str,
+    package: Package,
+    version: i64,
+    publish: bool,
+) -> Result<i64> {
+    save_checked(app, id, package, version, publish, Some(actor), &[]).await
+}
+async fn current_owner(app: &App, actor: Option<&crate::model::Session>) -> Result<()> {
+    if let Some(actor) = actor {
+        if !actor.is_admin() || actor.hash.is_empty() || actor.hash.starts_with("integration:") {
+            return Err(Error::forbidden());
+        }
+        crate::auth::current_editor(app, actor).await?;
+    }
+    Ok(())
+}
+async fn save_checked(
+    app: &App,
+    id: &str,
+    package: Package,
+    version: i64,
+    publish: bool,
+    actor: Option<&crate::model::Session>,
+    staged: &[bundle::Admitted],
+) -> Result<i64> {
     let _guard = app.mutation().await?;
+    current_owner(app, actor).await?;
     if !crate::schema::identifier(id) {
         return Err(Error::invalid("Invalid theme identifier."));
     }
     let registry = Registry::load(app).await?;
     package.validate(&registry)?;
-    validate_literal_references(app, &package).await?;
+    validate_references(app, &package, staged).await?;
     let raw = serde_json::to_string(&package).map_err(|_| Error::invalid("Invalid package."))?;
     if raw.len() > 256 * 1024 {
         return Err(Error::invalid("Theme package exceeds 256 KiB."));
     }
     let mut tx = app.db.pool.begin().await?;
+    if !staged.is_empty() {
+        let quota=sqlx::query("SELECT COUNT(*) AS records,CAST(COALESCE(SUM(size),0) AS BIGINT) AS bytes FROM theme_assets").fetch_one(&mut *tx).await?;
+        let mut records = quota.get::<i64, _>("records");
+        let mut total = quota.get::<i64, _>("bytes");
+        for font in staged {
+            let id = &font.definition.inspection.sha256;
+            let exists: Option<String> =
+                sqlx::query_scalar("SELECT id FROM theme_assets WHERE id=$1")
+                    .bind(id)
+                    .fetch_optional(&mut *tx)
+                    .await?;
+            if exists.is_some() {
+                continue;
+            }
+            records += 1;
+            total += font.data.len() as i64;
+            if records > assets::MAX_ASSETS || total > assets::MAX_TOTAL_BYTES {
+                return Err(Error::invalid(
+                    "Theme bundle exceeds local font storage quota.",
+                ));
+            }
+            let definition = serde_json::to_string(&font.definition)
+                .map_err(|_| Error::invalid("Invalid asset definition."))?;
+            sqlx::query("INSERT INTO theme_assets(id,definition,size,data) VALUES($1,$2,$3,$4)")
+                .bind(id)
+                .bind(definition)
+                .bind(font.data.len() as i64)
+                .bind(&font.data)
+                .execute(&mut *tx)
+                .await?;
+        }
+    }
     if version == 0 {
         let count: i64 = sqlx::query_scalar("SELECT count(*) FROM themes")
             .fetch_one(&mut *tx)
@@ -1024,15 +1335,42 @@ pub async fn save(
         }
     }
     sqlx::query("INSERT INTO theme_revisions(id,theme_id,version,package,published,created_at) VALUES($1,$2,$3,$4,$5,$6)").bind(uuid::Uuid::new_v4().to_string()).bind(id).bind(version+1).bind(raw).bind(i64::from(publish)).bind(crate::now()).execute(&mut *tx).await?;
+    let assets: BTreeSet<_> = package
+        .fonts
+        .values()
+        .map(|face| face.asset.as_str())
+        .collect();
+    for asset in assets {
+        sqlx::query(
+            "INSERT INTO theme_asset_references(theme_id,version,asset_id) VALUES($1,$2,$3)",
+        )
+        .bind(id)
+        .bind(version + 1)
+        .bind(asset)
+        .execute(&mut *tx)
+        .await?;
+    }
     // Keep 50 working revisions plus at least two published revisions for in-flight CSS.
     sqlx::query("DELETE FROM theme_revisions WHERE theme_id=$1 AND version NOT IN (SELECT version FROM theme_revisions WHERE theme_id=$1 ORDER BY version DESC LIMIT 50) AND version NOT IN (SELECT version FROM theme_revisions WHERE theme_id=$1 AND published=1 ORDER BY version DESC LIMIT 2)").bind(id).execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM theme_asset_references WHERE theme_id=$1 AND NOT EXISTS (SELECT 1 FROM theme_revisions r WHERE r.theme_id=theme_asset_references.theme_id AND r.version=theme_asset_references.version)").bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
     app.themes.lock().await.retain(|(key, _), _| key != id);
     tracing::info!(event="theme_saved",theme_id=%id,version=version+1,published=publish);
     Ok(version + 1)
 }
 pub async fn activate(app: &App, id: &str) -> Result<()> {
+    activate_checked(app, id, None).await
+}
+pub async fn activate_as(app: &App, actor: &crate::model::Session, id: &str) -> Result<()> {
+    activate_checked(app, id, Some(actor)).await
+}
+async fn activate_checked(
+    app: &App,
+    id: &str,
+    actor: Option<&crate::model::Session>,
+) -> Result<()> {
     let _guard = app.mutation().await?;
+    current_owner(app, actor).await?;
     let stored = load(app, id, false).await?;
     if stored.published_version < 1 {
         return Err(Error::invalid("Publish the theme before activating it."));
@@ -1592,6 +1930,14 @@ fn render_node(
                 .unwrap_or_default()
             }
         }
+        "navigation" if !n.source.is_empty() => {
+            let nav = p
+                .navigations
+                .get(&n.source)
+                .ok_or_else(|| Error::invalid("Unknown theme navigation."))?;
+            let body = nav.render(ctx.root["language"].as_str().unwrap_or("en"), budget)?;
+            html! {header class=(format!("site-header {class}")) {a class="site-brand" href="/" {(text(&ctx.root["site"]["title"]))} (body)}}
+        }
         "navigation" => {
             let nav: Vec<crate::model::NavItem> =
                 serde_json::from_value(ctx.root["navigation"].clone()).unwrap_or_default();
@@ -1756,14 +2102,15 @@ pub fn document(
         });
 
     tracing::debug!(event="theme_render",theme_id=%stored.id,nodes=budget,resolution_queries=ctx.queries,preview=draft);
-    fn has_tabs(p: &Package, n: &Node) -> bool {
+    fn has_widgets(p: &Package, n: &Node) -> bool {
         n.kind == "tabs"
-            || n.children.iter().any(|c| has_tabs(p, c))
-            || (n.kind == "component" && has_tabs(p, &p.components[&n.component].root))
+            || (n.kind == "navigation" && !n.source.is_empty())
+            || n.children.iter().any(|c| has_widgets(p, c))
+            || (n.kind == "component" && has_widgets(p, &p.components[&n.component].root))
     }
     let scripts = [&p.header, &p.footer, root]
         .into_iter()
-        .any(|n| has_tabs(p, n));
+        .any(|n| has_widgets(p, n));
     let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";@if let Some(src)=priority_image{link rel="preload" href=(src) as="image";}@if preload{link rel="preload" href=(&style) as="style";}link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" tabindex="-1" class="theme-shell"{(body)(extra)}(footer)(crate::business::engagement::markup(settings,draft))(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
     if output.len() > 2 * 1024 * 1024 {
         return Err(Error::invalid("Rendered document exceeds 2 MiB."));
@@ -1783,4 +2130,29 @@ pub async fn preflight(app: &App, registry: &Registry) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Explicit offline transition; ordinary parsers accept only the current grammar.
+pub(crate) fn upgrade_package_v1(raw: &str) -> Result<String> {
+    if raw.len() > 256 * 1024 {
+        return Err(Error::invalid("Pre-asset package exceeds its budget."));
+    }
+    let mut value: Value = serde_json::from_str(raw)
+        .map_err(|_| Error::invalid("Invalid pre-asset theme package."))?;
+    match value.get("format").and_then(Value::as_u64) {
+        Some(1) => {
+            if ["fonts", "styles", "navigations"]
+                .iter()
+                .any(|field| value.get(*field).is_some())
+            {
+                return Err(Error::invalid(
+                    "Pre-asset package contains newer declarations.",
+                ));
+            }
+            value["format"] = 2.into();
+        }
+
+        _ => return Err(Error::invalid("Unsupported pre-asset theme package.")),
+    }
+    serde_json::to_string(&value).map_err(|_| Error::invalid("Cannot migrate theme package."))
 }

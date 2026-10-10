@@ -2174,7 +2174,7 @@
     {
       "feature_id": "D03-01",
       "area": "Connected language workspace and local interface catalogs",
-      "scope": "Exact source/target review, protected field synchronization, bounded bundled message catalogs and separate interface/content language authorities; persistence and model evaluation still in progress.",
+      "scope": "Exact source/target review, protected field synchronization, bounded bundled message catalogs and separate interface/content language authorities; durable preferences and actual model evaluation verified within the defined scope.",
       "basis": "Primary W3C language guidance and internal authority contract; free plugin static inspection is reference semantics only.",
       "sources": [
         "https://www.w3.org/International/questions/qa-html-language-declarations.html",
@@ -2185,10 +2185,10 @@
       ],
       "applicable_versions": [
         "Polylang 3.8.10 static source inspection only",
-        "wpalt native schema 18 / portable graph v14; D03 development in progress",
+        "wpalt native schema 18 / portable graph v14; D03 PR19 merged",
         "Bundled interface catalog v1",
         "Unicode CLDR 48 integer cardinal scope",
-        "Ollama local generation API; actual installed runtime/model evaluation pending"
+        "Ollama 0.35.1 / Qwen3 1.7B actual evaluation: protocol passed, French editorial quality failed"
       ],
       "last_checked": "2026-10-07",
       "next_review": "2027-01-05",
@@ -2202,7 +2202,7 @@
       "tests": [
         "language_workspace_requires_current_actor_and_exact_protected_review",
         "translation_duplication_and_selected_sync_preserve_reviewed_language_authority",
-        "interface_catalog_preserves_safe_fallback_and_language_grammar; additional connected/browser/recovery/model tests pending",
+        "interface_catalog_preserves_safe_fallback_and_language_grammar; connected/browser/recovery/model workflows verified",
         "account_interface_preferences_recover_without_changing_content_authority",
         "canonical_translation_drafts_are_atomic_private_and_recoverable",
         "long_document_translation_preserves_structure_and_requires_complete_text_review",
@@ -2211,7 +2211,51 @@
       "triggers": [
         "Affected language, catalog, access, canonical document, plugin source or authoritative guidance changes"
       ],
-      "status": "reviewed-in-development; not complete localization or parity evidence"
+      "status": "verified-defined-local-scope; PR19 merged; not complete localization or parity evidence"
+    },
+    {
+      "feature_id": "D04-01",
+      "area": "Composed navigation and owner-local typography/assets",
+      "scope": "D04/F016/F019/F020: bounded theme-owned navigation, reusable style declarations, static TrueType fonts and private portable bundles; not complete theme/plugin/font-format parity.",
+      "basis": "Primary accessibility/font/WordPress guidance, pinned font parser and internal theme authority contract.",
+      "sources": [
+        "https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/examples/disclosure-navigation/",
+        "https://www.w3.org/TR/WOFF2/",
+        "https://learn.microsoft.com/en-us/typography/opentype/spec/otff",
+        "https://wordpress.org/documentation/article/navigation-block/",
+        "https://wordpress.org/documentation/article/the-font-library/",
+        "https://developer.wordpress.org/themes/global-settings-and-styles/settings/typography/",
+        "https://github.com/googlefonts/fontations"
+      ],
+      "applicable_versions": [
+        "W3C APG disclosure navigation updated 2026-01-20",
+        "WOFF2 Recommendation 2024-08-08, reference only; decoder not admitted yet",
+        "WordPress navigation documentation updated 2026-09-27 for 7.1; documentation-only reference",
+        "read-fonts 0.45.0 / Rust 1.85 / std only",
+        "Aboreto Regular unmodified official Git blob b9c09bfa15f38fa9ccabcb90320de9d33a6e991b / SIL OFL 1.1"
+      ],
+      "last_checked": "2026-10-07",
+      "next_review": "2027-01-05",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Native semantic lists/disclosures preserve bounded hierarchy, actual language/direction and no-JavaScript navigation.",
+        "Composed navigation/styles/assets share theme draft/live publication; current actor, dependencies and versions are authoritative.",
+        "Font input/container/table/glyph work is bounded; no native hint execution or rasterization; unsupported format breadth is explicit.",
+        "Shared immutable asset storage avoids repeated payloads in each theme revision; private/public exposure, provenance and fresh recovery require connected verification."
+      ],
+      "tests": [
+        "composed_navigation_preserves_publication_language_and_recovery_authority",
+        "local_fonts_follow_live_publication_and_recover_shared_bytes",
+        "real_font_admission_checks_tables_glyph_work_and_corruption",
+        "scripts/theme_assets_acceptance.cjs: keyboard/no-JavaScript, live/draft typography, actual-font readiness, narrow/RTL/open-group geometry and bundles",
+        "scripts/maintenance_acceptance.py: actual native-18 stopped upgrade and fresh old-runtime rollback",
+        "scripts/theme_assets_reference.py: two-engine exact font-publication query plans, immutable shared storage and declared resource observations"
+      ],
+      "triggers": [
+        "Affected navigation/font/style grammar, container/parser dependency, public asset admission, language configuration, publication/recovery or authoritative guidance changes"
+      ],
+      "status": "native acceptance verified; final browser/CI/archive delivery gates pending; broader format/style/navigation scope retained"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

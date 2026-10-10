@@ -872,3 +872,22 @@ html[dir="rtl"] .admin .skip {
     margin-right: 0;
   }
 }
+
+/* Long owner-supplied provenance remains readable without page-wide overflow. */
+:is(.admin, .member) .font-license {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+:is(.admin, .member) .font-digest {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+:is(.admin, .member) .font-license {
+  max-height: 24rem;
+  overflow: auto;
+}
+:is(.admin, .member) .font-license:focus-visible {
+  outline: 3px solid var(--ui-color-accent);
+  outline-offset: 3px;
+}

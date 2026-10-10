@@ -3,6 +3,7 @@ use crate::{
     auth::digest,
     error::{Error, Result},
 };
+use base64::{Engine, engine::general_purpose::STANDARD};
 use futures_util::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -30,6 +31,19 @@ pub async fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>> {
 
 // Types and table names are an allowlist, never supplied by an archive.
 pub(crate) const TABLES: &[(&str, &[(&str, bool)])] = &[
+    (
+        "theme_assets",
+        &[
+            ("id", false),
+            ("definition", false),
+            ("size", true),
+            ("data", false),
+        ],
+    ),
+    (
+        "theme_asset_references",
+        &[("theme_id", false), ("version", true), ("asset_id", false)],
+    ),
     (
         "recovery_mode",
         &[
@@ -1059,7 +1073,7 @@ pub fn safe_filename(name: &str) -> bool {
         && !name.contains('\\')
 }
 pub async fn capture(app: &App) -> Result<Vec<u8>> {
-    capture_format(app, 14).await
+    capture_format(app, 15).await
 }
 /// Only the stopped maintenance path may capture the original pre-change graph.
 pub(crate) async fn capture_maintenance(app: &App) -> Result<Vec<u8>> {
@@ -1072,8 +1086,10 @@ pub(crate) async fn capture_maintenance(app: &App) -> Result<Vec<u8>> {
             12
         } else if installed < 18 {
             13
-        } else {
+        } else if installed < 19 {
             14
+        } else {
+            15
         },
     )
     .await
@@ -1091,6 +1107,7 @@ async fn capture_format(app: &App, graph: i64) -> Result<Vec<u8>> {
     for (name, columns) in TABLES {
         if (graph < 13 && ["editorial_work", "editorial_decisions"].contains(name))
             || (graph < 14 && *name == "user_preferences")
+            || (graph < 15 && ["theme_assets", "theme_asset_references"].contains(name))
         {
             continue;
         }
@@ -1110,6 +1127,14 @@ async fn capture_format(app: &App, graph: i64) -> Result<Vec<u8>> {
             for (column, number) in *columns {
                 let value = if *number {
                     Value::from(row.get::<i64, _>(*column))
+                } else if *name == "theme_assets" && *column == "data" {
+                    let bytes: Vec<u8> = row.get(*column);
+                    if bytes.len() > crate::theme::font::MAX_FONT_BYTES {
+                        return Err(Error::invalid(
+                            "Stored font exceeds its supported byte budget.",
+                        ));
+                    }
+                    Value::from(STANDARD.encode(bytes))
                 } else {
                     Value::from(row.get::<String, _>(*column))
                 };
@@ -1210,14 +1235,14 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v14"
+    if envelope.format != "wpalt-backup-v15"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 14
+    if snapshot.schema != 15
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -1791,7 +1816,124 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
     for row in &snapshot.tables["theme_revisions"] {
         crate::theme::Package::parse_historical(row["package"].as_str().unwrap(), &registry)?;
     }
+    validate_theme_assets(&snapshot)?;
     Ok(snapshot)
+}
+fn validate_theme_assets(snapshot: &Snapshot) -> Result<()> {
+    use crate::theme::{assets, font};
+    let rows = &snapshot.tables["theme_assets"];
+    if rows.len() > assets::MAX_ASSETS as usize {
+        return Err(Error::invalid("Too many local font assets."));
+    }
+    let mut fonts = BTreeMap::new();
+    let mut bytes_total = 0usize;
+    for row in rows {
+        let id = row["id"].as_str().unwrap();
+        let encoded = row["data"].as_str().unwrap();
+        if encoded.len() > font::MAX_FONT_BYTES.div_ceil(3) * 4 {
+            return Err(Error::invalid("Font recovery bytes exceed their budget."));
+        }
+        let data = STANDARD
+            .decode(encoded)
+            .map_err(|_| Error::invalid("Invalid font recovery encoding."))?;
+        bytes_total += data.len();
+        if bytes_total > assets::MAX_TOTAL_BYTES as usize
+            || row["size"].as_i64() != Some(data.len() as i64)
+        {
+            return Err(Error::invalid(
+                "Font recovery storage budget/integrity mismatch.",
+            ));
+        }
+        let definition = assets::Definition::parse(row["definition"].as_str().unwrap())?;
+        if !assets::valid_id(id)
+            || definition.inspection.sha256 != id
+            || font::inspect(&data)? != definition.inspection
+            || fonts.insert(id.to_owned(), definition).is_some()
+        {
+            return Err(Error::invalid("Font recovery metadata/bytes do not match."));
+        }
+    }
+    let check_fonts = |package: &crate::theme::Package| -> Result<()> {
+        for face in package.fonts.values() {
+            let metadata = fonts
+                .get(&face.asset)
+                .ok_or_else(|| Error::invalid("Theme recovery lacks its local font."))?;
+            if metadata.inspection.weight != face.weight
+                || (face.style == "italic") != metadata.inspection.italic
+            {
+                return Err(Error::invalid(
+                    "Theme font recovery descriptors do not match.",
+                ));
+            }
+        }
+        Ok(())
+    };
+    let mut expected = HashSet::new();
+    for row in &snapshot.tables["theme_revisions"] {
+        let package: crate::theme::Package = serde_json::from_str(row["package"].as_str().unwrap())
+            .map_err(|_| Error::invalid("Invalid retained theme package."))?;
+        check_fonts(&package)?;
+        for face in package.fonts.values() {
+            expected.insert((
+                row["theme_id"].as_str().unwrap().to_owned(),
+                row["version"].as_i64().unwrap(),
+                face.asset.clone(),
+            ));
+        }
+    }
+    let mut actual = HashSet::new();
+    let references = &snapshot.tables["theme_asset_references"];
+    if references.len() > 32 * 52 * 8 {
+        return Err(Error::invalid(
+            "Theme font reference graph exceeds its retention budget.",
+        ));
+    }
+    for row in references {
+        let key = (
+            row["theme_id"].as_str().unwrap().to_owned(),
+            row["version"].as_i64().unwrap(),
+            row["asset_id"].as_str().unwrap().to_owned(),
+        );
+        if !actual.insert(key) {
+            return Err(Error::invalid("Duplicate theme font recovery reference."));
+        }
+    }
+    if actual != expected {
+        return Err(Error::invalid(
+            "Theme font recovery references are incomplete or excessive.",
+        ));
+    }
+    let discovery: crate::discovery::Definition = serde_json::from_str(
+        snapshot.tables["discovery_settings"][0]["definition"]
+            .as_str()
+            .unwrap(),
+    )
+    .map_err(|_| Error::invalid("Invalid recovery languages."))?;
+    for row in &snapshot.tables["themes"] {
+        for column in ["draft", "live"] {
+            let raw = row[column].as_str().unwrap();
+            if raw.is_empty() {
+                continue;
+            }
+            let package: crate::theme::Package = serde_json::from_str(raw)
+                .map_err(|_| Error::invalid("Invalid current theme recovery graph."))?;
+            check_fonts(&package)?;
+            for nav in package.navigations.values() {
+                if discovery.language(&nav.language)?.direction != nav.direction
+                    || nav.languages.iter().any(|(code, variant)| {
+                        discovery
+                            .language(code)
+                            .map_or(true, |language| language.direction != variant.direction)
+                    })
+                {
+                    return Err(Error::invalid(
+                        "Current theme recovery navigation conflicts with configured languages.",
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
@@ -1867,6 +2009,12 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             for (column, number) in *columns {
                 if *number {
                     values.push_bind(row[*column].as_i64().unwrap());
+                } else if *name == "theme_assets" && *column == "data" {
+                    values.push_bind(
+                        STANDARD
+                            .decode(row[*column].as_str().unwrap())
+                            .map_err(|_| Error::invalid("Invalid font recovery bytes."))?,
+                    );
                 } else {
                     values.push_bind(row[*column].as_str().unwrap());
                 }
@@ -2012,7 +2160,7 @@ pub fn migrate_m6(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<
             "Archive is not an unmigrated M6 recovery point.",
         ));
     }
-    snapshot.schema = 14;
+    upgrade_pre_asset_snapshot(&mut snapshot)?;
     snapshot.tables.insert("user_preferences".into(), vec![]);
     snapshot.tables.insert("editorial_work".into(), vec![]);
     snapshot.tables.insert("editorial_decisions".into(), vec![]);
@@ -2023,7 +2171,7 @@ pub fn migrate_m6(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Archive migration failed."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v14".into(),
+        format: "wpalt-backup-v15".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2047,11 +2195,18 @@ pub fn migrate_v12(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid v12 graph."))?;
     if snapshot.schema != 12
-        || snapshot.tables.len() != TABLES.len() - 3
+        || snapshot.tables.len() != TABLES.len() - 5
         || TABLES
             .iter()
             .filter(|(n, _)| {
-                !["editorial_work", "editorial_decisions", "user_preferences"].contains(n)
+                ![
+                    "editorial_work",
+                    "editorial_decisions",
+                    "user_preferences",
+                    "theme_assets",
+                    "theme_asset_references",
+                ]
+                .contains(n)
             })
             .any(|(n, _)| !snapshot.tables.contains_key(*n))
         || snapshot.tables.contains_key("editorial_work")
@@ -2074,14 +2229,14 @@ pub fn migrate_v12(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
             ));
         }
     }
-    snapshot.schema = 14;
+    upgrade_pre_asset_snapshot(&mut snapshot)?;
     snapshot.tables.insert("user_preferences".into(), vec![]);
     snapshot.tables.insert("editorial_work".into(), vec![]);
     snapshot.tables.insert("editorial_decisions".into(), vec![]);
     let payload =
         serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot convert archive."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v14".into(),
+        format: "wpalt-backup-v15".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2103,25 +2258,100 @@ pub fn migrate_v13(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid v13 graph."))?;
     if snapshot.schema != 13
-        || snapshot.tables.len() != TABLES.len() - 1
+        || snapshot.tables.len() != TABLES.len() - 3
         || snapshot.tables.contains_key("user_preferences")
         || TABLES
             .iter()
-            .filter(|(name, _)| *name != "user_preferences")
+            .filter(|(name, _)| {
+                !["user_preferences", "theme_assets", "theme_asset_references"].contains(name)
+            })
             .any(|(name, _)| !snapshot.tables.contains_key(*name))
     {
         return Err(Error::invalid("Unsupported v13 table set."));
     }
-    snapshot.schema = 14;
+    upgrade_pre_asset_snapshot(&mut snapshot)?;
     snapshot.tables.insert("user_preferences".into(), vec![]);
     let payload =
         serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot convert archive."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v14".into(),
+        format: "wpalt-backup-v15".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
     .map_err(|_| Error::invalid("Cannot convert archive."))?;
+    validate(config, &output)?;
+    Ok(output)
+}
+fn upgrade_pre_asset_snapshot(snapshot: &mut Snapshot) -> Result<()> {
+    if snapshot.tables.contains_key("theme_assets")
+        || snapshot.tables.contains_key("theme_asset_references")
+    {
+        return Err(Error::invalid(
+            "Pre-asset recovery graph contains unsupported newer asset tables.",
+        ));
+    }
+    snapshot.schema = 15;
+    snapshot.tables.insert("theme_assets".into(), vec![]);
+    snapshot
+        .tables
+        .insert("theme_asset_references".into(), vec![]);
+    for row in snapshot
+        .tables
+        .get_mut("themes")
+        .ok_or_else(|| Error::invalid("Missing pre-asset themes."))?
+    {
+        for column in ["draft", "live"] {
+            let raw = row[column]
+                .as_str()
+                .ok_or_else(|| Error::invalid("Invalid pre-asset theme."))?;
+            if !raw.is_empty() {
+                row.insert(column.into(), crate::theme::upgrade_package_v1(raw)?.into());
+            }
+        }
+    }
+    for row in snapshot
+        .tables
+        .get_mut("theme_revisions")
+        .ok_or_else(|| Error::invalid("Missing pre-asset revisions."))?
+    {
+        let raw = row["package"]
+            .as_str()
+            .ok_or_else(|| Error::invalid("Invalid pre-asset revision."))?;
+        row.insert(
+            "package".into(),
+            crate::theme::upgrade_package_v1(raw)?.into(),
+        );
+    }
+    Ok(())
+}
+pub fn migrate_v14(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<u8>> {
+    if encoded.len() > config.max_backup_bytes {
+        return Err(Error::invalid("Backup exceeds the configured size limit."));
+    }
+    let envelope: Envelope =
+        serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid v14 envelope."))?;
+    if envelope.format != "wpalt-backup-v14"
+        || digest(envelope.payload.as_bytes()) != envelope.sha256
+    {
+        return Err(Error::invalid("Invalid v14 format/checksum."));
+    }
+    let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
+        .map_err(|_| Error::invalid("Invalid v14 recovery graph."))?;
+    if snapshot.schema != 14
+        || snapshot.tables.contains_key("theme_assets")
+        || snapshot.tables.contains_key("theme_asset_references")
+    {
+        return Err(Error::invalid("Archive is not an unmigrated v14 graph."));
+    }
+    upgrade_pre_asset_snapshot(&mut snapshot)?;
+    let payload = serde_json::to_string(&snapshot)
+        .map_err(|_| Error::invalid("Archive migration failed."))?;
+    let output = serde_json::to_vec(&Envelope {
+        format: "wpalt-backup-v15".into(),
+        sha256: digest(payload.as_bytes()),
+        payload,
+    })
+    .map_err(|_| Error::invalid("Archive migration failed."))?;
     validate(config, &output)?;
     Ok(output)
 }
@@ -2131,24 +2361,31 @@ pub(crate) fn inspect_maintenance(config: &crate::config::Config, encoded: &[u8]
     let source = match envelope.format.as_str() {
         "wpalt-backup-v12" => 12,
         "wpalt-backup-v13" => 13,
+        "wpalt-backup-v14" => 14,
         _ => return inspect(config, encoded),
     };
     let converted = if source == 12 {
         migrate_v12(config, encoded)?
-    } else {
+    } else if source == 13 {
         migrate_v13(config, encoded)?
+    } else {
+        migrate_v14(config, encoded)?
     };
     let mut report = inspect(config, &converted)?;
     report["schema"] = source.into();
     if let Some(tables) = report["tables"].as_object_mut() {
-        tables.remove("user_preferences");
+        tables.remove("theme_assets");
+        tables.remove("theme_asset_references");
+        if source < 14 {
+            tables.remove("user_preferences");
+        }
         if source == 12 {
             tables.remove("editorial_work");
             tables.remove("editorial_decisions");
         }
     }
     report["boundary"] =
-        "Original source bytes retained; full validation through explicit offline v14 conversion."
+        "Original source bytes retained; full validation through explicit offline current-format conversion."
             .into();
     Ok(report)
 }

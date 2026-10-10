@@ -1,0 +1,44 @@
+{
+  "binary_sha256": "36259f6bd69eb26ca70d0b94cde9f5a51ef5e70d04e625d766b141fe7165a9b0",
+  "production_source_sha256": "751db4f3c57d28fc16c3f1ae82043c1526a63fa7b6d846bed1247d9a1ca84377",
+  "results": [
+    {
+      "engine": "sqlite",
+      "fixture_posts": 1500,
+      "matching_posts": 750,
+      "pages": 19,
+      "page_limit": 40,
+      "plans": [
+        {
+          "label": "all",
+          "query": "SELECT id,title,locale,translation_group,status,updated_at FROM posts WHERE 1=1 ORDER BY updated_at DESC,id DESC LIMIT 41",
+          "plan": [
+            "SCAN posts USING INDEX language_workspace_all"
+          ]
+        },
+        {
+          "label": "filtered",
+          "query": "SELECT id,title,locale,translation_group,status,updated_at FROM posts WHERE 1=1 AND locale='fr' ORDER BY updated_at DESC,id DESC LIMIT 41",
+          "plan": [
+            "SEARCH posts USING INDEX language_workspace_cursor (locale=?)"
+          ]
+        },
+        {
+          "label": "filtered cursor",
+          "query": "SELECT id,title,locale,translation_group,status,updated_at FROM posts WHERE 1=1 AND locale='fr' AND (updated_at,id)<(9223372036854775807,'ffffffff-ffff-ffff-ffff-ffffffffffff') ORDER BY updated_at DESC,id DESC LIMIT 41",
+          "plan": [
+            "SEARCH posts USING INDEX language_workspace_cursor (locale=? AND (updated_at,id)<(?,?))"
+          ]
+        }
+      ],
+      "plan_engine": "Python SQLite 3.45.1",
+      "http_samples": 44,
+      "http_p50_ms": 0.6357070000149179,
+      "http_p95_ms": 1.1553800000001502,
+      "process_rss_bytes": 46673920,
+      "fixture_local_file_bytes": 27395332,
+      "build_profile": "release",
+      "boundary": "Debug request logging enabled; declared build profile release; one sequential localhost client, warmed fixture, authentication included per request; no production throughput claim. PostgreSQL server files/RSS and optional model resources excluded."
+    }
+  ]
+}
