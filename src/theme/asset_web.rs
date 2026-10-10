@@ -85,7 +85,7 @@ async fn page(
             }
             @for (id,metadata,size) in &entries {
                 section class="field-row" {div {h2 {(metadata.label)}p {(format!("{} bytes · weight {} · {}",size,metadata.inspection.weight,if metadata.inspection.italic {"italic"} else {"normal"}))}
-                    details {summary {"Provenance and license"}p {(metadata.source)}pre class="font-license" tabindex="0" aria-label="Font license" {(metadata.license)}code class="font-digest" {(id)}}}
+                    details {summary {"Provenance and license"}p {(metadata.source)}pre class="font-license" tabindex="0" role="region" aria-label=(format!("Font license: {}",metadata.label)) {(metadata.license)}code class="font-digest" {(id)}}}
                     form method="post" action=(format!("/admin/design-assets/{id}/remove")) {(view::csrf(&actor))button class="secondary" {"Remove unused font"}}
                 }
             }

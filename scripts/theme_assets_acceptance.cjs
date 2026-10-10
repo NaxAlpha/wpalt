@@ -4,8 +4,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 module.exports = async (owner, visitors, origin, output) => {
   const admin = await owner.newPage(), page = await visitors.newPage();
-  const report = { status: 'incomplete', browser:visitors.browser().version(), measurements: [],library:[],errors:[] };
+  const report = { status: 'incomplete', browser:visitors.browser().version(), measurements: [],library:[],accessibility:[],errors:[] };
   admin.on('pageerror',error=>report.errors.push(error.message));
+  async function accessibility(surface,name){
+    await surface.route(origin+'/__ui_fixture/axe.js',route=>route.fulfill({contentType:'text/javascript',body:fs.readFileSync(path.join(__dirname,'../frontend/node_modules/axe-core/axe.min.js'))}));
+    await require('./ui_contracts.cjs').accessibility(surface,origin,name,report);
+  }
   let previous, csrf;
   try {
     await admin.goto(origin + '/admin/design-assets');
@@ -30,6 +34,7 @@ module.exports = async (owner, visitors, origin, output) => {
       const geometry=await license.evaluate(el=>({viewport:innerWidth,height:el.getBoundingClientRect().height,focused:document.activeElement===el,outline:parseFloat(getComputedStyle(el).outlineWidth),scrollable:el.scrollHeight>el.clientHeight}));
       assert(geometry.focused && geometry.outline>=3 && geometry.scrollable && geometry.height<=400,'Long license keeps a bounded keyboard-scrollable surface with visible focus');
       report.library.push(geometry);
+      if(width===320){const measured=await require('./ui_contracts.cjs').geometry(admin);assert.deepEqual(measured.failures,[]);report.library_components=measured;await accessibility(admin,'Expanded local-font library');}
       await admin.screenshot({ path: path.join(output, `d04-font-library-${width}.png`), fullPage: true });
       await admin.getByText('Provenance and license', { exact: true }).click();
     }
@@ -78,6 +83,7 @@ module.exports = async (owner, visitors, origin, output) => {
       const measured = await page.evaluate(() => ({ viewport: innerWidth, overflow: document.documentElement.scrollWidth > innerWidth + 1, controls: [...document.querySelectorAll('.theme-navigation a,.theme-navigation summary')].filter(el => el.checkVisibility()).map(el => { const rect = el.getBoundingClientRect(); return { label: el.textContent, x: rect.x, width: rect.width, height: rect.height }; }), font: getComputedStyle(document.body).fontFamily, rootFont:getComputedStyle(document.querySelector('.n-home')).fontSize }));
       assert(!measured.overflow); for (const control of measured.controls) assert(control.height >= 43.5 && control.x >= 0 && control.x + control.width <= width + 1);
       report.measurements.push(measured);
+      if(width===320)await accessibility(page,'Published open-group navigation');
       await page.screenshot({ path: path.join(output, `d04-font-navigation-${width}.png`), fullPage: true });
     }
     await page.setViewportSize({width:320,height:1000});await page.goto(origin+'/ar/');
