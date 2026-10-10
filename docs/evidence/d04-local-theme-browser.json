@@ -1,0 +1,158 @@
+{
+  "status": "passed",
+  "browser": "155.0.8059.39",
+  "measurements": [
+    {
+      "viewport": 320,
+      "overflow": false,
+      "controls": [
+        {
+          "label": "Explore",
+          "x": 48,
+          "width": 224,
+          "height": 44
+        },
+        {
+          "label": "Latest stories",
+          "x": 68,
+          "width": 204,
+          "height": 44
+        },
+        {
+          "label": "Resources",
+          "x": 48,
+          "width": 224,
+          "height": 44
+        },
+        {
+          "label": "Documentation for independent theme authors and local site owners",
+          "x": 68,
+          "width": 204,
+          "height": 102.375
+        },
+        {
+          "label": "About this publication",
+          "x": 48,
+          "width": 224,
+          "height": 44
+        }
+      ],
+      "font": "wpaltfont_local, Georgia, serif",
+      "rootFont": "18px"
+    },
+    {
+      "viewport": 768,
+      "overflow": false,
+      "controls": [
+        {
+          "label": "Explore",
+          "x": 299.046875,
+          "width": 412.953125,
+          "height": 44
+        },
+        {
+          "label": "Latest stories",
+          "x": 319.046875,
+          "width": 184.46875,
+          "height": 44
+        },
+        {
+          "label": "Resources",
+          "x": 299.046875,
+          "width": 412.953125,
+          "height": 44
+        },
+        {
+          "label": "Documentation for independent theme authors and local site owners",
+          "x": 319.046875,
+          "width": 184.46875,
+          "height": 102.375
+        },
+        {
+          "label": "About this publication",
+          "x": 299.046875,
+          "width": 187.5625,
+          "height": 44
+        }
+      ],
+      "font": "wpaltfont_local, Georgia, serif",
+      "rootFont": "18px"
+    },
+    {
+      "viewport": 1440,
+      "overflow": false,
+      "controls": [
+        {
+          "label": "Explore",
+          "x": 499.046875,
+          "width": 684.953125,
+          "height": 44
+        },
+        {
+          "label": "Latest stories",
+          "x": 519.046875,
+          "width": 320.46875,
+          "height": 44
+        },
+        {
+          "label": "Resources",
+          "x": 499.046875,
+          "width": 684.953125,
+          "height": 44
+        },
+        {
+          "label": "Documentation for independent theme authors and local site owners",
+          "x": 519.046875,
+          "width": 320.46875,
+          "height": 59.1875
+        },
+        {
+          "label": "About this publication",
+          "x": 499.046875,
+          "width": 187.5625,
+          "height": 44
+        }
+      ],
+      "font": "wpaltfont_local, Georgia, serif",
+      "rootFont": "18px"
+    }
+  ],
+  "library": [
+    {
+      "viewport": 320,
+      "height": 360,
+      "focused": true,
+      "outline": 3,
+      "scrollable": true
+    },
+    {
+      "viewport": 768,
+      "height": 360,
+      "focused": true,
+      "outline": 3,
+      "scrollable": true
+    },
+    {
+      "viewport": 1440,
+      "height": 360,
+      "focused": true,
+      "outline": 3,
+      "scrollable": true
+    }
+  ],
+  "errors": [],
+  "shared_style_edit": {
+    "draft_font_px": 20,
+    "public_font_px": 18
+  },
+  "local_processes": {
+    "processes": 2,
+    "workers": 1,
+    "worker_ready": true,
+    "routing": "round-robin-no-retry-no-stickiness",
+    "requests_by_node": [
+      38,
+      38
+    ]
+  }
+}

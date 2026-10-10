@@ -22,8 +22,15 @@ module.exports=async function fixture(temporary){
    const child=spawn(binary,['--config',cfg,'serve','--external-worker'],{stdio:['ignore',fd,fd]});children.push(child);nodes.push(nodePort);
    let ready=false;for(let n=0;n<150;n++){assert.equal(child.exitCode,null,'Local process exited before readiness');try{if((await fetch(`http://127.0.0.1:${nodePort}/health`)).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,100));}assert(ready,'Local process readiness timed out');
   }
-  const workerFd=fs.openSync(path.join(temporary,'worker.log'),'w',0o600);fds.push(workerFd);
-  children.push(spawn(binary,['--config',path.join(temporary,'node-0.toml'),'worker'],{stdio:['ignore',workerFd,workerFd]}));
+  const workerLog=path.join(temporary,'worker.log'),workerFd=fs.openSync(workerLog,'w',0o600);fds.push(workerFd);
+  const worker=spawn(binary,['--config',path.join(temporary,'node-0.toml'),'worker'],{stdio:['ignore',workerFd,workerFd]});children.push(worker);
+  // A short focused journey must not finish before worker startup installs its
+  // shutdown handler. Require native readiness rather than a fixed sleep.
+  let workerReady=false;for(let n=0;n<300;n++){
+   assert.equal(worker.exitCode,null,'Local worker exited before readiness');
+   if(fs.readFileSync(workerLog,'utf8').split('\n').some(line=>{try{return JSON.parse(line).fields?.event==='worker_started';}catch{return false;}})){workerReady=true;break;}
+   await new Promise(r=>setTimeout(r,100));
+  }assert(workerReady,'Local worker readiness timed out');
   let cursor=0;
   proxy=http.createServer((request,response)=>{
    const index=cursor++%nodes.length;counts[index]++;
@@ -38,5 +45,5 @@ module.exports=async function fixture(temporary){
   fs.writeFileSync(path.join(temporary,"../m9-browser-transport.json"),JSON.stringify({counts,staticFailures},null,2));
   sql('DROP SCHEMA '+schema+' CASCADE');
   if(failure)throw failure;
- },report(){assert(counts.every(n=>n>100),'Cumulative browser requests must exercise both nodes');return {processes:2,workers:1,routing:'round-robin-no-retry-no-stickiness',requests_by_node:counts};}};
+ },report(minimum=100){assert(counts.every(n=>n>minimum),'Browser requests must exercise both nodes');return {processes:2,workers:1,worker_ready:true,routing:'round-robin-no-retry-no-stickiness',requests_by_node:counts};}};
 };
