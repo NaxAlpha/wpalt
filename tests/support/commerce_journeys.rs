@@ -1630,6 +1630,37 @@ async fn commerce_upgrade_preserves_existing_site_and_rejects_route_and_currency
         .await
         .unwrap();
         // Reconstruct the merged M5 schema boundary, keeping its real publishing/account data.
+        // New package grammar must not be mislabeled as the older database.
+        for (table, columns) in [
+            ("themes", &["draft", "live"][..]),
+            ("theme_revisions", &["package"][..]),
+        ] {
+            for row in sqlx::query(&format!("SELECT id,{} FROM {table}", columns.join(",")))
+                .fetch_all(&site.app.db.pool)
+                .await
+                .unwrap()
+            {
+                let id: String = row.get("id");
+                for column in columns {
+                    let raw: String = row.get(*column);
+                    if raw.is_empty() {
+                        continue;
+                    }
+                    let mut package: serde_json::Value = serde_json::from_str(&raw).unwrap();
+                    assert!(package.get("fonts").is_none());
+                    assert!(package.get("styles").is_none());
+                    assert!(package.get("navigations").is_none());
+                    package["format"] = 1.into();
+                    sqlx::query(&format!("UPDATE {table} SET {column}=$1 WHERE id=$2"))
+                        .bind(package.to_string())
+                        .bind(&id)
+                        .execute(&site.app.db.pool)
+                        .await
+                        .unwrap();
+                }
+            }
+        }
+
         for table in wpalt::commerce::budget::TABLES.iter().rev() {
             sqlx::query(&format!("DROP TABLE {table}"))
                 .execute(&site.app.db.pool)

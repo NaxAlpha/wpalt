@@ -19,6 +19,8 @@ An owner authors and publishes an independent responsive theme with hierarchical
 
 Checked 2026-10-07: [W3C APG disclosure navigation](https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/examples/disclosure-navigation/) (updated 2026-01-20), [WOFF2 Recommendation](https://www.w3.org/TR/WOFF2/) (2024-08-08), and [font-display](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@font-face/font-display). APG examples require independent browser/assistive-technology verification. Font loading/fallback requires actual measured readiness and layout behavior. Refresh feature-guidance records, decisions, matrix and retained gaps before affected implementation or newly introduced dependencies.
 
+Current WordPress primary references: [Navigation block](https://wordpress.org/documentation/article/navigation-block/) updated 2026-09-27 for 7.1; [Font Library](https://wordpress.org/documentation/article/the-font-library/) updated 2026-07-26; [theme typography settings](https://developer.wordpress.org/themes/global-settings-and-styles/settings/typography/). These describe nested navigation, connected type controls and fonts hosted locally after installation. Documentation inspection is not executed WordPress/plugin parity. Local upload remains independent of outside font catalogs; no automatic vendor download is required.
+
 ## Explicit limits
 
 No paid plugin access, external API credentials, arbitrary extension execution, universal accessibility certification or app-license/support adoption is inferred. Theme asset licensing is a separate provenance requirement. Declare initial font/container/style/navigation limits and preserve remaining useful breadth in the backlog rather than silently marking the whole catalog complete.

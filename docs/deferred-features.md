@@ -44,11 +44,11 @@ Verifiable future outcome: Edit and compare language variants in the UI; no tran
 
 ### D04 — Theme composition and assets
 
-Origin: **M2/M8** · Catalog: **F016/F019** · Status: **contract preparation active; implementation follows D03 release verification**
+Origin: **M2/M8** · Catalog: **F016/F019** · Status: **defined local theme system implemented; final delivery gates pending**
 
 [D04 contract](d04-contract.md) governs composed publication and local asset authority.
 
-Hierarchical/mega navigation, expanded trusted-owner CSS/font/asset contracts and richer native layout/component authoring beyond bounded styles and pinned consent scripts.
+D04 adds language-specific hierarchical/grouped navigation, reusable controlled styles/typography, shared owner-local static TrueType fonts and atomic private theme bundles. Overlay mega-menu templates, broader font containers (WOFF/WOFF2/CFF/variable/color/SVG), arbitrary raw CSS/executable insertion, configurable asset ceilings and manual history pruning remain. Full Elementor adaptation stays D05; isolated executable extension authority stays D25. [Verification](evidence/d04-verification.md) records exact scope and failures.
 
 Verifiable future outcome: An independent theme preserves responsive/accessibility contracts and asset isolation under explicit owner trust.
 

@@ -91,3 +91,26 @@ An owner enables “Require assigned review before publication” on a model in 
 The native “Save & request review” button includes unsaved edits in one transaction. Decision controls refer to the saved working copy; save or discard on-screen edits before deciding. Private notes and recent decisions never appear in the public content projection. Review history is bounded to twenty decisions per item; the queue uses cursor pagination. Local review works without external accounts or email. Reviewer choices initially show at most 128 active accounts; large-team search and custom multi-stage policies remain later scope.
 
 A scheduled promotion rechecks exact material and current participants. If approval becomes invalid, promotion stops and preserves any earlier live snapshot. Editing scheduled reviewed content cancels its pending promotion. Cloned presentation content loses publication approval and requires a new destination review; source feedback/history remain private. Backups and fresh recovery include review authority under portable v13 and validate actors, versions, shapes and bounded notes before writes.
+
+## D04 grammar — delivery verification in progress
+
+Theme package 2 adds theme-owned navigation families, reusable bounded styles and static local TrueType font faces. Named navigation shares draft/live versioning; the existing empty-source site-links selection still follows site settings. Fonts reference immutable SHA-256 asset identities stored once outside revision JSON. Uploads require an owner, source and distribution-permission/license statement. Only inspected static TrueType containers up to 2 MiB are admitted initially; WOFF/WOFF2, variable, color, SVG and CFF fonts are refused. A theme declares at most eight faces with inspected weight/style, `swap` or `optional` loading and a controlled system/serif/mono fallback. `local:<face>` selects its site typeface.
+
+The staging runtime uses native schema 19, portable recovery v15 and package 2. Ordinary runtime/restore accepts the current formats. Explicit stopped upgrade handles native 14–18, retaining the original encrypted recovery bytes for fresh rollback with the corresponding old executable. Explicit `migrate-recovery-v12`, `migrate-recovery-v13` and `migrate-recovery-v14` produce separately validated current archives. Do not overwrite an original recovery point. Actual retained-native-18 migration and fresh old-runtime rollback pass on both database engines; final exact-head CI/release gates remain in verification; the previous paragraph describes the earlier released D01 boundary.
+
+Published font access follows the current published version of each declaring theme. Drafts and retained history alone grant no anonymous access. Browser caches may retain bytes already delivered publicly; withdrawing a reference controls subsequent server requests and does not erase previously downloaded public files. Backups preserve font bytes, immutable metadata and exact revision references; repeated revisions do not embed copies of the blob.
+
+Reusable styles are bounded named compositions (at most 32) applied with `style_ref`. An attached node does not mix independent overrides; detach a copy before independent editing. Properties include responsive layout/columns/gap/padding/width, controlled colors/alignment, node typeface, 12–96px type, 100–900 weight, 100–240% line height, logical block margin up to 96px, border up to 8px and radius up to 48px. Zero/empty inherits the native default. Raw CSS, imports and remote asset loaders are not admitted. Component roots participate in reachable template stylesheets, so unused component styles do not add request bytes.
+
+Native font-inclusive bundles include exactly the selected theme's declared fonts, their original bytes and immutable provenance/license metadata. They do not import content, media images, forms or external files; their native references must already exist on the destination. Full site recovery remains the complete graph transfer. Bundle import validates containers, descriptors, current dependencies and quotas; inserts assets, the theme and revision references in one transaction. A conflict or failure commits none of the new graph. Imports are private drafts by default. Review bundled distribution rights before confirming import. Export saved drafts from the Studio; unsaved plain JSON export still carries declarations without binary fonts.
+
+Stopped-site CLI examples:
+
+```sh
+wpalt --config site.toml theme font-import font.ttf --label 'My local font' --source 'Owner reference' --license LICENSE.txt --rights
+wpalt --config site.toml theme bundle-export my-theme theme.wpalt-theme.json --draft
+wpalt --config destination.toml theme bundle-import imported-theme theme.wpalt-theme.json --rights
+wpalt --config destination.toml theme publish imported-theme
+```
+
+Export files are created privately and exclusively. A bundle is limited to 24 MiB; each font to 2 MiB, eight faces per theme, and the shared store to 128 unique fonts / 16 MiB. These are current hard limits. Assets referenced by retained history cannot be deleted; revision retention prunes references alongside the existing 50-plus-live/draft history policy. Explicit manual revision pruning, more font containers, overlay mega-menu templates and unrestricted CSS remain retained breadth.

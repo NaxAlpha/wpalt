@@ -93,6 +93,34 @@ impl Site {
         }
     }
 }
+
+/// Construct the actual pre-asset grammar when exercising explicit old archive
+/// conversion. Merely relabeling a current graph would be a malformed fixture.
+fn pre_asset_graph(graph: &mut serde_json::Value) {
+    let tables = graph["tables"].as_object_mut().unwrap();
+    tables.remove("theme_assets");
+    tables.remove("theme_asset_references");
+    for (table, columns) in [
+        ("themes", &["draft", "live"][..]),
+        ("theme_revisions", &["package"][..]),
+    ] {
+        for row in tables.get_mut(table).unwrap().as_array_mut().unwrap() {
+            for column in columns {
+                let raw = row[*column].as_str().unwrap();
+                if !raw.is_empty() {
+                    let mut package: serde_json::Value = serde_json::from_str(raw).unwrap();
+                    assert!(
+                        package.get("fonts").is_none(),
+                        "Old fixture cannot retain new asset declarations"
+                    );
+                    package["format"] = 1.into();
+                    row[*column] = package.to_string().into();
+                }
+            }
+        }
+    }
+}
+
 fn engines() -> Vec<bool> {
     let pg = std::env::var("TEST_DATABASE_URL").is_ok();
     if std::env::var("WPALT_REQUIRE_POSTGRES").is_ok() {
@@ -4020,6 +4048,7 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let mut old: serde_json::Value = serde_json::from_slice(&current).unwrap();
         let mut payload: serde_json::Value =
             serde_json::from_str(old["payload"].as_str().unwrap()).unwrap();
+        pre_asset_graph(&mut payload);
         payload["schema"] = serde_json::json!(9);
         payload["tables"]
             .as_object_mut()
@@ -4062,7 +4091,7 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let migrated = backup::migrate_m6(&original.app.config, &legacy).unwrap();
         assert_eq!(
             backup::inspect(&original.app.config, &migrated).unwrap()["schema"],
-            14
+            15
         );
         let destination = tempfile::tempdir().unwrap();
         let key = encryption::generate_key();
@@ -7695,7 +7724,7 @@ async fn assigned_review_binds_material_and_recovers_without_public_note_leaks()
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            14
+            15
         );
         // The explicit previous graph conversion retains meaningful private review history.
         let mut previous: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -7708,6 +7737,7 @@ async fn assigned_review_binds_material_and_recovers_without_public_note_leaks()
                 .is_empty()
         );
         let decisions = old_graph["tables"]["editorial_decisions"].clone();
+        pre_asset_graph(&mut old_graph);
         old_graph["schema"] = 13.into();
         old_graph["tables"]
             .as_object_mut()
@@ -8547,7 +8577,7 @@ async fn account_interface_preferences_recover_without_changing_content_authorit
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            14
+            15
         );
         let restored = Site::new(pg, false).await;
         backup::restore(&restored.app, &bytes).await.unwrap();
@@ -8568,6 +8598,7 @@ async fn account_interface_preferences_recover_without_changing_content_authorit
         let mut envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         let mut payload: serde_json::Value =
             serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        pre_asset_graph(&mut payload);
         payload["schema"] = 13.into();
         payload["tables"]
             .as_object_mut()
@@ -8758,6 +8789,409 @@ async fn canonical_translation_drafts_are_atomic_private_and_recoverable() {
                 .is_err()
         );
         fresh.close().await;
+        site.close().await;
+    }
+}
+
+// D04 connected navigation: reviewed draft/live authority, language, escaping and recovery.
+#[tokio::test]
+async fn composed_navigation_preserves_publication_language_and_recovery_authority() {
+    use serde_json::json;
+    use wpalt::{discovery, theme};
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let (mut languages, language_version) = discovery::load(&site.app).await.unwrap();
+        languages.languages.push(discovery::Language {
+            code: "ar".into(),
+            label: "العربية".into(),
+            direction: "rtl".into(),
+            ..discovery::Language::default()
+        });
+        discovery::configure(&site.app, languages, language_version)
+            .await
+            .unwrap();
+        let original = theme::load(&site.app, "paper", true).await.unwrap();
+        let mut package = original.package.clone();
+        package.navigations.insert("main".into(), serde_json::from_value(json!({
+            "language":"en", "direction":"ltr", "label":"Primary navigation",
+            "items":[{"label":"Explore <script>","url":"/explore","description":"PRIVATE_NAV_DRAFT","children":[{"label":"Journal","url":"/search"}]}],
+            "languages":{"ar":{"direction":"rtl","label":"التنقل","items":[{"label":"المقالات","url":"/ar/search"}]}}
+        })).unwrap());
+        package.header.source = "main".into();
+        let version = theme::save(&site.app, "paper", package.clone(), original.version, false)
+            .await
+            .unwrap();
+        let public_before = get(&site.app, "/", None).await.1;
+        assert!(!public_before.contains("PRIVATE_NAV_DRAFT"));
+        let (status, headers, preview) = request(
+            &site.app,
+            "GET",
+            "/admin/design/paper/preview?template=home",
+            Some(&site.token),
+            "",
+            vec![],
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let preview = String::from_utf8(preview).unwrap();
+        assert!(
+            preview.contains("PRIVATE_NAV_DRAFT") && preview.contains("Explore &lt;script&gt;")
+        );
+        assert!(
+            preview.contains("<details")
+                && preview.contains("aria-label=\"Primary navigation\" lang=\"en\" dir=\"ltr\"")
+        );
+        assert!(
+            headers["content-security-policy"]
+                .to_str()
+                .unwrap()
+                .contains("script-src 'none'")
+        );
+        let (status, headers, denied) = request(
+            &site.app,
+            "GET",
+            "/admin/design/paper/preview?template=home",
+            None,
+            "",
+            vec![],
+        )
+        .await;
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        assert_eq!(headers["location"], "/login");
+        assert!(
+            !String::from_utf8(denied)
+                .unwrap()
+                .contains("PRIVATE_NAV_DRAFT")
+        );
+        assert_eq!(
+            theme::save(&site.app, "paper", package.clone(), original.version, true)
+                .await
+                .unwrap_err()
+                .0,
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            get(&site.app, "/", None).await.1,
+            public_before,
+            "A stale publication does not leak the draft"
+        );
+        theme::save(&site.app, "paper", package.clone(), version, true)
+            .await
+            .unwrap();
+        assert!(
+            get(&site.app, "/", None)
+                .await
+                .1
+                .contains("PRIVATE_NAV_DRAFT")
+        );
+        let arabic = get(&site.app, "/ar/", None).await.1;
+        assert!(arabic.contains("aria-label=\"التنقل\" lang=\"ar\" dir=\"rtl\""));
+        assert!(!arabic.contains("PRIVATE_NAV_DRAFT"));
+        let current = theme::load(&site.app, "paper", true).await.unwrap();
+        let mut unsafe_package = package.clone();
+        unsafe_package.navigations.get_mut("main").unwrap().items[0].url =
+            "javascript:alert(1)".into();
+        assert!(
+            theme::save(&site.app, "paper", unsafe_package, current.version, true)
+                .await
+                .is_err()
+        );
+        let mut wrong_language = package.clone();
+        wrong_language
+            .navigations
+            .get_mut("main")
+            .unwrap()
+            .languages
+            .get_mut("ar")
+            .unwrap()
+            .direction = "ltr".into();
+        assert!(
+            theme::save(&site.app, "paper", wrong_language, current.version, false)
+                .await
+                .is_err()
+        );
+        let mut oversized = package.clone();
+        let item = oversized.navigations["main"].items[0].clone();
+        oversized.navigations.get_mut("main").unwrap().items = vec![item; 33];
+        assert!(
+            theme::save(&site.app, "paper", oversized, current.version, false)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            theme::load(&site.app, "paper", true).await.unwrap().version,
+            current.version
+        );
+        let (mut definition, definition_version) = discovery::load(&site.app).await.unwrap();
+        definition
+            .languages
+            .retain(|language| language.code != "ar");
+        assert!(
+            discovery::configure(&site.app, definition, definition_version)
+                .await
+                .is_err(),
+            "A current navigation language cannot disappear"
+        );
+        let bytes = backup::capture(&site.app).await.unwrap();
+        let recovered = Site::new(pg, false).await;
+        backup::restore(&recovered.app, &bytes).await.unwrap();
+        assert_eq!(get(&recovered.app, "/ar/", None).await.1, arabic);
+        assert!(
+            theme::load(&recovered.app, "paper", true)
+                .await
+                .unwrap()
+                .package
+                .navigations
+                .contains_key("main")
+        );
+        recovered.close().await;
+        let held = site.app.mutation().await.unwrap();
+        let app = site.app.clone();
+        let actor = site.session().clone();
+        let candidate = current.package.clone();
+        let pending = tokio::spawn(async move {
+            theme::save_as(&app, &actor, "paper", candidate, current.version, true).await
+        });
+        tokio::task::yield_now().await;
+        sqlx::query("DELETE FROM sessions WHERE token_hash=$1")
+            .bind(&site.session().hash)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        drop(held);
+        assert_eq!(
+            pending.await.unwrap().unwrap_err().0,
+            StatusCode::FORBIDDEN,
+            "Theme commit rechecks the admitted administrator after revocation"
+        );
+        assert_eq!(
+            theme::activate_as(&site.app, site.session(), "ink")
+                .await
+                .unwrap_err()
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        site.close().await;
+    }
+}
+
+/// Local font authority follows the current live theme, while recovery retains
+/// private drafts and immutable history without duplicating bytes per revision.
+#[tokio::test]
+async fn local_fonts_follow_live_publication_and_recover_shared_bytes() {
+    use wpalt::theme::{self, FontFace, assets};
+    let font = include_bytes!("fixtures/fonts/Aboreto-Regular.ttf");
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let (id, created) = assets::admit(
+            &site.app,
+            site.session(),
+            "Aboreto".into(),
+            "Official Google Fonts fixture".into(),
+            include_str!("fixtures/fonts/OFL.txt").into(),
+            font.to_vec(),
+        )
+        .await
+        .unwrap();
+        assert!(created);
+        let (_, created) = assets::admit(
+            &site.app,
+            site.session(),
+            "Replacement label".into(),
+            "Another source".into(),
+            "Another license".into(),
+            font.to_vec(),
+        )
+        .await
+        .unwrap();
+        assert!(!created);
+        assert_eq!(
+            assets::metadata(&site.app, &id).await.unwrap().label,
+            "Aboreto"
+        );
+        let path = format!("/theme-assets/{id}");
+        assert_eq!(
+            request(&site.app, "GET", &path, None, "", vec![]).await.0,
+            StatusCode::NOT_FOUND
+        );
+        let (status, headers, bytes) =
+            request(&site.app, "GET", &path, Some(&site.token), "", vec![]).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(bytes, font);
+        assert_eq!(headers["cache-control"], "private, no-store");
+        let original = theme::load(&site.app, "paper", true).await.unwrap();
+        let mut package = original.package.clone();
+        package.fonts.insert(
+            "display".into(),
+            FontFace {
+                asset: id.clone(),
+                weight: 400,
+                style: "normal".into(),
+                display: "swap".into(),
+                fallback: "serif".into(),
+            },
+        );
+        package.tokens.insert("font".into(), "local:display".into());
+        package.styles.insert(
+            "reading".into(),
+            theme::Style {
+                font: "local:display".into(),
+                font_size: 18,
+                line_height: 170,
+                align: "start".into(),
+                padding: 16,
+                border_width: 1,
+                border_color: "#445544".into(),
+                radius: 8,
+                ..Default::default()
+            },
+        );
+        let root = package.templates.get_mut("home").unwrap();
+        root.style = Default::default();
+        root.style_ref = "reading".into();
+        let mut unsafe_style = package.clone();
+        unsafe_style.styles.get_mut("reading").unwrap().font =
+            "url(https://outside.example/font)".into();
+        assert!(
+            unsafe_style
+                .validate(&wpalt::schema::Registry::load(&site.app).await.unwrap())
+                .is_err()
+        );
+
+        assert!(package.css().contains(&path));
+        let version = theme::save(&site.app, "paper", package.clone(), original.version, false)
+            .await
+            .unwrap();
+        assert_eq!(
+            request(&site.app, "GET", &path, None, "", vec![]).await.0,
+            StatusCode::NOT_FOUND
+        );
+        let mut false_descriptor = package.clone();
+        false_descriptor.fonts.get_mut("display").unwrap().weight = 700;
+        assert!(
+            theme::save(&site.app, "paper", false_descriptor, version, true)
+                .await
+                .is_err()
+        );
+        let bundle = theme::bundle::export(&site.app, "paper", true)
+            .await
+            .unwrap();
+        let encoded = serde_json::to_vec(&bundle).unwrap();
+        let target = Site::new(pg, true).await;
+        assert!(
+            theme::bundle::import(
+                &target.app,
+                Some(target.session()),
+                "paper",
+                encoded.clone(),
+                999,
+                false
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM theme_assets")
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap(),
+            0,
+            "Stale theme commit rolls back new asset insertion"
+        );
+        let mut tampered: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
+        tampered["fonts"][0]["definition"]["inspection"]["weight"] = 700.into();
+        assert!(
+            theme::bundle::import(
+                &target.app,
+                Some(target.session()),
+                "portable",
+                serde_json::to_vec(&tampered).unwrap(),
+                0,
+                false
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM themes WHERE id='portable'")
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap(),
+            0
+        );
+        let imported = theme::bundle::import(
+            &target.app,
+            Some(target.session()),
+            "portable",
+            encoded,
+            0,
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(imported, 1);
+        assert_eq!(
+            request(&target.app, "GET", &path, None, "", vec![]).await.0,
+            StatusCode::NOT_FOUND
+        );
+        let imported = theme::load(&target.app, "portable", true).await.unwrap();
+        assert_eq!(imported.package.styles["reading"].font_size, 18);
+        theme::save(
+            &target.app,
+            "portable",
+            imported.package,
+            imported.version,
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            request(&target.app, "GET", &path, None, "", vec![]).await.2,
+            font
+        );
+        target.close().await;
+        let version = theme::save(&site.app, "paper", package, version, true)
+            .await
+            .unwrap();
+        let (status, headers, bytes) = request(&site.app, "GET", &path, None, "", vec![]).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(bytes, font);
+        assert_eq!(headers["content-type"], "font/ttf");
+        assert_eq!(headers["x-content-type-options"], "nosniff");
+        assert!(
+            assets::remove(&site.app, site.session(), &id)
+                .await
+                .is_err()
+        );
+        theme::save(&site.app, "paper", original.package, version, true)
+            .await
+            .unwrap();
+        assert_eq!(
+            request(&site.app, "GET", &path, None, "", vec![]).await.0,
+            StatusCode::NOT_FOUND,
+            "Previously published history does not grant current public asset access"
+        );
+        let archive = backup::capture(&site.app).await.unwrap();
+        let recovered = Site::new(pg, false).await;
+        backup::restore(&recovered.app, &archive).await.unwrap();
+        let stored: Vec<u8> = sqlx::query_scalar("SELECT data FROM theme_assets WHERE id=$1")
+            .bind(&id)
+            .fetch_one(&recovered.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(stored, font);
+        assert_eq!(
+            request(&recovered.app, "GET", &path, None, "", vec![])
+                .await
+                .0,
+            StatusCode::NOT_FOUND
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM theme_assets")
+            .fetch_one(&recovered.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+        recovered.close().await;
         site.close().await;
     }
 }

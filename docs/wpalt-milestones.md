@@ -340,3 +340,7 @@ D02 PR #18 merged as `eaddaca4b768`; actual-main release `nightly-202610070108-e
 ### D03 merged; D04 contract preparation — 2026-10-07
 
 [D03 PR #19](https://github.com/NaxAlpha/wpalt/pull/19) merged as `4ab84e49b595` after all seven final-head CI gates and independent exact-source archive verification. Its [ledger](evidence/d03-verification.md) separates actual model quality failure from native authority/protocol success and records retained language breadth. Actual-main release verification remains separate. [D04 contract](d04-contract.md) defines draft-owned navigation, bounded style/typography/local asset authority and connected visitor/owner/recovery verification before implementation.
+
+### D04 integrated local verification — 2026-10-10
+
+[D04](d04-contract.md) now supplies bounded hierarchical/grouped language-aware navigation, reusable typography/styles, owner-local static TrueType assets and atomic private bundles. Native acceptance (104 Rust cases, real SQLite/PostgreSQL), actual schema-18 stopped upgrade/fresh rollback and cumulative operations pass. The [ledger](evidence/d04-verification.md) records pending final browser/CI/archive/release gates and retained breadth. D05 remains the next dependency-ordered package after D04 readiness and merge.

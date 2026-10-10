@@ -103,13 +103,18 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
             try:
                 preview=json.loads(external('suggest','--source',id_,'--slug','local-ai-proposal','--ollama',f'http://127.0.0.1:{model.server_port}','--model','synthetic-contract-fixture','--output',proposal).stdout)
                 assert received[0]['stream'] is False and 'PRIVATE_EXTERNAL_DRAFT' in received[0]['prompt']
-                base=root/'base-theme.json';base.write_bytes((worker.parents[1]/'themes/field-journal.json').read_bytes());base.chmod(0o600)
+                base=root/'base-theme.json';base_package=json.loads((worker.parents[1]/'themes/field-journal.json').read_text())
+                base_package['styles']={'reading':{'font_size':18,'width':640}}
+                base_package['templates']['content']['style']={};base_package['templates']['content']['style_ref']='reading'
+                base.write_text(json.dumps(base_package));base.chmod(0o600)
                 layout_proposal=root/'layout-proposal.json'
                 layout_preview=json.loads(external('layout','--source',id_,'--base-theme',base,'--ollama',f'http://127.0.0.1:{model.server_port}','--model','synthetic-contract-fixture','--output',layout_proposal).stdout)
                 exported=root/'generated-theme.json'
                 external('export-layout',layout_proposal,'--execute','stale','--output',exported,ok=False);assert not exported.exists()
                 external('export-layout',layout_proposal,'--execute',layout_preview['plan'],'--output',exported)
                 package=json.loads(exported.read_text());assert package['templates']['content']['style']['width']==720
+                assert package['templates']['content']['style']['font_size']==18 and not package['templates']['content'].get('style_ref')
+                assert package['styles']['reading']['width']==640, 'Layout proposal detaches its edited node without changing other shared-style users'
                 assert package['templates']['home']['children'][2]['style']['columns']==2
                 assert exported.stat().st_mode&0o077==0
                 external('export-layout',layout_proposal,'--execute',layout_preview['plan'],'--output',exported,ok=False)
@@ -191,6 +196,6 @@ with tempfile.TemporaryDirectory(prefix='wpalt-integration-') as tmp:
     text=log.read_text()
     assert all(value not in text for value in [password,read_token,draft_token,'PRIVATE_EXTERNAL_DRAFT'])
     with sqlite3.connect(root/'site.db') as db:
-        assert db.execute('SELECT version FROM schema_version').fetchone()[0]==18
+        assert db.execute('SELECT version FROM schema_version').fetchone()[0]==19
         assert db.execute('SELECT COUNT(*) FROM posts').fetchone()[0]==len(seen)+3
 print('PASS: native scoped credentials, bounded external pagination/drafts, conflict/publication/origin/cookie denial, stopped-host revocation, fresh recovery without delegated authority and redacted diagnostics')

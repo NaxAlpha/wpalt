@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M9 and D01–D03 merged; D03 PR #19 passes all seven final-head gates and independent clean archive verification. Actual-main D03 release verification pending; D04 contract preparation active. Defined slices are not blanket plugin parity.",
+  "milestone": "M9 and D01\u2013D03 merged; D04 local theme delivery passes native acceptance and is undergoing final browser/CI/archive verification. Defined slices are not blanket plugin parity.",
   "capabilities": [
     {
       "id": "F001",
@@ -297,7 +297,7 @@
       "capability": "Header, footer and navigation builder",
       "deployment": "L",
       "milestone": "M2",
-      "status": "verified-local-defined-M2-scope; CI-status-on-PR-3",
+      "status": "verified-local-defined-M2-and-D04-scope; final delivery gates pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m2_coverage": "Compose shared header/footer/navigation nodes; navigation items use local site settings. Mega-menu/hierarchical navigation is not claimed.",
@@ -305,8 +305,14 @@
         "m2-contract.md",
         "evidence/m2-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d04-contract.md",
+        "evidence/d04-verification.md",
+        "../scripts/theme_assets_acceptance.cjs",
+        "../scripts/theme_assets_reference.py",
+        "../tests/font_assets.rs"
+      ],
+      "d04_coverage": "Theme-owned language-specific hierarchical/grouped navigation, columns/list layout, descriptions, bounded native disclosures, connected draft/preview/publication/history/recovery, keyboard/no-JavaScript/narrow/RTL checks. Overlay mega-menu templates and universal assistive-technology certification remain."
     },
     {
       "id": "F017",
@@ -349,7 +355,7 @@
       "capability": "Custom CSS and approved asset insertion",
       "deployment": "L",
       "milestone": "M2",
-      "status": "verified-local-defined-M2-scope; CI-status-on-PR-3",
+      "status": "verified-local-defined-M2-and-D04-scope; final delivery gates pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "completion_limits": "M2 covers controlled styles/tokens and approved local media; arbitrary executable assets/custom CSS require the M8 extension boundary.",
@@ -358,8 +364,14 @@
         "m2-contract.md",
         "evidence/m2-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d04-contract.md",
+        "evidence/d04-verification.md",
+        "../scripts/theme_assets_acceptance.cjs",
+        "../scripts/theme_assets_reference.py",
+        "../tests/font_assets.rs"
+      ],
+      "d04_coverage": "Reusable bounded style declarations, typography/spacing/align/border/radius and static local TrueType font admission; shared immutable assets with provenance, published-reference visibility and private bundles. WOFF/WOFF2/CFF/variable/color/SVG, arbitrary raw CSS/executable insertion, configurable asset ceilings and manual revision pruning remain."
     },
     {
       "id": "F020",
@@ -367,7 +379,7 @@
       "capability": "Template import/export and cross-site reuse",
       "deployment": "L",
       "milestone": "M2",
-      "status": "verified-local-defined-M2-scope; CI-status-on-PR-3",
+      "status": "verified-local-defined-M2-and-D04-scope; final delivery gates pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m2_coverage": "Portable declarative JSON import/export in studio and offline CLI; validates installed model/field/component dependencies, does not silently bundle a site database/media.",
@@ -375,8 +387,14 @@
         "m2-contract.md",
         "evidence/m2-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d04-contract.md",
+        "evidence/d04-verification.md",
+        "../scripts/theme_assets_acceptance.cjs",
+        "../scripts/theme_assets_reference.py",
+        "../tests/font_assets.rs"
+      ],
+      "d04_coverage": "Native package-2 saved draft/live export; rights-confirmed font-inclusive bundle export/import with exact referenced assets, immutable provenance/dedup, atomic optimistic-save and no implicit publication. Full-site recovery v15 preserves the graph. Content/media/form dependencies must exist for theme-only import."
     },
     {
       "id": "F021",
@@ -982,7 +1000,7 @@
       "status": "verified-local-defined-M5-scope; exact-CI-and-artifact-status-on-PR-10",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2–8 choices), 1–10 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
+      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2\u20138 choices), 1\u201310 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
       "evidence": [
         "m5-contract.md",
         "membership-learning.md",
@@ -1285,7 +1303,7 @@
       "status": "M7-verified-defined-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0–3600 seconds, default revalidation. Private/publication browser responses no-store.",
+      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0\u20133600 seconds, default revalidation. Private/publication browser responses no-store.",
       "evidence": [
         "resilient-operations.md",
         "../tests/acceptance.rs",

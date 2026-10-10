@@ -2,7 +2,7 @@ use crate::{config::Config, error::Result, model::Settings};
 use sqlx::{Any, AnyPool, ConnectOptions, Execute, QueryBuilder, Row, any::AnyPoolOptions};
 use std::str::FromStr;
 
-pub const SCHEMA_VERSION: i64 = 18;
+pub const SCHEMA_VERSION: i64 = 19;
 
 #[derive(Clone)]
 pub struct Db {
@@ -112,6 +112,7 @@ impl Db {
                     || version == Some(15)
                     || version == Some(16)
                     || version == Some(17)
+                    || version == Some(18)
                     || version == Some(SCHEMA_VERSION),
                 "unsupported schema version; use the documented migration/reset path"
             );
@@ -127,6 +128,73 @@ impl Db {
         }
         let mut tx = self.pool.begin().await?;
         sqlx::raw_sql(SCHEMA).execute(&mut *tx).await?;
+        sqlx::raw_sql(crate::theme::assets::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
+        if version.is_some_and(|version| version < 19) {
+            let rows = sqlx::query("SELECT id,draft,live FROM themes ORDER BY id LIMIT 33")
+                .fetch_all(&mut *tx)
+                .await?;
+            anyhow::ensure!(rows.len() <= 32, "too many pre-asset themes");
+            for row in rows {
+                let id: String = row.get("id");
+                for column in ["draft", "live"] {
+                    let raw: String = row.get(column);
+                    if raw.is_empty() {
+                        continue;
+                    }
+                    anyhow::ensure!(raw.len() <= 256 * 1024, "pre-asset package budget exceeded");
+                    let upgraded = if version.is_some_and(|v| v <= 3)
+                        && serde_json::from_str::<serde_json::Value>(&raw)?["format"] == 2
+                    {
+                        // Early core migrations construct current built-ins themselves.
+                        raw.clone()
+                    } else {
+                        crate::theme::upgrade_package_v1(&raw).map_err(|e| anyhow::anyhow!(e.1))?
+                    };
+                    sqlx::query(&format!("UPDATE themes SET {column}=$1 WHERE id=$2"))
+                        .bind(upgraded)
+                        .bind(&id)
+                        .execute(&mut *tx)
+                        .await?;
+                }
+            }
+            // Bound migration memory independently of retained revision volume.
+            let mut cursor = String::new();
+            let mut total = 0usize;
+            loop {
+                let rows = sqlx::query(
+                    "SELECT id,package FROM theme_revisions WHERE id>$1 ORDER BY id LIMIT 32",
+                )
+                .bind(&cursor)
+                .fetch_all(&mut *tx)
+                .await?;
+                if rows.is_empty() {
+                    break;
+                }
+                total += rows.len();
+                anyhow::ensure!(total <= 32 * 52, "pre-asset revision budget exceeded");
+                for row in rows {
+                    let id: String = row.get("id");
+                    let raw: String = row.get("package");
+                    anyhow::ensure!(raw.len() <= 256 * 1024, "pre-asset package budget exceeded");
+                    let upgraded = if version.is_some_and(|v| v <= 3)
+                        && serde_json::from_str::<serde_json::Value>(&raw)?["format"] == 2
+                    {
+                        // Early core migrations construct current built-ins themselves.
+                        raw.clone()
+                    } else {
+                        crate::theme::upgrade_package_v1(&raw).map_err(|e| anyhow::anyhow!(e.1))?
+                    };
+                    sqlx::query("UPDATE theme_revisions SET package=$1 WHERE id=$2")
+                        .bind(upgraded)
+                        .bind(&id)
+                        .execute(&mut *tx)
+                        .await?;
+                    cursor = id;
+                }
+            }
+        }
         sqlx::raw_sql(crate::platform::interface_web::SCHEMA)
             .execute(&mut *tx)
             .await?;

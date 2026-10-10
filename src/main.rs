@@ -200,8 +200,8 @@ enum Command {
     /// Validate a full recovery graph without restoring it.
     RecoveryInspect {
         input: PathBuf,
-        /// Explicit offline validation of a retained v12/v13 recovery point.
-        #[arg(long, default_value_t=14, value_parser=clap::value_parser!(u8).range(12..=14))]
+        /// Explicit offline validation of a retained v12/v13/v14 recovery point.
+        #[arg(long, default_value_t=15, value_parser=clap::value_parser!(u8).range(12..=15))]
         source_format: u8,
         #[arg(long)]
         key_file: Option<PathBuf>,
@@ -254,6 +254,13 @@ enum Command {
     },
     /// Offline v13-to-current conversion into a NEW private archive; preserves supplied encryption.
     MigrateRecoveryV13 {
+        input: PathBuf,
+        output: PathBuf,
+        #[arg(long)]
+        key_file: Option<PathBuf>,
+    },
+    /// Offline v14-to-current conversion into a NEW private archive; preserves supplied encryption.
+    MigrateRecoveryV14 {
         input: PathBuf,
         output: PathBuf,
         #[arg(long)]
@@ -561,6 +568,31 @@ async fn shop_command(app: &App, command: ShopCommand) -> wpalt::error::Result<(
 }
 #[derive(Subcommand)]
 enum ThemeCommand {
+    FontImport {
+        input: PathBuf,
+        #[arg(long)]
+        label: String,
+        #[arg(long)]
+        source: String,
+        #[arg(long)]
+        license: PathBuf,
+        #[arg(long)]
+        rights: bool,
+    },
+    BundleImport {
+        id: String,
+        input: PathBuf,
+        #[arg(long)]
+        publish: bool,
+        #[arg(long)]
+        rights: bool,
+    },
+    BundleExport {
+        id: String,
+        output: PathBuf,
+        #[arg(long)]
+        draft: bool,
+    },
     /// Validate a native package against this site without saving or publishing it.
     Validate {
         input: PathBuf,
@@ -978,12 +1010,13 @@ async fn main() -> anyhow::Result<()> {
             let bytes = match *source_format {
                 12 => backup::migrate_v12(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
                 13 => backup::migrate_v13(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
+                14 => backup::migrate_v14(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
                 _ => bytes,
             };
             let mut report = backup::inspect(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?;
-            if *source_format < 14 {
+            if *source_format < 15 {
                 report["source_schema"] = (*source_format).into();
-                report["boundary"]="Original source validated by explicit offline conversion; ordinary restore requires a separately converted v14 archive.".into();
+                report["boundary"]="Original source validated by explicit offline conversion; ordinary restore requires a separately converted v15 archive.".into();
             }
             println!("{}", serde_json::to_string_pretty(&report)?);
             return Ok(());
@@ -1054,9 +1087,16 @@ async fn main() -> anyhow::Result<()> {
             input,
             output,
             key_file,
+        }
+        | Command::MigrateRecoveryV14 {
+            input,
+            output,
+            key_file,
         } => {
             let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
-            let mut bytes = if matches!(&cli.command, Command::MigrateRecoveryV13 { .. }) {
+            let mut bytes = if matches!(&cli.command, Command::MigrateRecoveryV14 { .. }) {
+                backup::migrate_v14(&config, &bytes)
+            } else if matches!(&cli.command, Command::MigrateRecoveryV13 { .. }) {
                 backup::migrate_v13(&config, &bytes)
             } else {
                 backup::migrate_v12(&config, &bytes)
@@ -1070,7 +1110,7 @@ async fn main() -> anyhow::Result<()> {
                     .map_err(|e| anyhow::anyhow!(e.1))?;
             }
             backup::write_private(output, &bytes)?;
-            println!("Converted a new private v14 recovery archive; source retained.");
+            println!("Converted a new private v15 recovery archive; source retained.");
             return Ok(());
         }
         Command::MigrateBackup { input, output } => {
@@ -1428,7 +1468,8 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
         | Command::RecoveryClone { .. }
         | Command::MigrateBackup { .. }
         | Command::MigrateRecoveryV12 { .. }
-        | Command::MigrateRecoveryV13 { .. } => unreachable!(),
+        | Command::MigrateRecoveryV13 { .. }
+        | Command::MigrateRecoveryV14 { .. } => unreachable!(),
         Command::CloneActivate { review } => {
             wpalt::operations::clone_hold::activate(&app, &review)
                 .await
@@ -1620,6 +1661,25 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             use wpalt::{schema, theme};
             let result: wpalt::error::Result<()> = async {
                 match command {
+                    ThemeCommand::FontImport { input, label, source, license, rights } => {
+                        if !rights { return Err(wpalt::error::Error::invalid("Confirm distribution permission with --rights.")); }
+                        let data=backup::read_bounded(&input,theme::font::MAX_FONT_BYTES).await?;
+                        let license=backup::read_bounded(&license,16384).await?;
+                        let license=String::from_utf8(license).map_err(|_|wpalt::error::Error::invalid("Use UTF-8 license text."))?;
+                        let (id,_)=theme::assets::admit_stopped(&app,label,source,license,data).await?;
+                        println!("{id}");
+                    }
+                    ThemeCommand::BundleImport { id, input, publish, rights } => {
+                        if !rights { return Err(wpalt::error::Error::invalid("Review all bundled font licenses and confirm distribution permission with --rights.")); }
+                        let bytes=backup::read_bounded(&input,theme::bundle::MAX_BYTES).await?;
+                        let version:Option<i64>=sqlx::query_scalar("SELECT version FROM themes WHERE id=$1").bind(&id).fetch_optional(&app.db.pool).await?;
+                        theme::bundle::import(&app,None,&id,bytes,version.unwrap_or(0),publish).await?;
+                    }
+                    ThemeCommand::BundleExport { id, output, draft } => {
+                        let bundle=theme::bundle::export(&app,&id,draft).await?;
+                        let bytes=serde_json::to_vec_pretty(&bundle).map_err(|_|wpalt::error::Error::invalid("Invalid theme bundle."))?;
+                        backup::write_private(&output,&bytes).map_err(|_|wpalt::error::Error::invalid("Cannot create a new private theme bundle."))?;
+                    }
                     ThemeCommand::Validate { input } => {
                         let bytes = backup::read_bounded(&input, 256 * 1024).await?;
                         let raw = std::str::from_utf8(&bytes).map_err(|_| {

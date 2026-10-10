@@ -62,10 +62,19 @@ def validate_layout(layout):
 
 def layout_package(base,layout):
     validate_layout(layout)
-    if base.get('format')!=1 or not isinstance(base.get('templates'),dict):raise ValueError('Choose a native base theme.')
+    if base.get('format')!=2 or not isinstance(base.get('templates'),dict):raise ValueError('Choose a current native base theme.')
     base['name']='Local layout proposal'
     base['tokens']={**PALETTES[layout['palette']],'font':layout['font']}
-    base['templates']['content'].setdefault('style',{})['width']=layout['reading_width']
+    def independent_style(node):
+        # Detach only the nodes whose presentation knobs are being changed.
+        # Keep their effective declarations without mutating a shared style.
+        reference=node.pop('style_ref','')
+        if reference:
+            styles=base.get('styles',{})
+            if reference not in styles or not isinstance(styles[reference],dict):raise ValueError('Unknown reusable base style.')
+            node['style']=dict(styles[reference])
+        return node.setdefault('style',{})
+    independent_style(base['templates']['content'])['width']=layout['reading_width']
     # Locate one existing listing per home/search template. The model chooses
     # only bounded presentation knobs; it cannot add links, assets or code.
     def listing(node,depth=0):
@@ -78,7 +87,7 @@ def layout_package(base,layout):
     for name in ('home','search'):
         node=listing(base['templates'][name])
         if node is None:raise ValueError('Choose a base theme with native listing layouts.')
-        node['style']={**node.get('style',{}),'layout':'grid','columns':layout['home_columns'],'mobile_columns':1,'gap':layout['gap']}
+        node['style']={**independent_style(node),'layout':'grid','columns':layout['home_columns'],'mobile_columns':1,'gap':layout['gap']}
     return base
 
 def main():

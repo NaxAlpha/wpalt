@@ -2212,6 +2212,50 @@
         "Affected language, catalog, access, canonical document, plugin source or authoritative guidance changes"
       ],
       "status": "verified-defined-local-scope; PR19 merged; not complete localization or parity evidence"
+    },
+    {
+      "feature_id": "D04-01",
+      "area": "Composed navigation and owner-local typography/assets",
+      "scope": "D04/F016/F019/F020: bounded theme-owned navigation, reusable style declarations, static TrueType fonts and private portable bundles; not complete theme/plugin/font-format parity.",
+      "basis": "Primary accessibility/font/WordPress guidance, pinned font parser and internal theme authority contract.",
+      "sources": [
+        "https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/examples/disclosure-navigation/",
+        "https://www.w3.org/TR/WOFF2/",
+        "https://learn.microsoft.com/en-us/typography/opentype/spec/otff",
+        "https://wordpress.org/documentation/article/navigation-block/",
+        "https://wordpress.org/documentation/article/the-font-library/",
+        "https://developer.wordpress.org/themes/global-settings-and-styles/settings/typography/",
+        "https://github.com/googlefonts/fontations"
+      ],
+      "applicable_versions": [
+        "W3C APG disclosure navigation updated 2026-01-20",
+        "WOFF2 Recommendation 2024-08-08, reference only; decoder not admitted yet",
+        "WordPress navigation documentation updated 2026-09-27 for 7.1; documentation-only reference",
+        "read-fonts 0.45.0 / Rust 1.85 / std only",
+        "Aboreto Regular unmodified official Git blob b9c09bfa15f38fa9ccabcb90320de9d33a6e991b / SIL OFL 1.1"
+      ],
+      "last_checked": "2026-10-07",
+      "next_review": "2027-01-05",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Native semantic lists/disclosures preserve bounded hierarchy, actual language/direction and no-JavaScript navigation.",
+        "Composed navigation/styles/assets share theme draft/live publication; current actor, dependencies and versions are authoritative.",
+        "Font input/container/table/glyph work is bounded; no native hint execution or rasterization; unsupported format breadth is explicit.",
+        "Shared immutable asset storage avoids repeated payloads in each theme revision; private/public exposure, provenance and fresh recovery require connected verification."
+      ],
+      "tests": [
+        "composed_navigation_preserves_publication_language_and_recovery_authority",
+        "local_fonts_follow_live_publication_and_recover_shared_bytes",
+        "real_font_admission_checks_tables_glyph_work_and_corruption",
+        "scripts/theme_assets_acceptance.cjs: keyboard/no-JavaScript, live/draft typography, actual-font readiness, narrow/RTL/open-group geometry and bundles",
+        "scripts/maintenance_acceptance.py: actual native-18 stopped upgrade and fresh old-runtime rollback",
+        "scripts/theme_assets_reference.py: two-engine exact font-publication query plans, immutable shared storage and declared resource observations"
+      ],
+      "triggers": [
+        "Affected navigation/font/style grammar, container/parser dependency, public asset admission, language configuration, publication/recovery or authoritative guidance changes"
+      ],
+      "status": "native acceptance verified; final browser/CI/archive delivery gates pending; broader format/style/navigation scope retained"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

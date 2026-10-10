@@ -58,7 +58,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     run(config,'seed-demo','--posts','3')
     # Portable themes use the same validator and explicit publication as the studio.
     package_file=root/'paper.json';run(config,'theme','export','paper',str(package_file),'--draft')
-    package=json.loads(package_file.read_text());assert package['format']==1
+    package=json.loads(package_file.read_text());assert package['format']==2
     package['name']='Local variant';package['tokens']['accent']='#6c3ce6'
     imported=root/'variant.json';imported.write_text(json.dumps(package))
     run(config,'theme','import','variant',str(imported))
@@ -68,6 +68,18 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     assert json.loads(exported.read_text())['tokens']['accent']=='#6c3ce6'
     assert exported.stat().st_mode & 0o077 == 0,'Theme exports must be private'
     run(config,'theme','activate','paper')
+    font=root/'font.ttf';font.write_bytes((Path(__file__).resolve().parents[1]/'tests/fixtures/fonts/Aboreto-Regular.ttf').read_bytes())
+    license_file=root/'OFL.txt';license_file.write_bytes((Path(__file__).resolve().parents[1]/'tests/fixtures/fonts/OFL.txt').read_bytes())
+    run(config,'theme','font-import',str(font),'--label','Aboreto','--source','Unmodified official fixture','--license',str(license_file),ok=False)
+    font_id=run(config,'theme','font-import',str(font),'--label','Aboreto','--source','Unmodified official fixture','--license',str(license_file),'--rights').stdout.splitlines()[0]
+    assert len(font_id)==64
+    package['fonts']={'local':{'asset':font_id,'weight':400,'style':'normal','display':'swap','fallback':'serif'}};package['tokens']['font']='local:local'
+    imported.write_text(json.dumps(package));run(config,'theme','import','local-font',str(imported))
+    bundle=root/'font-theme.json';run(config,'theme','bundle-export','local-font',str(bundle),'--draft')
+    run(config,'theme','bundle-export','local-font',str(bundle),'--draft',ok=False)
+    run(config,'theme','bundle-import','portable-font',str(bundle),ok=False)
+    run(config,'theme','bundle-import','portable-font',str(bundle),'--rights')
+    assert bundle.stat().st_mode&0o077==0
 
     log=root/'server.log'
     with log.open('w') as log_file:
@@ -134,7 +146,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     portable=root/'portable.toml'
     portable.write_text(f'database_url = "postgres://invalid:invalid@127.0.0.1:1/unreachable"\ndata_dir = "{root/"never-created"}"\n')
     inspected=json.loads(run(portable,'recovery-inspect',str(snapshot)).stdout)
-    assert inspected['schema']==14
+    assert inspected['schema']==15
     selected=json.loads(run(portable,'recovery-select',str(snapshot),'--post',lesson).stdout)
     selection_file=root/'selection.json'
     run(portable,'recovery-select',str(snapshot),'--post',lesson,'--execute','wrong-plan','--output',str(selection_file),ok=False)
@@ -158,12 +170,12 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     encrypted=root/'encrypted.wpbackup'
     receipt=json.loads(run(config,'upgrade-prepare',str(encrypted),'--key-file',str(key)).stdout)
     import hashlib
-    assert receipt['format']=='wpalt-upgrade-receipt-v1' and receipt['schema']==14
+    assert receipt['format']=='wpalt-upgrade-receipt-v1' and receipt['schema']==15
     assert receipt['archive_sha256']==hashlib.sha256(encrypted.read_bytes()).hexdigest()
     assert receipt['archive_bytes']==encrypted.stat().st_size
     assert receipt['executable_sha256']==hashlib.sha256(binary.read_bytes()).hexdigest()
     run(config,'upgrade-prepare',str(encrypted),'--key-file',str(key),ok=False)
-    assert json.loads(run(portable,'recovery-inspect',str(encrypted),'--key-file',str(key)).stdout)['schema']==14
+    assert json.loads(run(portable,'recovery-inspect',str(encrypted),'--key-file',str(key)).stdout)['schema']==15
     wrong_key=root/'wrong.key';run(config,'recovery-key',str(wrong_key))
     run(portable,'recovery-inspect',str(encrypted),'--key-file',str(wrong_key),ok=False)
     run(target,'restore',str(snapshot));run(target,'restore',str(snapshot),ok=False)

@@ -1,4 +1,8 @@
 import { h, render, Fragment } from "preact";
+import { NavigationFamilies } from "./navigation.jsx";
+import { FontFaces } from "./fonts.jsx";
+import { CompositionStyle } from "./styles.jsx";
+import { ThemePortability } from "./portability.jsx";
 import { useState, useEffect, useRef } from "preact/hooks";
 import { Button, Field, Notice, Disclosure, SelectField } from "./ui.jsx";
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -925,6 +929,14 @@ function App() {
           />
         </label>
       </div>
+      <ThemePortability
+        id={id}
+        dirty={dirty}
+        busy={busy}
+        action={action}
+        api={api}
+        reload={reload}
+      />
       <Notice error={blocked}>
         {message ||
           "Drafts are private. Theme and shared options publish independently."}
@@ -1017,15 +1029,23 @@ function App() {
                 onSelect={setSelected}
               />
             )}
+            <NavigationFamilies
+              pkg={pkg}
+              languages={state.languages || []}
+              update={update}
+            />
+            <FontFaces pkg={pkg} assets={state.fonts || []} update={update} />
             <Disclosure summary="Design tokens" collapseOnNarrow>
-              {Object.keys(pkg.tokens).map((k) => (
-                <Scalar
-                  label={k}
-                  type={k === "font" ? "text" : "color"}
-                  value={pkg.tokens[k]}
-                  onChange={(v) => update((p) => (p.tokens[k] = v))}
-                />
-              ))}
+              {Object.keys(pkg.tokens)
+                .filter((k) => k !== "font")
+                .map((k) => (
+                  <Scalar
+                    label={k}
+                    type={k === "font" ? "text" : "color"}
+                    value={pkg.tokens[k]}
+                    onChange={(v) => update((p) => (p.tokens[k] = v))}
+                  />
+                ))}
             </Disclosure>
           </aside>
           <section class="panel preview-panel">
@@ -1134,6 +1154,22 @@ function App() {
                     value={current.image}
                     onChange={(v) => update((p) => (at(p, selected).image = v))}
                   />
+                )}
+                {current.kind === "navigation" && (
+                  <SelectField
+                    label="Navigation source"
+                    value={current.source || ""}
+                    onChange={(e) =>
+                      update(
+                        (p) => (at(p, selected).source = e.currentTarget.value),
+                      )
+                    }
+                  >
+                    <option value="">Site links</option>
+                    {Object.keys(pkg.navigations || {}).map((name) => (
+                      <option value={name}>{name}</option>
+                    ))}
+                  </SelectField>
                 )}
                 {current.kind === "condition" && (
                   <Condition
@@ -1282,45 +1318,12 @@ function App() {
                     </select>
                   </label>
                 )}
-                <h4>Responsive layout</h4>
-                <label>
-                  Layout
-                  <select
-                    aria-label="Layout"
-                    value={current.style?.layout || ""}
-                    onChange={(e) =>
-                      update(
-                        (p) =>
-                          (at(p, selected).style = {
-                            ...at(p, selected).style,
-                            layout: e.currentTarget.value,
-                          }),
-                      )
-                    }
-                  >
-                    {["", "stack", "grid", "row"].map((v) => (
-                      <option value={v}>{v || "Default"}</option>
-                    ))}
-                  </select>
-                </label>
-                {["columns", "mobile_columns", "gap", "padding", "width"].map(
-                  (k) => (
-                    <Scalar
-                      label={k.replaceAll("_", " ")}
-                      type="number"
-                      value={current.style?.[k] || 0}
-                      onChange={(v) =>
-                        update(
-                          (p) =>
-                            (at(p, selected).style = {
-                              ...at(p, selected).style,
-                              [k]: Number(v),
-                            }),
-                        )
-                      }
-                    />
-                  ),
-                )}
+                <CompositionStyle
+                  pkg={pkg}
+                  node={current}
+                  changeNode={(p) => at(p, selected)}
+                  update={update}
+                />
                 <label>
                   Add child
                   <select
