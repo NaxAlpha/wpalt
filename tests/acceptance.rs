@@ -8983,6 +8983,28 @@ async fn local_fonts_follow_live_publication_and_recover_shared_bytes() {
     let font = include_bytes!("fixtures/fonts/Aboreto-Regular.ttf");
     for pg in engines() {
         let site = Site::new(pg, true).await;
+        let work = site
+            .app
+            .media_work
+            .clone()
+            .acquire_many_owned(site.app.config.worker_concurrency as u32)
+            .await
+            .unwrap();
+        let denied = tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            request(
+                &site.app,
+                "POST",
+                "/api/admin/design/private/bundle",
+                None,
+                "application/json",
+                b"malformed JSON must not be parsed before authentication".to_vec(),
+            ),
+        )
+        .await
+        .expect("Unauthenticated bundle must not wait for font-work admission");
+        assert_eq!(denied.0, StatusCode::UNAUTHORIZED);
+        drop(work);
         let (id, created) = assets::admit(
             &site.app,
             site.session(),
@@ -9119,17 +9141,74 @@ async fn local_fonts_follow_live_publication_and_recover_shared_bytes() {
                 .unwrap(),
             0
         );
-        let imported = theme::bundle::import(
-            &target.app,
-            Some(target.session()),
-            "portable",
-            encoded,
+        let mut input = serde_json::json!({"csrf":target.session().csrf,"version":0,"rights":false,"bundle":serde_json::from_slice::<serde_json::Value>(&encoded).unwrap()});
+        let bundle_path = "/api/admin/design/portable/bundle";
+        assert_eq!(
+            request(
+                &target.app,
+                "POST",
+                bundle_path,
+                Some(&target.token),
+                "application/json",
+                serde_json::to_vec(&input).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        input["rights"] = true.into();
+        let mut oversized = input.clone();
+        oversized["bundle"]["package"]["templates"]["home"]["text"] = "x".repeat(256 * 1024).into();
+        assert_eq!(
+            request(
+                &target.app,
+                "POST",
+                bundle_path,
+                Some(&target.token),
+                "application/json",
+                serde_json::to_vec(&oversized).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        input["version"] = 999.into();
+        assert_eq!(
+            request(
+                &target.app,
+                "POST",
+                bundle_path,
+                Some(&target.token),
+                "application/json",
+                serde_json::to_vec(&input).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM theme_assets")
+                .fetch_one(&target.app.db.pool)
+                .await
+                .unwrap(),
             0,
-            false,
+            "Refused HTTP bundle cannot partially admit font bytes"
+        );
+        input["version"] = 0.into();
+        let imported = request(
+            &target.app,
+            "POST",
+            bundle_path,
+            Some(&target.token),
+            "application/json",
+            serde_json::to_vec(&input).unwrap(),
         )
-        .await
-        .unwrap();
-        assert_eq!(imported, 1);
+        .await;
+        assert_eq!(imported.0, StatusCode::OK);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&imported.2).unwrap()["version"],
+            1
+        );
         assert_eq!(
             request(&target.app, "GET", &path, None, "", vec![]).await.0,
             StatusCode::NOT_FOUND

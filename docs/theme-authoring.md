@@ -114,3 +114,5 @@ wpalt --config destination.toml theme publish imported-theme
 ```
 
 Export files are created privately and exclusively. A bundle is limited to 24 MiB; each font to 2 MiB, eight faces per theme, and the shared store to 128 unique fonts / 16 MiB. These are current hard limits. Assets referenced by retained history cannot be deleted; revision retention prunes references alongside the existing 50-plus-live/draft history policy. Explicit manual revision pruning, more font containers, overlay mega-menu templates and unrestricted CSS remain retained breadth.
+
+Bundle HTTP import requires `application/json`. Owner authentication precedes body reading; parsing/inspection uses finite blocking-work admission, and imported canonical theme packages remain limited to 256 KiB inside the 24 MiB bundle envelope. A request timeout does not release inspection capacity until any already-started blocking work finishes.

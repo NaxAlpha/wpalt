@@ -101,16 +101,17 @@ async fn admit_checked(
     // Finite validation work runs away from asynchronous request executors.
     let permit = app
         .media_work
-        .acquire()
+        .clone()
+        .acquire_owned()
         .await
         .map_err(|_| Error::invalid("Font work unavailable."))?;
     let (data, inspection) = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
         let inspected = font::inspect(&data)?;
         Ok::<_, Error>((data, inspected))
     })
     .await
     .map_err(|_| Error::invalid("Font inspection failed."))??;
-    drop(permit);
     let definition = Definition {
         format: 1,
         label,

@@ -7,7 +7,7 @@ use crate::{
 };
 use axum::{
     Json, Router,
-    extract::{DefaultBodyLimit, Form, Multipart, Path, Query, State},
+    extract::{DefaultBodyLimit, Form, Multipart, Path, Query, Request, State},
     http::{HeaderMap, StatusCode, header},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
@@ -270,8 +270,20 @@ async fn export_bundle(
     if !crate::schema::identifier(&id) {
         return Err(Error::not_found());
     }
+    let permit = app
+        .media_work
+        .clone()
+        .acquire_owned()
+        .await
+        .map_err(|_| Error::invalid("Theme bundle work unavailable."))?;
     let bundle = super::bundle::export(&app, &id, query.draft).await?;
-    let mut response = Json(bundle).into_response();
+    let bytes = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        serde_json::to_vec(&bundle).map_err(|_| Error::invalid("Invalid theme bundle."))
+    })
+    .await
+    .map_err(|_| Error::invalid("Theme bundle export failed."))??;
+    let mut response = ([(header::CONTENT_TYPE, "application/json")], bytes).into_response();
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, "private, no-store".parse().unwrap());
@@ -297,17 +309,56 @@ async fn import_bundle(
     State(app): State<App>,
     headers: HeaderMap,
     Path(id): Path<String>,
-    Json(input): Json<BundleImport>,
+    request: Request,
 ) -> Result<Json<serde_json::Value>> {
+    // Authenticate before reading any potentially large upload, then admit body
+    // buffering and parsing to the finite font-work budget.
     let actor = owner(&app, &headers).await?;
-    auth::csrf(&actor, &input.csrf)?;
-    if !input.rights {
-        return Err(Error::invalid(
-            "Review the bundled font licenses and confirm distribution permission.",
+    if headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(';').next())
+        .map(str::trim)
+        != Some("application/json")
+    {
+        return Err(Error(
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "Use application/json for a native theme bundle.",
         ));
     }
-    let bytes = serde_json::to_vec(&input.bundle).map_err(|_| Error::invalid("Invalid bundle."))?;
+    let permit = app
+        .media_work
+        .clone()
+        .acquire_owned()
+        .await
+        .map_err(|_| Error::invalid("Theme bundle work unavailable."))?;
+    let bytes = axum::body::to_bytes(request.into_body(), super::bundle::MAX_BYTES + 32768)
+        .await
+        .map_err(|_| {
+            Error(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "Theme bundle body exceeds its read budget or is incomplete.",
+            )
+        })?;
+    let checked_actor = actor.clone();
+    let (package, fonts, version, publish) = tokio::task::spawn_blocking(move || {
+        // Blocking inspection owns its permit: timing out the request cannot
+        // admit replacement work while this non-cancellable task still runs.
+        let _permit = permit;
+        let input: BundleImport = serde_json::from_slice(&bytes)
+            .map_err(|_| Error::invalid("Invalid native theme bundle request."))?;
+        auth::csrf(&checked_actor, &input.csrf)?;
+        if !input.rights {
+            return Err(Error::invalid(
+                "Review the bundled font licenses and confirm distribution permission.",
+            ));
+        }
+        let (package, fonts) = input.bundle.inspect()?;
+        Ok::<_, Error>((package, fonts, input.version, input.publish))
+    })
+    .await
+    .map_err(|_| Error::invalid("Theme bundle inspection failed."))??;
     let version =
-        super::bundle::import(&app, Some(&actor), &id, bytes, input.version, input.publish).await?;
+        super::save_checked(&app, &id, package, version, publish, Some(&actor), &fonts).await?;
     Ok(Json(serde_json::json!({"version":version})))
 }

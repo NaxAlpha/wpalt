@@ -28,7 +28,27 @@ pub(super) struct Admitted {
     pub data: Vec<u8>,
 }
 impl Bundle {
-    fn inspect(self) -> Result<(Package, Vec<Admitted>)> {
+    pub(super) fn inspect(self) -> Result<(Package, Vec<Admitted>)> {
+        // Bound the canonical package before it reaches asynchronous validation.
+        // Counting serialization stops at the budget without a second large buffer.
+        struct PackageBytes(usize);
+        impl std::io::Write for PackageBytes {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.0 = self
+                    .0
+                    .checked_add(bytes.len())
+                    .ok_or_else(|| std::io::Error::other("Package exceeds its byte budget"))?;
+                if self.0 > 256 * 1024 {
+                    return Err(std::io::Error::other("Package exceeds its byte budget"));
+                }
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        serde_json::to_writer(PackageBytes(0), &self.package)
+            .map_err(|_| Error::invalid("Bundled theme package exceeds 256 KiB or is invalid."))?;
         if self.format != 1 || self.fonts.len() > 8 {
             return Err(Error::invalid(
                 "Unsupported native theme bundle or font count.",
@@ -134,18 +154,19 @@ pub async fn import(
     if bytes.len() > MAX_BYTES {
         return Err(Error::invalid("Theme bundles are limited to 24 MiB."));
     }
-    let _permit = app
+    let permit = app
         .media_work
-        .acquire()
+        .clone()
+        .acquire_owned()
         .await
         .map_err(|_| Error::invalid("Font inspection unavailable."))?;
     let (package, fonts) = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
         let bundle: Bundle = serde_json::from_slice(&bytes)
             .map_err(|_| Error::invalid("Invalid native theme bundle."))?;
         bundle.inspect()
     })
     .await
     .map_err(|_| Error::invalid("Theme bundle inspection failed."))??;
-    drop(_permit);
     super::save_checked(app, id, package, version, publish, actor, &fonts).await
 }

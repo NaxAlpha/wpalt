@@ -17,6 +17,8 @@ Owners author language-specific hierarchical/grouped navigation, reusable bounde
 - Independently retained actual native-schema-18 executable passes data-bearing stopped upgrade, exact stale/preexisting-point refusal and fresh-target old-runtime rollback on SQLite/PostgreSQL. The old runtime is never pointed at upgraded data. CI additionally downloads/verifies the published D03 executable; the earlier M8 source remains a cumulative gate.
 - Two real local processes and one worker pass the existing cross-domain race, authority, shutdown/crash and reconciliation journey. Physical multi-host deployment remains a separate infrastructure boundary.
 
+A final request-budget refinement authenticates bundle imports before reading/parsing their body, admits buffering and one-pass JSON/font inspection to finite work capacity, and keeps an owned permit inside non-cancellable blocking work even if the request times out. Canonical package bytes are counted up to 256 KiB without a second large allocation. HTTP bundle export serialization also runs under bounded blocking work. The connected font journey adds unauthenticated malformed-body refusal while work capacity is occupied, rights/oversized/stale HTTP denial, zero partial assets and successful private HTTP import. Final source CI must rerun after this refinement.
+
 Local receipts: `work/d04-final-rust-fixed.log`, `d04-final-clippy.log`, `d04-final-build.log`, `d04-final-*_acceptance*.log`, `d04-actual18-upgrade-rollback-fixed.log`, `d04-local-process-reference.json`, `d04-dependency-audit.json` and `d04-npm-audit.log`. Private fixtures are temporary/ignored; CI uploads synthetic evidence rather than private site data.
 
 ## Browser and design verification
