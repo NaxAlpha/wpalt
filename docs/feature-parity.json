@@ -473,7 +473,7 @@
       "capability": "SEO titles, metadata and social previews",
       "deployment": "L",
       "milestone": "M3",
-      "status": "M3 baseline delivered; D06 defined extensions implemented with final integrated delivery gates pending",
+      "status": "verified-defined-D06-scope; merged PR #22 and independently verified actual-main release",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m3_coverage": "Per-content title/description and social metadata; no social image manager or SERP preview scoring.",
@@ -487,7 +487,8 @@
         "publication-discovery.md",
         "evidence/d06-verification.md",
         "../scripts/discovery_acceptance.cjs",
-        "../scripts/discovery_reference.py"
+        "../scripts/discovery_reference.py",
+        "evidence/d06-main-release.json"
       ],
       "d06_coverage": "Owner-selected local social image with factual alt/type/available dimensions and illustrative editorial preview; native form, working/public snapshot and current privacy authority.",
       "d06_remaining": "Exact external card/SERP appearance and scoring are not promised; premium plugin execution requires owner license."
@@ -516,7 +517,7 @@
       "capability": "XML, image, video and news sitemaps",
       "deployment": "L",
       "milestone": "M3",
-      "status": "M3 baseline delivered; D06 defined extensions implemented with final integrated delivery gates pending",
+      "status": "verified-defined-D06-scope; merged PR #22 and independently verified actual-main release",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m3_coverage": "Bounded XML content sitemaps and index; image/video/news extensions deferred.",
@@ -530,7 +531,8 @@
         "publication-discovery.md",
         "evidence/d06-verification.md",
         "../scripts/discovery_acceptance.cjs",
-        "../scripts/discovery_reference.py"
+        "../scripts/discovery_reference.py",
+        "evidence/d06-main-release.json"
       ],
       "d06_coverage": "Publication-owned canonical image index; current publicly accessible relevant attached-video and original recent news declarations; namespace XML, keyset pages, independent index coverage and bounded aggregate work.",
       "d06_remaining": "Theme/dynamic/raw-HTML images, arbitrary external videos and all optional provider tags remain outside this bounded canonical slice."
@@ -550,8 +552,16 @@
         "discovery.md",
         "evidence/m3-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d07-contract.md",
+        "structured-data.md",
+        "evidence/d07-verification.md",
+        "../tests/structured.rs",
+        "../scripts/structured_acceptance.cjs"
+      ],
+      "d07_status": "native and browser verified locally; PR #23 exact-source delivery pending",
+      "d07_coverage": "Known named entities/properties, typed field/publication/relationship/image/enumeration bindings, finite cyclic identities, shared visible facts and JSON-LD, offline attributed Schema.org 30.1 lookup and selected dated guidance warnings.",
+      "d07_limits": "Bounded native admission policy and selected provider checks; no full ontology/search eligibility or licensed premium execution claim. Editorial price/availability/offers remain refused pending authoritative D16 commerce enrichment."
     },
     {
       "id": "F029",
@@ -568,8 +578,16 @@
         "discovery.md",
         "evidence/m3-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d07-contract.md",
+        "structured-data.md",
+        "evidence/d07-verification.md",
+        "../tests/structured.rs",
+        "../scripts/structured_acceptance.cjs"
+      ],
+      "d07_status": "native and browser verified locally; PR #23 exact-source delivery pending",
+      "d07_coverage": "Explicit published organization/location records with specific vocabulary business types, scoped actual addresses/coordinates/opening hours and native relationships; current related/media restriction and unpublication boundaries.",
+      "d07_limits": "Bounded native admission policy and selected provider checks; no full ontology/search eligibility or licensed premium execution claim. Editorial price/availability/offers remain refused pending authoritative D16 commerce enrichment."
     },
     {
       "id": "F030",

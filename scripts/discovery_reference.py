@@ -3,7 +3,7 @@
 import argparse, hashlib, http.cookiejar, re, xml.etree.ElementTree as ET, json, secrets, socket, sqlite3, subprocess, tempfile, time, urllib.parse, urllib.request, uuid
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser();p.add_argument('--binary',required=True);p.add_argument('--output',default='work/d06-discovery-reference.json');args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--binary',required=True);p.add_argument('--output',default='work/d06-discovery-reference.json');p.add_argument('--structured',action='store_true');args=p.parse_args()
 binary=Path(args.binary).resolve();nonce=uuid.uuid4().hex[:12]
 network,database,site,volume=[f'wpalt-d06-{name}-{nonce}' for name in ('net','db','site','files')]
 secret,password=secrets.token_hex(24),secrets.token_hex(24)
@@ -21,15 +21,24 @@ def port():
 client=urllib.request.build_opener(urllib.request.ProxyHandler({}))
 from html.parser import HTMLParser
 class Head(HTMLParser):
- def __init__(self):super().__init__();self.meta={};self.title='';self.in_title=False
+ def __init__(self):super().__init__();self.meta={};self.title='';self.in_title=False;self.in_graph=False;self.graphs=[];self.graph_text=''
  def handle_starttag(self,tag,attrs):
   a=dict(attrs)
   if tag=='meta':self.meta[a.get('property',a.get('name',''))]=a.get('content','')
   if tag=='title':self.in_title=True
+  if tag=='script' and a.get('type')=='application/ld+json':self.in_graph=True;self.graph_text=''
  def handle_endtag(self,tag):
   if tag=='title':self.in_title=False
+  if tag=='script' and self.in_graph:
+   value=json.loads(self.graph_text)
+   # JSON-LD admits an object or an array of objects at the document root.
+   # Yoast emits an object; native output combines its graph in an array.
+   documents=value if isinstance(value,list) else [value]
+   assert all(isinstance(document,dict) for document in documents)
+   self.graphs.extend(documents);self.in_graph=False
  def handle_data(self,data):
   if self.in_title:self.title+=data
+  if self.in_graph:self.graph_text+=data
 with tempfile.TemporaryDirectory(prefix='wpalt-d06-reference-') as temporary:
  root=Path(temporary);server=None;log=None
  report={'format':'wpalt-d06-discovery-reference-v1','binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'status':'incomplete','scope':'Actual pinned free Yoast title/description/social image and image sitemap; independently configured native workflow. No premium news/video execution, source migration or full visual equivalence claim.'}
@@ -55,9 +64,20 @@ with tempfile.TemporaryDirectory(prefix='wpalt-d06-reference-') as temporary:
   report['wordpress_version']=wp('core','version');assert report['wordpress_version']=='7.1.3'
   wp('core','verify-checksums');wp('option','update','blog_public','1')
   wp('plugin','install','wordpress-seo','--version=28.6','--activate');wp('plugin','verify-checksums','wordpress-seo','--strict');report['yoast_version']=wp('plugin','get','wordpress-seo','--field=version');assert report['yoast_version']=='28.6'
+  if args.structured:wp('eval',"wp_update_user(['ID'=>1,'display_name'=>'Public pen name']);")
   run('docker','cp',str(ROOT/'tests/fixtures/green.png'),site+':/var/www/html/wpalt-d06-image.png')
   run('docker','cp',str(ROOT/'scripts/reference/d06-seed.php'),site+':/var/www/html/wpalt-d06-source.php')
   source=json.loads(wp('eval-file','/var/www/html/wpalt-d06-source.php'))
+  if args.structured:
+   # A new publication has equal publication/modification timestamps. The
+   # actual free plugin deliberately omits dateModified until a later edit.
+   # Perform a real public edit; never force artificial timestamp metadata.
+   time.sleep(1.1)
+   wp('post','update',str(source['id']),'--post_content=An actual later editorial update. <img src="'+source['image']+'" alt="D06 garden" />')
+   wp('eval','YoastSEO()->classes->get(\\Yoast\\WP\\SEO\\Builders\\Indexable_Builder::class)->build_for_id_and_type('+str(int(source['id']))+', "post");')
+   source['published_gmt']=wp('post','get',str(source['id']),'--field=post_date_gmt')
+   source['modified_gmt']=wp('post','get',str(source['id']),'--field=post_modified_gmt')
+   assert source['modified_gmt']>source['published_gmt']
   with client.open(source['url'],timeout=15) as response:source_html=response.read().decode()
   parsed=Head();parsed.feed(source_html)
   assert parsed.title==source['title'];assert parsed.meta['description']==source['description'];assert parsed.meta['og:image']==source['image']
@@ -96,6 +116,28 @@ with tempfile.TemporaryDirectory(prefix='wpalt-d06-reference-') as temporary:
   value['version']=saved['version'];value['action']='save';value['seo']=json.dumps({'title':'PRIVATE_SOURCE_CHANGED','social_image':image});post('/api/admin/content/'+saved['id'],value)
   assert 'PRIVATE_SOURCE_CHANGED' not in get('/d06-actual-journal',public).decode()
   report['native']={'html_sha256':hashlib.sha256(native_html.encode()).hexdigest(),'sitemap_sha256':hashlib.sha256(native_xml).hexdigest(),'matched_title_description_image_relationship':True,'working_copy_isolation':True,'difference':'Owner-local identities and image alt per Open Graph guidance; native canonical editorial image index. Does not copy source plugin rules or assert premium/rendering equivalence.'}
+  if args.structured:
+   source_nodes=[n for g in parsed.graphs for n in g.get('@graph',[])];source_ids={n['@id']:n for n in source_nodes if '@id' in n}
+   article=next(n for n in source_nodes if 'Article' in ([n.get('@type')] if isinstance(n.get('@type'),str) else n.get('@type',[])))
+   authors=article['author'] if isinstance(article['author'],list) else [article['author']];actual_author=source_ids[authors[0]['@id']]
+   assert article['headline']==source['factual_title'] and actual_author['name']=='Public pen name'
+   assert article.get('datePublished') and article.get('dateModified')
+   registry=json.loads(get('/api/admin/design'));model=registry['registry']['models']['post']
+   person={'label':'Public authors','fields':{'name':{'kind':'string'}},'structured':{'vocabulary':'30.1','primary':'person','entities':{'person':{'types':['Person'],'properties':{'name':{'kind':'field','path':['name'],'datatype':'Text'},'url':{'kind':'publication','attribute':'url'}}}}}}
+   post('/api/admin/models/public_person',{'csrf':csrf,'version':0,'definition':person})
+   author=post('/api/admin/content',{'title':'Public author profile','slug':'public-author-profile','kind':'public_person','body':'Publicly authored biography.','fields':json.dumps({'name':actual_author['name']}),'action':'publish'})
+   model['fields'].update({'public_author':{'kind':'relationship','target':'public_person'},'public_image':{'kind':'media'}})
+   model['structured']={'vocabulary':'30.1','primary':'article','entities':{'article':{'types':['Article'],'properties':{'headline':{'kind':'publication','attribute':'title'},'datePublished':{'kind':'publication','attribute':'published_at'},'image':{'kind':'image','path':['public_image']},'author':{'kind':'relationship','path':['public_author'],'entity':'person'}}}}}
+   post('/api/admin/models/post',{'csrf':csrf,'version':registry['model_versions']['post'],'definition':model})
+   post('/api/admin/content',{'title':source['factual_title'],'slug':'native-structured-reference','kind':'post','body':'Actual local editorial image.','fields':json.dumps({'public_author':author['id'],'public_image':image}),'action':'publish','seo':json.dumps({'title':source['title']})})
+   structured_html=get('/native-structured-reference',public).decode();structured_head=Head();structured_head.feed(structured_html)
+   native_nodes=next(g['@graph'] for g in structured_head.graphs if '@graph' in g);native_article=native_nodes[0]
+   assert native_article['headline']==article['headline'];assert native_nodes[1]['name']==actual_author['name'];assert native_article['image']['contentUrl']==native_origin+'/media/'+image
+   assert native_article['datePublished'] and 'dateModified' not in native_article
+   assert 'Public pen name' in structured_html and 'owner@example.test' not in structured_html
+   report['structured']={'source_article_type':article['@type'],'source_public_author_type':actual_author['@type'],'source_headline':article['headline'],'source_actual_publication_dates_present':True,'source_modification_was_actual_later_public_edit':True,'native_matches_explicit_public_author_and_visible_headline':True,'native_local_image_with_dimensions':True,'native_original_publication_date_present':True,'native_does_not_invent_modification_date':True,'source_graph_sha256':hashlib.sha256(json.dumps(source_nodes,sort_keys=True).encode()).hexdigest(),'native_graph_sha256':hashlib.sha256(json.dumps(native_nodes,sort_keys=True).encode()).hexdigest(),'difference':'Free Yoast derives author from public WordPress display_name and emits actual WordPress publication time and a modification time only after the real later published edit. Native author is a separately published explicit identity; original publication time is factual and no new modification date is invented. No premium location execution or complete provider feature equivalence.'}
+   report['format']='wpalt-d07-structured-reference-v1'
+   report['scope']='Actual pinned free Yoast Article/public author/dates alongside the existing title/image/sitemap reference, compared with independently configured native structured author/image/headline. No premium execution, migration or universal schema parity.'
   report['status']='passed'
  finally:
   if server:server.terminate();server.wait(timeout=10)

@@ -244,6 +244,7 @@ pub(crate) async fn save_guarded(
         .map_err(|_| Error::invalid("Fields must be valid JSON."))?;
     let fields = registry.fields_for(&input.kind)?;
     registry.validate_values(&fields, &values)?;
+    registry.validate_structured_values(&input.kind, &values)?;
     registry.validate_references(app, &fields, &values).await?;
     let custom: std::collections::BTreeMap<String, Vec<String>> =
         serde_json::from_str(&input.taxonomies)

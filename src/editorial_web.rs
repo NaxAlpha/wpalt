@@ -34,6 +34,7 @@ async fn session(app: &App, headers: &HeaderMap) -> Result<Session> {
 #[derive(Default)]
 pub(crate) struct Panel {
     pub work: Option<editorial::Work>,
+    pub models: std::collections::BTreeMap<String, String>,
     reviewers: Vec<AnyRow>,
     history: Vec<AnyRow>,
     required: bool,
@@ -51,6 +52,11 @@ impl Panel {
         };
         Ok(Self {
             work,
+            models: registry
+                .models
+                .iter()
+                .map(|(id, m)| (id.clone(), m.label.clone()))
+                .collect(),
             reviewers,
             history,
             required,

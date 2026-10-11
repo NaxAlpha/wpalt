@@ -154,6 +154,370 @@ fn engines() -> Vec<bool> {
     }
     if pg { vec![false, true] } else { vec![false] }
 }
+fn structured_graph(page: &str) -> serde_json::Value {
+    let script = page
+        .split_once("<script type=\"application/ld+json\">")
+        .expect("Public JSON-LD script")
+        .1
+        .split_once("</script>")
+        .unwrap()
+        .0;
+    let values: serde_json::Value =
+        serde_json::from_str(script).expect("Independent JSON parser accepts script output");
+    values
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v.get("@graph").is_some())
+        .expect("Explicit graph replaces the implicit article")
+        .clone()
+}
+
+#[tokio::test]
+async fn old_archive_markers_cannot_admit_current_structured_model_grammar() {
+    use serde_json::{Value, json};
+    type Converter = fn(&Config, &[u8]) -> wpalt::error::Result<Vec<u8>>;
+    let site = Site::new(false, true).await;
+    let bytes = backup::capture(&site.app).await.unwrap();
+    let envelope: Value = serde_json::from_slice(&bytes).unwrap();
+    let base: Value = serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+    for (marker, schema, convert) in [
+        (8, 9, backup::migrate_m6 as Converter),
+        (12, 12, backup::migrate_v12 as Converter),
+        (13, 13, backup::migrate_v13 as Converter),
+        (14, 14, backup::migrate_v14 as Converter),
+        (15, 15, backup::migrate_v15 as Converter),
+        (16, 16, backup::migrate_v16 as Converter),
+    ] {
+        let mut old = base.clone();
+        old["schema"] = schema.into();
+        if marker < 15 {
+            pre_asset_graph(&mut old);
+        }
+        let tables = old["tables"].as_object_mut().unwrap();
+        if marker < 14 {
+            tables.remove("user_preferences");
+        }
+        if marker < 13 {
+            tables.remove("editorial_work");
+            tables.remove("editorial_decisions");
+        }
+        if marker == 8 {
+            for name in [
+                "user_factors",
+                "user_passkeys",
+                "privacy_requests",
+                "recovery_mode",
+            ] {
+                tables.remove(name);
+            }
+            old.as_object_mut().unwrap().remove("audit_history");
+        }
+        let encode = |graph: &Value| {
+            let payload = graph.to_string();
+            serde_json::to_vec(&json!({"format":format!("wpalt-backup-v{marker}"),"sha256":auth::digest(payload.as_bytes()),"payload":payload})).unwrap()
+        };
+        let converted = convert(&site.app.config, &encode(&old))
+            .expect("Valid historical grammar must pass before testing a new-key attack");
+        assert_eq!(
+            backup::inspect(&site.app.config, &converted).unwrap()["schema"],
+            17
+        );
+        assert!(backup::inspect(&site.app.config, &encode(&old)).is_err());
+        for injected in [Value::Null, json!({})] {
+            let mut attack = old.clone();
+            let model = &mut attack["tables"]["content_models"][0]["definition"];
+            let mut definition: Value = serde_json::from_str(model.as_str().unwrap()).unwrap();
+            definition["structured"] = injected;
+            *model = definition.to_string().into();
+            assert!(
+                convert(&site.app.config, &encode(&attack)).is_err(),
+                "marker {marker} must refuse the newer key even when empty/null"
+            );
+        }
+    }
+    site.close().await;
+}
+
+/// Owner model configuration, public author/location facts and current access
+/// policy remain connected through the real renderer and fresh-target recovery.
+#[tokio::test]
+async fn structured_entities_publish_visible_facts_without_draft_or_account_leaks() {
+    use serde_json::json;
+    use wpalt::schema::{self, Model, Registry};
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let person:Model=serde_json::from_value(json!({"label":"Public authors","fields":{"public_name":{"kind":"string","label":"Public name"}},"structured":{
+            "vocabulary":"30.1","primary":"person","entities":{"person":{"types":["Person"],"properties":{"name":{"kind":"field","path":["public_name"],"datatype":"Text"}}}}
+        }})).unwrap();
+        schema::save_model(&site.app, "author", person, 0)
+            .await
+            .unwrap();
+        let location:Model=serde_json::from_value(json!({"label":"Locations","fields":{
+            "business_name":{"kind":"string","label":"Business name"},"address":{"kind":"object","label":"Address","fields":{"street":{"kind":"string"},"city":{"kind":"string"}}}
+        },"structured":{"vocabulary":"30.1","primary":"location","entities":{
+            "location":{"types":["Restaurant"],"properties":{"name":{"kind":"field","path":["business_name"],"datatype":"Text"},"address":{"kind":"entity","entity":"address"}}},
+            "address":{"types":["PostalAddress"],"scope":["address"],"properties":{"streetAddress":{"kind":"field","path":["street"],"datatype":"Text"},"addressLocality":{"kind":"field","path":["city"],"datatype":"Text"}}}
+        }}})).unwrap();
+        schema::save_model(&site.app, "location", location.clone(), 0)
+            .await
+            .unwrap();
+        let organization:Model=serde_json::from_value(json!({"label":"Organizations","fields":{
+            "public_name":{"kind":"string"},"locations":{"kind":"relationships","target":"location"}
+        },"structured":{"vocabulary":"30.1","primary":"organization","entities":{"organization":{"types":["Organization"],"properties":{
+            "name":{"kind":"field","path":["public_name"],"datatype":"Text"},"location":{"kind":"relationship","path":["locations"],"entity":"location"}
+        }}}}})).unwrap();
+        schema::save_model(&site.app, "organization", organization, 0)
+            .await
+            .unwrap();
+        let mut post_model = Registry::load(&site.app).await.unwrap().models["post"].clone();
+        post_model.fields.insert(
+            "public_author".into(),
+            serde_json::from_value(json!({"kind":"relationship","target":"author"})).unwrap(),
+        );
+        post_model.fields.insert(
+            "public_image".into(),
+            serde_json::from_value(json!({"kind":"media"})).unwrap(),
+        );
+        post_model.structured=Some(serde_json::from_value(json!({"vocabulary":"30.1","primary":"article","entities":{"article":{"types":["Article"],"properties":{
+            "image":{"kind":"image","path":["public_image"]},"headline":{"kind":"publication","attribute":"title"},"datePublished":{"kind":"publication","attribute":"published_at"},"author":{"kind":"relationship","path":["public_author"],"entity":"person"}
+        }}}})).unwrap());
+        schema::save_model(&site.app, "post", post_model.clone(), 1)
+            .await
+            .unwrap();
+        let make = |kind: &str, slug: &str, values: serde_json::Value| {
+            let mut v = input(slug, "publish");
+            v.kind = kind.into();
+            v.fields = values.to_string();
+            v.categories.clear();
+            v.tags.clear();
+            v
+        };
+        let author_input = make(
+            "author",
+            "public-author",
+            json!({"public_name":"Public pen name\n</script> & café"}),
+        );
+        let author = content::save(&site.app, site.session(), None, author_input.clone())
+            .await
+            .unwrap();
+        let downtown=content::save(&site.app,site.session(),None,make("location","downtown",json!({"business_name":"Downtown café","address":{"street":"1 Main St","city":"Tokyo"}}))).await.unwrap();
+        let garden=content::save(&site.app,site.session(),None,make("location","garden",json!({"business_name":"Garden café","address":{"street":"2 Garden St","city":"Kyoto"}}))).await.unwrap();
+        let org = content::save(
+            &site.app,
+            site.session(),
+            None,
+            make(
+                "organization",
+                "our-locations",
+                json!({"public_name":"Independent cafés","locations":[downtown.id,garden.id]}),
+            ),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            upload(&site, "structured-fact.png", &png(), "public").await,
+            StatusCode::SEE_OTHER
+        );
+        let image: String = sqlx::query_scalar("SELECT id FROM media WHERE original_name=$1")
+            .bind("structured-fact.png")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let mut story_input = input("structured-story", "publish");
+        story_input.fields = json!({"public_author":author.id,"public_image":image}).to_string();
+        story_input.seo = json!({"title":"A separate search snippet"}).to_string();
+        let story = content::save(&site.app, site.session(), None, story_input.clone())
+            .await
+            .unwrap();
+        let public = get(&site.app, "/structured-story", None).await;
+        assert_eq!(public.0, StatusCode::OK);
+        let graph = structured_graph(&public.1);
+        assert_eq!(graph["@graph"][0]["headline"], story.published_title);
+        assert!(
+            graph["@graph"][0]["datePublished"]
+                .as_str()
+                .unwrap()
+                .ends_with('Z')
+        );
+        assert_eq!(
+            graph["@graph"][1]["name"],
+            "Public pen name\n</script> & café"
+        );
+        assert!(
+            public
+                .1
+                .contains("Public pen name\n&lt;/script&gt; &amp; café")
+        );
+        assert!(!public.1.contains("owner@example.test"));
+        let images: Vec<_> = wpalt::structured::declaration::items(&graph["@graph"][0]["image"])
+            .into_iter()
+            .filter(|n| n["@type"] == "ImageObject")
+            .collect();
+        assert_eq!(images.len(), 1);
+        assert!(
+            images[0]["contentUrl"]
+                .as_str()
+                .unwrap()
+                .ends_with(&format!("/media/{image}"))
+        );
+        assert!(images[0]["width"].as_u64().unwrap() > 0);
+        assert!(
+            public
+                .1
+                .contains("<title>A separate search snippet</title>")
+        );
+        let locations = get(&site.app, "/our-locations", None).await;
+        let location_graph = structured_graph(&locations.1);
+        assert_eq!(location_graph["@graph"].as_array().unwrap().len(), 5);
+        assert_eq!(
+            location_graph["@graph"][0]["location"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert!(locations.1.contains("1 Main St") && locations.1.contains("2 Garden St"));
+        let mut edit = author_input.clone();
+        edit.version = author.version;
+        edit.action = "save".into();
+        edit.fields = json!({"public_name":"PRIVATE_WORKING_AUTHOR"}).to_string();
+        let working = content::save(&site.app, site.session(), Some(&author.id), edit.clone())
+            .await
+            .unwrap();
+        let live = get(&site.app, "/structured-story", None).await;
+        assert!(!live.1.contains("PRIVATE_WORKING_AUTHOR"));
+        assert_eq!(structured_graph(&live.1), graph);
+        let preview = get(
+            &site.app,
+            &format!("/admin/preview/{}", author.id),
+            Some(&site.token),
+        )
+        .await;
+        assert_eq!(preview.0, StatusCode::OK);
+        assert!(preview.1.contains("PRIVATE_WORKING_AUTHOR"));
+        assert!(!preview.1.contains("application/ld+json"));
+        assert_eq!(
+            content::save(&site.app, site.session(), Some(&author.id), edit)
+                .await
+                .unwrap_err()
+                .0,
+            StatusCode::CONFLICT
+        );
+        let unauthorized = get(
+            &site.app,
+            "/api/admin/structured/vocabulary?family=type&prefix=Local",
+            None,
+        )
+        .await;
+        assert!(!unauthorized.0.is_success());
+        let terms = get(
+            &site.app,
+            "/api/admin/structured/vocabulary?family=type&prefix=Local",
+            Some(&site.token),
+        )
+        .await;
+        assert_eq!(terms.0, StatusCode::OK);
+        let terms: serde_json::Value = serde_json::from_str(&terms.1).unwrap();
+        assert_eq!(terms["release"], "30.1");
+        assert!(
+            terms["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|v| v["name"] == "LocalBusiness")
+        );
+        // A new datatype constraint must validate both working and published snapshots
+        // before configuration CAS; failed preflight leaves the definition intact.
+        let mut wrong = post_model.clone();
+        wrong
+            .structured
+            .as_mut()
+            .unwrap()
+            .entities
+            .get_mut("article")
+            .unwrap()
+            .properties
+            .insert(
+                "author".into(),
+                serde_json::from_value(
+                    json!({"kind":"field","path":["public_author"],"datatype":"Text"}),
+                )
+                .unwrap(),
+            );
+        assert!(
+            schema::save_model(&site.app, "post", wrong, 2)
+                .await
+                .is_err()
+        );
+        let (left, right) = tokio::join!(
+            schema::save_model(&site.app, "post", post_model.clone(), 2),
+            schema::save_model(&site.app, "post", post_model, 2)
+        );
+        assert_eq!(usize::from(left.is_ok()) + usize::from(right.is_ok()), 1);
+        assert_eq!(
+            left.err().or_else(|| right.err()).unwrap().0,
+            StatusCode::CONFLICT
+        );
+        let archived = backup::capture(&site.app).await.unwrap();
+        let recovered = Site::new(pg, false).await;
+        backup::restore(&recovered.app, &archived).await.unwrap();
+        let recovered_story = get(&recovered.app, "/structured-story", None).await;
+        assert_eq!(structured_graph(&recovered_story.1), graph);
+        assert!(!recovered_story.1.contains("PRIVATE_WORKING_AUTHOR"));
+        assert_eq!(
+            structured_graph(&get(&recovered.app, "/our-locations", None).await.1),
+            location_graph
+        );
+        recovered.close().await;
+        // Current restrictions override historical published references and root markup.
+        let policy =
+            wpalt::membership::policy(&site.app, "Structured privacy", "structured-private", "")
+                .await
+                .unwrap();
+        wpalt::membership::protect(&site.app, "post", &author.id, &policy, 0, 0)
+            .await
+            .unwrap();
+        wpalt::membership::protect(&site.app, "media", &image, &policy, 0, 0)
+            .await
+            .unwrap();
+        let restricted = get(&site.app, "/structured-story", None).await;
+        let restricted_graph = structured_graph(&restricted.1);
+        assert!(restricted_graph["@graph"][0].get("author").is_none());
+        assert!(restricted_graph["@graph"][0].get("image").is_none());
+        assert!(!restricted.1.contains("Public pen name"));
+        assert!(!restricted.1.contains(&image));
+        wpalt::membership::protect(&site.app, "post", &story.id, &policy, 0, 0)
+            .await
+            .unwrap();
+        assert!(
+            !get(&site.app, "/structured-story", None)
+                .await
+                .0
+                .is_success()
+        );
+        let owner = get(&site.app, "/structured-story", Some(&site.token)).await;
+        assert_eq!(owner.0, StatusCode::OK);
+        assert!(!owner.1.contains("application/ld+json"));
+        wpalt::membership::release(&site.app, "post", &story.id)
+            .await
+            .unwrap();
+        // Keep the image restricted to exercise omission after author unpublication.
+        let mut revoke = author_input;
+        revoke.action = "unpublish".into();
+        revoke.version = working.version;
+        content::save(&site.app, site.session(), Some(&author.id), revoke)
+            .await
+            .unwrap();
+        let revoked = get(&site.app, "/structured-story", None).await;
+        let revoked_graph = structured_graph(&revoked.1);
+        assert_eq!(revoked_graph["@graph"].as_array().unwrap().len(), 1);
+        assert!(revoked_graph["@graph"][0].get("author").is_none());
+        assert!(!revoked.1.contains("Public pen name"));
+        assert_eq!(org.kind, "organization");
+        site.close().await;
+    }
+}
 fn input(slug: &str, action: &str) -> PostInput {
     PostInput {
         import_markdown: false,
@@ -4129,7 +4493,7 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let migrated = backup::migrate_m6(&original.app.config, &legacy).unwrap();
         assert_eq!(
             backup::inspect(&original.app.config, &migrated).unwrap()["schema"],
-            16
+            17
         );
         let destination = tempfile::tempdir().unwrap();
         let key = encryption::generate_key();
@@ -7762,7 +8126,7 @@ async fn assigned_review_binds_material_and_recovers_without_public_note_leaks()
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            16
+            17
         );
         // The explicit previous graph conversion retains meaningful private review history.
         let mut previous: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -8615,7 +8979,7 @@ async fn account_interface_preferences_recover_without_changing_content_authorit
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            16
+            17
         );
         let restored = Site::new(pg, false).await;
         backup::restore(&restored.app, &bytes).await.unwrap();
@@ -9793,7 +10157,7 @@ async fn discovery_formats_have_explicit_conversion_validation_and_private_draft
         let mut envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         let mut graph: serde_json::Value =
             serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
-        assert_eq!(graph["schema"], 16);
+        assert_eq!(graph["schema"], 17);
         assert!(
             graph["tables"].get("published_image_refs").is_none(),
             "Derived index is rebuilt from canonical publication, not separately trusted"
@@ -9827,7 +10191,7 @@ async fn discovery_formats_have_explicit_conversion_validation_and_private_draft
         let converted = backup::migrate_v15(&site.app.config, &old).unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &converted).unwrap()["schema"],
-            16
+            17
         );
         // An attacker cannot relabel newly extended SEO as an older accepted format.
         graph["tables"]["posts"][0]["seo"] = r#"{"social_alt":"new field"}"#.into();

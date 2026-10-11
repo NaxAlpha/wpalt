@@ -1,5 +1,7 @@
 # Running and recovering wpalt
 
+D07 development uses native schema 21 / portable recovery v17. Older adopted sites need a reviewed stopped upgrade and retained old executable/recovery key; explicit archive conversion is separate from ordinary restore. See [distributed upgrade guidance](distributed-operations.md#d07-structured-model-grammar). D07 delivery checks are still in progress.
+
 ## Build and initialize
 
 Use Rust and Cargo. Build once; runtime does not need Cargo, Node, PHP or internet access:

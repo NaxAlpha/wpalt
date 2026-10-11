@@ -36,6 +36,7 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: python3 scripts/check_protocols.py
+      - run: python3 scripts/schema_vocabulary.py --check
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '22'
@@ -147,6 +148,14 @@ jobs:
           name: d06-clean-release-discovery-evidence
           path: work/d06-clean-release-discovery-observations.json
           retention-days: 30
+      - name: Observe structured output and zero additional queries
+        run: python3 scripts/structured_benchmark.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --profile release --output work/d07-clean-release-structured-observations.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d07-clean-release-structured-evidence
+          path: work/d07-clean-release-structured-observations.json
+          retention-days: 30
       - name: Package source identity, executable and checksums
         run: python3 scripts/package_build.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --target x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -220,6 +229,8 @@ jobs:
       - run: WPALT_SCRIPTS_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_CLONE_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_SPAM_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Verify typed structured location authoring and visible facts
+        run: WPALT_STRUCTURED_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Install optional local video fixture tools
         run: sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Verify publication discovery previews, playable local video and revocation
@@ -312,7 +323,7 @@ jobs:
           name: d05-elementor-reference
           path: work/d05-elementor-reference.json
   discovery-reference:
-    if: github.event_name == 'pull_request' && github.head_ref == 'feature/d06-publication-discovery'
+    if: github.event_name == 'pull_request' && (github.head_ref == 'feature/d06-publication-discovery' || github.head_ref == 'feature/d07-structured-locations')
     needs: clean-build
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -324,11 +335,15 @@ jobs:
           path: work/distribution
       - run: python3 scripts/release_build.py --directory work/distribution --source "$GITHUB_SHA" --extract work/verified-build
       - run: python3 scripts/discovery_reference.py --binary "$PWD/work/verified-build/wpalt"
+      - if: github.head_ref == 'feature/d07-structured-locations'
+        run: python3 scripts/discovery_reference.py --binary "$PWD/work/verified-build/wpalt" --structured --output work/d07-structured-reference.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: d06-discovery-reference
-          path: work/d06-discovery-reference.json
+          path: |
+            work/d06-discovery-reference.json
+            work/d07-structured-reference.json
   local-processes:
     needs: clean-build
     runs-on: ubuntu-24.04
@@ -387,6 +402,15 @@ jobs:
           git show 33667fa20083836b54b8498388281c49a2232a0a:scripts/release_build.py > work/d05-release-verifier.py
           python3 work/d05-release-verifier.py --directory work/d05-runtime-reference --source 33667fa20083836b54b8498388281c49a2232a0a --extract work/d05-runtime-app
           python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d05-runtime-app/wpalt" --source-schema 19
+      - name: Verify actual D06 upgrade and fresh old-runtime rollback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --depth=1 origin f8d03ff93105a7c0e057059a2d8219700541dbaa
+          gh release download nightly-202610110720-f8d03ff93105 --pattern '*.tar.gz' --pattern SHA256SUMS --dir work/d06-runtime-reference
+          git show f8d03ff93105a7c0e057059a2d8219700541dbaa:scripts/release_build.py > work/d06-release-verifier.py
+          python3 work/d06-release-verifier.py --directory work/d06-runtime-reference --source f8d03ff93105a7c0e057059a2d8219700541dbaa --extract work/d06-runtime-app
+          python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d06-runtime-app/wpalt" --source-schema 20
       - run: python3 scripts/local_process_acceptance.py --binary "$PWD/work/verified-build/wpalt"
       - run: frontend/node_modules/.bin/playwright install --with-deps chromium
       - name: Cumulative browser journeys across two processes and one worker
@@ -402,6 +426,11 @@ jobs:
         env:
           WPALT_LOCAL_PROCESSES: '1'
           WPALT_ELEMENTOR_DESIGN_ONLY: '1'
+        run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Verify typed structured facts across local processes
+        env:
+          WPALT_LOCAL_PROCESSES: '1'
+          WPALT_STRUCTURED_ONLY: '1'
         run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Verify publication discovery across local processes
         env:

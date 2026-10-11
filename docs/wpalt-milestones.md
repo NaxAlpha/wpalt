@@ -356,3 +356,10 @@ Reviewed Elementor data now compiles to shared editable native composition throu
 ### D05 merged; D06 publication-aware discovery active — 2026-10-11
 
 [D05 PR #21](https://github.com/NaxAlpha/wpalt/pull/21) merged as `33667fa20083836b54b8498388281c49a2232a0a` after all eight final-head gates in run 38102203237 and exact-parent archive verification. Actual current free Elementor 4.3.4 legacy/atomic exports passed their selected connected runtime journeys; full F024 breadth remains retained. [D06 contract](d06-contract.md) connects illustrative previews, admitted local social images and publication-aware sitemap extensions with explicit persisted migration and privacy boundaries.
+
+
+### D06 merged and released; D07 active — 2026-10-11
+
+PR #22 merged as `f8d03ff93105a7c0e057059a2d8219700541dbaa` after eight exact-head gates and independent exact-parent clean archive verification. Actual-main seven cumulative gates, release publication and independent public archive verification pass; [receipt](evidence/d06-main-release.json). The canonical local publication-discovery slice, XML edge guard, catalog contention regression and bounded failure evidence are delivered. Broader declared gaps remain in the matrix/backlog. D07 starts [publication-bound structured entities and multiple locations](d07-contract.md), reusing native models/publications/privacy and dated offline vocabulary rather than a second schema-content authority.
+
+D07 local implementation now supplies publication-bound typed entities, offline vocabulary lookup, visible factual output and multiple related location records. Native/current privacy/recovery checks and single/two-process browser receipts are in the [ledger](evidence/d07-verification.md); delivery PR #23 remains draft pending exact-source reference/release gates. Native 21 / portable v17 fence new persisted model meaning. No search eligibility, full premium execution or complete ontology claim is added.

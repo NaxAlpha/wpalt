@@ -656,3 +656,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## News language identifiers
 
 `assets/news-language-codes.txt` contains derived ISO 639-2 alpha identifiers from the official Library of Congress UTF-8 dataset checked 2026-10-11. No language-name text is bundled. Exact source, retrieval facts and SHA-256 are in `docs/research/d06-news-language-provenance.json`; runtime validation does not contact the registry. Chinese news codes follow Google’s explicit guideline. Yoast/WordPress inspection fixtures execute separately in disposable reference environments; their plugin implementation is not bundled or copied into wpalt.
+
+
+## Schema.org vocabulary 30.1
+
+`docs/research/schemaorg-30.1.jsonld` and the normalized derivative `assets/schemaorg-v30.1.json` contain Schema.org contributor vocabulary data licensed under [Creative Commons Attribution-ShareAlike 3.0 Unported](https://creativecommons.org/licenses/by-sa/3.0/). Copyright Schema.org contributors. The same CC BY-SA 3.0 license applies to the normalized derivative data; no endorsement is implied. Attribution, exact source URL/commit/hash and changes are recorded in `docs/research/d07-vocabulary-provenance.json`. The source is [Schema.org release 30.1](https://github.com/schemaorg/schemaorg/blob/5f2d8cdec99b7329459ef6584e94b6a840f88471/data/releases/30.1/schemaorg-current-https.jsonld). Normalization retains term identities, relationships and status and omits prose/examples/external namespaces.
+
+This notice covers vocabulary data. Schema.org's separate Apache software license is not substituted for its data license. No Schema.org or WordPress plugin software is incorporated by this vocabulary derivation. wpalt's own application-license selection remains the separate owner decision recorded in D30.

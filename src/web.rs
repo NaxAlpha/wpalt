@@ -1018,6 +1018,16 @@ async fn render_post(
         &settings,
     )
     .await?;
+    if ctx.root["_structured"].is_object() {
+        ctx.root["_discovery"]["structured"] = ctx.root["_structured"].clone();
+        ctx.root["_discovery"]["structured_article"] = ctx.root["_structured_article"].clone();
+        ctx.root["_discovery"]["structured_overrides_business"] =
+            ctx.root["_structured_organization"].clone();
+    }
+    if protected > 0 {
+        ctx.root["_discovery"]["private"] = true.into();
+        ctx.root["_discovery"]["noindex"] = true.into();
+    }
     ctx.root["navigation"] = ctx.root["_discovery"]["navigation"].clone();
     let extra = html! {(crate::discovery::language_nav(&ctx.root["_discovery"]))            section class="comments" {p class="muted" {@for t in terms {a href=(term_archive_url(&discovery.path(&locale,""), &t.get::<String,_>("kind"), &t.get::<String,_>("slug"))) {(t.get::<String,_>("name"))} " · "}}
                     h2 {"Conversation"}
@@ -1166,7 +1176,7 @@ fn editor_form(
                     input type="hidden" name="blocks" value="[]";
                 }
             }aside class="panel" {h2 {"Publication"}label {"URL slug" input name="slug" aria-label="URL slug" value=(p.slug) required pattern="[a-z0-9-]+" maxlength="120";small {"Lowercase ASCII letters, digits and hyphens."}}
-                label {"Content type" select name="kind" aria-label="Content type" {option value="post" selected[p.kind=="post"] {"Post"}option value="page" selected[p.kind=="page"] {"Page"}@if p.kind!="post"&&p.kind!="page"{option value=(p.kind) selected{(p.kind)}}}small {"Type is fixed after creation. Define additional models in Design studio."}}
+                label {"Content type" select name="kind" aria-label="Content type" {@for (kind,label) in &review.models {option value=(kind) selected[p.kind==*kind] {(label)}}}small {"Type is fixed after creation. Define additional models in Design studio."}}
                 label {"Categories" input name="categories" aria-label="Categories" value=(p.categories);small {"Comma-separated names."}}
                 label {"Tags" input name="tags" value=(p.tags);}
                 label {"Custom taxonomies (JSON)" textarea name="taxonomies" {(p.taxonomies)}small {"Declared taxonomy identifiers mapped to arrays of term names."}}
