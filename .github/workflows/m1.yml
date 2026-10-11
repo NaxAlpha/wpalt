@@ -36,6 +36,9 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: python3 scripts/check_protocols.py
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
       - run: python3 -m unittest discover -s tests/pipeline -v
       - run: cargo fmt --all --check
       - run: cargo clippy --locked --all-targets -- -D warnings
@@ -136,6 +139,14 @@ jobs:
           name: d04-clean-release-theme-evidence
           path: work/d04-clean-release-theme-reference.json
           retention-days: 30
+      - name: Observe populated publication discovery with the clean release executable
+        run: python3 scripts/discovery_benchmark.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --profile release --output work/d06-clean-release-discovery-observations.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d06-clean-release-discovery-evidence
+          path: work/d06-clean-release-discovery-observations.json
+          retention-days: 30
       - name: Package source identity, executable and checksums
         run: python3 scripts/package_build.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --target x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -211,6 +222,8 @@ jobs:
       - run: WPALT_SPAM_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Install optional local video fixture tools
         run: sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Verify publication discovery previews, playable local video and revocation
+        run: WPALT_DISCOVERY_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_VIDEO_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
@@ -298,6 +311,24 @@ jobs:
         with:
           name: d05-elementor-reference
           path: work/d05-elementor-reference.json
+  discovery-reference:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/d06-publication-discovery'
+    needs: clean-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: wpalt-clean-linux-x86_64-${{ github.sha }}
+          path: work/distribution
+      - run: python3 scripts/release_build.py --directory work/distribution --source "$GITHUB_SHA" --extract work/verified-build
+      - run: python3 scripts/discovery_reference.py --binary "$PWD/work/verified-build/wpalt"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d06-discovery-reference
+          path: work/d06-discovery-reference.json
   local-processes:
     needs: clean-build
     runs-on: ubuntu-24.04
@@ -327,7 +358,7 @@ jobs:
           name: wpalt-clean-linux-x86_64-${{ github.sha }}
           path: work/distribution
       - run: python3 scripts/release_build.py --directory work/distribution --source "$GITHUB_SHA" --extract work/verified-build
-      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client ffmpeg
       - name: Verify supported upgrade and rollback from published M8 executable
         env:
           GH_TOKEN: ${{ github.token }}
@@ -347,6 +378,15 @@ jobs:
           git show 4ab84e49b5951d3065ef2e77cb19965da4d1db7b:scripts/release_build.py > work/d03-release-verifier.py
           python3 work/d03-release-verifier.py --directory work/d03-runtime-reference --source 4ab84e49b5951d3065ef2e77cb19965da4d1db7b --extract work/d03-runtime-app
           python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d03-runtime-app/wpalt" --source-schema 18
+      - name: Verify actual D05 upgrade and fresh old-runtime rollback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --depth=1 origin 33667fa20083836b54b8498388281c49a2232a0a
+          gh release download nightly-202610110146-33667fa20083 --pattern '*.tar.gz' --pattern SHA256SUMS --dir work/d05-runtime-reference
+          git show 33667fa20083836b54b8498388281c49a2232a0a:scripts/release_build.py > work/d05-release-verifier.py
+          python3 work/d05-release-verifier.py --directory work/d05-runtime-reference --source 33667fa20083836b54b8498388281c49a2232a0a --extract work/d05-runtime-app
+          python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d05-runtime-app/wpalt" --source-schema 19
       - run: python3 scripts/local_process_acceptance.py --binary "$PWD/work/verified-build/wpalt"
       - run: frontend/node_modules/.bin/playwright install --with-deps chromium
       - name: Cumulative browser journeys across two processes and one worker
@@ -362,6 +402,11 @@ jobs:
         env:
           WPALT_LOCAL_PROCESSES: '1'
           WPALT_ELEMENTOR_DESIGN_ONLY: '1'
+        run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Verify publication discovery across local processes
+        env:
+          WPALT_LOCAL_PROCESSES: '1'
+          WPALT_DISCOVERY_ONLY: '1'
         run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()

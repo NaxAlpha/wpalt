@@ -25,7 +25,7 @@ module.exports = async (owner, origin, output) => {
     ]);
     assert(
       response.status() < 400,
-      `Commerce action ${new URL(response.url()).pathname} returned ${response.status()}`,
+      `Commerce action ${new URL(response.url()).pathname} returned ${response.status()} (request ${response.headers()["x-request-id"] || "unavailable"})`,
     );
   };
   const measure = async (p, name) => {

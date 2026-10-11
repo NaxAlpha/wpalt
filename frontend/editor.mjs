@@ -1,3 +1,4 @@
+import "./discovery.mjs";
 import { Schema } from "prosemirror-model";
 import {
   EditorState,

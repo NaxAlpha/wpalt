@@ -1073,7 +1073,7 @@ pub fn safe_filename(name: &str) -> bool {
         && !name.contains('\\')
 }
 pub async fn capture(app: &App) -> Result<Vec<u8>> {
-    capture_format(app, 15).await
+    capture_format(app, 16).await
 }
 /// Only the stopped maintenance path may capture the original pre-change graph.
 pub(crate) async fn capture_maintenance(app: &App) -> Result<Vec<u8>> {
@@ -1088,8 +1088,10 @@ pub(crate) async fn capture_maintenance(app: &App) -> Result<Vec<u8>> {
             13
         } else if installed < 19 {
             14
-        } else {
+        } else if installed < 20 {
             15
+        } else {
+            16
         },
     )
     .await
@@ -1235,14 +1237,14 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v15"
+    if envelope.format != "wpalt-backup-v16"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 15
+    if snapshot.schema != 16
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -1408,17 +1410,47 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
         ));
     }
     for row in &snapshot.tables["posts"] {
+        for key in ["title", "published_title"] {
+            if row[key]
+                .as_str()
+                .is_none_or(|title| !crate::discovery::plain_text(title))
+            {
+                return Err(Error::invalid(
+                    "Correct control or XML-invalid characters in content titles before recovery or upgrade.",
+                ));
+            }
+        }
         for key in ["document", "published_document"] {
-            crate::document::Document::parse(
-                row[key]
-                    .as_str()
-                    .ok_or(Error::invalid("Missing document"))?,
-            )?;
+            let raw = row[key]
+                .as_str()
+                .ok_or(Error::invalid("Missing document"))?;
+            if key == "published_document" {
+                crate::discovery::publication::image_ids(raw)?;
+            } else {
+                crate::document::Document::parse(raw)?;
+            }
         }
     }
     for row in &snapshot.tables["revisions"] {
         let value: Value = serde_json::from_str(row["snapshot"].as_str().unwrap())
             .map_err(|_| Error::invalid("Invalid revision"))?;
+        for key in ["title", "published_title"] {
+            if value["post"][key]
+                .as_str()
+                .is_none_or(|title| !crate::discovery::plain_text(title))
+            {
+                return Err(Error::invalid(
+                    "Correct control or XML-invalid revision titles before recovery or upgrade.",
+                ));
+            }
+        }
+        for key in ["seo", "published_seo"] {
+            crate::discovery::Seo::parse(
+                value["post"][key]
+                    .as_str()
+                    .ok_or_else(|| Error::invalid("Invalid revision SEO."))?,
+            )?;
+        }
         for key in ["document", "published_document"] {
             crate::document::Document::parse(
                 value["post"][key]
@@ -2029,6 +2061,7 @@ pub async fn restore(app: &App, encoded: &[u8]) -> Result<()> {
             sqlx::query_with(&sql, args).execute(&mut *tx).await?;
         }
     }
+    crate::discovery::publication::rebuild(&mut tx).await?;
     // Restored leases cannot belong to a live worker. SMTP acceptance may have
     // happened before capture; keep it uncertain. Local spools are reproducible.
     sqlx::query("UPDATE mail_jobs SET state='uncertain',lease_owner='',lease_until=0,last_code='restored_lease' WHERE state='leased'").execute(&mut *tx).await?;
@@ -2171,7 +2204,7 @@ pub fn migrate_m6(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Archive migration failed."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v15".into(),
+        format: "wpalt-backup-v16".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2236,7 +2269,7 @@ pub fn migrate_v12(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let payload =
         serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot convert archive."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v15".into(),
+        format: "wpalt-backup-v16".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2274,7 +2307,7 @@ pub fn migrate_v13(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let payload =
         serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot convert archive."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v15".into(),
+        format: "wpalt-backup-v16".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2290,7 +2323,7 @@ fn upgrade_pre_asset_snapshot(snapshot: &mut Snapshot) -> Result<()> {
             "Pre-asset recovery graph contains unsupported newer asset tables.",
         ));
     }
-    snapshot.schema = 15;
+    snapshot.schema = 16;
     snapshot.tables.insert("theme_assets".into(), vec![]);
     snapshot
         .tables
@@ -2347,11 +2380,84 @@ pub fn migrate_v14(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Archive migration failed."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v15".into(),
+        format: "wpalt-backup-v16".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
     .map_err(|_| Error::invalid("Archive migration failed."))?;
+    validate(config, &output)?;
+    Ok(output)
+}
+/// Explicit offline conversion. Old envelopes never enter ordinary restore.
+pub fn migrate_v15(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<u8>> {
+    if encoded.len() > config.max_backup_bytes {
+        return Err(Error::invalid("Archive exceeds configured budget."));
+    }
+    let envelope: Envelope =
+        serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid v15 envelope."))?;
+    if envelope.format != "wpalt-backup-v15"
+        || digest(envelope.payload.as_bytes()) != envelope.sha256
+    {
+        return Err(Error::invalid("Invalid v15 format/checksum."));
+    }
+    let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
+        .map_err(|_| Error::invalid("Invalid v15 graph."))?;
+    if snapshot.schema != 15 {
+        return Err(Error::invalid("Archive is not an unmigrated v15 graph."));
+    }
+    // New discovery fields must not be smuggled through a falsely old marker.
+    fn legacy(raw: &str) -> Result<()> {
+        let v: Value = serde_json::from_str(raw).map_err(|_| Error::invalid("Invalid old SEO."))?;
+        if v.as_object().is_none_or(|o| {
+            o.keys()
+                .any(|k| !["title", "description", "noindex", "schema_type"].contains(&k.as_str()))
+        }) {
+            return Err(Error::invalid("v15 SEO contains unsupported newer fields."));
+        }
+        crate::discovery::Seo::parse(raw)?;
+        Ok(())
+    }
+    for row in snapshot
+        .tables
+        .get("posts")
+        .ok_or_else(|| Error::invalid("Missing v15 posts."))?
+    {
+        for key in ["seo", "published_seo"] {
+            legacy(
+                row.get(key)
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| Error::invalid("Missing v15 SEO."))?,
+            )?;
+        }
+    }
+    for row in snapshot
+        .tables
+        .get("revisions")
+        .ok_or_else(|| Error::invalid("Missing v15 revisions."))?
+    {
+        let v: Value = serde_json::from_str(
+            row.get("snapshot")
+                .and_then(Value::as_str)
+                .ok_or_else(|| Error::invalid("Missing v15 revision."))?,
+        )
+        .map_err(|_| Error::invalid("Invalid v15 revision."))?;
+        for key in ["seo", "published_seo"] {
+            legacy(
+                v["post"][key]
+                    .as_str()
+                    .ok_or_else(|| Error::invalid("Missing v15 revision SEO."))?,
+            )?;
+        }
+    }
+    snapshot.schema = 16;
+    let payload =
+        serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot convert archive."))?;
+    let output = serde_json::to_vec(&Envelope {
+        format: "wpalt-backup-v16".into(),
+        sha256: digest(payload.as_bytes()),
+        payload,
+    })
+    .map_err(|_| Error::invalid("Cannot convert archive."))?;
     validate(config, &output)?;
     Ok(output)
 }
@@ -2362,14 +2468,17 @@ pub(crate) fn inspect_maintenance(config: &crate::config::Config, encoded: &[u8]
         "wpalt-backup-v12" => 12,
         "wpalt-backup-v13" => 13,
         "wpalt-backup-v14" => 14,
+        "wpalt-backup-v15" => 15,
         _ => return inspect(config, encoded),
     };
     let converted = if source == 12 {
         migrate_v12(config, encoded)?
     } else if source == 13 {
         migrate_v13(config, encoded)?
-    } else {
+    } else if source == 14 {
         migrate_v14(config, encoded)?
+    } else {
+        migrate_v15(config, encoded)?
     };
     let mut report = inspect(config, &converted)?;
     report["schema"] = source.into();

@@ -93,6 +93,7 @@ pub fn validate_settings(s: &Settings) -> Result<()> {
 pub fn validate_input(p: &PostInput, s: &Settings) -> Result<()> {
     if p.title.trim().is_empty()
         || p.title.len() > 300
+        || !crate::discovery::plain_text(&p.title)
         || !valid_slug(&p.slug)
         || !crate::schema::identifier(&p.kind)
         || p.body.len() > 512 * 1024
@@ -407,6 +408,9 @@ pub(crate) async fn save_guarded(
     if input.action == "publish" {
         copy_terms(&mut tx, &post.id).await?;
     }
+    if input.action == "publish" {
+        crate::discovery::publication::index(&mut tx, &post.id, &post.published_document).await?;
+    }
     let snapshot = serde_json::json!({"post":post,"categories":input.categories,"tags":input.tags,"taxonomies":custom});
     sqlx::query(
         "INSERT INTO revisions(id,post_id,version,snapshot,created_at) VALUES($1,$2,$3,$4,$5)",
@@ -547,6 +551,7 @@ pub async fn publish_due(app: &App) -> Result<usize> {
         if changed == 1 {
             if allowed {
                 copy_terms(&mut tx, &p.id).await?;
+                crate::discovery::publication::index(&mut tx, &p.id, &p.published_document).await?;
                 n += 1;
             }
             crate::editorial::scheduled_result(&mut tx, &p, allowed).await?;

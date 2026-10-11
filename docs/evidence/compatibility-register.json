@@ -2,11 +2,11 @@
   "schema": 1,
   "layers": [
     {
-      "id": "d04-offline-recovery-v12-v14",
+      "id": "d06-offline-recovery-v12-v15",
       "owner": "wpalt maintainers",
-      "reason": "Native schemas 14\u201318 archives remain recoverable across explicit editorial, preference and local theme asset migrations; ordinary runtime/restore has no legacy branch.",
-      "supported_versions": "Native schemas 14\u201318, portable v12/v13/v14; schema 19 / graph v15 / theme package 2 target",
-      "migration_path": "Stopped upgrade retains original encrypted v12 (14\u201316), v13 (17) or v14 (18) bytes for old-executable fresh rollback. Explicit migrate-recovery-v12/v13/v14 create separately validated v15 archives and package-2 graphs without source overwrite.",
+      "reason": "Supported source schemas 14\u201319 retain bounded explicit maintenance/fresh old-runtime rollback; ordinary runtime and restore have no old parser branch.",
+      "supported_versions": "Native schemas 14\u201319, portable v12/v13/v14/v15; schema 20 / graph v16 / theme package 2 target",
+      "migration_path": "Stopped upgrade retains original encrypted v12 (14\u201316), v13 (17), v14 (18) or v15 (19) bytes for matching old-executable fresh rollback. Explicit migrate-recovery-v12/v13/v14/v15 create separately validated v16 archives; canonical editorial image relationships are rebuilt atomically during current fresh recovery/upgrade.",
       "removal_release": "First adopted release after a documented supported-source retirement decision and verified replacement recovery path",
       "review_deadline": "2027-01-05"
     }

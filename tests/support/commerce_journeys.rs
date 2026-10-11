@@ -105,6 +105,155 @@ pub(super) async fn pay(site: &Site, id: &str, reference: &str) {
     .unwrap()
 }
 #[tokio::test]
+async fn commerce_catalog_edits_wait_for_worker_writes_and_keep_version_conflicts() {
+    use std::time::Duration;
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let (product_id, variant_id) = product(&site, "physical", 1000, 10, "").await;
+        // A separate worker owns an unrelated row. SQLite has one database-wide
+        // writer; PostgreSQL should still admit this unrelated catalog edit.
+        for action in ["new variant", "edit variant", "edit product", "coupon"] {
+            let mut worker = site.app.db.pool.begin().await.unwrap();
+            sqlx::query("UPDATE engagement_settings SET enabled=enabled WHERE id=1")
+                .execute(&mut *worker)
+                .await
+                .unwrap();
+            let variant = catalog::VariantInput {
+                title: "Updated Standard".into(),
+                sku: format!("worker-race-{action}"),
+                price_minor: 1200,
+                member_price_minor: -1,
+                member_key: String::new(),
+                stock_total: 10,
+                billing_interval: String::new(),
+                active: true,
+            };
+            let product = catalog::ProductInput {
+                slug: "updated-under-worker-write".into(),
+                title: "Updated catalog".into(),
+                description: "Changes survive an independent worker write.".into(),
+                kind: "physical".into(),
+                entitlement: String::new(),
+                access_seconds: 0,
+                download_id: String::new(),
+                published: true,
+            };
+            let coupon = catalog::DiscountInput {
+                code: "WORKER-RACE".into(),
+                title: "Local coupon".into(),
+                bps: 100,
+                starts_at: 0,
+                expires_at: wpalt::now() + 3600,
+                max_uses: 10,
+                member_key: String::new(),
+                product_id: product_id.clone(),
+                reward_id: String::new(),
+                active: true,
+            };
+            let edit = async {
+                match action {
+                    "new variant" => catalog::save_variant(
+                        &site.app,
+                        site.session(),
+                        &product_id,
+                        None,
+                        0,
+                        &variant,
+                    )
+                    .await
+                    .map(|_| ()),
+                    "edit variant" => catalog::save_variant(
+                        &site.app,
+                        site.session(),
+                        &product_id,
+                        Some(&variant_id),
+                        1,
+                        &variant,
+                    )
+                    .await
+                    .map(|_| ()),
+                    "edit product" => catalog::save_product(
+                        &site.app,
+                        site.session(),
+                        Some(&product_id),
+                        1,
+                        &product,
+                    )
+                    .await
+                    .map(|_| ()),
+                    _ => catalog::discount(&site.app, site.session(), &coupon, 0).await,
+                }
+            };
+            tokio::pin!(edit);
+            let wait = if pg {
+                Duration::from_secs(3)
+            } else {
+                Duration::from_millis(300)
+            };
+            let initial = tokio::time::timeout(wait, &mut edit).await;
+            if pg {
+                initial
+                    .expect("Unrelated PostgreSQL worker must not block catalog rows")
+                    .unwrap();
+                worker.commit().await.unwrap();
+            } else {
+                assert!(
+                    initial.is_err(),
+                    "SQLite catalog edit must wait for worker ownership, not return an error: {initial:?}"
+                );
+                worker.commit().await.unwrap();
+                tokio::time::timeout(Duration::from_secs(3), &mut edit)
+                    .await
+                    .unwrap()
+                    .unwrap();
+            }
+        }
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM shop_variants WHERE product_id=$1")
+                .bind(&product_id)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            count, 2,
+            "Exactly one variant was added; no retry duplicates"
+        );
+        let (price, version): (i64, i64) =
+            sqlx::query_as("SELECT price_minor,version FROM shop_variants WHERE id=$1")
+                .bind(&variant_id)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!((price, version), (1200, 2));
+        let stale = catalog::VariantInput {
+            title: "Stale update".into(),
+            sku: "stale".into(),
+            price_minor: 900,
+            member_price_minor: -1,
+            member_key: String::new(),
+            stock_total: 10,
+            billing_interval: String::new(),
+            active: true,
+        };
+        assert_eq!(
+            catalog::save_variant(
+                &site.app,
+                site.session(),
+                &product_id,
+                Some(&variant_id),
+                1,
+                &stale
+            )
+            .await
+            .unwrap_err()
+            .0,
+            StatusCode::CONFLICT
+        );
+        site.close().await;
+    }
+}
+
+#[tokio::test]
 async fn commerce_checkout_snapshots_prices_refunds_stock_and_preserves_financial_graph() {
     for pg in engines() {
         let site = Site::new(pg, true).await;

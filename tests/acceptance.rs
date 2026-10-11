@@ -16,6 +16,29 @@ use wpalt::{
 };
 const PASSWORD: &str = "test-only-correct-password";
 
+fn xml_elements(source: &str) -> Vec<(String, String)> {
+    use quick_xml::{NsReader, events::Event, name::ResolveResult};
+    let mut reader = NsReader::from_str(source);
+    let mut result = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .expect("Well-formed generated XML");
+        match event {
+            Event::Start(e) | Event::Empty(e) => {
+                let namespace = match namespace {
+                    ResolveResult::Bound(n) => n.as_ref().to_owned(),
+                    ResolveResult::Unbound => String::new(),
+                    ResolveResult::Unknown(_) => panic!("Undeclared XML namespace"),
+                };
+                result.push((namespace, e.local_name().as_ref().to_owned()));
+            }
+            Event::Eof => return result,
+            _ => (),
+        }
+    }
+}
+
 struct Site {
     app: App,
     _directory: tempfile::TempDir,
@@ -2737,12 +2760,25 @@ async fn discovery_volume_has_bounded_pages_and_indexed_language_search() {
             "Volume rows retain and render their canonical text and callout, not empty legacy columns"
         );
         let index = get(&site.app, "/sitemap-index.xml", None).await.1;
-        assert_eq!(index.matches("<sitemap>").count(), 3);
+        assert_eq!(
+            index
+                .split("<loc>")
+                .skip(1)
+                .filter(|s| s.starts_with(&format!("{}/sitemap.xml", site.app.config.origin())))
+                .count(),
+            3
+        );
+        assert!(
+            index.contains("/discovery-sitemap/image")
+                && index.contains("/discovery-sitemap/video")
+                && index.contains("/discovery-sitemap/news")
+        );
         let mut all = HashSet::new();
         for loc in index
             .split("<loc>")
             .skip(1)
             .map(|part| part.split("</loc>").next().unwrap())
+            .filter(|loc| loc.starts_with(&format!("{}/sitemap.xml", site.app.config.origin())))
         {
             let path = loc.strip_prefix(&site.app.config.origin()).unwrap();
             let (status, body) = get(&site.app, path, None).await;
@@ -2866,6 +2902,8 @@ async fn schema_two_upgrade_preserves_publication_and_restorable_editor_history(
             "indexable_identity",
             "language_workspace_cursor",
             "language_workspace_all",
+            "discovery_video_identity",
+            "discovery_news_identity",
         ] {
             sqlx::query(&format!("DROP INDEX IF EXISTS {index}"))
                 .execute(&site.app.db.pool)
@@ -4091,7 +4129,7 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let migrated = backup::migrate_m6(&original.app.config, &legacy).unwrap();
         assert_eq!(
             backup::inspect(&original.app.config, &migrated).unwrap()["schema"],
-            15
+            16
         );
         let destination = tempfile::tempdir().unwrap();
         let key = encryption::generate_key();
@@ -7724,7 +7762,7 @@ async fn assigned_review_binds_material_and_recovers_without_public_note_leaks()
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            15
+            16
         );
         // The explicit previous graph conversion retains meaningful private review history.
         let mut previous: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -8577,7 +8615,7 @@ async fn account_interface_preferences_recover_without_changing_content_authorit
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            15
+            16
         );
         let restored = Site::new(pg, false).await;
         backup::restore(&restored.app, &bytes).await.unwrap();
@@ -9446,6 +9484,554 @@ async fn reviewed_elementor_design_preserves_live_pages_and_exact_owner_review()
                 .contains("IMPORTED_PRIVATE_HERO")
         );
         restored.close().await;
+        site.close().await;
+    }
+}
+
+/// One publication contract connects editor, assets, XML and fresh recovery.
+#[tokio::test]
+async fn publication_discovery_assets_never_promote_drafts_or_revoked_resources() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        assert_eq!(
+            upload(&site, "social.png", &png(), "public").await,
+            StatusCode::SEE_OTHER
+        );
+        let image: String = sqlx::query_scalar("SELECT id FROM media LIMIT 1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        // Delivery-policy fixture; actual native MP4 processing has its separate cumulative journey.
+        let video = uuid::Uuid::new_v4().to_string();
+        let filename = format!("{video}.mp4");
+        let bytes = b"bounded synthetic media delivery fixture";
+        tokio::fs::write(
+            site.app.config.data_dir.join("media").join(&filename),
+            bytes,
+        )
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO media(id,filename,original_name,mime,alt,visibility,size,sha256,created_at) VALUES($1,$2,'policy-video.mp4','video/mp4','','public',$3,$4,0)").bind(&video).bind(filename).bind(bytes.len() as i64).bind(auth::digest(bytes)).execute(&site.app.db.pool).await.unwrap();
+        let mut p = input("discovery-journal", "publish");
+        p.body = format!("A real editorial image ![Garden](/media/{image})");
+        p.blocks = "[]".into();
+        p.seo=serde_json::json!({"title":"Garden & journal","description":"A truthful description","schema_type":"Article","social_image":image,"social_alt":"Garden & soil","video":{"media":video,"poster":image,"title":"Garden & film","description":"Visible film description","sitemap":true},"news":{"publication":"Quiet & Journal","language":"en"}}).to_string();
+        let original = p.clone();
+        let published = content::save(&site.app, site.session(), None, p.clone())
+            .await
+            .unwrap();
+        let html = get(&site.app, "/discovery-journal", None).await.1;
+        assert!(
+            html.contains("property=\"og:image\"")
+                && html.contains("property=\"og:image:width\" content=\"8\"")
+        );
+        assert!(html.contains("Garden &amp; soil") && html.contains("<video controls"));
+        assert!(html.contains("Garden &amp; film") && html.contains("Visible film description"));
+        for (kind, namespace, required) in [
+            (
+                "image",
+                "http://www.google.com/schemas/sitemap-image/1.1",
+                vec!["image", "loc"],
+            ),
+            (
+                "video",
+                "http://www.google.com/schemas/sitemap-video/1.1",
+                vec![
+                    "video",
+                    "thumbnail_loc",
+                    "title",
+                    "description",
+                    "content_loc",
+                ],
+            ),
+            (
+                "news",
+                "http://www.google.com/schemas/sitemap-news/0.9",
+                vec![
+                    "news",
+                    "publication",
+                    "name",
+                    "language",
+                    "publication_date",
+                    "title",
+                ],
+            ),
+        ] {
+            let (status, headers, bytes) = request(
+                &site.app,
+                "GET",
+                &format!("/discovery-sitemap/{kind}"),
+                None,
+                "",
+                vec![],
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(headers["cache-control"], "no-store");
+            let output = String::from_utf8(bytes).unwrap();
+            let elements = xml_elements(&output);
+            for name in required {
+                assert!(
+                    elements.contains(&(namespace.into(), name.into())),
+                    "Required {kind} element {name}"
+                );
+            }
+            assert!(output.contains("/discovery-journal"));
+        }
+        assert_eq!(
+            get(&site.app, "/discovery-sitemap/image?after=bad", None)
+                .await
+                .0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+        let editor = get(
+            &site.app,
+            &format!("/admin/posts/{}", published.id),
+            Some(&site.token),
+        )
+        .await
+        .1;
+        assert!(
+            editor.contains("Illustrative working-copy preview")
+                && editor.contains("seo_video_media")
+                && editor.contains("seo_news_publication")
+        );
+        // Saving working metadata leaves all live outputs and the original date unchanged.
+        p.version = published.version;
+        p.action = "save".into();
+        p.seo = r#"{"title":"PRIVATE_NEW_DISCOVERY","noindex":true}"#.into();
+        p.body = "Private replacement body".into();
+        let draft = content::save(&site.app, site.session(), Some(&published.id), p.clone())
+            .await
+            .unwrap();
+        assert_eq!(draft.published_at, published.published_at);
+        assert!(
+            !get(&site.app, "/discovery-journal", None)
+                .await
+                .1
+                .contains("PRIVATE_NEW_DISCOVERY")
+        );
+        assert!(
+            get(&site.app, "/discovery-sitemap/image", None)
+                .await
+                .1
+                .contains(&image)
+        );
+        let archive = backup::capture(&site.app).await.unwrap();
+        let fresh = Site::new(pg, false).await;
+        backup::restore(&fresh.app, &archive).await.unwrap();
+        assert!(
+            get(&fresh.app, "/discovery-sitemap/image", None)
+                .await
+                .1
+                .contains(&image)
+        );
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM published_image_refs WHERE post_id=$1")
+                .bind(&published.id)
+                .fetch_one(&fresh.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 1);
+        fresh.close().await;
+        // Current asset and post membership restrictions override historical publication snapshots.
+        sqlx::query(
+            "INSERT INTO member_policies(id,title) VALUES('discovery-private','Private discovery')",
+        )
+        .execute(&site.app.db.pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('media',$1,'discovery-private')").bind(&image).execute(&site.app.db.pool).await.unwrap();
+        let html = get(&site.app, "/discovery-journal", None).await.1;
+        assert!(!html.contains("property=\"og:image\"") && !html.contains("<video controls"));
+        assert!(
+            !get(&site.app, "/discovery-sitemap/image", None)
+                .await
+                .1
+                .contains(&image)
+        );
+        assert!(
+            !get(&site.app, "/discovery-sitemap/video", None)
+                .await
+                .1
+                .contains(&video)
+        );
+        sqlx::query("DELETE FROM member_resources WHERE kind='media' AND resource_id=$1")
+            .bind(&image)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE media SET visibility='private' WHERE id=$1")
+            .bind(&image)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            !get(&site.app, "/discovery-journal", None)
+                .await
+                .1
+                .contains("property=\"og:image\"")
+        );
+        assert!(
+            !get(&site.app, "/discovery-sitemap/image", None)
+                .await
+                .1
+                .contains(&image)
+        );
+        sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('post',$1,'discovery-private')").bind(&published.id).execute(&site.app.db.pool).await.unwrap();
+        assert!(
+            !get(&site.app, "/discovery-sitemap/news", None)
+                .await
+                .1
+                .contains("/discovery-journal")
+        );
+        sqlx::query("DELETE FROM member_resources WHERE kind='post' AND resource_id=$1")
+            .bind(&published.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        // Recent edits must not turn old articles into fresh news.
+        sqlx::query("UPDATE posts SET published_at=$1 WHERE id=$2")
+            .bind(wpalt::now() - 3 * 86400)
+            .bind(&published.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let mut republish = original;
+        republish.version = draft.version;
+        let again = content::save(&site.app, site.session(), Some(&published.id), republish)
+            .await
+            .unwrap();
+        assert!(again.published_at < wpalt::now() - 2 * 86400);
+        assert!(
+            !get(&site.app, "/discovery-sitemap/news", None)
+                .await
+                .1
+                .contains("/discovery-journal")
+        );
+        p.version = again.version;
+        p.action = "publish".into();
+        let hidden = content::save(&site.app, site.session(), Some(&published.id), p.clone())
+            .await
+            .unwrap();
+        for kind in ["image", "video", "news"] {
+            assert!(
+                !get(&site.app, &format!("/discovery-sitemap/{kind}"), None)
+                    .await
+                    .1
+                    .contains("/discovery-journal")
+            );
+        }
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM published_image_refs WHERE post_id=$1")
+                .bind(&published.id)
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 0);
+        p.version = hidden.version;
+        p.action = "unpublish".into();
+        content::save(&site.app, site.session(), Some(&published.id), p)
+            .await
+            .unwrap();
+        assert_eq!(
+            get(&site.app, "/discovery-journal", None).await.0,
+            StatusCode::NOT_FOUND
+        );
+        site.close().await;
+    }
+}
+
+#[tokio::test]
+async fn discovery_formats_have_explicit_conversion_validation_and_private_draft_authority() {
+    use wpalt::discovery::Seo;
+    assert!(
+        Seo::parse(r#"{"schema_type":"Article","news":{"publication":"Journal","language":"fr"}}"#)
+            .is_ok()
+    );
+    for language in [
+        "xx", "und", "en-us", "zh", "zho", "chi", "mul", "zxx", "mis",
+    ] {
+        assert!(Seo::parse(&serde_json::json!({"schema_type":"Article","news":{"publication":"Journal","language":language}}).to_string()).is_err());
+    }
+    for raw in [
+        r#"{"social_image":"https://evil.test/image.png"}"#,
+        r#"{"news":{"publication":"Journal","language":"en"}}"#,
+        r#"{"video":{"media":"unknown","poster":"bad","title":"Film","description":"Film"}}"#,
+        r#"{"unknown":"field"}"#,
+    ] {
+        assert!(Seo::parse(raw).is_err());
+    }
+    for invalid in [
+        "Invalid\u{1}XML",
+        "Invalid\u{fffe}XML",
+        "Invalid\u{ffff}XML",
+    ] {
+        for raw in [
+            serde_json::json!({"title":invalid}),
+            serde_json::json!({"social_alt":invalid}),
+            serde_json::json!({"schema_type":"Article","news":{"publication":invalid,"language":"en"}}),
+            serde_json::json!({"video":{"media":uuid::Uuid::new_v4().to_string(),"poster":uuid::Uuid::new_v4().to_string(),"title":invalid,"description":"Visible film"}}),
+        ] {
+            assert!(
+                Seo::parse(&raw.to_string()).is_err(),
+                "XML-invalid metadata must be refused before publication"
+            );
+        }
+    }
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let p = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("old-discovery", "publish"),
+        )
+        .await
+        .unwrap();
+        let bytes = backup::capture(&site.app).await.unwrap();
+        let mut envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let mut graph: serde_json::Value =
+            serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        assert_eq!(graph["schema"], 16);
+        assert!(
+            graph["tables"].get("published_image_refs").is_none(),
+            "Derived index is rebuilt from canonical publication, not separately trusted"
+        );
+        for invalid in [
+            "Invalid\u{1}XML",
+            "Invalid\u{fffe}XML",
+            "Invalid\u{ffff}XML",
+        ] {
+            let mut invalid_titles = graph.clone();
+            invalid_titles["tables"]["posts"][0]["published_title"] = invalid.into();
+            let invalid_payload = invalid_titles.to_string();
+            let mut invalid_envelope = envelope.clone();
+            invalid_envelope["payload"] = invalid_payload.clone().into();
+            invalid_envelope["sha256"] = auth::digest(invalid_payload.as_bytes()).into();
+            assert!(
+                backup::inspect(
+                    &site.app.config,
+                    &serde_json::to_vec(&invalid_envelope).unwrap()
+                )
+                .is_err()
+            );
+        }
+        graph["schema"] = 15.into();
+        let payload = graph.to_string();
+        envelope["payload"] = payload.clone().into();
+        envelope["sha256"] = auth::digest(payload.as_bytes()).into();
+        envelope["format"] = "wpalt-backup-v15".into();
+        let old = serde_json::to_vec(&envelope).unwrap();
+        assert!(backup::inspect(&site.app.config, &old).is_err());
+        let converted = backup::migrate_v15(&site.app.config, &old).unwrap();
+        assert_eq!(
+            backup::inspect(&site.app.config, &converted).unwrap()["schema"],
+            16
+        );
+        // An attacker cannot relabel newly extended SEO as an older accepted format.
+        graph["tables"]["posts"][0]["seo"] = r#"{"social_alt":"new field"}"#.into();
+        let payload = graph.to_string();
+        envelope["payload"] = payload.clone().into();
+        envelope["sha256"] = auth::digest(payload.as_bytes()).into();
+        assert!(
+            backup::migrate_v15(&site.app.config, &serde_json::to_vec(&envelope).unwrap()).is_err()
+        );
+        assert_eq!(
+            upload(&site, "private-preview.png", &png(), "private").await,
+            StatusCode::SEE_OTHER
+        );
+        let image: String = sqlx::query_scalar("SELECT id FROM media LIMIT 1")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        let mut edit = input("old-discovery", "save");
+        edit.version = p.version;
+        edit.seo = serde_json::json!({"social_image":image,"social_alt":"PRIVATE ALT"}).to_string();
+        let draft = content::save(&site.app, site.session(), Some(&p.id), edit.clone())
+            .await
+            .unwrap();
+        assert!(
+            !get(&site.app, "/old-discovery", None)
+                .await
+                .1
+                .contains(&image)
+        );
+        assert_eq!(
+            get(&site.app, &format!("/admin/preview/{}", p.id), None)
+                .await
+                .0,
+            StatusCode::SEE_OTHER
+        );
+        let mut stale = edit.clone();
+        stale.version = p.version;
+        stale.action = "publish".into();
+        assert!(
+            content::save(&site.app, site.session(), Some(&p.id), stale)
+                .await
+                .is_err()
+        );
+        edit.version = draft.version;
+        edit.action = "publish".into();
+        content::save(&site.app, site.session(), Some(&p.id), edit)
+            .await
+            .unwrap();
+        assert!(
+            !get(&site.app, "/old-discovery", None)
+                .await
+                .1
+                .contains("property=\"og:image\"")
+        );
+        // Native forms keep all expanded fields even when JavaScript is disabled.
+        let current = content::get(&site.app, &p.id).await.unwrap();
+        let (status, _) = form(
+            &site.app,
+            &format!("/admin/posts/{}", p.id),
+            Some(&site.token),
+            &[
+                ("csrf", &site.session().csrf),
+                ("version", &current.version.to_string()),
+                ("title", "Native discovery"),
+                ("slug", "old-discovery"),
+                ("kind", "post"),
+                ("body", "Native content"),
+                ("fields", "{}"),
+                ("blocks", "[]"),
+                ("taxonomies", "{}"),
+                ("locale", "en"),
+                ("seo_title", "Native preview"),
+                ("seo_type", "Article"),
+                ("seo_social_image", &image),
+                ("seo_social_alt", "Native private alt"),
+                ("seo_news_publication", "Native Journal"),
+                ("seo_news_language", "en"),
+                ("action", "save"),
+            ],
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let saved = content::get(&site.app, &p.id).await.unwrap();
+        let seo = Seo::parse(&saved.seo).unwrap();
+        assert_eq!(seo.social_alt, "Native private alt");
+        assert_eq!(seo.news.unwrap().publication, "Native Journal");
+        assert_eq!(seo.social_image, image);
+        site.close().await;
+    }
+}
+
+/// Independent pagination and simultaneous publication preserve one complete image graph.
+#[tokio::test]
+async fn discovery_sitemap_pages_and_publish_races_keep_exact_canonical_relationships() {
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        for name in ["one.png", "two.png"] {
+            assert_eq!(
+                upload(&site, name, &png(), "public").await,
+                StatusCode::SEE_OTHER
+            );
+        }
+        let ids: Vec<String> = sqlx::query_scalar("SELECT id FROM media ORDER BY id")
+            .fetch_all(&site.app.db.pool)
+            .await
+            .unwrap();
+        let mut p = input("paged-discovery", "publish");
+        p.blocks = "[]".into();
+        p.body = format!("![One](/media/{})", ids[0]);
+        let base = content::save(&site.app, site.session(), None, p.clone())
+            .await
+            .unwrap();
+        let mut tx = site.app.db.pool.begin().await.unwrap();
+        for n in 0..120 {
+            let id = uuid::Uuid::new_v4().to_string();
+            let slug = format!("image-page-{n}");
+            sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo,document,published_document) SELECT $1,$2,kind,title,body,fields,blocks,status,version,$2,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo,document,published_document FROM posts WHERE id=$3").bind(&id).bind(slug).bind(&base.id).execute(&mut *tx).await.unwrap();
+            wpalt::discovery::publication::index(&mut tx, &id, &base.published_document)
+                .await
+                .unwrap();
+        }
+        tx.commit().await.unwrap();
+        let index = get(&site.app, "/sitemap-index.xml", None).await.1;
+        let mut seen = HashSet::new();
+        let mut pages = 0;
+        for url in index
+            .split("<loc>")
+            .skip(1)
+            .map(|s| s.split("</loc>").next().unwrap())
+            .filter(|url| url.contains("/discovery-sitemap/image"))
+        {
+            pages += 1;
+            let path = url.strip_prefix(&site.app.config.origin()).unwrap();
+            let (status, body) = get(&site.app, path, None).await;
+            assert_eq!(status, StatusCode::OK);
+            xml_elements(&body);
+            assert!(body.matches("<url>").count() <= 100);
+            for url in body
+                .split("<url><loc>")
+                .skip(1)
+                .map(|s| s.split("</loc>").next().unwrap())
+            {
+                assert!(
+                    seen.insert(url.to_owned()),
+                    "Each eligible URL occurs on one stable page"
+                );
+            }
+        }
+        assert_eq!(pages, 2);
+        assert_eq!(seen.len(), 121);
+        let mut one = p.clone();
+        one.version = base.version;
+        one.body = format!("![One](/media/{})", ids[0]);
+        let mut two = one.clone();
+        two.body = format!("![Two](/media/{})", ids[1]);
+        let (a, b) = tokio::join!(
+            content::save(&site.app, site.session(), Some(&base.id), one),
+            content::save(&site.app, site.session(), Some(&base.id), two)
+        );
+        assert_ne!(
+            a.is_ok(),
+            b.is_ok(),
+            "Exactly one concurrent publication wins"
+        );
+        let current = content::get(&site.app, &base.id).await.unwrap();
+        let expected = wpalt::document::Document::parse(&current.published_document)
+            .unwrap()
+            .image_ids();
+        let actual: Vec<String> = sqlx::query_scalar(
+            "SELECT media_id FROM published_image_refs WHERE post_id=$1 ORDER BY media_id",
+        )
+        .bind(&base.id)
+        .fetch_all(&site.app.db.pool)
+        .await
+        .unwrap();
+        assert_eq!(actual, expected.into_iter().collect::<Vec<_>>());
+        // Oversized publication must roll back every part of the content mutation.
+        let mut large = p.clone();
+        large.version = current.version;
+        large.body = (0..1001)
+            .map(|_| format!("![Image](/media/{})", uuid::Uuid::new_v4()))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            content::save(&site.app, site.session(), Some(&base.id), large)
+                .await
+                .is_err()
+        );
+        let unchanged = content::get(&site.app, &base.id).await.unwrap();
+        assert_eq!(unchanged.version, current.version);
+        assert_eq!(unchanged.published_document, current.published_document);
+        for title in [
+            "XML\u{1}control",
+            "XML\u{fffe}noncharacter",
+            "XML\u{ffff}noncharacter",
+        ] {
+            let mut malformed = input("invalid-news-title", "publish");
+            malformed.title = title.into();
+            assert!(
+                content::save(&site.app, site.session(), None, malformed)
+                    .await
+                    .is_err()
+            );
+        }
         site.close().await;
     }
 }

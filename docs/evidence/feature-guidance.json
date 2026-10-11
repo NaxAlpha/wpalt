@@ -2255,7 +2255,7 @@
       "triggers": [
         "Affected navigation/font/style grammar, container/parser dependency, public asset admission, language configuration, publication/recovery or authoritative guidance changes"
       ],
-      "status": "native acceptance verified; final browser/CI/archive delivery gates pending; broader format/style/navigation scope retained"
+      "status": "Defined native/browser/two-engine scope verified; PR #20 merged; actual-main release independently verified. Broader scope retained."
     },
     {
       "feature_id": "D05-01",
@@ -2298,7 +2298,94 @@
         "source or native parser advisory",
         "mapping/permission/publication/recovery change"
       ],
-      "status": "Native connected SQLite/PostgreSQL and focused macOS browser passed; cumulative and current-free Linux container evidence pending."
+      "status": "Defined native/browser/two-engine and actual free 4.3.4 container scope passed; PR #21 merged; actual-main public release independently verified. Full F024 retained."
+    },
+    {
+      "feature_id": "D06-01",
+      "area": "Publication discovery previews and image/video/news extensions",
+      "scope": "F025/F027 bounded local canonical slice; external appearance/indexing and premium plugin implementation are not certified",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developers.google.com/search/docs/appearance/title-link",
+        "https://developers.google.com/search/docs/appearance/snippet",
+        "https://ogp.me/",
+        "https://developers.google.com/search/docs/crawling-indexing/sitemaps/image-sitemaps",
+        "https://developers.google.com/search/docs/crawling-indexing/sitemaps/video-sitemaps",
+        "https://developers.google.com/search/docs/crawling-indexing/sitemaps/news-sitemap",
+        "https://www.loc.gov/standards/iso639-2/ascii_8bits.html",
+        "https://wordpress.org/plugins/wordpress-seo/",
+        "https://github.com/Yoast/wordpress-seo/tree/147c9792623e321d1c51fe7df5a35e84eda5c51f",
+        "https://www.w3.org/TR/xml/#charsets"
+      ],
+      "applicable_versions": [
+        "Google sitemap guidance revised 2025-12-10, checked 2026-10-11",
+        "Yoast free 28.6; WordPress 7.1.3 reference",
+        "wpalt native 20 / portable v16 / theme package 2",
+        "LOC ISO 639-2 data SHA256 42b71885e4dc885559fda5ad059fd81838cf4782cedb5fd08cc3431f7d067371",
+        "W3C XML 1.0 Fifth Edition, production [2]"
+      ],
+      "last_checked": "2026-10-11",
+      "next_review": "2026-11-10",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Illustrative preview; no guarantee of external title/card selection or ranking.",
+        "Published snapshots plus current media/member authority control public declarations; private working previews authenticate.",
+        "Image canonical graph, explicit central/relevant video placement and original recent news date/language; no invented or deprecated tags.",
+        "Bound queries, rows, XML and pages; rebuild derived graph during stopped upgrade/fresh recovery; no network fetch.",
+        "Refuse controls and U+FFFE/U+FFFF in publication metadata/titles and recovery revisions; never silently rewrite facts."
+      ],
+      "tests": [
+        "publication_discovery_assets_never_promote_drafts_or_revoked_resources",
+        "discovery_formats_have_explicit_conversion_validation_and_private_draft_authority",
+        "discovery_sitemap_pages_and_publish_races_keep_exact_canonical_relationships",
+        "scripts/discovery_acceptance.cjs",
+        "scripts/discovery_reference.py",
+        "scripts/maintenance_acceptance.py"
+      ],
+      "triggers": [
+        "affected declaration/publication/media/privacy/recovery release",
+        "upstream namespace/required-tag/date/language guideline change",
+        "source plugin version or parser advisory"
+      ],
+      "status": "Final 109-case Rust suite, 11 pipeline cases, Clippy, actual D05 stopped upgrade/fresh rollback, single-server/two-process browser, optimized plans and real SQLx counts pass. Reproduced XML-invalid recovery and Linux touch-target regressions are fixed. Corrected actual free WordPress/Yoast reference passes; exact final-head cumulative/reference/clean archive and actual-main release remain pending."
+    },
+    {
+      "feature_id": "D06-02",
+      "area": "Catalog write contention and public browser failure evidence",
+      "scope": "D06 cumulative regression repair; catalog product/variant/coupon transactions and bounded diagnostic artifacts",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.sqlite.org/isolation.html",
+        "https://www.sqlite.org/lang_transaction.html",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "SQLite WAL / SQLx 0.8.6",
+        "PostgreSQL 17 ordinary transactions",
+        "Node 22 browser diagnostic projection"
+      ],
+      "last_checked": "2026-10-11",
+      "next_review": "2027-01-09",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Reserve SQLite catalog write ownership before snapshot reads; retain PostgreSQL row concurrency, exact-version conflicts and no mutation retry.",
+        "Use existing five-second SQLite busy timeout; do not hold a write transaction over external network work.",
+        "Public browser artifacts admit fixed events and typed correlation/status/code fields only; exclude raw logs, SQL, arbitrary text, bodies, credentials and query strings. Tail input and emitted event budgets are engineering choices."
+      ],
+      "tests": [
+        "commerce_catalog_edits_wait_for_worker_writes_and_keep_version_conflicts",
+        "test_secrets_are_excluded_and_truncated_records_are_not_interpreted",
+        "scripts/browser_acceptance.cjs cumulative commerce journey"
+      ],
+      "triggers": [
+        "Database driver/isolation changes",
+        "Catalog transaction or worker writer changes",
+        "Browser diagnostics/artifact disclosure changes",
+        "Relevant logging/security guidance update"
+      ],
+      "status": "Reproduced prior failure; repaired native/cumulative browser paths verified locally; exact-head Linux gates pending."
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

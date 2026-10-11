@@ -1,0 +1,7 @@
+# 0020 — Publication-aware discovery metadata and assets
+
+Date: 2026-10-11. D06 extends shared SEO JSON/revisions/publication rather than adding vendor accounts or another publication authority. Previews are illustrative; current public media/member policy governs live head and sitemap output. Explicit central/relevant video discovery requires a visibly rendered local attachment. Original publication time governs news, independently of later edits.
+
+Native schema 20 / portable v16 protects the expanded grammar from old runtime admission. Derived local editorial image relationships are built in the same publication transaction and rebuilt from canonical documents in stopped upgrade/fresh recovery; they are not separately trusted portable data. This is a refinement of D06 preparation, preserving its migration and efficient-request outcome. Explicit v15 conversion validates original shape and creates new v16 bytes; matching old-runtime fresh rollback preserves the untouched recovery point.
+
+Extension queries filter eligible publications, reuse batched current asset authority and one consistent database snapshot, and refuse aggregate output/work ceilings. Partial per-engine video/news indexes avoid reading unrelated rich documents; default metadata without attachments does not query media. Full theme/dynamic/raw-HTML graph breadth stays assigned to later graph/composition work. Optional sitemap fields, licensed premium execution and external appearance/indexing remain explicit limits.
