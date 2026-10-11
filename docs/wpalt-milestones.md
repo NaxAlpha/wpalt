@@ -352,3 +352,7 @@ D02 PR #18 merged as `eaddaca4b768`; actual-main release `nightly-202610070108-e
 ### D05 native implementation and verification — 2026-10-10
 
 Reviewed Elementor data now compiles to shared editable native composition through Studio and stopped CLI, with explicit placements, admitted local dependencies/global-style mappings, source loss accounting and exact private-draft CAS. Selected atomic content/layout properties are separate from raw source styles/interactions. Connected SQLite/PostgreSQL import/race/publication/isolation/recovery and scoped macOS browser/UI checks pass; current-head cumulative checks, actual current-free Linux comparison and clean artifact/release gates remain distinct. No new persisted format or source PHP runtime is introduced. Full F024 breadth remains visible.
+
+### D05 merged; D06 publication-aware discovery active — 2026-10-11
+
+[D05 PR #21](https://github.com/NaxAlpha/wpalt/pull/21) merged as `33667fa20083836b54b8498388281c49a2232a0a` after all eight final-head gates in run 38102203237 and exact-parent archive verification. Actual current free Elementor 4.3.4 legacy/atomic exports passed their selected connected runtime journeys; full F024 breadth remains retained. [D06 contract](d06-contract.md) connects illustrative previews, admitted local social images and publication-aware sitemap extensions with explicit persisted migration and privacy boundaries.

@@ -54,7 +54,7 @@ Verifiable future outcome: An independent theme preserves responsive/accessibili
 
 ### D05 — Elementor compatibility
 
-Origin: **M8** · Catalog: **F024** · Status: **native design migration implemented; cumulative and actual-current-free verification in progress**
+Origin: **M8** · Catalog: **F024** · Status: **defined reviewed native design migration merged in PR #21; full compatibility breadth retained**
 
 [D05 contract](d05-contract.md) and [verification ledger](evidence/d05-verification.md) govern reviewed editable native design migration and separate legacy/atomic/source-version coverage. Full template/widget/style/dynamic/display-condition mapping and rendered-output compatibility remain the goal; current heading/text projection plus explicit losses remains supported.
 
@@ -64,7 +64,7 @@ Verifiable future outcome: Selected real free/premium source fixtures preserve r
 
 Origin: **M3** · Catalog: **F025/F027** · Status: **queued for dependency-ordered autonomous resumption**
 
-Social image/SERP-preview management and image/video/news sitemap extensions.
+[D06 contract](d06-contract.md) governs social image/illustrative discovery-preview management and publication-aware image/video/news sitemap extensions. Implementation and verification remain in progress.
 
 Verifiable future outcome: Published/private boundaries, latest primary guidance and meaningful generated-output tests cover each extension; no ranking promise.
 

@@ -1,0 +1,40 @@
+# D06 — Publication-aware discovery previews and sitemap extensions
+
+Date: 2026-10-11 (Tokyo). D05 PR #21 merged as `33667fa20083836b54b8498388281c49a2232a0a` after eight final-head gates and independent exact-parent clean archive verification. Actual-main release verification is tracked separately. F025/F027 remain incomplete until this connected outcome and its gates pass.
+
+## End-user outcome
+
+An editor reviews a clearly labelled illustrative search/social preview alongside the same title/description/image metadata that publication uses. Local social images remain owner-selected existing assets; previews never call an outside preview service. A news/video publisher supplies truthful required metadata and sees publication-only image/video/news sitemap output. Draft edits, private/member resources and unavailable assets must not leak into public head or sitemap output. Indexing and actual platform appearance remain external decisions.
+
+## Functional sequence
+
+1. Specify bounded typed metadata using shared content/revision/publication and local media policy. Map original news date, language, video title/description/thumbnail/content and social image alt/type/dimensions explicitly; do not invent values from update timestamps or unsupported asset types. Assess persisted grammar changes and provide versioned upgrade/recovery/rollback evidence rather than adding old runtime branches.
+2. Add coherent progressively disclosed editorial controls and illustrative previews using shared controls and existing native/no-JavaScript publishing paths. Private previews use authenticated admitted asset delivery; live output uses publication snapshots plus current resource authority. No remote resource fetching or vendor account.
+3. Generate namespace-correct, escaped image/video/news sitemap extensions with strict publication/privacy/current-asset rules, bounded aggregate output and independent pagination/index coverage. Include only explicitly relevant public video placements and recent declared news articles. Keep current general sitemap/robots behavior correct and avoid per-record query expansion.
+4. Verify integrated publication/edit/unpublish/restrict/media-revoke/language/revision/fresh-recovery behavior on real SQLite/PostgreSQL, including simultaneous edits and denied actors. XML parsers check actual output/namespace/required tags and absence of unpublished/private/noindex/expired items; browser checks preview controls, long text, narrow widths and publication. Retain cumulative gates, actual-source clean archive and actual-main public-release verification.
+5. Measure query count/plans, bounded populated sitemap generation, editor control geometry, response bytes and warm memory. Optimize projection/batched asset lookups before asserting performance. Document exact source-guidance versions, selected behavior and remaining gaps; no ranking, appearance or universal accessibility promise.
+
+## Primary guidance checked 2026-10-11
+
+- [Google title links](https://developers.google.com/search/docs/appearance/title-link): titles may be rewritten/truncated according to device and content; preview is illustrative, not an exact SERP promise.
+- [Google snippets](https://developers.google.com/search/docs/appearance/snippet): snippets can use page content or meta descriptions; no fixed text guarantee.
+- [Open Graph](https://ogp.me/): image URL plus available type/dimensions/alt are derived from the chosen local image; metadata must describe the image.
+- [Image sitemaps](https://developers.google.com/search/docs/crawling-indexing/sitemaps/image-sitemaps), revision 2025-12-10: use required image wrapper/location and avoid deprecated caption/title/license/geolocation tags; up to 1,000 images per URL is an external ceiling, not a required local budget.
+- [Video sitemaps](https://developers.google.com/search/docs/crawling-indexing/sitemaps/video-sitemaps): truthful title, thumbnail, description and content/player location required; referenced files must be publicly crawlable. Omit invented ratings/view counts and retired tags.
+- [News sitemaps](https://developers.google.com/search/docs/crawling-indexing/sitemaps/news-sitemap): at most 1,000 news tags/file; recent two-day original publications only; exact publication name and supported language code required. Empty periods are valid.
+
+The old official X large-card URLs currently redirect to the platform overview; precise current card dimensions are not asserted from historical documentation. Open Graph output can proceed independently, with X-specific behavior recorded as uncertain until primary guidance is available.
+
+These are verified current primary sources; local privacy, resource budgets, illustrative layout and no-network design are engineering choices. Freshness manifests/triggers/review intervals will accompany implementation. Provider credentials, premium fixtures and external indexing remain owner/external boundaries and do not block native local work.
+
+## Implementation preparation findings
+
+Current discovery snapshots carry bounded SEO JSON and preserve native original `published_at` through later promotions. M8 imports original WordPress publication timestamps. Reuse that factual date; do not use `updated_at`. Existing local media authority checks public visibility plus membership restrictions, and image dimensions already have a bounded admitted cache. Existing canonical document image references can supply a publication-time indexed relationship, avoiding full-document reads for every sitemap request. Current themes do not provide a public video composition node: an explicit per-content attached video must render visibly with the same title/description/poster as sitemap metadata, rather than publishing invisible sitemap-only declarations. Broader video editing/composition remains tracked separately.
+
+Tentative persisted change: native schema 20 and portable graph v16 for the expanded SEO grammar plus derived publication-image relationships. Old current schema-19 data needs a stopped, versioned upgrade and fresh old-runtime rollback; old portable v15 requires an explicit separate conversion. Avoid a permanent old SEO/parser branch. Enforce aggregate XML/row/image work budgets and keyset delivery; no per-image query or source-resource fetch. Document canonical editorial-image coverage and separately retain theme/dynamic/raw-HTML graph breadth. This is preparation, not implemented or verified behavior.
+
+## Pinned free reference preparation
+
+Official WordPress directory checked 2026-10-11 lists Yoast free 28.6 (2026-09-29), 10M+ active installations and compatibility tested through WordPress 7.1.3. Pinned source tag object `e56d0a90b1e70ec12cf31bb7a00934d2ef5c9bae` peels to `147c9792623e321d1c51fe7df5a35e84eda5c51f` in the ignored sparse inspection checkout. Public source declares Open Graph image URL/type/dimensions and sitemap image parsing from thumbnail/content. Directory describes free SERP preview and premium social previews/video/news extensions. These are vendor declarations/source inspection, not executed premium behavior or a ranking guarantee. A disposable free 28.6 runtime comparison should verify actual publication metadata/image sitemap; news/video native output is checked against primary specifications without claiming access to premium implementation. No plugin code will be copied.
+
+Offline news language preparation: official Library of Congress ISO 639-2 UTF-8 data, checked 2026-10-11, 16,010 bytes / 487 rows / 689 unique alpha-2/alpha-3 codes, SHA-256 `42b71885e4dc885559fda5ad059fd81838cf4782cedb5fd08cc3431f7d067371`. Names are not needed at runtime. Reserved ranges/non-identifying codes must not be treated as specific article languages; Chinese news codes require explicit `zh-cn`/`zh-tw` as prescribed. A normal text-browser user agent succeeds where the default Python user agent receives HTTP 403; this is a preparation download, not a runtime dependency. Data freshness/provenance will be bundled with implementation.
