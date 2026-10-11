@@ -85,6 +85,18 @@ impl Db {
             commerce_max_records: config.commerce.max_records,
         })
     }
+    /// Reserve SQLite write ownership before reading a transaction's snapshot.
+    /// The process mutation guard does not serialize independent worker writes.
+    /// PostgreSQL retains its normal row-level concurrency; no write is retried.
+    pub async fn begin_write(
+        &self,
+    ) -> std::result::Result<sqlx::Transaction<'static, Any>, sqlx::Error> {
+        if self.postgres {
+            self.pool.begin().await
+        } else {
+            self.pool.begin_with("BEGIN IMMEDIATE").await
+        }
+    }
     pub async fn migrate(&self) -> anyhow::Result<()> {
         sqlx::query("CREATE TABLE IF NOT EXISTS schema_version(id BIGINT PRIMARY KEY CHECK(id=1),version BIGINT NOT NULL)").execute(&self.pool).await?;
         let version: Option<i64> =

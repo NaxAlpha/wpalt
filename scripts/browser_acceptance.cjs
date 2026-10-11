@@ -7,7 +7,7 @@ const { spawn, spawnSync } = require("node:child_process");
 const assert = require("node:assert/strict");
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const root = path.resolve(__dirname, "..");
-const output = path.join(root, "work/browser-evidence");
+const output = path.resolve(process.env.WPALT_BROWSER_OUTPUT || path.join(root, "work/browser-evidence"));
 fs.mkdirSync(output, { recursive: true });
 const temporary = fs.mkdtempSync(path.join(root, "work/browser-site-"));
 const binary = path.resolve(
@@ -772,7 +772,11 @@ async function freePort() {
   );
 })()
   .catch(async (e) => {
+    process.exitCode = 1;
     console.error(e);
+    const diagnostics = require("./browser_diagnostics.cjs").collect(temporary);
+    fs.writeFileSync(path.join(output, "failure-diagnostics.json"), JSON.stringify(diagnostics, null, 2));
+    console.error("Safe native failure diagnostics:", JSON.stringify(diagnostics));
     if (browser) {
       const p = browser.contexts()[0]?.pages()[0];
       if (p) {

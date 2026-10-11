@@ -4593,7 +4593,11 @@
       "duration": 1,
       "width": 64,
       "height": 48,
-      "source": "http://localhost:60937/media/2df9aa36-94d4-4dcc-b637-d59b461c6143"
+      "source": "http://localhost:49187/media/6c47f9ec-d50c-474f-834c-f0dbc9a06c1a",
+      "decoded_frames": 4
     }
-  ]
+  ],
+  "binary_sha256": "2b0a43a83438306a2d93943e36f23b16d24b94bf081cdcbfe4d1c5f421c5ded8",
+  "fixture_script_sha256": "845f57ececade6c56383c282dd55eb836edbabb1b51b5c365248d1f55720de8c",
+  "discovery_script_sha256": "62c858d999f19b2ea51d6a508b3fc09ed1432fce9c6690bb80485eab6632ad92"
 }

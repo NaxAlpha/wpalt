@@ -33,7 +33,12 @@ module.exports=async(owner,visitors,origin,output)=>{
   assert.equal((await visitors.request.get(origin+'/browser-discovery-journal')).status(),404);
   await submit(page.getByRole('button',{name:'Publish now',exact:true}));
   await visitor.goto(origin+'/browser-discovery-journal');await visitor.getByRole('heading',{name:'The local garden film',exact:true}).waitFor();
-  const observed=await visitor.locator('video').evaluate(async el=>{if(el.readyState<1)await new Promise((resolve,reject)=>{el.addEventListener('loadedmetadata',resolve,{once:true});el.addEventListener('error',reject,{once:true});});return{duration:el.duration,width:el.videoWidth,height:el.videoHeight,source:el.getAttribute('src')};});assert(observed.duration>0&&observed.width>0&&observed.height>0);report.observations.push(observed);
+  const observed=await visitor.locator('video').evaluate(async el=>{if(el.readyState<1)await new Promise((resolve,reject)=>{el.addEventListener('loadedmetadata',resolve,{once:true});el.addEventListener('error',reject,{once:true});});return{duration:el.duration,width:el.videoWidth,height:el.videoHeight,source:el.getAttribute('src')};});assert(observed.duration>0&&observed.width>0&&observed.height>0);
+  // Decode an actual frame, rather than treating loaded metadata as playback.
+  await visitor.locator('video').evaluate(el=>{el.muted=true;return el.play();});
+  await visitor.waitForFunction(()=>document.querySelector('video').getVideoPlaybackQuality().totalVideoFrames>0,{},{timeout:5000});
+  observed.decoded_frames=await visitor.locator('video').evaluate(el=>{el.pause();return el.getVideoPlaybackQuality().totalVideoFrames;});
+  assert(observed.decoded_frames>0);report.observations.push(observed);
   assert.equal(await visitor.locator('meta[property="og:image"]').getAttribute('content'),origin+'/media/'+image.id);
   for(const kind of ['image','video','news']){const r=await visitors.request.get(origin+'/discovery-sitemap/'+kind);assert(r.ok());assert((await r.text()).includes('/browser-discovery-journal'));}
   await visitor.screenshot({path:path.join(output,'d06-discovery-public.png'),fullPage:true});

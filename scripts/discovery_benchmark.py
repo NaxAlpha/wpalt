@@ -83,7 +83,7 @@ for engine in (['sqlite','postgres'] if args.postgres else ['sqlite']):
    rss=int(subprocess.check_output(['ps','-o','rss=','-p',str(server.pid)],text=True).strip())*1024
    if engine=='sqlite':database_bytes=sum(p.stat().st_size for p in root.glob('site.db*'))
    else:database_bytes=int(pg("SELECT SUM(pg_total_relation_size(quote_ident(schemaname)||'.'||quote_ident(tablename))) FROM pg_tables WHERE schemaname='"+schema+"'"))
-   results.append({'engine':engine,'fixture':'1500 seed publications plus 121 actual canonical image/news API publications; one admitted shared PNG; empty video population, real playback separately browser-verified','paths':observations,'query_plans':plans,'discovery_indexes':indexes,'warm_application_rss_bytes':rss,'database_bytes':database_bytes,'database_scope':'SQLite DB/WAL/SHM' if engine=='sqlite' else 'All fixture PostgreSQL relations including indexes; engine memory excluded'})
+   results.append({'engine':engine,'fixture':'1500 seed publications plus 121 actual canonical image/news API publications; one admitted shared PNG; empty video population, first decoded frame separately browser-verified','paths':observations,'query_plans':plans,'discovery_indexes':indexes,'warm_application_rss_bytes':rss,'database_bytes':database_bytes,'database_scope':'SQLite DB/WAL/SHM' if engine=='sqlite' else 'All fixture PostgreSQL relations including indexes; engine memory excluded'})
   finally:
    if connection:connection.close()
    if server:server.terminate();server.wait(timeout=10)

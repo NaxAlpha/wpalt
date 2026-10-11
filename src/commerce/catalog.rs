@@ -81,7 +81,7 @@ pub async fn save_product(
     } else {
         p.entitlement.clone()
     };
-    let mut tx = app.db.pool.begin().await?;
+    let mut tx = app.db.begin_write().await?;
     if version == 0 {
         sqlx::query("INSERT INTO shop_products(id,slug,title,description,kind,entitlement,access_seconds,download_id,published,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)").bind(&id).bind(&p.slug).bind(p.title.trim()).bind(&p.description).bind(&p.kind).bind(&entitlement).bind(p.access_seconds).bind(&p.download_id).bind(i64::from(p.published)).bind(crate::now()).execute(&mut *tx).await?;
     } else {
@@ -172,7 +172,7 @@ pub async fn save_variant(
     }
     let _guard = app.mutation().await?;
     owner(app, s).await?;
-    let mut tx = app.db.pool.begin().await?;
+    let mut tx = app.db.begin_write().await?;
     let kind: String = sqlx::query_scalar("SELECT kind FROM shop_products WHERE id=$1")
         .bind(product)
         .fetch_optional(&mut *tx)
@@ -254,7 +254,7 @@ pub async fn discount(app: &App, s: &Session, d: &DiscountInput, version: i64) -
     }
     let _guard = app.mutation().await?;
     owner(app, s).await?;
-    let mut tx = app.db.pool.begin().await?;
+    let mut tx = app.db.begin_write().await?;
     for (id, table) in [
         (&d.product_id, "shop_products"),
         (&d.reward_id, "promotion_rewards"),

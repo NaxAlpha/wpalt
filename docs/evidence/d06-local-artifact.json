@@ -2,7 +2,7 @@
   "date": "2026-10-11",
   "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
   "profile": "debug",
-  "binary_sha256": "a36bb9b8343a4e57d517a37c9e4a316729f6f207e2e2e36bf4b874857a3a3fe9",
+  "binary_sha256": "2b0a43a83438306a2d93943e36f23b16d24b94bf081cdcbfe4d1c5f421c5ded8",
   "source_sha256": {
     "src/backup.rs": "9a5ffbe75819d984a16dfd5e645c954f7bb9111ec573af18767ad0a42e512cce",
     "src/content.rs": "d406b71a086974f7a1707a2e4a67628ea2a03c565d344325c0a66fed18053a23",
@@ -12,14 +12,22 @@
     "tests/acceptance.rs": "6aa21bd1ec089ac62bdfc6ce8a67b41a7aa203628c9ac6ea3c3b8bb252e96f2d",
     "assets/generated/editor.js": "029e214e4c461e4506f35e2801b683a726ed6c8c481c018b60dde57cef4dfd98",
     "assets/generated/admin-ui.css": "be3f1d6c9aa5f35a9c247b2983dc3e577e88c922606c000b01fe11a478f9eca8",
-    "scripts/discovery_acceptance.cjs": "e0d484701a2aef135db29769b0cb1d1e1082e42040516243b61001ed8ff7b529",
-    "scripts/discovery_benchmark.py": "66597e88711aff56e264c869137fd8f28a1e4170540ea9b3dfdf6622dce0b885",
-    "scripts/discovery_reference.py": "375178baa7cd7719db9118e45a145edf065d403438f0640d35e8a1c6046d0989"
+    "scripts/discovery_acceptance.cjs": "62c858d999f19b2ea51d6a508b3fc09ed1432fce9c6690bb80485eab6632ad92",
+    "scripts/discovery_benchmark.py": "a06fa376128ab9e4d49bac5e87f6f4c8a80da6d409a03f9a96393e357bce662a",
+    "scripts/discovery_reference.py": "375178baa7cd7719db9118e45a145edf065d403438f0640d35e8a1c6046d0989",
+    "src/db.rs": "f1ac0fde3f4a9b8d9efaac0ec5dffaf75e9c8d1ab400a25e03ca7a9f9fe46597",
+    "src/commerce/catalog.rs": "b72bad4c44435db13e98c1fe090cbce1c3f04fcdba76ceeb224626b6ba634399",
+    "tests/support/commerce_journeys.rs": "071ae79d54e35da688beb116a771a7927ebf756b7977df1222f757329d6a256f",
+    "scripts/browser_acceptance.cjs": "845f57ececade6c56383c282dd55eb836edbabb1b51b5c365248d1f55720de8c",
+    "scripts/commerce_acceptance.cjs": "70dbb9c2d0c1cfae1719fa3472571bff4ebdbc4d8c4661272172b17496410e32",
+    "scripts/browser_diagnostics.cjs": "620e368f0dd0b83e0adc7bef982680f303b3aeb3dac234f7b60954fce5635c12",
+    "tests/pipeline/test_browser_diagnostics.py": "693c90cd8df29f4f38320ce1fcac10505c78bd4bc63787ec607f7f51042eb740",
+    ".github/workflows/m1.yml": "b46ca69bc73334a9b2bf408d2e31dd0b345f63ce19457978a02511aab522de6b"
   },
   "native_schema": 20,
   "portable_format": 16,
-  "rust_cases": 109,
-  "pipeline_cases": 11,
+  "rust_cases": 110,
+  "pipeline_cases": 12,
   "engines": [
     "SQLite",
     "PostgreSQL 17.11 required"
@@ -30,11 +38,22 @@
     "cargo build --locked and matching immutable copy",
     "cargo fmt --all --check",
     "locked frontend format check",
-    "guidance freshness, 67 records",
+    "guidance freshness, 68 records",
     "single-server connected discovery browser",
     "two PostgreSQL processes plus separate worker, round robin without retry/stickiness",
     "independently retained actual D05 native-19 migration and fresh old-runtime rollback",
-    "serial populated discovery measurements and actual SQLx SELECT counts"
+    "serial populated discovery measurements and actual SQLx SELECT counts",
+    "cumulative single-server browser with real scheduler/commerce journey",
+    "reproduced pre-fix independent-worker catalog failure; fixed native SQLite/PostgreSQL contention and stale-version regression",
+    "bounded public failure diagnostic privacy and correlation regression",
+    "actual local video decoding: four decoded frames in each focused browser deployment"
   ],
-  "limits": "Local scoped evidence; separate exact-head Linux/reference/archive and actual-main release gates remain pending. No universal accessibility, throughput, peak RSS, premium parity or external appearance claim."
+  "limits": "Local scoped evidence; separate exact-head Linux/reference/archive and actual-main release gates remain pending. No universal accessibility, throughput, peak RSS, premium parity or external appearance claim.",
+  "previous_checkpoint": {
+    "binary_sha256": "a36bb9b8343a4e57d517a37c9e4a316729f6f207e2e2e36bf4b874857a3a3fe9",
+    "rust_cases": 109,
+    "pipeline_cases": 11,
+    "status": "Local XML/target-size checkpoint passed; single-server cumulative CI later failed commerce. Superseded by contention fix."
+  },
+  "guidance_records": 68
 }

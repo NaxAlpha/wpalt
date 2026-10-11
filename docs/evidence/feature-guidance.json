@@ -2349,6 +2349,43 @@
         "source plugin version or parser advisory"
       ],
       "status": "Final 109-case Rust suite, 11 pipeline cases, Clippy, actual D05 stopped upgrade/fresh rollback, single-server/two-process browser, optimized plans and real SQLx counts pass. Reproduced XML-invalid recovery and Linux touch-target regressions are fixed. Corrected actual free WordPress/Yoast reference passes; exact final-head cumulative/reference/clean archive and actual-main release remain pending."
+    },
+    {
+      "feature_id": "D06-02",
+      "area": "Catalog write contention and public browser failure evidence",
+      "scope": "D06 cumulative regression repair; catalog product/variant/coupon transactions and bounded diagnostic artifacts",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.sqlite.org/isolation.html",
+        "https://www.sqlite.org/lang_transaction.html",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html"
+      ],
+      "applicable_versions": [
+        "SQLite WAL / SQLx 0.8.6",
+        "PostgreSQL 17 ordinary transactions",
+        "Node 22 browser diagnostic projection"
+      ],
+      "last_checked": "2026-10-11",
+      "next_review": "2027-01-09",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Reserve SQLite catalog write ownership before snapshot reads; retain PostgreSQL row concurrency, exact-version conflicts and no mutation retry.",
+        "Use existing five-second SQLite busy timeout; do not hold a write transaction over external network work.",
+        "Public browser artifacts admit fixed events and typed correlation/status/code fields only; exclude raw logs, SQL, arbitrary text, bodies, credentials and query strings. Tail input and emitted event budgets are engineering choices."
+      ],
+      "tests": [
+        "commerce_catalog_edits_wait_for_worker_writes_and_keep_version_conflicts",
+        "test_secrets_are_excluded_and_truncated_records_are_not_interpreted",
+        "scripts/browser_acceptance.cjs cumulative commerce journey"
+      ],
+      "triggers": [
+        "Database driver/isolation changes",
+        "Catalog transaction or worker writer changes",
+        "Browser diagnostics/artifact disclosure changes",
+        "Relevant logging/security guidance update"
+      ],
+      "status": "Reproduced prior failure; repaired native/cumulative browser paths verified locally; exact-head Linux gates pending."
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."
