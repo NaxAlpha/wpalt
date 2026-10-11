@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M9 and defined D01–D05 deliveries merged with independently verified releases; D06 publication discovery is undergoing final integrated verification. Full plugin breadth remains tracked.",
+  "milestone": "M9 and defined D01\u2013D05 deliveries merged with independently verified releases; D06 publication discovery is undergoing final integrated verification. Full plugin breadth remains tracked.",
   "capabilities": [
     {
       "id": "F001",
@@ -631,9 +631,12 @@
       "m9_coverage": "Bounded complete public canonical published-document content-link graph with redirects, deduplicated non-self edges and inbound-link candidates; navigation/theme/dynamic graphs excluded.",
       "evidence": [
         "discovery.md",
-        "../src/platform/content_audit.rs"
+        "../src/platform/content_audit.rs",
+        "evidence/d08-verification.md",
+        "../src/discovery/rendered_links.rs"
       ],
-      "deferred_work": "deferred-features.md"
+      "deferred_work": "deferred-features.md",
+      "d08_overlap": "Bounded owner analysis of actual anonymous canonical publication and language-landing HTML, including navigation/theme/raw/dynamic edges, explicit target states and no-inbound candidates within declared sources. Broader editorial and incremental workloads remain D09."
     },
     {
       "id": "F032",
@@ -1059,7 +1062,7 @@
       "status": "verified-local-defined-M5-scope; exact-CI-and-artifact-status-on-PR-10",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2–8 choices), 1–10 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
+      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2\u20138 choices), 1\u201310 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
       "evidence": [
         "m5-contract.md",
         "membership-learning.md",
@@ -1362,7 +1365,7 @@
       "status": "M7-verified-defined-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0–3600 seconds, default revalidation. Private/publication browser responses no-store.",
+      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0\u20133600 seconds, default revalidation. Private/publication browser responses no-store.",
       "evidence": [
         "resilient-operations.md",
         "../tests/acceptance.rs",
