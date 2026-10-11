@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M9 and defined D01\u2013D05 deliveries merged with independently verified releases; D06 publication discovery is undergoing final integrated verification. Full plugin breadth remains tracked.",
+  "milestone": "M9 and defined D01–D05 deliveries merged with independently verified releases; D06 publication discovery is undergoing final integrated verification. Full plugin breadth remains tracked.",
   "capabilities": [
     {
       "id": "F001",
@@ -557,9 +557,12 @@
         "structured-data.md",
         "evidence/d07-verification.md",
         "../tests/structured.rs",
-        "../scripts/structured_acceptance.cjs"
+        "../scripts/structured_acceptance.cjs",
+        "evidence/d07-main-release.json",
+        "evidence/d07-free-reference.json",
+        "evidence/d07-clean-release-observations.json"
       ],
-      "d07_status": "native and browser verified locally; PR #23 exact-source delivery pending",
+      "d07_status": "merged PR #23; actual-main cumulative gates and independent public release verification passed",
       "d07_coverage": "Known named entities/properties, typed field/publication/relationship/image/enumeration bindings, finite cyclic identities, shared visible facts and JSON-LD, offline attributed Schema.org 30.1 lookup and selected dated guidance warnings.",
       "d07_limits": "Bounded native admission policy and selected provider checks; no full ontology/search eligibility or licensed premium execution claim. Editorial price/availability/offers remain refused pending authoritative D16 commerce enrichment."
     },
@@ -583,9 +586,12 @@
         "structured-data.md",
         "evidence/d07-verification.md",
         "../tests/structured.rs",
-        "../scripts/structured_acceptance.cjs"
+        "../scripts/structured_acceptance.cjs",
+        "evidence/d07-main-release.json",
+        "evidence/d07-free-reference.json",
+        "evidence/d07-clean-release-observations.json"
       ],
-      "d07_status": "native and browser verified locally; PR #23 exact-source delivery pending",
+      "d07_status": "merged PR #23; actual-main cumulative gates and independent public release verification passed",
       "d07_coverage": "Explicit published organization/location records with specific vocabulary business types, scoped actual addresses/coordinates/opening hours and native relationships; current related/media restriction and unpublication boundaries.",
       "d07_limits": "Bounded native admission policy and selected provider checks; no full ontology/search eligibility or licensed premium execution claim. Editorial price/availability/offers remain refused pending authoritative D16 commerce enrichment."
     },
@@ -604,8 +610,14 @@
         "discovery.md",
         "evidence/m3-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d08-contract.md",
+        "redirects-and-links.md",
+        "evidence/d08-verification.md",
+        "../tests/redirect_plans.rs"
+      ],
+      "d08_status": "in development; native forms and route engine implemented; connected checks progressing; delivery pending",
+      "d08_limits": "Bounded local ASCII-path Rust regex and declared anonymous publication/language graph. No full PCRE, external redirect/crawler, query-forwarding or infinite/client-generated link-state claim."
     },
     {
       "id": "F031",
@@ -638,8 +650,14 @@
         "discovery.md",
         "evidence/m3-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d08-contract.md",
+        "redirects-and-links.md",
+        "evidence/d08-verification.md",
+        "../tests/redirect_plans.rs"
+      ],
+      "d08_status": "in development; native forms and route engine implemented; connected checks progressing; delivery pending",
+      "d08_limits": "Bounded local ASCII-path Rust regex and declared anonymous publication/language graph. No full PCRE, external redirect/crawler, query-forwarding or infinite/client-generated link-state claim."
     },
     {
       "id": "F033",
@@ -1041,7 +1059,7 @@
       "status": "verified-local-defined-M5-scope; exact-CI-and-artifact-status-on-PR-10",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2\u20138 choices), 1\u201310 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
+      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2–8 choices), 1–10 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
       "evidence": [
         "m5-contract.md",
         "membership-learning.md",
@@ -1344,7 +1362,7 @@
       "status": "M7-verified-defined-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0\u20133600 seconds, default revalidation. Private/publication browser responses no-store.",
+      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0–3600 seconds, default revalidation. Private/publication browser responses no-store.",
       "evidence": [
         "resilient-operations.md",
         "../tests/acceptance.rs",

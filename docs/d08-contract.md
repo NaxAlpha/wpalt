@@ -1,0 +1,39 @@
+# D08 — Redirect and rendered-link workspace
+
+Date: 2026-10-11. D07 PR #23 is merged as f18bc86aee0a971017a34799f2ce1d55514182ea after all eight applicable PR gates and independent merge-source archive/reference verification. Its actual-main seven gates plus release job pass, and separate CI/public archives independently verify ([receipt](evidence/d07-main-release.json)). D08 implementation progresses on its own branch. Scope F030/F032; D09 retains richer editorial advisories and larger incremental workloads. No external accounts are required for native work.
+
+## End-user outcome
+
+An owner manages exact redirects, bounded capture rules, optional automatic publication-route redirects and an optional retained 404 report in one calm workspace. Preview shows matches, precedence, destination, loops, conflicts and work-limit refusals before saving. A rendered-publication link report identifies links from actual content, navigation, templates, shared options and server-resolved dynamic bindings. Owners understand which targets were resolved locally, which were skipped and whether the declared graph is complete. Native forms remain usable with JavaScript disabled.
+
+## Functional steps
+
+1. Consolidate redirect-plan authority. Preserve exact rules and actual route precedence. Add bounded whole-path Rust regex capture rules, deterministic ordering and actionable sample previews. Store exact-version policy changes under a shared database transaction boundary; static exact-loop checks and runtime visited/hop protection cover supported plans.
+2. Add explicitly enabled automatic aliases for real previously and newly published routes. Updating the working slug creates no redirect. Publication, alias flattening and removal of an owned destination alias commit together. A manual rule is never overwritten; failed or stale publication leaves aliases unchanged. Scheduled publication shares the same transaction path.
+3. Provide opt-in bounded 404 aggregation with retention, deletion and actionable rule creation. Store public safe paths/counts/times only, never queries, headers, request bodies or client addresses. Only narrowly admitted public paths are retained; owner-chosen slugs may themselves contain personal information. Exclude private-content and reserved/security/API routes. Disabling/purging removes retained data. Document that public slugs themselves may contain personal information.
+4. Analyze the same internal anonymous HTML rendering used by readers, using the existing bounded HTML parser and no network crawler. Include canonical public content and explicitly enumerated language landing pages. Report anchor/image edges and their rendered source, local route/media/fragment resolution, skipped external/private/non-HTTP destinations and items without inbound links in this defined graph. Refuse complete/orphan output on budget overflow or concurrent publication-generation change.
+5. Verify, harden and optimize each step and the connected workspace. Measure rule lookup/compile work, rendering/graph budgets, query counts/plans, concurrency, RSS/disk and responsive geometry. Preserve earlier journeys, migrations/recovery and exact-source delivery gates.
+
+## Security and semantic boundaries
+
+Native regex behavior deliberately differs from PHP PCRE: full-path matching, bounded linear-time Rust syntax, numbered captures only, no lookaround/backreference execution and local-only validated replacement. Discard query strings; do not reflect captured data into a remote origin, reserved route, malformed header or encoded traversal. Exact manual rules have precedence over automatic aliases, then stable ordered regex rules. Successful real routes retain authority; restricted publications must not become redirects or 404-report existence signals. Collapse only supported safe chains, and retain temporary semantics if any traversed hop is temporary.
+
+Static selected samples can reveal overlaps and loops but cannot prove universal regex disjointness. Refuse runtime loops/oversized plans; make this limitation explicit. No SEO ranking or indexing guarantee. Arbitrary links created later by JavaScript, infinite search/filter states, external services and unlisted route families remain outside the precisely declared rendered graph. A complete result describes its scanned sources, not the entire internet or every possible site state.
+
+## Initial engineering ceilings
+
+At most 1,000 manual exact rules, 1,000 owned aliases and 128 regex rules, with 512-byte patterns, 32 KiB aggregate pattern source, at most 16 captures and 15 redirect hops. Use bounded RegexBuilder nesting and approximate compiled/DFA size limits; verify actual memory rather than treating those APIs as exact total heap guarantees. Redirect paths are ASCII, with a 300-byte ceiling; queries are discarded rather than matched or forwarded. 404 data has a finite configurable path/retention ceiling. The initial complete rendered graph is limited to 1,000 public publications, enumerated language landing pages, 20,000 edges and bounded aggregate HTML/tree work. A streaming allocation preflight additionally caps 50,000 lexical tokens and 128 raw open tags before constructing the DOM. It deliberately refuses certain malformed/self-closing non-void HTML rather than allocate a pathological tree; the DOM retains its stricter node/depth budgets. Record populated measurements and any justified changes before final delivery.
+
+## Storage, migration and recovery
+
+Persisted rule/report semantics require native schema 22 and portable recovery v18. Ordinary runtime and restore accept only the current grammar. Separate stopped maintenance and guarded v17 conversion preserve actual D07 native-21 data. New tables/grammar cannot be smuggled under old markers. Preserve an independently verified D07 executable and original archive; authentic old-runtime fresh rollback remains required. Operational report data retention/recovery choices must be explicit; no compatibility runtime branch.
+
+## Verification journeys
+
+Component tests cover real captures, unsupported syntax and nonexistent captures, compiled/input/output limits, reserved/protocol-relative/dot/encoded/control destinations, exact precedence, selected ambiguities, loops and temporary chains. Connected SQLite/PostgreSQL tests cover draft versus actual publication, repeated route changes and rename back, stale/failed publication rollback, manual conflicts, restricted/revoked targets, scheduled workers, simultaneous loop-producing rule edits, opt-in counters/retention/purge, and fresh recovery.
+
+Rendered-graph tests introduce links only through admitted raw HTML, navigation, templates and resolved native data; compare actual public HTML rather than mirror field definitions. Verify fragment resolution, current media access and conditional omission, external skipping and stale/budget refusal. Browser acceptance exercises real owner preview/save, native fallback, meaningful invalid/conflict/empty/report states and 320/768/1440 geometry plus scoped accessibility. Actual pinned free Redirection execution runs in an isolated WordPress CI reference; source inspection alone is not an execution claim.
+
+## Current guidance
+
+Reviewed 2026-10-11: Google's server-side permanent/temporary redirect guidance; official Redirection matching/capture/monitoring documentation and free 5.10.1 source; Rust regex bounded compilation documentation; WCAG 2.2 reflow and target-size guidance. The free archive SHA-256 is `f68a4be447ecba00c64e8a39d7517807ed49cc18e77b7a364c20cb31848235b7`. Full PCRE, external-origin rules, provider-conditioned matching and import-format parity are separate broader capabilities. Refresh applicable feature-guidance records, source pins and release checks when behavior or primary guidance changes.

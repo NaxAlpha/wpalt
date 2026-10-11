@@ -1,0 +1,38 @@
+{
+  "source_commit": "f18bc86aee0a971017a34799f2ce1d55514182ea",
+  "tag": "nightly-202610111220-f18bc86aee0a",
+  "archive": "wpalt-x86_64-unknown-linux-gnu-f18bc86aee0a.tar.gz",
+  "archive_sha256": "3a6eb47a797dc24525cdcd46441903616c87dad859dcc67006ff8750bf90dd6f",
+  "binary_sha256": "33cb48c196aa0f20dbb287d76a831a9731261ebd69d76e2622e47c855b6d5b1a",
+  "binary_bytes": 37591656,
+  "timestamp_basis": "commit time, UTC",
+  "date": "2026-10-11",
+  "pr": 23,
+  "pr_head": "a5aa58f45ce4cd975f1900617138ab38f7e28601",
+  "pr_run": 38128293109,
+  "pr_merge_source": "9a5af50fb01e676fd0788200099ab37e07398946",
+  "pr_parent_verification": {
+    "pr": 23,
+    "head": "a5aa58f45ce4cd975f1900617138ab38f7e28601",
+    "base": "f8d03ff93105a7c0e057059a2d8219700541dbaa",
+    "merge_source": "9a5af50fb01e676fd0788200099ab37e07398946",
+    "parents": [
+      "f8d03ff93105a7c0e057059a2d8219700541dbaa",
+      "a5aa58f45ce4cd975f1900617138ab38f7e28601"
+    ]
+  },
+  "main_run": 38138917207,
+  "gates": [
+    "application",
+    "compiler-floor",
+    "dependency-audit",
+    "clean-build",
+    "frontend",
+    "local-processes",
+    "native-pitr",
+    "release"
+  ],
+  "release_url": "https://github.com/NaxAlpha/wpalt/releases/tag/nightly-202610111220-f18bc86aee0a",
+  "public_archive_matches_separately_verified_ci_archive": true,
+  "main_source_tree_matches_verified_pr_source": true
+}

@@ -200,8 +200,8 @@ enum Command {
     /// Validate a full recovery graph without restoring it.
     RecoveryInspect {
         input: PathBuf,
-        /// Explicit offline validation of a retained v12/v13/v14/v15/v16 recovery point.
-        #[arg(long, default_value_t=17, value_parser=clap::value_parser!(u8).range(12..=17))]
+        /// Explicit offline validation of a retained v12–v17 recovery point.
+        #[arg(long, default_value_t=18, value_parser=clap::value_parser!(u8).range(12..=18))]
         source_format: u8,
         #[arg(long)]
         key_file: Option<PathBuf>,
@@ -275,6 +275,13 @@ enum Command {
     },
     /// Offline v16-to-current conversion into a NEW private archive; preserves supplied encryption.
     MigrateRecoveryV16 {
+        input: PathBuf,
+        output: PathBuf,
+        #[arg(long)]
+        key_file: Option<PathBuf>,
+    },
+    /// Offline v17-to-current conversion into a NEW private archive; preserves supplied encryption.
+    MigrateRecoveryV17 {
         input: PathBuf,
         output: PathBuf,
         #[arg(long)]
@@ -1040,12 +1047,13 @@ async fn main() -> anyhow::Result<()> {
                 14 => backup::migrate_v14(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
                 15 => backup::migrate_v15(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
                 16 => backup::migrate_v16(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
+                17 => backup::migrate_v17(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
                 _ => bytes,
             };
             let mut report = backup::inspect(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?;
-            if *source_format < 17 {
+            if *source_format < 18 {
                 report["source_schema"] = (*source_format).into();
-                report["boundary"]="Original source validated by explicit offline conversion; ordinary restore requires a separately converted v17 archive.".into();
+                report["boundary"]="Original source validated by explicit offline conversion; ordinary restore requires a separately converted v18 archive.".into();
             }
             println!("{}", serde_json::to_string_pretty(&report)?);
             return Ok(());
@@ -1131,9 +1139,16 @@ async fn main() -> anyhow::Result<()> {
             input,
             output,
             key_file,
+        }
+        | Command::MigrateRecoveryV17 {
+            input,
+            output,
+            key_file,
         } => {
             let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
-            let mut bytes = if matches!(&cli.command, Command::MigrateRecoveryV16 { .. }) {
+            let mut bytes = if matches!(&cli.command, Command::MigrateRecoveryV17 { .. }) {
+                backup::migrate_v17(&config, &bytes)
+            } else if matches!(&cli.command, Command::MigrateRecoveryV16 { .. }) {
                 backup::migrate_v16(&config, &bytes)
             } else if matches!(&cli.command, Command::MigrateRecoveryV15 { .. }) {
                 backup::migrate_v15(&config, &bytes)
@@ -1153,7 +1168,7 @@ async fn main() -> anyhow::Result<()> {
                     .map_err(|e| anyhow::anyhow!(e.1))?;
             }
             backup::write_private(output, &bytes)?;
-            println!("Converted a new private v17 recovery archive; source retained.");
+            println!("Converted a new private v18 recovery archive; source retained.");
             return Ok(());
         }
         Command::MigrateBackup { input, output } => {
@@ -1515,6 +1530,7 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
         | Command::MigrateRecoveryV14 { .. }
         | Command::MigrateRecoveryV15 { .. }
         | Command::MigrateRecoveryV16 { .. } => unreachable!(),
+        Command::MigrateRecoveryV17 { .. } => unreachable!(),
         Command::CloneActivate { review } => {
             wpalt::operations::clone_hold::activate(&app, &review)
                 .await
@@ -1906,6 +1922,11 @@ async fn worker_loop(
                 )
                 .await,
                 stage_unit("quota-retention", wpalt::business::quotas::cleanup(&app)).await,
+                stage(
+                    "missing-path-retention",
+                    wpalt::discovery::redirects::retention(&app),
+                )
+                .await,
                 stage_unit("maintenance", cleanup(&app)).await,
             ]
         })

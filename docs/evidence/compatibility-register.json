@@ -5,10 +5,19 @@
       "id": "d06-offline-recovery-v12-v15",
       "owner": "wpalt maintainers",
       "reason": "Supported source schemas 14\u201319 retain bounded explicit maintenance/fresh old-runtime rollback; ordinary runtime and restore have no old parser branch.",
-      "supported_versions": "Native schemas 14\u201319, portable v12/v13/v14/v15; schema 20 / graph v16 / theme package 2 target",
-      "migration_path": "Stopped upgrade retains original encrypted v12 (14\u201316), v13 (17), v14 (18) or v15 (19) bytes for matching old-executable fresh rollback. Explicit migrate-recovery-v12/v13/v14/v15 create separately validated v16 archives; canonical editorial image relationships are rebuilt atomically during current fresh recovery/upgrade.",
+      "supported_versions": "Native schemas14\u201319, portable v12/v13/v14/v15; current native22 / portable18 target",
+      "migration_path": "Stopped upgrade retains original encrypted v12 (14\u201316), v13 (17), v14 (18), or v15 (19) bytes for matching old-executable fresh rollback. Explicit converters validate the original grammar and produce a separately validated current v18 graph. Canonical editorial image relationships are rebuilt atomically; redirect policy defaults invent neither reporting consent nor historical aliases.",
       "removal_release": "First adopted release after a documented supported-source retirement decision and verified replacement recovery path",
       "review_deadline": "2027-01-05"
+    },
+    {
+      "id": "d08-offline-recovery-v16-v17",
+      "owner": "wpalt maintainers",
+      "reason": "Explicit stopped maintenance preserves original native20/21 portable16/17 recovery and fresh rollback; no older ordinary-runtime parser.",
+      "supported_versions": "Native schemas20/21 and portable16/17; native22 / portable18 target",
+      "migration_path": "Stopped upgrade keeps original old-format bytes for the matching retained old executable. Explicit migrate-recovery-v16/v17 produces a separately validated v18 graph. v17 adds only default redirect policy and empty missing-path rows; no reporting consent or historical aliases are invented.",
+      "removal_release": "First adopted release after supported-source retirement and verified replacement recovery decision",
+      "review_deadline": "2027-01-09"
     }
   ],
   "policy": "No legacy runtime shims before M9. Add any temporary bridge with version range, owner, migration path and removal deadline."

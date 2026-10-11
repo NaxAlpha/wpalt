@@ -1,0 +1,13 @@
+# 0022 — One redirect and publication authority
+
+Date: 2026-10-11. Accepted implementation design within the authorized D08 backlog; verification remains in progress.
+
+Keep exact manual rules, owned publication aliases and bounded capture rules in one ordered plan. Public and private real routes retain their existing authority. A shared database policy row serializes plan writers with actual and scheduled publication. Compare-and-swap versions prevent stale owner changes; rollback restores both publication and aliases. Automatic aliases are opt-in and use actual retained published routes, never a working-copy slug. Turning creation off retains existing aliases; removing or unpublishing an owned publication removes its aliases explicitly.
+
+Rust regex is deliberately bounded and differs from PHP PCRE. Whole ASCII paths, at most sixteen numbered captures, compiled nesting/size ceilings and revalidation of every replacement prevent unsafe or unbounded execution. Query matching/forwarding, external redirects, lookaround and backreferences are outside this delivery. Preview and public fallback share resolution. Selected samples expose overlap, but cannot establish universal regex disjointness. Actual route authority, visited paths and fifteen hops bound chains.
+
+Missing-path reporting is disabled initially. When enabled, only narrowly admitted public path/count/time aggregates are stored. No queries, client addresses, headers or request bodies. Current private routes are excluded; path slugs may themselves contain personal information. Finite retention and path limits, versioned deletion, explicit purge and disabling cleanup are owner controls. Operational counter writes must not invalidate every public page; local-process crash fencing still participates. Background jobs enforce retention, and incoming aggregate writes prune expired rows. Counts do not represent unique people.
+
+Rendered-link analysis will use the existing anonymous server rendering and bounded HTML parser rather than reconstruct links from only Markdown fields. Enumerated publication/language sources define its scope. No external fetch, execution of client JavaScript or whole-site completeness claim from a partial graph. Budgets and concurrent generation changes must refuse orphan/completeness conclusions.
+
+Native 22 and portable v18 fence the persisted policy/report meaning. An explicit stopped migration and strict v17 converter retain original D07 data; ordinary runtime accepts only the current grammar. Authentic old-runtime fresh rollback, not synthetic marker changes, remains a delivery requirement. See [the contract](../d08-contract.md).

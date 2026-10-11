@@ -121,6 +121,8 @@ impl Site {
 /// conversion. Merely relabeling a current graph would be a malformed fixture.
 fn pre_asset_graph(graph: &mut serde_json::Value) {
     let tables = graph["tables"].as_object_mut().unwrap();
+    tables.remove("redirect_policy");
+    tables.remove("missing_paths");
     tables.remove("theme_assets");
     tables.remove("theme_asset_references");
     for (table, columns) in [
@@ -195,6 +197,8 @@ async fn old_archive_markers_cannot_admit_current_structured_model_grammar() {
             pre_asset_graph(&mut old);
         }
         let tables = old["tables"].as_object_mut().unwrap();
+        tables.remove("redirect_policy");
+        tables.remove("missing_paths");
         if marker < 14 {
             tables.remove("user_preferences");
         }
@@ -221,7 +225,7 @@ async fn old_archive_markers_cannot_admit_current_structured_model_grammar() {
             .expect("Valid historical grammar must pass before testing a new-key attack");
         assert_eq!(
             backup::inspect(&site.app.config, &converted).unwrap()["schema"],
-            17
+            18
         );
         assert!(backup::inspect(&site.app.config, &encode(&old)).is_err());
         for injected in [Value::Null, json!({})] {
@@ -4493,7 +4497,7 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let migrated = backup::migrate_m6(&original.app.config, &legacy).unwrap();
         assert_eq!(
             backup::inspect(&original.app.config, &migrated).unwrap()["schema"],
-            17
+            18
         );
         let destination = tempfile::tempdir().unwrap();
         let key = encryption::generate_key();
@@ -8126,7 +8130,7 @@ async fn assigned_review_binds_material_and_recovers_without_public_note_leaks()
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            17
+            18
         );
         // The explicit previous graph conversion retains meaningful private review history.
         let mut previous: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -8979,7 +8983,7 @@ async fn account_interface_preferences_recover_without_changing_content_authorit
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            17
+            18
         );
         let restored = Site::new(pg, false).await;
         backup::restore(&restored.app, &bytes).await.unwrap();
@@ -10157,7 +10161,7 @@ async fn discovery_formats_have_explicit_conversion_validation_and_private_draft
         let mut envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         let mut graph: serde_json::Value =
             serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
-        assert_eq!(graph["schema"], 17);
+        assert_eq!(graph["schema"], 18);
         assert!(
             graph["tables"].get("published_image_refs").is_none(),
             "Derived index is rebuilt from canonical publication, not separately trusted"
@@ -10181,6 +10185,14 @@ async fn discovery_formats_have_explicit_conversion_validation_and_private_draft
                 .is_err()
             );
         }
+        graph["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("redirect_policy");
+        graph["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("missing_paths");
         graph["schema"] = 15.into();
         let payload = graph.to_string();
         envelope["payload"] = payload.clone().into();
@@ -10191,7 +10203,7 @@ async fn discovery_formats_have_explicit_conversion_validation_and_private_draft
         let converted = backup::migrate_v15(&site.app.config, &old).unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &converted).unwrap()["schema"],
-            17
+            18
         );
         // An attacker cannot relabel newly extended SEO as an older accepted format.
         graph["tables"]["posts"][0]["seo"] = r#"{"social_alt":"new field"}"#.into();
@@ -10396,6 +10408,691 @@ async fn discovery_sitemap_pages_and_publish_races_keep_exact_canonical_relation
                     .is_err()
             );
         }
+        site.close().await;
+    }
+}
+
+/// Actual publishing, not working-copy edits, owns automatic historical routes.
+#[tokio::test]
+async fn redirect_publication_aliases_are_atomic_across_drafts_conflicts_and_scheduling() {
+    use wpalt::discovery::{self, redirects};
+    for pg in engines() {
+        let site = Site::with_connections(pg, true, 1).await;
+        let (_, version) = redirects::load(&site.app).await.unwrap();
+        redirects::configure(
+            &site.app,
+            redirects::Settings {
+                automatic_slug_redirects: true,
+                ..Default::default()
+            },
+            version,
+        )
+        .await
+        .unwrap();
+        let first = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("first-address", "publish"),
+        )
+        .await
+        .unwrap();
+        let mut edit = input("second-address", "save");
+        edit.version = first.version;
+        let draft = content::save(&site.app, site.session(), Some(&first.id), edit.clone())
+            .await
+            .unwrap();
+        assert!(
+            redirects::load(&site.app)
+                .await
+                .unwrap()
+                .0
+                .aliases
+                .is_empty()
+        );
+        assert_eq!(
+            get(&site.app, "/first-address", None).await.0,
+            StatusCode::OK
+        );
+        edit.action = "publish".into();
+        assert_eq!(
+            content::save(&site.app, site.session(), Some(&first.id), edit.clone())
+                .await
+                .unwrap_err()
+                .0,
+            StatusCode::CONFLICT
+        );
+        edit.version = draft.version;
+        let second = content::save(&site.app, site.session(), Some(&first.id), edit.clone())
+            .await
+            .unwrap();
+        let (status, headers, _) = request(
+            &site.app,
+            "GET",
+            "/first-address?secret=excluded",
+            None,
+            "",
+            vec![],
+        )
+        .await;
+        assert_eq!(status, StatusCode::MOVED_PERMANENTLY);
+        assert_eq!(headers["location"], "/second-address");
+        discovery::save_redirect(&site.app, "/blocked-third", "/somewhere", 301, 0)
+            .await
+            .unwrap();
+        let before = redirects::load(&site.app).await.unwrap();
+        let mut conflict = input("blocked-third", "publish");
+        conflict.version = second.version;
+        assert!(
+            content::save(&site.app, site.session(), Some(&first.id), conflict)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            serde_json::to_value(redirects::load(&site.app).await.unwrap().0).unwrap(),
+            serde_json::to_value(before.0).unwrap()
+        );
+        assert_eq!(
+            content::get(&site.app, &first.id)
+                .await
+                .unwrap()
+                .published_slug,
+            "second-address"
+        );
+        let mut scheduled = input("third-address", "schedule");
+        scheduled.version = second.version;
+        scheduled.publish_at = wpalt::now() + 3600;
+        let pending = content::save(&site.app, site.session(), Some(&first.id), scheduled)
+            .await
+            .unwrap();
+        assert_eq!(
+            redirects::load(&site.app).await.unwrap().0.aliases["/first-address"].target,
+            "/second-address"
+        );
+        sqlx::query("UPDATE posts SET publish_at=$1 WHERE id=$2")
+            .bind(wpalt::now() - 1)
+            .bind(&first.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(content::publish_due(&site.app).await.unwrap(), 1);
+        let (policy, _) = redirects::load(&site.app).await.unwrap();
+        assert_eq!(policy.aliases["/first-address"].target, "/third-address");
+        assert_eq!(policy.aliases["/second-address"].target, "/third-address");
+        let mut back = input("first-address", "publish");
+        back.version = pending.version + 1;
+        let returned = content::save(&site.app, site.session(), Some(&first.id), back)
+            .await
+            .unwrap();
+        let (policy, _) = redirects::load(&site.app).await.unwrap();
+        assert!(!policy.aliases.contains_key("/first-address"));
+        assert_eq!(policy.aliases["/third-address"].target, "/first-address");
+        let mut unpublish = input("first-address", "unpublish");
+        unpublish.version = returned.version;
+        content::save(&site.app, site.session(), Some(&first.id), unpublish)
+            .await
+            .unwrap();
+        assert!(
+            redirects::load(&site.app)
+                .await
+                .unwrap()
+                .0
+                .aliases
+                .is_empty()
+        );
+        assert_eq!(
+            get(&site.app, "/third-address", None).await.0,
+            StatusCode::NOT_FOUND
+        );
+        site.close().await;
+    }
+}
+
+/// A real native preview preserves invalid input and performs no write; API policy
+/// CAS and report controls use the same authority and permissions.
+#[tokio::test]
+async fn redirect_workspace_preview_policy_and_opt_in_report_share_real_authority() {
+    use wpalt::discovery::redirects;
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("current-story", "publish"),
+        )
+        .await
+        .unwrap();
+        let (_, version) = redirects::load(&site.app).await.unwrap();
+        let fields = [
+            ("csrf", site.session().csrf.as_str()),
+            ("version", &version.to_string()),
+            ("id", "old_articles"),
+            ("label", "Old article addresses"),
+            ("pattern", "^/old/([a-z0-9-]+)$"),
+            ("target", "/$1"),
+            ("code", "301"),
+            ("priority", "10"),
+            ("enabled", "on"),
+            ("sample", "/old/current-story"),
+            ("action", "preview"),
+        ];
+        let (status, body) = form(
+            &site.app,
+            "/admin/discovery/routes/rule",
+            Some(&site.token),
+            &fields,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let html = String::from_utf8(body).unwrap();
+        assert!(html.contains("/old/current-story → /current-story"));
+        assert!(
+            redirects::load(&site.app)
+                .await
+                .unwrap()
+                .0
+                .settings
+                .rules
+                .is_empty()
+        );
+        let mut save_fields = fields.to_vec();
+        *save_fields.last_mut().unwrap() = ("action", "save");
+        assert_eq!(
+            form(
+                &site.app,
+                "/admin/discovery/routes/rule",
+                Some(&site.token),
+                &save_fields
+            )
+            .await
+            .0,
+            StatusCode::SEE_OTHER
+        );
+        let (status, headers, _) = request(
+            &site.app,
+            "GET",
+            "/old/current-story?private=query",
+            None,
+            "",
+            vec![],
+        )
+        .await;
+        assert_eq!(status, StatusCode::MOVED_PERMANENTLY);
+        assert_eq!(headers["location"], "/current-story");
+        let mut invalid = save_fields.clone();
+        invalid[5] = ("target", "https://outside.test/$1");
+        let next_version = (version + 1).to_string();
+        invalid[1] = ("version", &next_version);
+        let (status, body) = form(
+            &site.app,
+            "/admin/discovery/routes/rule",
+            Some(&site.token),
+            &invalid,
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(
+            String::from_utf8(body)
+                .unwrap()
+                .contains("value=\"https://outside.test/$1\"")
+        );
+        let (status, body) = form(
+            &site.app,
+            "/admin/discovery/routes/settings",
+            Some(&site.token),
+            &[
+                ("csrf", &site.session().csrf),
+                ("version", &next_version),
+                ("retention_days", "91"),
+                ("max_paths", "123"),
+                ("report_404", "on"),
+            ],
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        let html = String::from_utf8(body).unwrap();
+        assert!(
+            html.contains("value=\"91\"") && html.contains("value=\"123\""),
+            "Rejected native settings preserve entered values"
+        );
+        let (status, body) = form(
+            &site.app,
+            "/admin/discovery/redirects",
+            Some(&site.token),
+            &[
+                ("csrf", &site.session().csrf),
+                ("return_workspace", "on"),
+                ("source", "/entered-source"),
+                ("target", "https://outside.test/entered"),
+                ("code", "302"),
+            ],
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        let html = String::from_utf8(body).unwrap();
+        assert!(
+            html.contains("value=\"/entered-source\"")
+                && html.contains("value=\"https://outside.test/entered\""),
+            "Workspace refusal is native HTML retaining both exact inputs"
+        );
+        auth::add_user(
+            &site.app,
+            "redirect-editor@example.test",
+            "Editor",
+            "editor",
+            PASSWORD,
+        )
+        .await
+        .unwrap();
+        let (editor_token, _) = auth::login(&site.app, "redirect-editor@example.test", PASSWORD)
+            .await
+            .unwrap();
+        assert_eq!(
+            get(
+                &site.app,
+                "/api/discovery/redirect-policy",
+                Some(&editor_token)
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            get(&site.app, "/admin/discovery/routes", Some(&editor_token))
+                .await
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            get(&site.app, "/missed-path?password=never-retained", None)
+                .await
+                .0,
+            StatusCode::NOT_FOUND
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM missing_paths")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+        let (mut policy, version) = redirects::load(&site.app).await.unwrap();
+        policy.settings.report_404 = true;
+        policy.settings.max_paths = 2;
+        let update = serde_json::json!({"csrf":site.session().csrf,"version":version,"settings":policy.settings});
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/api/discovery/redirect-policy",
+                Some(&site.token),
+                "application/json",
+                update.to_string().into_bytes()
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                "/api/discovery/redirect-policy",
+                Some(&site.token),
+                "application/json",
+                update.to_string().into_bytes()
+            )
+            .await
+            .0,
+            StatusCode::CONFLICT
+        );
+        let generation = site
+            .app
+            .cache_generation
+            .load(std::sync::atomic::Ordering::SeqCst);
+        get(&site.app, "/missed-path?password=never-retained", None).await;
+        request(&site.app, "HEAD", "/head-only", None, "", vec![]).await;
+        get(&site.app, "/api/not-present?token=private", None).await;
+        get(&site.app, "/account/not-present", None).await;
+        get(&site.app, "/another-missing", None).await;
+        get(&site.app, "/over-capacity", None).await;
+        get(&site.app, "/missed-path?different=also-discarded", None).await;
+        let rows = sqlx::query("SELECT path,hits,version FROM missing_paths ORDER BY path")
+            .fetch_all(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[1].get::<String, _>("path"), "/missed-path");
+        assert_eq!(rows[1].get::<i64, _>("hits"), 2);
+        assert_eq!(
+            site.app
+                .cache_generation
+                .load(std::sync::atomic::Ordering::SeqCst),
+            generation,
+            "Operational counters do not invalidate public caches"
+        );
+        assert_eq!(
+            redirects::delete_missing(&site.app, "/missed-path", 1)
+                .await
+                .unwrap_err()
+                .0,
+            StatusCode::CONFLICT
+        );
+        redirects::delete_missing(&site.app, "/missed-path", 2)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE missing_paths SET first_seen=$1,last_seen=$1")
+            .bind(wpalt::now() - 31 * 86400)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let retention_generation = site
+            .app
+            .cache_generation
+            .load(std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(redirects::retention(&site.app).await.unwrap(), 1);
+        assert_eq!(
+            site.app
+                .cache_generation
+                .load(std::sync::atomic::Ordering::SeqCst),
+            retention_generation,
+            "Operational retention does not invalidate publication caches"
+        );
+        get(&site.app, "/new-report-path", None).await;
+        let (mut policy, version) = redirects::load(&site.app).await.unwrap();
+        policy.settings.report_404 = false;
+        redirects::configure(&site.app, policy.settings, version)
+            .await
+            .unwrap();
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM missing_paths")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+        site.close().await;
+    }
+}
+
+/// Independent application instances test database serialization, not merely the
+/// in-process mutation mutex: two individually safe edits cannot commit a loop.
+#[tokio::test]
+async fn redirect_concurrent_writers_cannot_commit_a_combined_cycle() {
+    use wpalt::discovery;
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let peer = App::open((*site.app.config).clone()).await.unwrap();
+        let (one, two) = tokio::join!(
+            discovery::save_redirect(&site.app, "/race-a", "/race-b", 301, 0),
+            discovery::save_redirect(&peer, "/race-b", "/race-a", 301, 0)
+        );
+        assert_ne!(
+            one.is_ok(),
+            two.is_ok(),
+            "Exactly one transaction commits; the second sees and refuses the combined cycle"
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM redirects")
+            .fetch_one(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+        let (mut policy, version) = wpalt::discovery::redirects::load(&site.app).await.unwrap();
+        policy.settings.report_404 = true;
+        wpalt::discovery::redirects::configure(&site.app, policy.settings, version)
+            .await
+            .unwrap();
+        for _ in 0..12 {
+            let (one, two) = tokio::join!(
+                wpalt::discovery::redirects::record_missing(&site.app, "/concurrent-missing"),
+                wpalt::discovery::redirects::record_missing(&peer, "/concurrent-missing")
+            );
+            one.unwrap();
+            two.unwrap();
+        }
+        let hits: i64 =
+            sqlx::query_scalar("SELECT hits FROM missing_paths WHERE path='/concurrent-missing'")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            hits, 24,
+            "Independent writers retain every admitted hit without lost updates"
+        );
+        peer.db.pool.close().await;
+        site.close().await;
+    }
+}
+
+/// Links introduced only by native rendering must be represented; Markdown-only
+/// scanners cannot establish this publication/navigation/binding graph.
+#[tokio::test]
+async fn rendered_link_graph_uses_anonymous_templates_bindings_and_current_privacy() {
+    use serde_json::json;
+    use wpalt::{
+        discovery::{self, rendered_links},
+        theme,
+    };
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        for slug in [
+            "raw-target",
+            "bound-target",
+            "quiet-target",
+            "private-target",
+        ] {
+            content::save(&site.app, site.session(), None, input(slug, "publish"))
+                .await
+                .unwrap();
+        }
+        let mut source = input("graph-source", "publish");
+        source.fields = json!({"subtitle":"/bound-target","featured":true}).to_string();
+        source.body="[Old address](/historical-bound) and [External](https://external.invalid/never-fetch).".into();
+        content::save(&site.app, site.session(), None, source)
+            .await
+            .unwrap();
+        discovery::save_redirect(&site.app, "/historical-bound", "/bound-target", 301, 0)
+            .await
+            .unwrap();
+        let (mut discovery, version) = discovery::load(&site.app).await.unwrap();
+        discovery.languages[0].navigation = vec![
+            wpalt::model::NavItem {
+                label: "Raw destination".into(),
+                url: "/raw-target".into(),
+            },
+            wpalt::model::NavItem {
+                label: "Missing navigation".into(),
+                url: "/missing-navigation".into(),
+            },
+        ];
+        discovery::configure(&site.app, discovery, version)
+            .await
+            .unwrap();
+        let mut stored = theme::load(&site.app, "paper", true).await.unwrap();
+        stored.package.templates.insert(
+            "home".into(),
+            serde_json::from_value(json!({"id":"graph-home","kind":"text","text":"Graph landing"}))
+                .unwrap(),
+        );
+        let original = stored.package.templates.remove("content").unwrap();
+        let mut wrapper: theme::Node =
+            serde_json::from_value(json!({"id":"graph-content","kind":"section"})).unwrap();
+        wrapper.children.push(original);
+        let body = &mut wrapper.children;
+        body.push(serde_json::from_value(json!({"id":"graph-binding","kind":"link","text":"Bound destination","href":{"bind":"post.fields.subtitle"}})).unwrap());
+        body.push(serde_json::from_value(json!({"id":"graph-raw","kind":"body","text":"<a href=\"/raw-target#main\">Real raw anchor</a> <a href=\"/raw-target#missing\">Missing fragment</a> <a href=\"/raw-target#%6dain\">Encoded fragment</a> <a href=\"/raw-target#TOP\">Top</a> <a href=\"/raw-target#:~:text=browser\">Text directive</a> <img src=\"/media/not-a-uuid\" alt=\"Invalid media\"> <a href=\"/private-target\">Private</a> <a href=\"/?category=unbounded\">Filter</a>"})).unwrap());
+        body.push(serde_json::from_value(json!({"id":"graph-hidden","kind":"condition","condition":{"op":"eq","left":{"bind":"post.fields.featured"},"right":false},"children":[{"id":"graph-hidden-link","kind":"link","text":"Hidden","href":"/conditional-missing"}]})).unwrap());
+        stored.package.templates.insert("content".into(), wrapper);
+        theme::save(&site.app, "paper", stored.package, stored.version, true)
+            .await
+            .unwrap();
+        let private_id: String =
+            sqlx::query_scalar("SELECT id FROM posts WHERE published_slug='private-target'")
+                .fetch_one(&site.app.db.pool)
+                .await
+                .unwrap();
+        sqlx::query("INSERT INTO member_policies(id,title) VALUES('graph-private','Private graph reference')").execute(&site.app.db.pool).await.unwrap();
+        sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('post',$1,'graph-private')").bind(private_id).execute(&site.app.db.pool).await.unwrap();
+        let reader = get(&site.app, "/graph-source", None).await;
+        assert!(
+            reader.1.contains("/raw-target#main") && reader.1.contains("/bound-target"),
+            "Fixture must create actual rendered anchors before evaluating the graph"
+        );
+        let report = rendered_links::report(&site.app).await.unwrap();
+        assert!(report.complete);
+        assert_eq!(report.sources.len(), 5);
+        assert!(!report.sources.iter().any(|s| s.path == "/private-target"));
+        let actual = get(&site.app, "/graph-source", None).await;
+        assert_eq!(actual.0, StatusCode::OK);
+        assert_eq!(
+            report
+                .sources
+                .iter()
+                .find(|s| s.path == "/graph-source")
+                .unwrap()
+                .html_sha256,
+            auth::digest(actual.1.as_bytes()),
+            "Analysis hashes actual anonymous reader output"
+        );
+        let edges: Vec<_> = report
+            .edges
+            .iter()
+            .filter(|e| e.source == "/graph-source")
+            .collect();
+        for (target, state) in [
+            ("/raw-target#main", "resolved-source"),
+            ("/raw-target#missing", "broken-fragment"),
+            ("/raw-target#%6dain", "resolved-source"),
+            ("/raw-target#TOP", "resolved-source"),
+            (
+                "/raw-target#:~:text=browser",
+                "fragment-directive-unscanned",
+            ),
+            ("/media/not-a-uuid", "broken-media"),
+            ("/bound-target", "resolved-source"),
+            ("/historical-bound", "resolved-redirect"),
+            ("/private-target", "private-skipped"),
+            ("/?category=unbounded", "query-state-unscanned"),
+            ("https://external.invalid/never-fetch", "external-skipped"),
+            ("/missing-navigation", "broken-local"),
+        ] {
+            assert!(
+                edges.iter().any(|e| e.target == target && e.state == state),
+                "Actual rendered edge {target} classified {state}"
+            );
+        }
+        assert!(
+            edges
+                .iter()
+                .any(|e| e.target == "/raw-target" && e.placement == "navigation")
+        );
+        assert!(!edges.iter().any(|e| e.target == "/conditional-missing"));
+        assert!(report.without_inbound.contains(&"/quiet-target".into()));
+        assert!(!report.without_inbound.contains(&"/bound-target".into()));
+        let (status, body) = form(
+            &site.app,
+            "/admin/discovery/rendered-links",
+            Some(&site.token),
+            &[("csrf", &site.session().csrf), ("output", "json")],
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap()["complete"],
+            true
+        );
+        site.close().await;
+    }
+}
+
+/// Portable recovery preserves genuine owned aliases/report settings and refuses
+/// those newer tables under an older grammar marker.
+#[tokio::test]
+async fn redirect_recovery_preserves_ownership_and_refuses_old_marker_smuggling() {
+    use serde_json::{Value, json};
+    use wpalt::discovery::redirects;
+    for pg in engines() {
+        let site = Site::new(pg, true).await;
+        let (_, version) = redirects::load(&site.app).await.unwrap();
+        redirects::configure(
+            &site.app,
+            redirects::Settings {
+                automatic_slug_redirects: true,
+                report_404: true,
+                ..Default::default()
+            },
+            version,
+        )
+        .await
+        .unwrap();
+        let first = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("recover-old", "publish"),
+        )
+        .await
+        .unwrap();
+        let mut changed = input("recover-new", "publish");
+        changed.version = first.version;
+        content::save(&site.app, site.session(), Some(&first.id), changed)
+            .await
+            .unwrap();
+        get(&site.app, "/retained-missing?secret=never-retained", None).await;
+        let bytes = backup::capture(&site.app).await.unwrap();
+        assert_eq!(
+            backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
+            18
+        );
+        let fresh = Site::new(pg, false).await;
+        backup::restore(&fresh.app, &bytes).await.unwrap();
+        let (status, headers, _) =
+            request(&fresh.app, "GET", "/recover-old", None, "", vec![]).await;
+        assert_eq!(status, StatusCode::MOVED_PERMANENTLY);
+        assert_eq!(headers["location"], "/recover-new");
+        let row = sqlx::query("SELECT path,hits FROM missing_paths")
+            .fetch_one(&fresh.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(row.get::<String, _>("path"), "/retained-missing");
+        assert_eq!(row.get::<i64, _>("hits"), 1);
+        let envelope: Value = serde_json::from_slice(&bytes).unwrap();
+        let mut graph: Value = serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        graph["schema"] = 17.into();
+        let encode = |graph: &Value| {
+            let payload = graph.to_string();
+            serde_json::to_vec(&json!({"format":"wpalt-backup-v17","sha256":auth::digest(payload.as_bytes()),"payload":payload})).unwrap()
+        };
+        assert!(
+            backup::migrate_v17(&site.app.config, &encode(&graph)).is_err(),
+            "New ownership/report tables cannot be relabeled as old grammar"
+        );
+        // A genuine old grammar has neither table. This is a conversion guard,
+        // not a claim to have exercised an original D07 executable.
+        graph["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("redirect_policy");
+        graph["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("missing_paths");
+        let converted = backup::migrate_v17(&site.app.config, &encode(&graph)).unwrap();
+        assert_eq!(
+            backup::inspect(&site.app.config, &converted).unwrap()["schema"],
+            18
+        );
+        let converted_envelope: Value = serde_json::from_slice(&converted).unwrap();
+        let converted_graph: Value =
+            serde_json::from_str(converted_envelope["payload"].as_str().unwrap()).unwrap();
+        let policy: redirects::Policy = serde_json::from_str(
+            converted_graph["tables"]["redirect_policy"][0]["definition"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(
+            policy.aliases.is_empty() && !policy.settings.report_404,
+            "No historical aliases or reporting consent are invented by conversion"
+        );
+        fresh.close().await;
         site.close().await;
     }
 }

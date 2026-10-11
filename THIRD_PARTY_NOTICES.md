@@ -663,3 +663,33 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 `docs/research/schemaorg-30.1.jsonld` and the normalized derivative `assets/schemaorg-v30.1.json` contain Schema.org contributor vocabulary data licensed under [Creative Commons Attribution-ShareAlike 3.0 Unported](https://creativecommons.org/licenses/by-sa/3.0/). Copyright Schema.org contributors. The same CC BY-SA 3.0 license applies to the normalized derivative data; no endorsement is implied. Attribution, exact source URL/commit/hash and changes are recorded in `docs/research/d07-vocabulary-provenance.json`. The source is [Schema.org release 30.1](https://github.com/schemaorg/schemaorg/blob/5f2d8cdec99b7329459ef6584e94b6a840f88471/data/releases/30.1/schemaorg-current-https.jsonld). Normalization retains term identities, relationships and status and omits prose/examples/external namespaces.
 
 This notice covers vocabulary data. Schema.org's separate Apache software license is not substituted for its data license. No Schema.org or WordPress plugin software is incorporated by this vocabulary derivation. wpalt's own application-license selection remains the separate owner decision recorded in D30.
+
+## Rust regex engine
+
+The bounded route planner uses regex 1.13.1 under its MIT license. The original source and dual-license choice are documented at https://github.com/rust-lang/regex. No free WordPress plugin implementation is incorporated.
+
+Copyright (c) 2014 The Rust Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.

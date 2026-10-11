@@ -229,6 +229,8 @@ jobs:
       - run: WPALT_SCRIPTS_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_CLONE_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_SPAM_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Verify native redirect workspace and actual rendered-link graph
+        run: WPALT_REDIRECT_LINKS_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Verify typed structured location authoring and visible facts
         run: WPALT_STRUCTURED_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Install optional local video fixture tools
@@ -323,7 +325,7 @@ jobs:
           name: d05-elementor-reference
           path: work/d05-elementor-reference.json
   discovery-reference:
-    if: github.event_name == 'pull_request' && (github.head_ref == 'feature/d06-publication-discovery' || github.head_ref == 'feature/d07-structured-locations')
+    if: github.event_name == 'pull_request' && (github.head_ref == 'feature/d06-publication-discovery' || github.head_ref == 'feature/d07-structured-locations' || github.head_ref == 'feature/d08-redirect-link-workspace')
     needs: clean-build
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -334,7 +336,10 @@ jobs:
           name: wpalt-clean-linux-x86_64-${{ github.sha }}
           path: work/distribution
       - run: python3 scripts/release_build.py --directory work/distribution --source "$GITHUB_SHA" --extract work/verified-build
-      - run: python3 scripts/discovery_reference.py --binary "$PWD/work/verified-build/wpalt"
+      - if: github.head_ref != 'feature/d08-redirect-link-workspace'
+        run: python3 scripts/discovery_reference.py --binary "$PWD/work/verified-build/wpalt"
+      - if: github.head_ref == 'feature/d08-redirect-link-workspace'
+        run: python3 scripts/redirect_reference.py --binary "$PWD/work/verified-build/wpalt"
       - if: github.head_ref == 'feature/d07-structured-locations'
         run: python3 scripts/discovery_reference.py --binary "$PWD/work/verified-build/wpalt" --structured --output work/d07-structured-reference.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -344,6 +349,7 @@ jobs:
           path: |
             work/d06-discovery-reference.json
             work/d07-structured-reference.json
+            work/d08-redirection-reference.json
   local-processes:
     needs: clean-build
     runs-on: ubuntu-24.04
@@ -411,6 +417,15 @@ jobs:
           git show f8d03ff93105a7c0e057059a2d8219700541dbaa:scripts/release_build.py > work/d06-release-verifier.py
           python3 work/d06-release-verifier.py --directory work/d06-runtime-reference --source f8d03ff93105a7c0e057059a2d8219700541dbaa --extract work/d06-runtime-app
           python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d06-runtime-app/wpalt" --source-schema 20
+      - name: Verify actual D07 upgrade and fresh old-runtime rollback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --depth=1 origin f18bc86aee0a971017a34799f2ce1d55514182ea
+          gh release download nightly-202610111220-f18bc86aee0a --pattern '*.tar.gz' --pattern SHA256SUMS --dir work/d07-runtime-reference
+          git show f18bc86aee0a971017a34799f2ce1d55514182ea:scripts/release_build.py > work/d07-release-verifier.py
+          python3 work/d07-release-verifier.py --directory work/d07-runtime-reference --source f18bc86aee0a971017a34799f2ce1d55514182ea --extract work/d07-runtime-app
+          python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d07-runtime-app/wpalt" --source-schema 21
       - run: python3 scripts/local_process_acceptance.py --binary "$PWD/work/verified-build/wpalt"
       - run: frontend/node_modules/.bin/playwright install --with-deps chromium
       - name: Cumulative browser journeys across two processes and one worker
@@ -426,6 +441,11 @@ jobs:
         env:
           WPALT_LOCAL_PROCESSES: '1'
           WPALT_ELEMENTOR_DESIGN_ONLY: '1'
+        run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Verify redirect workspace and rendered graph across local processes
+        env:
+          WPALT_LOCAL_PROCESSES: '1'
+          WPALT_REDIRECT_LINKS_ONLY: '1'
         run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Verify typed structured facts across local processes
         env:

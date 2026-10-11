@@ -264,7 +264,13 @@ pub(crate) async fn save_guarded(
     }
 
     crate::discovery::validate_content(app, &input).await?;
-    let mut tx = app.db.pool.begin().await?;
+    let mut tx = app.db.begin_write().await?;
+    let mut redirect_plan = if ["publish", "schedule", "unpublish"].contains(&input.action.as_str())
+    {
+        Some(crate::discovery::redirects::lock(&mut tx).await?)
+    } else {
+        None
+    };
     let old = if let Some(id) = id {
         Some(
             sqlx::query("UPDATE posts SET version=version WHERE id=$1 RETURNING *")
@@ -364,6 +370,18 @@ pub(crate) async fn save_guarded(
                 post.publish_at = 0;
             }
         }
+    }
+    if let Some((policy, version)) = &mut redirect_plan
+        && crate::discovery::redirects::publication(
+            &mut tx,
+            policy,
+            &post,
+            old.as_ref(),
+            &input.action,
+        )
+        .await?
+    {
+        crate::discovery::redirects::store(&mut tx, policy, *version).await?;
     }
     if old.is_some() {
         let result=sqlx::query("UPDATE posts SET slug=$1,title=$2,body=$3,fields=$4,blocks=$5,status=$6,version=$7,published_slug=$8,published_title=$9,published_body=$10,published_fields=$11,published_blocks=$12,publish_at=$13,published_at=$14,updated_at=$15,locale=$18,translation_group=$19,seo=$20,published_locale=$21,published_translation_group=$22,published_seo=$23,document=$24,published_document=$25 WHERE id=$16 AND version=$17")
@@ -483,7 +501,10 @@ pub async fn publish_due(app: &App) -> Result<usize> {
         return Ok(0);
     }
     let registry = crate::schema::Registry::load(app).await?;
-    let mut tx = app.db.pool.begin().await?;
+    let mut tx = app.db.begin_write().await?;
+    let (mut redirect_policy, redirect_version) =
+        crate::discovery::redirects::lock(&mut tx).await?;
+    let mut redirect_changed = false;
     // The first transaction statement acquires bounded write/row locks; workers
     // must not promote a decision snapshot another writer can invalidate.
     let mut query = sqlx::QueryBuilder::<sqlx::Any>::new(
@@ -503,6 +524,7 @@ pub async fn publish_due(app: &App) -> Result<usize> {
     posts.sort_by(|a, b| (a.publish_at, &a.id).cmp(&(b.publish_at, &b.id)));
     let mut n = 0;
     for mut p in posts {
+        let previous = p.clone();
         let terms=sqlx::query("SELECT t.name,t.kind FROM terms t JOIN post_terms pt ON pt.term_id=t.id WHERE pt.post_id=$1 ORDER BY t.name").bind(&p.id).fetch_all(&mut *tx).await?;
         let names = |kind: &str| {
             terms
@@ -542,6 +564,16 @@ pub async fn publish_due(app: &App) -> Result<usize> {
         }
         p.version += 1;
         p.updated_at = now();
+        if allowed {
+            redirect_changed |= crate::discovery::redirects::publication(
+                &mut tx,
+                &mut redirect_policy,
+                &p,
+                Some(&previous),
+                "publish",
+            )
+            .await?;
+        }
         let changed = if allowed {
             sqlx::query("UPDATE posts SET status='published',published_slug=slug,published_title=title,published_body=body,published_document=document,published_fields=fields,published_blocks=blocks,published_locale=locale,published_translation_group=translation_group,published_seo=seo,publish_at=0,published_at=$1,version=$2,updated_at=$3 WHERE id=$4 AND status='scheduled' AND version=$5")
                 .bind(p.published_at).bind(p.version).bind(p.updated_at).bind(&p.id).bind(p.version-1).execute(&mut *tx).await?.rows_affected()
@@ -575,6 +607,9 @@ pub async fn publish_due(app: &App) -> Result<usize> {
             )
             .await?;
         }
+    }
+    if redirect_changed {
+        crate::discovery::redirects::store(&mut tx, &redirect_policy, redirect_version).await?;
     }
     tx.commit().await?;
     if n > 0 {

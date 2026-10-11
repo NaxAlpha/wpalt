@@ -1,0 +1,48 @@
+{
+  "format": "wpalt-d07-structured-reference-v1",
+  "binary_sha256": "33cb48c196aa0f20dbb287d76a831a9731261ebd69d76e2622e47c855b6d5b1a",
+  "status": "passed",
+  "scope": "Actual pinned free Yoast Article/public author/dates alongside the existing title/image/sitemap reference, compared with independently configured native structured author/image/headline. No premium execution, migration or universal schema parity.",
+  "images": {
+    "wordpress:7.1.3-php8.3-apache": [
+      "wordpress@sha256:8ecd8d8e374167ea22235acf30f80d1165b82f07ffa5bcef90c1cad8f7be251f"
+    ],
+    "wordpress:cli-php8.3": [
+      "wordpress@sha256:36243da432a0f0a3b56dc3240ecee9b159108d71305e7c064d987a20a465bfde"
+    ],
+    "mariadb:11.4": [
+      "mariadb@sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6"
+    ]
+  },
+  "wordpress_version": "7.1.3",
+  "yoast_version": "28.6",
+  "reference": {
+    "html_sha256": "612a7a24ddb41935e05372417ce60e4b0d5f7e7c4e8c5989c42a7f750daced09",
+    "sitemap_sha256": "76290c56103240c2bc79b97a5799eb926058517977474231ab14e3398627b10b",
+    "title": "D06 truthful search title",
+    "description": "D06 actual publication description",
+    "social_image_present": true,
+    "image_sitemap_present": true
+  },
+  "native": {
+    "html_sha256": "79a6097bb5f9f4c579b60c3277b16094a8a18ce66f37c0b36bd1150b3f174c1d",
+    "sitemap_sha256": "1b69ffcb97d2010582fce0a7bc0ec102eb9d20e9863ec839560b15fa7a364d11",
+    "matched_title_description_image_relationship": true,
+    "working_copy_isolation": true,
+    "difference": "Owner-local identities and image alt per Open Graph guidance; native canonical editorial image index. Does not copy source plugin rules or assert premium/rendering equivalence."
+  },
+  "structured": {
+    "source_article_type": "Article",
+    "source_public_author_type": "Person",
+    "source_headline": "D06 actual journal",
+    "source_actual_publication_dates_present": true,
+    "source_modification_was_actual_later_public_edit": true,
+    "native_matches_explicit_public_author_and_visible_headline": true,
+    "native_local_image_with_dimensions": true,
+    "native_original_publication_date_present": true,
+    "native_does_not_invent_modification_date": true,
+    "source_graph_sha256": "d4c38c46b22e3fdd3efcf03ead83757f16cefdc538b7e61d09664ae5e14e7c4d",
+    "native_graph_sha256": "c2f0d07a749744d823d3e4db3b5e86964470781bbdda47512f10597b1ed7cc4d",
+    "difference": "Free Yoast derives author from public WordPress display_name and emits actual WordPress publication time and a modification time only after the real later published edit. Native author is a separately published explicit identity; original publication time is factual and no new modification date is invented. No premium location execution or complete provider feature equivalence."
+  }
+}

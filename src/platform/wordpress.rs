@@ -362,6 +362,17 @@ pub async fn prepare_with_adapters(
         ));
     }
     let owner = users[0]["id"].as_str().ok_or_else(invalid)?.to_owned();
+    let policy_rows = tables["redirect_policy"].as_array().ok_or_else(invalid)?;
+    if policy_rows.len() != 1
+        || policy_rows[0]["id"] != 1
+        || policy_rows[0]["version"] != 1
+        || policy_rows[0]["definition"]
+            != serde_json::to_string(&crate::discovery::redirects::Policy::default()).unwrap()
+    {
+        return Err(Error::invalid(
+            "Migration template has configured route policy; use an untouched fresh template.",
+        ));
+    }
     for (name, rows) in tables.iter() {
         if ![
             "users",
@@ -371,6 +382,7 @@ pub async fn prepare_with_adapters(
             "themes",
             "theme_revisions",
             "discovery_settings",
+            "redirect_policy",
             "site_design",
             "shop_settings",
             "business_usage",
@@ -679,7 +691,7 @@ pub async fn prepare_with_adapters(
     snapshot["audit_history"] = json!([]);
     let payload = serde_json::to_string(&snapshot).map_err(|_| invalid())?;
     let bytes = serde_json::to_vec(
-        &json!({"format":"wpalt-backup-v17","sha256":digest(payload.as_bytes()),"payload":payload}),
+        &json!({"format":"wpalt-backup-v18","sha256":digest(payload.as_bytes()),"payload":payload}),
     )
     .map_err(|_| invalid())?;
     crate::backup::inspect(&app.config, &bytes)?;
