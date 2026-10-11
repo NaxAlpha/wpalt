@@ -1,0 +1,311 @@
+{
+  "profile": "debug",
+  "benchmark_script_sha256": "589f131ec41e5439b5b9b7564d96b2757371c6025bd7df7534b21c3d5b5b7514",
+  "binary_sha256": "35f2c842a742983dcec0ad8c93d9ebb31633c7e788717578e2d72f152cf92029",
+  "binary_bytes": 118313224,
+  "scope": "Synthetic actual API publications, 128 regex rules, 150 seeded stories, the seeded about page, and one real publication. Debug SQL logging on; five warmups and 30 serial anonymous loopback requests; capture observations include the followed destination. Graph scanned 153 sources, then refuses an independent directly inserted >1000-publication DB fixture. RSS is warm application process memory, not peak or database-engine memory; database storage scopes differ. No throughput, CWV or relative WordPress efficiency claim.",
+  "observations": [
+    {
+      "engine": "sqlite",
+      "rules": 128,
+      "configuration_ms": [
+        352.169,
+        343.906,
+        345.003
+      ],
+      "report_disabled": {
+        "samples": 30,
+        "p50_ms": 1.473,
+        "p95_ms": 2.003,
+        "response_bytes": 22,
+        "observed_sql": 4,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026"
+        ],
+        "warm_rss_bytes": 69926912
+      },
+      "report_enabled": {
+        "samples": 30,
+        "p50_ms": 3.932,
+        "p95_ms": 4.457,
+        "response_bytes": 22,
+        "observed_sql": 10,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "UPDATE redirect_policy SET version=version \u2026",
+          "SELECT definition FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "DELETE FROM missing_paths WHERE \u2026",
+          "SELECT COUNT(*) FROM missing_paths \u2026",
+          "INSERT INTO missing_paths(path,hits,first_seen,last_seen,version) VALUES($1,1,$2,$2,1) \u2026"
+        ],
+        "warm_rss_bytes": 73924608
+      },
+      "last_capture_with_destination": {
+        "samples": 30,
+        "p50_ms": 5.253,
+        "p95_ms": 6.028,
+        "response_bytes": 2181,
+        "observed_sql": 16,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT id FROM posts \u2026",
+          "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+          "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+          "SELECT COUNT(*) FROM member_resources \u2026",
+          "SELECT name,body FROM comments \u2026",
+          "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+          "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+          "SELECT published_version,version FROM themes \u2026",
+          "SELECT live_options FROM site_design \u2026",
+          "SELECT '' AS id,field_schema \u2026"
+        ],
+        "warm_rss_bytes": 70877184
+      },
+      "graph": {
+        "request_ms": 756.939,
+        "rendered_ms": 731.353,
+        "sources": 153,
+        "edges": 1240,
+        "html_bytes": 583008
+      },
+      "over_1000_publications_refusal_ms": 25.647,
+      "database_bytes_after_larger_fixture": 16578512,
+      "query_plans": {
+        "publication_point": [
+          "SEARCH posts USING INDEX published_slugs (published_slug=?)"
+        ],
+        "retention_range": [
+          "SEARCH missing_paths USING INDEX missing_paths_retention (last_seen<?)"
+        ],
+        "exact_ordered_cap": [
+          "SCAN redirects USING INDEX sqlite_autoindex_redirects_1"
+        ],
+        "policy_point": [
+          "SEARCH redirect_policy USING INDEX sqlite_autoindex_redirect_policy_1 (id=?)"
+        ]
+      }
+    },
+    {
+      "engine": "postgres",
+      "rules": 128,
+      "configuration_ms": [
+        359.009,
+        345.852,
+        345.326
+      ],
+      "report_disabled": {
+        "samples": 30,
+        "p50_ms": 1.727,
+        "p95_ms": 2.163,
+        "response_bytes": 22,
+        "observed_sql": 4,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026"
+        ],
+        "warm_rss_bytes": 64782336
+      },
+      "report_enabled": {
+        "samples": 30,
+        "p50_ms": 4.121,
+        "p95_ms": 4.632,
+        "response_bytes": 22,
+        "observed_sql": 10,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "UPDATE redirect_policy SET version=version \u2026",
+          "SELECT definition FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "DELETE FROM missing_paths WHERE \u2026",
+          "SELECT COUNT(*) FROM missing_paths \u2026",
+          "INSERT INTO missing_paths(path,hits,first_seen,last_seen,version) VALUES($1,1,$2,$2,1) \u2026"
+        ],
+        "warm_rss_bytes": 68616192
+      },
+      "last_capture_with_destination": {
+        "samples": 30,
+        "p50_ms": 6.052,
+        "p95_ms": 8.648,
+        "response_bytes": 2181,
+        "observed_sql": 16,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT id FROM posts \u2026",
+          "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+          "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+          "SELECT COUNT(*) FROM member_resources \u2026",
+          "SELECT name,body FROM comments \u2026",
+          "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+          "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+          "SELECT published_version,version FROM themes \u2026",
+          "SELECT live_options FROM site_design \u2026",
+          "SELECT '' AS id,field_schema \u2026"
+        ],
+        "warm_rss_bytes": 65667072
+      },
+      "graph": {
+        "request_ms": 826.029,
+        "rendered_ms": 802.499,
+        "sources": 153,
+        "edges": 1240,
+        "html_bytes": 583071
+      },
+      "over_1000_publications_refusal_ms": 21.759,
+      "database_bytes_after_larger_fixture": 10477568,
+      "query_plans": {
+        "publication_point": [
+          {
+            "Plan": {
+              "Node Type": "Index Scan",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Scan Direction": "Forward",
+              "Index Name": "published_slugs",
+              "Relation Name": "posts",
+              "Alias": "posts",
+              "Startup Cost": 0.28,
+              "Total Cost": 8.29,
+              "Plan Rows": 1,
+              "Plan Width": 37,
+              "Index Cond": "(published_slug = 'route-measured'::text)",
+              "Filter": "(status = 'published'::text)"
+            }
+          }
+        ],
+        "retention_range": [
+          {
+            "Plan": {
+              "Node Type": "ModifyTable",
+              "Operation": "Delete",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Relation Name": "missing_paths",
+              "Alias": "missing_paths",
+              "Startup Cost": 6.42,
+              "Total Cost": 20.08,
+              "Plan Rows": 0,
+              "Plan Width": 0,
+              "Plans": [
+                {
+                  "Node Type": "Bitmap Heap Scan",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Relation Name": "missing_paths",
+                  "Alias": "missing_paths",
+                  "Startup Cost": 6.42,
+                  "Total Cost": 20.08,
+                  "Plan Rows": 293,
+                  "Plan Width": 6,
+                  "Recheck Cond": "(last_seen < 0)",
+                  "Plans": [
+                    {
+                      "Node Type": "Bitmap Index Scan",
+                      "Parent Relationship": "Outer",
+                      "Parallel Aware": false,
+                      "Async Capable": false,
+                      "Index Name": "missing_paths_retention",
+                      "Startup Cost": 0.0,
+                      "Total Cost": 6.35,
+                      "Plan Rows": 293,
+                      "Plan Width": 0,
+                      "Index Cond": "(last_seen < 0)"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "exact_ordered_cap": [
+          {
+            "Plan": {
+              "Node Type": "Limit",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Startup Cost": 0.15,
+              "Total Cost": 55.4,
+              "Plan Rows": 750,
+              "Plan Width": 72,
+              "Plans": [
+                {
+                  "Node Type": "Index Scan",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Scan Direction": "Forward",
+                  "Index Name": "redirects_pkey",
+                  "Relation Name": "redirects",
+                  "Alias": "redirects",
+                  "Startup Cost": 0.15,
+                  "Total Cost": 55.4,
+                  "Plan Rows": 750,
+                  "Plan Width": 72
+                }
+              ]
+            }
+          }
+        ],
+        "policy_point": [
+          {
+            "Plan": {
+              "Node Type": "Index Scan",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Scan Direction": "Forward",
+              "Index Name": "redirect_policy_pkey",
+              "Relation Name": "redirect_policy",
+              "Alias": "redirect_policy",
+              "Startup Cost": 0.15,
+              "Total Cost": 8.17,
+              "Plan Rows": 1,
+              "Plan Width": 32,
+              "Index Cond": "(id = 1)"
+            }
+          }
+        ],
+        "publication_forced_generic": [
+          {
+            "Plan": {
+              "Node Type": "Index Scan",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Scan Direction": "Forward",
+              "Index Name": "published_slugs",
+              "Relation Name": "posts",
+              "Alias": "posts",
+              "Startup Cost": 0.28,
+              "Total Cost": 8.29,
+              "Plan Rows": 1,
+              "Plan Width": 37,
+              "Index Cond": "(published_slug = $1)",
+              "Filter": "(status = 'published'::text)"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Redirects and published links
 
-D08 implementation is in progress. This document describes the developing contract, not a delivered release claim.
+Native schema 22 / portable recovery v18. This guide describes the supported local controls; delivery status, reproducible evidence and remaining limits are tracked in [D08 verification](evidence/d08-verification.md).
 
 Open **Discovery → Redirect & missing-link workspace** (`/admin/discovery/routes`). Native owner forms work without JavaScript. Exact rules win over owned publication aliases, followed by enabled capture rules ordered by priority and identifier. Existing real routes retain authority. All supported destinations are local safe ASCII paths; query strings are discarded rather than forwarded. A redirect to an unserved destination can still result in a missing page.
 

@@ -1,0 +1,13 @@
+{
+  "implementation_commit": "c5da5068a4a7c40bd266998ddf5322d79db4aee9",
+  "scope": "Actual retained native21 D07 executable initializes its own data and original v17 recovery point. Current stopped upgrade and fresh old-executable rollback run on both real SQLite/PostgreSQL. This is a local immutable-debug implementation receipt, not clean-release provenance.",
+  "engines": [
+    "sqlite",
+    "postgres"
+  ],
+  "status": "passed",
+  "verification_script": "scripts/maintenance_acceptance.py --source-schema 21 --source-binary work/d07-delivery-runtime/wpalt",
+  "source_binary_sha256": "a317cb009a2e8a365f4fe482f10f7497604a8c8fc4fe8672c9539a4d86168d1b",
+  "target_binary_sha256": "35f2c842a742983dcec0ad8c93d9ebb31633c7e788717578e2d72f152cf92029",
+  "log_sha256": "8dde53ffc8eb465f4a1904e985f45e3682b280a10e033f041dbe82b797cfb363"
+}

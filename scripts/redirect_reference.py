@@ -56,13 +56,13 @@ with tempfile.TemporaryDirectory(prefix='wpalt-d08-reference-') as temporary:
   run('docker','cp',str(archive),site+':/var/www/html/redirection.zip');wp('plugin','install','/var/www/html/redirection.zip','--activate');wp('plugin','verify-checksums','redirection','--strict')
   report['redirection_version']=wp('plugin','get','redirection','--field=version');assert report['redirection_version']=='5.10.1'
   run('docker','cp',str(ROOT/'scripts/reference/d08-seed.php'),site+':/var/www/html/wpalt-d08-source.php')
-  source=json.loads(wp('eval-file','/var/www/html/wpalt-d08-source.php'));assert source['before']=='/source-old/' and source['after']=='/source-new/'
+  source=json.loads(wp('eval-file','/var/www/html/wpalt-d08-source.php'));assert source['before']=='/source-old/' and source['after']=='/source-new/' and source['plugin_monitor_created']['redirect_id']>0
   observed=[]
   for path,code,target in [('/exact-old',301,source['after']),('/legacy/source-new',302,source['after']),('/source-old/',301,source['after']),('/partial/story',301,'/new-part/story'),('/except/story',301,source['after'])]:
    status,headers,_=response(origin+path);assert status==code and path_of(headers['Location'])==target,(path,status,headers.get('Location'));observed.append({'path':path,'status':status,'destination':target})
   for _ in range(2):assert response(origin+'/wpalt-reference-missing')[0]==404
   count=int(wp('eval',"global $wpdb; echo $wpdb->get_var(\"SELECT COUNT(*) FROM {$wpdb->prefix}redirection_404 WHERE url='/wpalt-reference-missing'\");"));assert count>=2
-  report['free_plugin']={'redirects':observed,'actual_published_slug_change':True,'404_records_for_two_requests':count,'logging_configuration':'IP logging disabled; no reference request payload or client metadata exported.'}
+  report['free_plugin']={'redirects':observed,'actual_published_slug_change':True,'plugin_monitor_creation_event':source['plugin_monitor_created'],'404_records_for_two_requests':count,'logging_configuration':'IP logging disabled; no reference request payload or client metadata exported.'}
   native_origin=f'http://127.0.0.1:{port()}';config=root/'native.toml';config.write_text(f'database_url={json.dumps("sqlite://"+str(root/"native.db")+"?mode=rwc")}\ndata_dir={json.dumps(str(root/"data"))}\nlisten={json.dumps(native_origin.removeprefix("http://"))}\nbase_url={json.dumps(native_origin)}\n');config.chmod(0o600)
   run(str(binary),'--config',str(config),'init','--admin-email','owner@example.test',stdin=password+'\n')
   log=open(root/'native-private.log','w');server=subprocess.Popen([str(binary),'--config',str(config),'serve','--external-worker'],stdout=log,stderr=log)

@@ -176,6 +176,7 @@ def run(binary, postgres, psql):
                         plans = {name: [row[3] for row in connection.execute("EXPLAIN QUERY PLAN " + query)] for name, query in queries.items()}
                 else:
                     plans = {name: json.loads(pg("SET search_path=" + schema + "; EXPLAIN (FORMAT JSON) " + query)) for name, query in queries.items()}
+                    plans["publication_forced_generic"] = json.loads(pg("SET search_path="+schema+"; SET plan_cache_mode=force_generic_plan; PREPARE measured_route(text) AS SELECT id FROM posts WHERE published_slug=$1 AND published_slug<>'' AND status='published'; EXPLAIN (FORMAT JSON) EXECUTE measured_route('route-measured')"))
                 database_bytes = sum(file.stat().st_size for file in root.glob("site.db*")) if engine == "sqlite" else int(pg("SELECT SUM(pg_total_relation_size(quote_ident(schemaname)||'.'||quote_ident(tablename))) FROM pg_tables WHERE schemaname='" + schema + "'"))
                 observations.append({"engine": engine, "rules": 128, "configuration_ms": [round(value, 3) for value in timings], "report_disabled": disabled, "report_enabled": enabled, "last_capture_with_destination": capture, "graph": graph_observation, "over_1000_publications_refusal_ms": refusal_ms, "database_bytes_after_larger_fixture": database_bytes, "query_plans": plans})
             finally:
@@ -198,7 +199,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     binary = Path(args.binary).resolve()
-    report = {"profile": args.profile, "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "binary_bytes": binary.stat().st_size, "scope": "Synthetic actual API publications, 128 regex rules, 150 seeded stories, the seeded about page, and one real publication. Debug SQL logging on; five warmups and 30 serial anonymous loopback requests; capture observations include the followed destination. Graph scanned 153 sources, then refuses an independent directly inserted >1000-publication DB fixture. RSS is warm application process memory, not peak or database-engine memory; database storage scopes differ. No throughput, CWV or relative WordPress efficiency claim.", "observations": run(binary, args.postgres, args.psql)}
+    report = {"profile": args.profile, "benchmark_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "binary_bytes": binary.stat().st_size, "scope": "Synthetic actual API publications, 128 regex rules, 150 seeded stories, the seeded about page, and one real publication. Debug SQL logging on; five warmups and 30 serial anonymous loopback requests; capture observations include the followed destination. Graph scanned 153 sources, then refuses an independent directly inserted >1000-publication DB fixture. RSS is warm application process memory, not peak or database-engine memory; database storage scopes differ. No throughput, CWV or relative WordPress efficiency claim.", "observations": run(binary, args.postgres, args.psql)}
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + "\n")
