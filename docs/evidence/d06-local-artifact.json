@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-11",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "profile": "debug",
+  "binary_sha256": "a36bb9b8343a4e57d517a37c9e4a316729f6f207e2e2e36bf4b874857a3a3fe9",
+  "source_sha256": {
+    "src/backup.rs": "9a5ffbe75819d984a16dfd5e645c954f7bb9111ec573af18767ad0a42e512cce",
+    "src/content.rs": "d406b71a086974f7a1707a2e4a67628ea2a03c565d344325c0a66fed18053a23",
+    "src/discovery.rs": "b44283e883a972fb01925030f21383e2668022bdb7951e75b33b5af2c80876f5",
+    "src/discovery/publication.rs": "ada8e6e8bd13526b75474d1732154e292bcb7946d5d480a27b7cc4ccb40e2fcc",
+    "src/web.rs": "99a616e8a7ed1fde4838bedec845edc036cb9b5bf2193eec6f339e67b76af852",
+    "tests/acceptance.rs": "6aa21bd1ec089ac62bdfc6ce8a67b41a7aa203628c9ac6ea3c3b8bb252e96f2d",
+    "assets/generated/editor.js": "029e214e4c461e4506f35e2801b683a726ed6c8c481c018b60dde57cef4dfd98",
+    "assets/generated/admin-ui.css": "be3f1d6c9aa5f35a9c247b2983dc3e577e88c922606c000b01fe11a478f9eca8",
+    "scripts/discovery_acceptance.cjs": "e0d484701a2aef135db29769b0cb1d1e1082e42040516243b61001ed8ff7b529",
+    "scripts/discovery_benchmark.py": "66597e88711aff56e264c869137fd8f28a1e4170540ea9b3dfdf6622dce0b885",
+    "scripts/discovery_reference.py": "375178baa7cd7719db9118e45a145edf065d403438f0640d35e8a1c6046d0989"
+  },
+  "native_schema": 20,
+  "portable_format": 16,
+  "rust_cases": 109,
+  "pipeline_cases": 11,
+  "engines": [
+    "SQLite",
+    "PostgreSQL 17.11 required"
+  ],
+  "checks": [
+    "full cargo test --locked",
+    "cargo clippy --locked --all-targets -- -D warnings",
+    "cargo build --locked and matching immutable copy",
+    "cargo fmt --all --check",
+    "locked frontend format check",
+    "guidance freshness, 67 records",
+    "single-server connected discovery browser",
+    "two PostgreSQL processes plus separate worker, round robin without retry/stickiness",
+    "independently retained actual D05 native-19 migration and fresh old-runtime rollback",
+    "serial populated discovery measurements and actual SQLx SELECT counts"
+  ],
+  "limits": "Local scoped evidence; separate exact-head Linux/reference/archive and actual-main release gates remain pending. No universal accessibility, throughput, peak RSS, premium parity or external appearance claim."
+}

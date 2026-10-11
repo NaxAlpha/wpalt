@@ -93,7 +93,7 @@ pub fn validate_settings(s: &Settings) -> Result<()> {
 pub fn validate_input(p: &PostInput, s: &Settings) -> Result<()> {
     if p.title.trim().is_empty()
         || p.title.len() > 300
-        || p.title.chars().any(char::is_control)
+        || !crate::discovery::plain_text(&p.title)
         || !valid_slug(&p.slug)
         || !crate::schema::identifier(&p.kind)
         || p.body.len() > 512 * 1024

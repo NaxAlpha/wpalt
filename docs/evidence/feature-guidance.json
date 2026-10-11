@@ -2314,13 +2314,15 @@
         "https://developers.google.com/search/docs/crawling-indexing/sitemaps/news-sitemap",
         "https://www.loc.gov/standards/iso639-2/ascii_8bits.html",
         "https://wordpress.org/plugins/wordpress-seo/",
-        "https://github.com/Yoast/wordpress-seo/tree/147c9792623e321d1c51fe7df5a35e84eda5c51f"
+        "https://github.com/Yoast/wordpress-seo/tree/147c9792623e321d1c51fe7df5a35e84eda5c51f",
+        "https://www.w3.org/TR/xml/#charsets"
       ],
       "applicable_versions": [
         "Google sitemap guidance revised 2025-12-10, checked 2026-10-11",
         "Yoast free 28.6; WordPress 7.1.3 reference",
         "wpalt native 20 / portable v16 / theme package 2",
-        "LOC ISO 639-2 data SHA256 42b71885e4dc885559fda5ad059fd81838cf4782cedb5fd08cc3431f7d067371"
+        "LOC ISO 639-2 data SHA256 42b71885e4dc885559fda5ad059fd81838cf4782cedb5fd08cc3431f7d067371",
+        "W3C XML 1.0 Fifth Edition, production [2]"
       ],
       "last_checked": "2026-10-11",
       "next_review": "2026-11-10",
@@ -2330,7 +2332,8 @@
         "Illustrative preview; no guarantee of external title/card selection or ranking.",
         "Published snapshots plus current media/member authority control public declarations; private working previews authenticate.",
         "Image canonical graph, explicit central/relevant video placement and original recent news date/language; no invented or deprecated tags.",
-        "Bound queries, rows, XML and pages; rebuild derived graph during stopped upgrade/fresh recovery; no network fetch."
+        "Bound queries, rows, XML and pages; rebuild derived graph during stopped upgrade/fresh recovery; no network fetch.",
+        "Refuse controls and U+FFFE/U+FFFF in publication metadata/titles and recovery revisions; never silently rewrite facts."
       ],
       "tests": [
         "publication_discovery_assets_never_promote_drafts_or_revoked_resources",
@@ -2345,7 +2348,7 @@
         "upstream namespace/required-tag/date/language guideline change",
         "source plugin version or parser advisory"
       ],
-      "status": "Final native 109 Rust cases, 11 pipeline cases, real stopped D05 upgrade/rollback, single-server and two-process browser journeys, actual SQLx counts and optimized plans passed; exact-head CI/free-reference/clean archive and actual-main release pending."
+      "status": "Final 109-case Rust suite, 11 pipeline cases, Clippy, actual D05 stopped upgrade/fresh rollback, single-server/two-process browser, optimized plans and real SQLx counts pass. Reproduced XML-invalid recovery and Linux touch-target regressions are fixed. Corrected actual free WordPress/Yoast reference passes; exact final-head cumulative/reference/clean archive and actual-main release remain pending."
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

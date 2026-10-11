@@ -9762,6 +9762,23 @@ async fn discovery_formats_have_explicit_conversion_validation_and_private_draft
     ] {
         assert!(Seo::parse(raw).is_err());
     }
+    for invalid in [
+        "Invalid\u{1}XML",
+        "Invalid\u{fffe}XML",
+        "Invalid\u{ffff}XML",
+    ] {
+        for raw in [
+            serde_json::json!({"title":invalid}),
+            serde_json::json!({"social_alt":invalid}),
+            serde_json::json!({"schema_type":"Article","news":{"publication":invalid,"language":"en"}}),
+            serde_json::json!({"video":{"media":uuid::Uuid::new_v4().to_string(),"poster":uuid::Uuid::new_v4().to_string(),"title":invalid,"description":"Visible film"}}),
+        ] {
+            assert!(
+                Seo::parse(&raw.to_string()).is_err(),
+                "XML-invalid metadata must be refused before publication"
+            );
+        }
+    }
     for pg in engines() {
         let site = Site::new(pg, true).await;
         let p = content::save(
@@ -9781,19 +9798,25 @@ async fn discovery_formats_have_explicit_conversion_validation_and_private_draft
             graph["tables"].get("published_image_refs").is_none(),
             "Derived index is rebuilt from canonical publication, not separately trusted"
         );
-        let mut invalid_titles = graph.clone();
-        invalid_titles["tables"]["posts"][0]["published_title"] = "Invalid\u{0001}XML".into();
-        let invalid_payload = invalid_titles.to_string();
-        let mut invalid_envelope = envelope.clone();
-        invalid_envelope["payload"] = invalid_payload.clone().into();
-        invalid_envelope["sha256"] = auth::digest(invalid_payload.as_bytes()).into();
-        assert!(
-            backup::inspect(
-                &site.app.config,
-                &serde_json::to_vec(&invalid_envelope).unwrap()
-            )
-            .is_err()
-        );
+        for invalid in [
+            "Invalid\u{1}XML",
+            "Invalid\u{fffe}XML",
+            "Invalid\u{ffff}XML",
+        ] {
+            let mut invalid_titles = graph.clone();
+            invalid_titles["tables"]["posts"][0]["published_title"] = invalid.into();
+            let invalid_payload = invalid_titles.to_string();
+            let mut invalid_envelope = envelope.clone();
+            invalid_envelope["payload"] = invalid_payload.clone().into();
+            invalid_envelope["sha256"] = auth::digest(invalid_payload.as_bytes()).into();
+            assert!(
+                backup::inspect(
+                    &site.app.config,
+                    &serde_json::to_vec(&invalid_envelope).unwrap()
+                )
+                .is_err()
+            );
+        }
         graph["schema"] = 15.into();
         let payload = graph.to_string();
         envelope["payload"] = payload.clone().into();
@@ -9996,13 +10019,19 @@ async fn discovery_sitemap_pages_and_publish_races_keep_exact_canonical_relation
         let unchanged = content::get(&site.app, &base.id).await.unwrap();
         assert_eq!(unchanged.version, current.version);
         assert_eq!(unchanged.published_document, current.published_document);
-        let mut malformed = input("invalid-news-title", "publish");
-        malformed.title = "XML\u{1}control".into();
-        assert!(
-            content::save(&site.app, site.session(), None, malformed)
-                .await
-                .is_err()
-        );
+        for title in [
+            "XML\u{1}control",
+            "XML\u{fffe}noncharacter",
+            "XML\u{ffff}noncharacter",
+        ] {
+            let mut malformed = input("invalid-news-title", "publish");
+            malformed.title = title.into();
+            assert!(
+                content::save(&site.app, site.session(), None, malformed)
+                    .await
+                    .is_err()
+            );
+        }
         site.close().await;
     }
 }

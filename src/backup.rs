@@ -1413,10 +1413,10 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
         for key in ["title", "published_title"] {
             if row[key]
                 .as_str()
-                .is_none_or(|title| title.chars().any(char::is_control))
+                .is_none_or(|title| !crate::discovery::plain_text(title))
             {
                 return Err(Error::invalid(
-                    "Correct control characters in content titles before recovery or upgrade.",
+                    "Correct control or XML-invalid characters in content titles before recovery or upgrade.",
                 ));
             }
         }
@@ -1434,6 +1434,16 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
     for row in &snapshot.tables["revisions"] {
         let value: Value = serde_json::from_str(row["snapshot"].as_str().unwrap())
             .map_err(|_| Error::invalid("Invalid revision"))?;
+        for key in ["title", "published_title"] {
+            if value["post"][key]
+                .as_str()
+                .is_none_or(|title| !crate::discovery::plain_text(title))
+            {
+                return Err(Error::invalid(
+                    "Correct control or XML-invalid revision titles before recovery or upgrade.",
+                ));
+            }
+        }
         for key in ["seo", "published_seo"] {
             crate::discovery::Seo::parse(
                 value["post"][key]

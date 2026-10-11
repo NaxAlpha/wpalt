@@ -20,6 +20,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub mod publication;
 
+/// Shared single-line publication text must also be representable in XML 1.0.
+/// Rust strings already exclude surrogates; U+FFFE/U+FFFF are not controls.
+/// See W3C XML 1.0 Fifth Edition, production [2] (Char).
+pub fn plain_text(s: &str) -> bool {
+    !s.chars()
+        .any(|c| c.is_control() || matches!(c, '\u{fffe}' | '\u{ffff}'))
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Language {
@@ -178,9 +186,7 @@ impl Seo {
             || s.title.len() > 300
             || s.description.len() > 1000
             || !["WebPage", "Article"].contains(&s.schema_type.as_str())
-            || [&s.title, &s.description]
-                .iter()
-                .any(|s| s.chars().any(char::is_control))
+            || [&s.title, &s.description].iter().any(|s| !plain_text(s))
         {
             return Err(Error::invalid(
                 "Use bounded SEO text and Article or WebPage structured output.",

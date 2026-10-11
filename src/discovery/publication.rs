@@ -136,12 +136,12 @@ fn identifier(s: &str) -> bool {
     uuid::Uuid::parse_str(s).is_ok()
 }
 fn text(s: &str, limit: usize) -> bool {
-    !s.trim().is_empty() && s.len() <= limit && !s.chars().any(char::is_control)
+    !s.trim().is_empty() && s.len() <= limit && super::plain_text(s)
 }
 pub fn validate(seo: &Seo) -> Result<()> {
     if (!seo.social_image.is_empty() && !identifier(&seo.social_image))
         || seo.social_alt.len() > 1000
-        || seo.social_alt.chars().any(char::is_control)
+        || !super::plain_text(&seo.social_alt)
     {
         return Err(Error::invalid(
             "Choose a local social image identity and bounded plain alt text.",
@@ -518,12 +518,18 @@ pub async fn sitemap(
                     let date = chrono::DateTime::from_timestamp(date, 0)
                         .ok_or_else(|| Error::invalid("Invalid original news date."))?
                         .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+                    let title: String = r.get("published_title");
+                    if !text(&title, 300) {
+                        return Err(Error::invalid(
+                            "Correct invalid published news title before discovery.",
+                        ));
+                    }
                     extension = format!(
                         "<news:news><news:publication><news:name>{}</news:name><news:language>{}</news:language></news:publication><news:publication_date>{}</news:publication_date><news:title>{}</news:title></news:news>",
                         xml(&n.publication),
                         xml(&n.language),
                         xml(&date),
-                        xml(&r.get::<String, _>("published_title"))
+                        xml(&title)
                     );
                 }
             }

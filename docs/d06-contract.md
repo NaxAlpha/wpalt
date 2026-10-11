@@ -18,6 +18,7 @@ An editor reviews a clearly labelled illustrative search/social preview alongsid
 
 - [Google title links](https://developers.google.com/search/docs/appearance/title-link): titles may be rewritten/truncated according to device and content; preview is illustrative, not an exact SERP promise.
 - [Google snippets](https://developers.google.com/search/docs/appearance/snippet): snippets can use page content or meta descriptions; no fixed text guarantee.
+- [XML 1.0 Fifth Edition](https://www.w3.org/TR/xml/#charsets): production [2] excludes U+FFFE/U+FFFF independently of control-character handling; refuse invalid publication text and recovery graphs rather than silently altering facts.
 - [Open Graph](https://ogp.me/): image URL plus available type/dimensions/alt are derived from the chosen local image; metadata must describe the image.
 - [Image sitemaps](https://developers.google.com/search/docs/crawling-indexing/sitemaps/image-sitemaps), revision 2025-12-10: use required image wrapper/location and avoid deprecated caption/title/license/geolocation tags; up to 1,000 images per URL is an external ceiling, not a required local budget.
 - [Video sitemaps](https://developers.google.com/search/docs/crawling-indexing/sitemaps/video-sitemaps): truthful title, thumbnail, description and content/player location required; referenced files must be publicly crawlable. Omit invented ratings/view counts and retired tags.
