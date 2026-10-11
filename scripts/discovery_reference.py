@@ -62,6 +62,16 @@ with tempfile.TemporaryDirectory(prefix='wpalt-d06-reference-') as temporary:
   run('docker','cp',str(ROOT/'tests/fixtures/green.png'),site+':/var/www/html/wpalt-d06-image.png')
   run('docker','cp',str(ROOT/'scripts/reference/d06-seed.php'),site+':/var/www/html/wpalt-d06-source.php')
   source=json.loads(wp('eval-file','/var/www/html/wpalt-d06-source.php'))
+  if args.structured:
+   # A new publication has equal publication/modification timestamps. The
+   # actual free plugin deliberately omits dateModified until a later edit.
+   # Perform a real public edit; never force artificial timestamp metadata.
+   time.sleep(1.1)
+   wp('post','update',str(source['id']),'--post_content=An actual later editorial update. <img src="'+source['image']+'" alt="D06 garden" />')
+   wp('eval','YoastSEO()->classes->get(\\Yoast\\WP\\SEO\\Builders\\Indexable_Builder::class)->build_for_id_and_type('+str(int(source['id']))+', "post");')
+   source['published_gmt']=wp('post','get',str(source['id']),'--field=post_date_gmt')
+   source['modified_gmt']=wp('post','get',str(source['id']),'--field=post_modified_gmt')
+   assert source['modified_gmt']>source['published_gmt']
   with client.open(source['url'],timeout=15) as response:source_html=response.read().decode()
   parsed=Head();parsed.feed(source_html)
   assert parsed.title==source['title'];assert parsed.meta['description']==source['description'];assert parsed.meta['og:image']==source['image']
@@ -119,7 +129,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-d06-reference-') as temporary:
    assert native_article['headline']==article['headline'];assert native_nodes[1]['name']==actual_author['name'];assert native_article['image']['contentUrl']==native_origin+'/media/'+image
    assert native_article['datePublished'] and 'dateModified' not in native_article
    assert 'Public pen name' in structured_html and 'owner@example.test' not in structured_html
-   report['structured']={'source_article_type':article['@type'],'source_public_author_type':actual_author['@type'],'source_headline':article['headline'],'source_actual_publication_dates_present':True,'native_matches_explicit_public_author_and_visible_headline':True,'native_local_image_with_dimensions':True,'native_original_publication_date_present':True,'native_does_not_invent_modification_date':True,'source_graph_sha256':hashlib.sha256(json.dumps(source_nodes,sort_keys=True).encode()).hexdigest(),'native_graph_sha256':hashlib.sha256(json.dumps(native_nodes,sort_keys=True).encode()).hexdigest(),'difference':'Free Yoast derives author from public WordPress display_name and emits actual WordPress publication/modification dates. Native author is a separately published explicit identity; original publication time is factual and no new modification date is invented. No premium location execution or complete provider feature equivalence.'}
+   report['structured']={'source_article_type':article['@type'],'source_public_author_type':actual_author['@type'],'source_headline':article['headline'],'source_actual_publication_dates_present':True,'source_modification_was_actual_later_public_edit':True,'native_matches_explicit_public_author_and_visible_headline':True,'native_local_image_with_dimensions':True,'native_original_publication_date_present':True,'native_does_not_invent_modification_date':True,'source_graph_sha256':hashlib.sha256(json.dumps(source_nodes,sort_keys=True).encode()).hexdigest(),'native_graph_sha256':hashlib.sha256(json.dumps(native_nodes,sort_keys=True).encode()).hexdigest(),'difference':'Free Yoast derives author from public WordPress display_name and emits actual WordPress publication time and a modification time only after the real later published edit. Native author is a separately published explicit identity; original publication time is factual and no new modification date is invented. No premium location execution or complete provider feature equivalence.'}
    report['format']='wpalt-d07-structured-reference-v1'
    report['scope']='Actual pinned free Yoast Article/public author/dates alongside the existing title/image/sitemap reference, compared with independently configured native structured author/image/headline. No premium execution, migration or universal schema parity.'
   report['status']='passed'
