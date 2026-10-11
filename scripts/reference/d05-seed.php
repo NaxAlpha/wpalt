@@ -10,7 +10,7 @@ $legacy = [['id'=>'legacyroot','elType'=>'container','settings'=>['flex_directio
 ]]];
 $atomic = [['id'=>'atomicroot','elType'=>'e-div-block','version'=>'0.0','settings'=>[],'styles'=>[],'interactions'=>[],'editor_settings'=>[],'elements'=>[
     ['id'=>'atomicheading','elType'=>'widget','widgetType'=>'e-heading','version'=>'0.0','settings'=>['title'=>['$$type'=>'escaped-html','value'=>'D05_ATOMIC_HEADING'],'tag'=>['$$type'=>'string','value'=>'h1']],'styles'=>[],'interactions'=>[],'editor_settings'=>[],'elements'=>[]],
-    ['id'=>'atomiccopy','elType'=>'widget','widgetType'=>'e-paragraph','version'=>'0.0','settings'=>['paragraph'=>['$$type'=>'string','value'=>'<p>D05_ATOMIC_BODY.</p>']],'styles'=>[],'interactions'=>[],'editor_settings'=>[],'elements'=>[]],
+    ['id'=>'atomiccopy','elType'=>'widget','widgetType'=>'e-paragraph','version'=>'0.0','settings'=>['paragraph'=>['$$type'=>'escaped-html','value'=>'<p>D05_ATOMIC_BODY.</p>']],'styles'=>[],'interactions'=>[],'editor_settings'=>[],'elements'=>[]],
     ['id'=>'atomicbutton','elType'=>'widget','widgetType'=>'e-button','version'=>'0.0','settings'=>['text'=>['$$type'=>'escaped-html','value'=>'D05_ATOMIC_LINK'],'link'=>['$$type'=>'link','value'=>['destination'=>['$$type'=>'url','value'=>'/local-path'],'tag'=>['$$type'=>'string','value'=>'a']]]],'styles'=>[],'interactions'=>[],'editor_settings'=>[],'elements'=>[]]
 ]]];
 $summary = [];

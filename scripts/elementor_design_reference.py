@@ -10,7 +10,9 @@ secret,password=secrets.token_hex(24),secrets.token_hex(24)
 images=['wordpress:7.1.3-php8.3-apache','wordpress:cli-php8.3','mariadb:11.4']
 def run(*argv,stdin=None,ok=True):
  r=subprocess.run(argv,input=stdin,text=True,capture_output=True,timeout=240)
- if ok and r.returncode:raise RuntimeError(r.stderr.replace(secret,'[redacted]').replace(password,'[redacted]')[-2000:])
+ if ok and r.returncode:
+  diagnostic=r.stderr.replace(secret,'[redacted]').replace(password,'[redacted]')
+  raise RuntimeError(diagnostic if len(diagnostic)<=4000 else diagnostic[:2000]+'\n[bounded middle omitted]\n'+diagnostic[-2000:])
  return r
 params=['-e','WORDPRESS_DB_HOST='+database,'-e','WORDPRESS_DB_USER=wpalt','-e','WORDPRESS_DB_PASSWORD='+secret,'-e','WORDPRESS_DB_NAME=wpalt']
 def wp(*argv):return run('docker','run','--rm','--network',network,'--user','33:33','-v',volume+':/var/www/html',*params,images[1],'php','-d','memory_limit=512M','/usr/local/bin/wp',*argv).stdout.strip()

@@ -10,7 +10,7 @@ Legacy containers/sections/columns, headings, sanitized text, links, images, gal
 
 ## Native correctness and security
 
-The full local suite passed 106 Rust cases before the final bounded rich-text/leaf refinements: 83 domain/HTTP acceptance journeys, 14 business-rule cases, four canonical document cases, two Elementor cases and one each authentication/font/catalog. The changed connected journeys pass on the final source against real SQLite/PostgreSQL. This is a case count, not a test coverage percentage. All-target Clippy denies warnings; formatting, locked frontend build/format, protocol freshness and pipeline checks remain required.
+The full final-source local suite passes 106 Rust cases: 83 domain/HTTP acceptance journeys, 14 business-rule cases, four canonical document cases, two Elementor cases and one each authentication/font/catalog. The changed connected journeys pass on the final source against real SQLite/PostgreSQL. This is a case count, not a test coverage percentage. All-target Clippy denies warnings; formatting, locked frontend build/format, protocol freshness and pipeline checks remain required.
 
 `design_review_accounts_for_atomic_styles_and_refuses_unsafe_graphs` covers atomic fields/control losses, theme/base fingerprints, required and explicitly aliased globals, literal text/encoded markup/foreign image/code/link attacks, explicit fallback fonts, visible leaf descendants, duplicate and oversized source graphs, unsafe URLs and unknown executable source widgets. `reviewed_elementor_design_preserves_live_pages_and_exact_owner_review` covers both real databases: malformed unauthenticated refusal before work, read-only private review, no-store, required loss acknowledgement, changed target/fingerprint refusal, exactly one concurrent save, preview/live separation, unrelated page preservation and fresh recovery.
 
@@ -29,3 +29,7 @@ Current pinned free 4.3.4 source inspection is recorded in `research/d05-element
 ## Retained breadth
 
 Full free/Pro widgets, raw atomic style/responsive variants, custom breakpoints, dynamic tags, display conditions, template/site assignment and exact rendering remain F024 work. Owner-provisioned licensed premium fixtures require external access. Large repeated content imports can exhaust native condition depth; future indexed per-content template assignment is tracked rather than hidden by a compatibility layer. No application license/adoption policy, physical multi-host or assistive-technology certification is inferred.
+
+## Candidate verification checkpoint
+
+[PR #21](https://github.com/NaxAlpha/wpalt/pull/21) candidate `cb042ca4bca1522e00fe1e1673824c674642b196` passes all seven cumulative application gates in run [38064297355](https://github.com/NaxAlpha/wpalt/actions/runs/38064297355). The eighth current-free reference gate verifies WordPress 7.1.3/free Elementor 4.3.4 checksums and container availability, but fails at saving the synthetic atomic document. The fixture used a `string` paragraph instead of that version's declared `escaped-html` property. The corrected fixture and bounded first/last error reporting must pass the new exact head before readiness/merge. No failed comparison is counted as executed parity. The full local final-source native run independently passes 106 cases with PostgreSQL required; 11 meaningful pipeline cases also pass.
