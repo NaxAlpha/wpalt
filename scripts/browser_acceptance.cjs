@@ -53,7 +53,7 @@ async function freePort() {
     fs.writeFileSync(script,source);
     fs.appendFileSync(config,`\n[[consent_scripts.scripts]]\nid = "example"\nlabel = "Local example"\npurpose = "Count consented visits on this server."\npath = ${JSON.stringify(script)}\nsha256 = "${crypto.createHash('sha256').update(source).digest('hex')}"\n`);
   }
-  if (process.env.WPALT_VIDEO_ONLY) {
+  if (process.env.WPALT_VIDEO_ONLY || process.env.WPALT_DISCOVERY_ONLY) {
     const ffmpeg = process.env.WPALT_TEST_FFMPEG || (process.platform === "darwin" ? "/opt/homebrew/bin/ffmpeg" : "/usr/bin/ffmpeg");
     const ffprobe = process.env.WPALT_TEST_FFPROBE || (process.platform === "darwin" ? "/opt/homebrew/bin/ffprobe" : "/usr/bin/ffprobe");
     assert(fs.existsSync(ffmpeg) && fs.existsSync(ffprobe),"Enabled video browser fixture requires owner-installed tools");
@@ -138,6 +138,7 @@ async function freePort() {
   if (process.env.WPALT_INTERFACE_ONLY) { await require('./interface_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_LANGUAGE_ONLY) { await require('./language_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_EDITORIAL_ONLY) { await require('./editorial_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
+  if (process.env.WPALT_DISCOVERY_ONLY) { await require('./discovery_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d06-discovery.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }
   if (process.env.WPALT_ELEMENTOR_DESIGN_ONLY) { await require('./elementor_design_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d05-elementor-design.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }
   if (process.env.WPALT_THEME_ASSETS_ONLY) { await require('./theme_assets_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d04-theme-assets.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }
   if (process.env.WPALT_THEME_ONLY) { await require("./independent_theme_acceptance.cjs")(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }

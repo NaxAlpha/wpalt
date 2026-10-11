@@ -2,7 +2,7 @@ use crate::{config::Config, error::Result, model::Settings};
 use sqlx::{Any, AnyPool, ConnectOptions, Execute, QueryBuilder, Row, any::AnyPoolOptions};
 use std::str::FromStr;
 
-pub const SCHEMA_VERSION: i64 = 19;
+pub const SCHEMA_VERSION: i64 = 20;
 
 #[derive(Clone)]
 pub struct Db {
@@ -113,6 +113,7 @@ impl Db {
                     || version == Some(16)
                     || version == Some(17)
                     || version == Some(18)
+                    || version == Some(19)
                     || version == Some(SCHEMA_VERSION),
                 "unsupported schema version; use the documented migration/reset path"
             );
@@ -128,6 +129,9 @@ impl Db {
         }
         let mut tx = self.pool.begin().await?;
         sqlx::raw_sql(SCHEMA).execute(&mut *tx).await?;
+        sqlx::raw_sql(crate::discovery::publication::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
         sqlx::raw_sql(crate::theme::assets::SCHEMA)
             .execute(&mut *tx)
             .await?;
@@ -315,6 +319,14 @@ impl Db {
         sqlx::raw_sql(crate::platform::local_processes::SCHEMA)
             .execute(&mut *tx)
             .await?;
+        sqlx::raw_sql(&crate::discovery::publication::indexes(self.postgres))
+            .execute(&mut *tx)
+            .await?;
+        if version.is_some_and(|v| v < 20) {
+            crate::discovery::publication::rebuild(&mut tx)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.1))?;
+        }
         sqlx::query("UPDATE schema_version SET version=$1 WHERE id=1")
             .bind(SCHEMA_VERSION)
             .execute(&mut *tx)

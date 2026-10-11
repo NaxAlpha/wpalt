@@ -18,6 +18,8 @@ use serde_json::{Value, json};
 use sqlx::Row;
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod publication;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Language {
@@ -149,6 +151,10 @@ pub struct Seo {
     pub description: String,
     pub noindex: bool,
     pub schema_type: String,
+    pub social_image: String,
+    pub social_alt: String,
+    pub video: Option<publication::Video>,
+    pub news: Option<publication::News>,
 }
 impl Default for Seo {
     fn default() -> Self {
@@ -157,15 +163,18 @@ impl Default for Seo {
             description: String::new(),
             noindex: false,
             schema_type: "WebPage".into(),
+            social_image: String::new(),
+            social_alt: String::new(),
+            video: None,
+            news: None,
         }
     }
 }
 impl Seo {
     pub fn parse(raw: &str) -> Result<Self> {
-        let s: Self = serde_json::from_str(raw).map_err(|_| {
-            Error::invalid("SEO must contain title, description, noindex and schema_type only.")
-        })?;
-        if raw.len() > 4096
+        let s: Self = serde_json::from_str(raw)
+            .map_err(|_| Error::invalid("SEO must contain supported discovery fields only."))?;
+        if raw.len() > 8192
             || s.title.len() > 300
             || s.description.len() > 1000
             || !["WebPage", "Article"].contains(&s.schema_type.as_str())
@@ -177,6 +186,7 @@ impl Seo {
                 "Use bounded SEO text and Article or WebPage structured output.",
             ));
         }
+        publication::validate(&s)?;
         Ok(s)
     }
 }
@@ -392,9 +402,9 @@ pub async fn metadata_with_settings(
     } else {
         json!({"@context":"https://schema.org","@type":"WebSite","name":title,"url":app.config.origin(),"inLanguage":language})
     };
-    Ok(
-        json!({"origin":app.config.origin(),"language":language,"direction":l.direction,"title":title,"description":description,"canonical":canonical,"noindex":seo.noindex||search,"alternates":alternates,"structured":structured,"business":d.business,"navigation":if l.navigation.is_empty(){serde_json::from_str::<Value>(&settings.navigation).unwrap_or(json!([]))}else{serde_json::to_value(&l.navigation).unwrap()},"search_label":l.search_label}),
-    )
+    let mut meta = json!({"origin":app.config.origin(),"language":language,"direction":l.direction,"title":title,"description":description,"canonical":canonical,"noindex":seo.noindex||search,"alternates":alternates,"structured":structured,"business":d.business,"navigation":if l.navigation.is_empty(){serde_json::from_str::<Value>(&settings.navigation).unwrap_or(json!([]))}else{serde_json::to_value(&l.navigation).unwrap()},"search_label":l.search_label});
+    publication::enrich(app, &seo, &mut meta, false).await?;
+    Ok(meta)
 }
 pub fn head(meta: &Value, draft: bool) -> Markup {
     let mut structures = vec![meta["structured"].clone()];
@@ -407,7 +417,7 @@ pub fn head(meta: &Value, draft: bool) -> Markup {
         .replace('<', "\\u003c")
         .replace('>', "\\u003e")
         .replace('&', "\\u0026");
-    html! {title{(meta["title"].as_str().unwrap_or(""))}meta name="description" content=(meta["description"].as_str().unwrap_or(""));meta name="robots" content=(if draft||meta["noindex"]==true{"noindex,follow"}else{"index,follow"});@if !draft{link rel="canonical" href=(meta["canonical"].as_str().unwrap_or(""));@for a in meta["alternates"].as_array().into_iter().flatten(){link rel="alternate" hreflang=(a["language"].as_str().unwrap_or("")) href=(a["url"].as_str().unwrap_or(""));}meta property="og:title" content=(meta["title"].as_str().unwrap_or(""));meta property="og:description" content=(meta["description"].as_str().unwrap_or(""));meta property="og:url" content=(meta["canonical"].as_str().unwrap_or(""));meta property="og:type" content=(if meta["structured"]["@type"]=="Article"{"article"}else{"website"});meta name="twitter:card" content="summary";script type="application/ld+json"{(PreEscaped(script))}}}
+    html! {title{(meta["title"].as_str().unwrap_or(""))}meta name="description" content=(meta["description"].as_str().unwrap_or(""));meta name="robots" content=(if draft||meta["noindex"]==true{"noindex,follow"}else{"index,follow"});@if !draft{link rel="canonical" href=(meta["canonical"].as_str().unwrap_or(""));@for a in meta["alternates"].as_array().into_iter().flatten(){link rel="alternate" hreflang=(a["language"].as_str().unwrap_or("")) href=(a["url"].as_str().unwrap_or(""));}meta property="og:title" content=(meta["title"].as_str().unwrap_or(""));meta property="og:description" content=(meta["description"].as_str().unwrap_or(""));meta property="og:url" content=(meta["canonical"].as_str().unwrap_or(""));meta property="og:type" content=(if meta["structured"]["@type"]=="Article"{"article"}else{"website"});@if let Some(image)=meta["social_image"]["url"].as_str(){meta property="og:image" content=(image);meta property="og:image:type" content=(meta["social_image"]["type"].as_str().unwrap_or(""));meta property="og:image:alt" content=(meta["social_image"]["alt"].as_str().unwrap_or(""));@if let Some(width)=meta["social_image"]["width"].as_u64(){meta property="og:image:width" content=(width);}@if let Some(height)=meta["social_image"]["height"].as_u64(){meta property="og:image:height" content=(height);}}meta name="twitter:card" content="summary";script type="application/ld+json"{(PreEscaped(script))}}}
 }
 pub fn language_nav(meta: &Value) -> Markup {
     html! { @if meta["alternates"].as_array().is_some_and(|a|a.len()>1){nav class="toolbar" aria-label="Languages"{@for a in meta["alternates"].as_array().unwrap(){a href=(a["url"].as_str().unwrap_or("")) hreflang=(a["language"].as_str().unwrap_or("")) lang=(a["language"].as_str().unwrap_or("")) aria-current=[(a["language"]==meta["language"]).then_some("page")]{(a["label"].as_str().unwrap_or(""))}}}}}
@@ -483,7 +493,7 @@ async fn sitemap_index(State(app): State<App>) -> Result<Response> {
     .await?;
     let mut cursors = vec![String::new()];
     for r in rows {
-        if r.get::<i64, _>("n") < count {
+        if r.get::<i64, _>("n") < count && r.get::<i64, _>("n") % 1000 == 0 {
             cursors.push(r.get("id"));
         }
     }
@@ -498,6 +508,7 @@ async fn sitemap_index(State(app): State<App>) -> Result<Response> {
             xml(&format!("{}/sitemap.xml{suffix}", app.config.origin()))
         ));
     }
+    result.push_str(&publication::index_entries(&app).await?);
     result.push_str("</sitemapindex>");
     Ok(([("content-type", "application/xml; charset=utf-8")], result).into_response())
 }
@@ -516,6 +527,7 @@ pub fn safe_path(path: &str) -> bool {
         && !path.starts_with("/assets")
         && !path.starts_with("/media")
         && !path.starts_with("/themes")
+        && !path.starts_with("/discovery-sitemap/")
         && !path.starts_with("/audience/")
         && !path.starts_with("/registration/")
         && !matches!(
@@ -786,6 +798,7 @@ pub fn routes() -> Router<App> {
         .route("/admin/discovery/links", get(links_page))
         .route("/sitemap.xml", get(sitemap))
         .route("/sitemap-index.xml", get(sitemap_index))
+        .route("/discovery-sitemap/{kind}", get(publication::sitemap))
         .route("/robots.txt", get(robots))
 }
 

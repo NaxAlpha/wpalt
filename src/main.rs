@@ -200,8 +200,8 @@ enum Command {
     /// Validate a full recovery graph without restoring it.
     RecoveryInspect {
         input: PathBuf,
-        /// Explicit offline validation of a retained v12/v13/v14 recovery point.
-        #[arg(long, default_value_t=15, value_parser=clap::value_parser!(u8).range(12..=15))]
+        /// Explicit offline validation of a retained v12/v13/v14/v15 recovery point.
+        #[arg(long, default_value_t=16, value_parser=clap::value_parser!(u8).range(12..=16))]
         source_format: u8,
         #[arg(long)]
         key_file: Option<PathBuf>,
@@ -261,6 +261,13 @@ enum Command {
     },
     /// Offline v14-to-current conversion into a NEW private archive; preserves supplied encryption.
     MigrateRecoveryV14 {
+        input: PathBuf,
+        output: PathBuf,
+        #[arg(long)]
+        key_file: Option<PathBuf>,
+    },
+    /// Offline v15-to-current conversion into a NEW private archive; preserves supplied encryption.
+    MigrateRecoveryV15 {
         input: PathBuf,
         output: PathBuf,
         #[arg(long)]
@@ -1024,12 +1031,13 @@ async fn main() -> anyhow::Result<()> {
                 12 => backup::migrate_v12(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
                 13 => backup::migrate_v13(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
                 14 => backup::migrate_v14(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
+                15 => backup::migrate_v15(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
                 _ => bytes,
             };
             let mut report = backup::inspect(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?;
-            if *source_format < 15 {
+            if *source_format < 16 {
                 report["source_schema"] = (*source_format).into();
-                report["boundary"]="Original source validated by explicit offline conversion; ordinary restore requires a separately converted v15 archive.".into();
+                report["boundary"]="Original source validated by explicit offline conversion; ordinary restore requires a separately converted v16 archive.".into();
             }
             println!("{}", serde_json::to_string_pretty(&report)?);
             return Ok(());
@@ -1105,9 +1113,16 @@ async fn main() -> anyhow::Result<()> {
             input,
             output,
             key_file,
+        }
+        | Command::MigrateRecoveryV15 {
+            input,
+            output,
+            key_file,
         } => {
             let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
-            let mut bytes = if matches!(&cli.command, Command::MigrateRecoveryV14 { .. }) {
+            let mut bytes = if matches!(&cli.command, Command::MigrateRecoveryV15 { .. }) {
+                backup::migrate_v15(&config, &bytes)
+            } else if matches!(&cli.command, Command::MigrateRecoveryV14 { .. }) {
                 backup::migrate_v14(&config, &bytes)
             } else if matches!(&cli.command, Command::MigrateRecoveryV13 { .. }) {
                 backup::migrate_v13(&config, &bytes)
@@ -1482,7 +1497,8 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
         | Command::MigrateBackup { .. }
         | Command::MigrateRecoveryV12 { .. }
         | Command::MigrateRecoveryV13 { .. }
-        | Command::MigrateRecoveryV14 { .. } => unreachable!(),
+        | Command::MigrateRecoveryV14 { .. }
+        | Command::MigrateRecoveryV15 { .. } => unreachable!(),
         Command::CloneActivate { review } => {
             wpalt::operations::clone_hold::activate(&app, &review)
                 .await

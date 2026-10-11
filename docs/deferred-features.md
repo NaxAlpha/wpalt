@@ -62,7 +62,7 @@ Verifiable future outcome: Selected real free/premium source fixtures preserve r
 
 ### D06 — SEO previews and sitemap extensions
 
-Origin: **M3** · Catalog: **F025/F027** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M3** · Catalog: **F025/F027** · Status: **active; defined native implementation under final integrated verification**
 
 [D06 contract](d06-contract.md) governs social image/illustrative discovery-preview management and publication-aware image/video/news sitemap extensions. Implementation and verification remain in progress.
 

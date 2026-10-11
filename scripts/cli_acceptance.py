@@ -146,7 +146,7 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     portable=root/'portable.toml'
     portable.write_text(f'database_url = "postgres://invalid:invalid@127.0.0.1:1/unreachable"\ndata_dir = "{root/"never-created"}"\n')
     inspected=json.loads(run(portable,'recovery-inspect',str(snapshot)).stdout)
-    assert inspected['schema']==15
+    assert inspected['schema']==16
     selected=json.loads(run(portable,'recovery-select',str(snapshot),'--post',lesson).stdout)
     selection_file=root/'selection.json'
     run(portable,'recovery-select',str(snapshot),'--post',lesson,'--execute','wrong-plan','--output',str(selection_file),ok=False)
@@ -170,12 +170,12 @@ with tempfile.TemporaryDirectory(prefix='wpalt-cli-') as temporary:
     encrypted=root/'encrypted.wpbackup'
     receipt=json.loads(run(config,'upgrade-prepare',str(encrypted),'--key-file',str(key)).stdout)
     import hashlib
-    assert receipt['format']=='wpalt-upgrade-receipt-v1' and receipt['schema']==15
+    assert receipt['format']=='wpalt-upgrade-receipt-v1' and receipt['schema']==16
     assert receipt['archive_sha256']==hashlib.sha256(encrypted.read_bytes()).hexdigest()
     assert receipt['archive_bytes']==encrypted.stat().st_size
     assert receipt['executable_sha256']==hashlib.sha256(binary.read_bytes()).hexdigest()
     run(config,'upgrade-prepare',str(encrypted),'--key-file',str(key),ok=False)
-    assert json.loads(run(portable,'recovery-inspect',str(encrypted),'--key-file',str(key)).stdout)['schema']==15
+    assert json.loads(run(portable,'recovery-inspect',str(encrypted),'--key-file',str(key)).stdout)['schema']==16
     wrong_key=root/'wrong.key';run(config,'recovery-key',str(wrong_key))
     run(portable,'recovery-inspect',str(encrypted),'--key-file',str(wrong_key),ok=False)
     run(target,'restore',str(snapshot));run(target,'restore',str(snapshot),ok=False)

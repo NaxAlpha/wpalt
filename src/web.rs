@@ -703,6 +703,7 @@ struct ListQuery {
     tag: Option<String>,
     taxonomy: Option<String>,
     term: Option<String>,
+    media_kind: Option<String>,
     after: Option<String>,
 }
 #[derive(Serialize)]
@@ -1129,10 +1130,12 @@ async fn new_post(State(app): State<App>, headers: HeaderMap) -> Result<Html<Str
         "Create content",
         &app.db.settings().await?,
         Some(&s),
-        html! {(editor_form(&s, None, &input, &[], None, &crate::discovery::load(&app).await?.0, &crate::editorial_web::Panel::load(&app,&s,None,&input.kind).await?))script defer src="/assets/builder.js"{}},
+        html! {(editor_form(&app.config.origin(), &s, None, &input, &[], None, &crate::discovery::load(&app).await?.0, &crate::editorial_web::Panel::load(&app,&s,None,&input.kind).await?))script defer src="/assets/builder.js"{}},
     ))
 }
+#[allow(clippy::too_many_arguments)] // Native and enhanced editor use the same presentation contract.
 fn editor_form(
+    origin: &str,
     s: &Session,
     id: Option<&str>,
     p: &PostInput,
@@ -1145,7 +1148,7 @@ fn editor_form(
     html! {
         (view::heading("Publishing",if id.is_some(){"Edit content"}else{"New content"},"Write directly, organize your ideas, and publish when you are ready."))
         div class="notice error" data-editor-error hidden[error.is_none()] {(error.unwrap_or(""))}
-        form method="post" action=(id.map(|id|format!("/admin/posts/{id}")).unwrap_or_else(||"/admin/posts/new".into())) data-editor data-autosave data-owner=(s.user.id) data-new=(if id.is_some(){"false"}else{"true"}) {
+        form method="post" action=(id.map(|id|format!("/admin/posts/{id}")).unwrap_or_else(||"/admin/posts/new".into())) data-editor data-origin=(origin) data-autosave data-owner=(s.user.id) data-new=(if id.is_some(){"false"}else{"true"}) {
             (view::csrf(s)) input type="hidden" name="version" value=(p.version);input type="hidden" name="publish_at" value=(p.publish_at);
             div class="split" {section class="panel" {label {"Title" input name="title" value=(p.title) required maxlength="300";}input type="hidden" name="document" value=(if p.document.is_empty(){crate::document::import(&p.body,&p.blocks).map(|d|d.encode()).unwrap_or_else(|_|crate::document::empty())}else{p.document.clone()});div data-writing-canvas hidden {}label {"Content" textarea class="editor-body" name="body" aria-label="Content" maxlength="524288" {(p.body)}small {"Markdown import replaces the rich document. Select replacement below to apply edits; use the direct editor to preserve rich blocks."}}label data-markdown-replacement {input type="checkbox" name="import_markdown" value="true" checked[p.document.is_empty()];"Replace content using Markdown"}
                 details {summary {"Language & discovery"}
@@ -1156,6 +1159,7 @@ fn editor_form(
                     label {"Search title" input name="seo_title" aria-label="Search title" data-seo-title value=(seo.title) maxlength="300";small {"Leave blank to use the published content title."}}
                     label {"Search description" textarea name="seo_description" data-seo-description maxlength="1000" {(seo.description)}}
                     label {input type="checkbox" name="seo_noindex" value="true" data-seo-noindex checked[seo.noindex];"Exclude from search indexing"}
+                    (crate::discovery::publication::editor_controls(&seo, p, discovery))
                     label {"Structured content" select name="seo_type" aria-label="Structured content" data-seo-type {option value="WebPage" selected[seo.schema_type=="WebPage"] {"Web page"}option value="Article" selected[seo.schema_type=="Article"] {"Article"}}}
                 }
                 details {summary {"Typed fields & composition"}label {"Fields (JSON)" textarea name="fields" {(p.fields)}small {"Defined in Site & theme. Example: {\"subtitle\":\"A fresh start\",\"featured\":true}"}}
@@ -1236,7 +1240,7 @@ async fn edit_post(
         "Edit content",
         &app.db.settings().await?,
         Some(&s),
-        html! {(editor_form(&s, Some(&id), &input, &revisions, None, &crate::discovery::load(&app).await?.0, &crate::editorial_web::Panel::load(&app,&s,Some(&id),&input.kind).await?))script defer src="/assets/builder.js"{}},
+        html! {(editor_form(&app.config.origin(), &s, Some(&id), &input, &revisions, None, &crate::discovery::load(&app).await?.0, &crate::editorial_web::Panel::load(&app,&s,Some(&id),&input.kind).await?))script defer src="/assets/builder.js"{}},
     ))
 }
 async fn save_form(
@@ -1275,6 +1279,7 @@ async fn save_form(
                         &app.db.settings().await?,
                         Some(&s),
                         editor_form(
+                            &app.config.origin(),
                             &s,
                             id,
                             &input,
@@ -1302,10 +1307,41 @@ fn native_content_form(
         None
     };
     if fields.contains_key("seo_title") {
+        let video_media = fields.remove("seo_video_media").unwrap_or_default();
+        let video_poster = fields.remove("seo_video_poster").unwrap_or_default();
+        let video_title = fields.remove("seo_video_title").unwrap_or_default();
+        let video_description = fields.remove("seo_video_description").unwrap_or_default();
+        let video_sitemap = fields.remove("seo_video_sitemap").is_some();
+        let publication = fields.remove("seo_news_publication").unwrap_or_default();
+        let language = fields.remove("seo_news_language").unwrap_or_default();
         let seo = crate::discovery::Seo {
             title: fields.remove("seo_title").unwrap_or_default(),
             description: fields.remove("seo_description").unwrap_or_default(),
             noindex: fields.remove("seo_noindex").is_some(),
+            social_image: fields.remove("seo_social_image").unwrap_or_default(),
+            social_alt: fields.remove("seo_social_alt").unwrap_or_default(),
+            video: (video_sitemap
+                || [
+                    &video_media,
+                    &video_poster,
+                    &video_title,
+                    &video_description,
+                ]
+                .iter()
+                .any(|s| !s.is_empty()))
+            .then_some(crate::discovery::publication::Video {
+                media: video_media,
+                poster: video_poster,
+                title: video_title,
+                description: video_description,
+                sitemap: video_sitemap,
+            }),
+            news: (!publication.is_empty() || !language.is_empty()).then_some(
+                crate::discovery::publication::News {
+                    publication,
+                    language,
+                },
+            ),
             schema_type: fields
                 .remove("seo_type")
                 .unwrap_or_else(|| "WebPage".into()),
@@ -1411,6 +1447,13 @@ async fn preview(
     working.published_translation_group.clear();
     ctx.root["_discovery"] =
         crate::discovery::metadata(&app, Some(&working), &p.locale, "/", false).await?;
+    crate::discovery::publication::enrich(
+        &app,
+        &crate::discovery::Seo::parse(&p.seo)?,
+        &mut ctx.root["_discovery"],
+        true,
+    )
+    .await?;
     Ok(Html(crate::theme::document(
         &stored,
         &settings,
@@ -1433,9 +1476,16 @@ async fn media_picker(
     if !after.is_empty() && uuid::Uuid::parse_str(&after).is_err() {
         return Err(Error::invalid("Invalid media cursor."));
     }
-    let rows = sqlx::query(
-        "SELECT id,original_name,alt,visibility FROM media WHERE mime<>'video/mp4' AND id>$1 ORDER BY id LIMIT 41",
-    )
+    let video = match q.media_kind.as_deref().unwrap_or("image") {
+        "image" => false,
+        "video" => true,
+        _ => return Err(Error::invalid("Choose image or video media.")),
+    };
+    let rows = sqlx::query(if video {
+        "SELECT id,original_name,alt,visibility FROM media WHERE mime='video/mp4' AND id>$1 ORDER BY id LIMIT 41"
+    } else {
+        "SELECT id,original_name,alt,visibility FROM media WHERE mime IN ('image/png','image/jpeg','image/webp','image/gif') AND id>$1 ORDER BY id LIMIT 41"
+    })
     .bind(after)
     .fetch_all(&app.db.pool)
     .await?;

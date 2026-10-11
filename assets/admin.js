@@ -6,8 +6,6 @@ for (const link of document.querySelectorAll('.sidebar nav a')) {
 }
 const editor = document.querySelector('[data-editor][data-autosave]');
 if (editor) {
-  const seo = editor.querySelector('[data-seo-json]');
-  if (seo) editor.addEventListener('input', () => { seo.value = JSON.stringify({title:editor.querySelector('[data-seo-title]').value,description:editor.querySelector('[data-seo-description]').value,noindex:editor.querySelector('[data-seo-noindex]').checked,schema_type:editor.querySelector('[data-seo-type]').value}); });
   let dirty = false, saving = false, conflicted = false, timer;
   const status = document.querySelector('[data-save-status]');
   const error = document.querySelector('[data-editor-error]');
@@ -20,6 +18,7 @@ if (editor) {
   });
   async function autosave() {
     if (!dirty || saving || conflicted || editor.dataset.new === 'true') return;
+    if (editor.dataset.discoveryIncomplete === 'true') { status.textContent = 'Finish the video/news declaration to save your working copy. Your edits remain here.'; return; }
     saving = true; dirty = false;
     const values = new URLSearchParams(new FormData(editor));
     values.set('action', 'autosave');

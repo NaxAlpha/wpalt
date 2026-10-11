@@ -1,6 +1,6 @@
 # D06 — Publication-aware discovery previews and sitemap extensions
 
-Date: 2026-10-11 (Tokyo). D05 PR #21 merged as `33667fa20083836b54b8498388281c49a2232a0a` after eight final-head gates and independent exact-parent clean archive verification. Actual-main release verification is tracked separately. F025/F027 remain incomplete until this connected outcome and its gates pass.
+Date: 2026-10-11 (Tokyo). D05 PR #21 merged as `33667fa20083836b54b8498388281c49a2232a0a` after eight final-head gates and independent exact-parent clean archive verification. Actual-main run 38102948822 passed seven cumulative application gates plus release publication; the independently downloaded public archive is verified in [the D05 release receipt](evidence/d05-main-release.json). F025/F027 remain incomplete until this connected outcome and its gates pass.
 
 ## End-user outcome
 
@@ -31,7 +31,7 @@ These are verified current primary sources; local privacy, resource budgets, ill
 
 Current discovery snapshots carry bounded SEO JSON and preserve native original `published_at` through later promotions. M8 imports original WordPress publication timestamps. Reuse that factual date; do not use `updated_at`. Existing local media authority checks public visibility plus membership restrictions, and image dimensions already have a bounded admitted cache. Existing canonical document image references can supply a publication-time indexed relationship, avoiding full-document reads for every sitemap request. Current themes do not provide a public video composition node: an explicit per-content attached video must render visibly with the same title/description/poster as sitemap metadata, rather than publishing invisible sitemap-only declarations. Broader video editing/composition remains tracked separately.
 
-Tentative persisted change: native schema 20 and portable graph v16 for the expanded SEO grammar plus derived publication-image relationships. Old current schema-19 data needs a stopped, versioned upgrade and fresh old-runtime rollback; old portable v15 requires an explicit separate conversion. Avoid a permanent old SEO/parser branch. Enforce aggregate XML/row/image work budgets and keyset delivery; no per-image query or source-resource fetch. Document canonical editorial-image coverage and separately retain theme/dynamic/raw-HTML graph breadth. This is preparation, not implemented or verified behavior.
+Implemented persisted change under final verification: native schema 20 and portable graph v16 for the expanded SEO grammar with publication-image relationships rebuilt from canonical documents rather than trusted as separate portable tables. Old current schema-19 data needs a stopped, versioned upgrade and fresh old-runtime rollback; old portable v15 requires an explicit separate conversion. Avoid a permanent old SEO/parser branch. Enforce aggregate XML/row/image work budgets and keyset delivery; no per-image query or source-resource fetch. Document canonical editorial-image coverage and separately retain theme/dynamic/raw-HTML graph breadth. The behavior is implemented; native connected tests pass on both engines. Final browser, migration, populated observations, actual free-reference and delivery gates are recorded separately in the verification ledger.
 
 ## Pinned free reference preparation
 

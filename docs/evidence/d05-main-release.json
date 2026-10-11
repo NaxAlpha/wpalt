@@ -1,0 +1,19 @@
+{
+  "source_commit": "33667fa20083836b54b8498388281c49a2232a0a",
+  "tag": "nightly-202610110146-33667fa20083",
+  "archive": "wpalt-x86_64-unknown-linux-gnu-33667fa20083.tar.gz",
+  "archive_sha256": "02653e8d40d8a553f5656df96150a8aa985b0584238701f6f7092d94d6bd9390",
+  "binary_sha256": "06c7089ecf6f10ab87bab21b243d715b6f8f7a9b58ac1d8e0d69c784e6502fdf",
+  "binary_bytes": 36567112,
+  "timestamp_basis": "commit time, UTC",
+  "pr": "https://github.com/NaxAlpha/wpalt/pull/21",
+  "final_head": "ee45173654790ffed592687ef1469585172c496a",
+  "final_head_run": 38102203237,
+  "applicable_pr_gates": 8,
+  "main_run": 38102948822,
+  "main_application_gates": 7,
+  "main_release_gate": "success",
+  "release": "https://github.com/NaxAlpha/wpalt/releases/tag/nightly-202610110146-33667fa20083",
+  "public_archive_independently_verified": true,
+  "comparison": "Selected actual free Elementor 4.3.4 legacy/atomic saved/exported/rendered journeys; no full free/Pro/rendering equivalence claim"
+}

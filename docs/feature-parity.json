@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M9 and D01\u2013D03 merged; D04 local theme delivery passes native acceptance and is undergoing final browser/CI/archive verification. Defined slices are not blanket plugin parity.",
+  "milestone": "M9 and defined D01\u2013D05 deliveries merged with independently verified releases; D06 publication discovery is undergoing final integrated verification. Full plugin breadth remains tracked.",
   "capabilities": [
     {
       "id": "F001",
@@ -451,7 +451,7 @@
       "capability": "Exact Elementor template/widget compatibility",
       "deployment": "L",
       "milestone": "M8",
-      "status": "D05 implemented; integrated verification in progress; full source compatibility remains tracked",
+      "status": "D05 defined import slice verified and merged in PR #21; full source compatibility retained",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "sequencing_reason": "Local AI worker integrations and Elementor import/output mapping belong to extensibility/migration; no PHP plugin runtime compatibility is assumed. Requirement retained for explicit reconciliation.",
@@ -463,7 +463,8 @@
         "tests/elementor.rs",
         "tests/acceptance.rs::reviewed_elementor_design_preserves_live_pages_and_exact_owner_review",
         "scripts/elementor_design_acceptance.cjs",
-        "scripts/elementor_design_reference.py"
+        "scripts/elementor_design_reference.py",
+        "evidence/d05-main-release.json"
       ]
     },
     {
@@ -472,7 +473,7 @@
       "capability": "SEO titles, metadata and social previews",
       "deployment": "L",
       "milestone": "M3",
-      "status": "implemented-defined-M3-scope; current-head verification recorded on milestone PR",
+      "status": "M3 baseline delivered; D06 defined extensions implemented with final integrated delivery gates pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m3_coverage": "Per-content title/description and social metadata; no social image manager or SERP preview scoring.",
@@ -481,8 +482,15 @@
         "discovery.md",
         "evidence/m3-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d06-contract.md",
+        "publication-discovery.md",
+        "evidence/d06-verification.md",
+        "../scripts/discovery_acceptance.cjs",
+        "../scripts/discovery_reference.py"
+      ],
+      "d06_coverage": "Owner-selected local social image with factual alt/type/available dimensions and illustrative editorial preview; native form, working/public snapshot and current privacy authority.",
+      "d06_remaining": "Exact external card/SERP appearance and scoring are not promised; premium plugin execution requires owner license."
     },
     {
       "id": "F026",
@@ -508,7 +516,7 @@
       "capability": "XML, image, video and news sitemaps",
       "deployment": "L",
       "milestone": "M3",
-      "status": "implemented-defined-M3-scope; current-head verification recorded on milestone PR",
+      "status": "M3 baseline delivered; D06 defined extensions implemented with final integrated delivery gates pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m3_coverage": "Bounded XML content sitemaps and index; image/video/news extensions deferred.",
@@ -517,8 +525,15 @@
         "discovery.md",
         "evidence/m3-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d06-contract.md",
+        "publication-discovery.md",
+        "evidence/d06-verification.md",
+        "../scripts/discovery_acceptance.cjs",
+        "../scripts/discovery_reference.py"
+      ],
+      "d06_coverage": "Publication-owned canonical image index; current publicly accessible relevant attached-video and original recent news declarations; namespace XML, keyset pages, independent index coverage and bounded aggregate work.",
+      "d06_remaining": "Theme/dynamic/raw-HTML images, arbitrary external videos and all optional provider tags remain outside this bounded canonical slice."
     },
     {
       "id": "F028",
