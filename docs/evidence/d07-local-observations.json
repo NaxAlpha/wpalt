@@ -1,0 +1,139 @@
+{
+  "profile": "debug",
+  "binary_sha256": "a317cb009a2e8a365f4fe482f10f7497604a8c8fc4fe8672c9539a4d86168d1b",
+  "scope": "1500 seeded posts plus public author and 30 actual related API publications. Same populated fields disabled/enabled, 5 warmups and 30 serial loopback requests; five repeated 1531-record configuration preflight observations. Debug SQL diagnostics enabled; warm RSS is neither peak nor isolated vocabulary-memory attribution. No throughput, TLS, CWV or WordPress efficiency claim. SQLite/PostgreSQL database sizes have differing scopes.",
+  "observations": [
+    {
+      "engine": "sqlite",
+      "population": 1531,
+      "publications_with_author": 30,
+      "request_observations": {
+        "same_fields_disabled": {
+          "samples": 30,
+          "p50_ms": 3.331,
+          "p95_ms": 4.135,
+          "response_bytes": 2261,
+          "observed_selects": 13,
+          "select_shapes": [
+            "SELECT definition,version FROM discovery_settings \u2026",
+            "SELECT published_locale FROM posts \u2026",
+            "SELECT id FROM posts \u2026",
+            "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+            "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+            "SELECT COUNT(*) FROM member_resources \u2026",
+            "SELECT name,body FROM comments \u2026",
+            "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+            "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+            "SELECT published_version,version FROM themes \u2026",
+            "SELECT live_options FROM site_design \u2026",
+            "SELECT '' AS id,field_schema \u2026",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields,published_at FROM posts \u2026"
+          ],
+          "warm_application_rss_bytes": 71598080
+        },
+        "same_fields_enabled": {
+          "samples": 30,
+          "p50_ms": 3.477,
+          "p95_ms": 4.216,
+          "response_bytes": 3190,
+          "observed_selects": 13,
+          "select_shapes": [
+            "SELECT definition,version FROM discovery_settings \u2026",
+            "SELECT published_locale FROM posts \u2026",
+            "SELECT id FROM posts \u2026",
+            "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+            "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+            "SELECT COUNT(*) FROM member_resources \u2026",
+            "SELECT name,body FROM comments \u2026",
+            "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+            "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+            "SELECT published_version,version FROM themes \u2026",
+            "SELECT live_options FROM site_design \u2026",
+            "SELECT '' AS id,field_schema \u2026",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields,published_at FROM posts \u2026"
+          ],
+          "warm_application_rss_bytes": 72597504
+        }
+      },
+      "extra_projection_selects": 0,
+      "schema_preflight_ms": {
+        "samples": 5,
+        "p50": 60.386,
+        "max": 62.666
+      },
+      "cached_search_ms": {
+        "samples": 30,
+        "p50": 0.735,
+        "p95": 0.857
+      },
+      "database_bytes": 28652608,
+      "database_scope": "SQLite DB/WAL/SHM"
+    },
+    {
+      "engine": "postgres",
+      "population": 1531,
+      "publications_with_author": 30,
+      "request_observations": {
+        "same_fields_disabled": {
+          "samples": 30,
+          "p50_ms": 4.316,
+          "p95_ms": 5.863,
+          "response_bytes": 2261,
+          "observed_selects": 13,
+          "select_shapes": [
+            "SELECT definition,version FROM discovery_settings \u2026",
+            "SELECT published_locale FROM posts \u2026",
+            "SELECT id FROM posts \u2026",
+            "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+            "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+            "SELECT COUNT(*) FROM member_resources \u2026",
+            "SELECT name,body FROM comments \u2026",
+            "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+            "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+            "SELECT published_version,version FROM themes \u2026",
+            "SELECT live_options FROM site_design \u2026",
+            "SELECT '' AS id,field_schema \u2026",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields,published_at FROM posts \u2026"
+          ],
+          "warm_application_rss_bytes": 63012864
+        },
+        "same_fields_enabled": {
+          "samples": 30,
+          "p50_ms": 4.19,
+          "p95_ms": 4.527,
+          "response_bytes": 3190,
+          "observed_selects": 13,
+          "select_shapes": [
+            "SELECT definition,version FROM discovery_settings \u2026",
+            "SELECT published_locale FROM posts \u2026",
+            "SELECT id FROM posts \u2026",
+            "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+            "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+            "SELECT COUNT(*) FROM member_resources \u2026",
+            "SELECT name,body FROM comments \u2026",
+            "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+            "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+            "SELECT published_version,version FROM themes \u2026",
+            "SELECT live_options FROM site_design \u2026",
+            "SELECT '' AS id,field_schema \u2026",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields,published_at FROM posts \u2026"
+          ],
+          "warm_application_rss_bytes": 63193088
+        }
+      },
+      "extra_projection_selects": 0,
+      "schema_preflight_ms": {
+        "samples": 5,
+        "p50": 54.686,
+        "max": 58.69
+      },
+      "cached_search_ms": {
+        "samples": 30,
+        "p50": 0.819,
+        "p95": 1.119
+      },
+      "database_bytes": 20660224,
+      "database_scope": "All fixture PostgreSQL relations/indexes; engine memory excluded"
+    }
+  ]
+}

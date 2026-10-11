@@ -226,6 +226,7 @@ fn caption(name: &str) -> String {
         "addressRegion" => Some("Region"),
         "addressCountry" => Some("Country"),
         "mainEntityOfPage" => Some("Page"),
+        "url" => Some("Website"),
         "datePublished" => Some("First published"),
         "inLanguage" => Some("Language"),
         "dayOfWeek" => Some("Days"),

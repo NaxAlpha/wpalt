@@ -72,7 +72,16 @@ pub fn warnings(nodes: &[Value], v: &Vocabulary) -> Vec<String> {
             if addresses.is_empty()
                 || addresses.iter().any(|a| {
                     resolve(a).is_none_or(|n| {
-                        !is_a(n, v, "PostalAddress") || n.as_object().is_none_or(|o| o.len() <= 2)
+                        !is_a(n, v, "PostalAddress")
+                            || ![
+                                "streetAddress",
+                                "addressLocality",
+                                "addressRegion",
+                                "postalCode",
+                                "addressCountry",
+                            ]
+                            .iter()
+                            .any(|p| n.get(p).is_some_and(|v| !declaration::items(v).is_empty()))
                     })
                 })
             {
@@ -113,7 +122,10 @@ pub fn warnings(nodes: &[Value], v: &Vocabulary) -> Vec<String> {
                         "Review distinct positive integer positions on ordered breadcrumb ListItems.",
                     );
                 }
-                if item["name"].as_str().is_none_or(str::is_empty) {
+                if item["name"].as_str().is_none_or(str::is_empty)
+                    && resolve(&item["item"])
+                        .is_none_or(|target| target["name"].as_str().is_none_or(str::is_empty))
+                {
                     warn("Review a factual breadcrumb name, or a named Thing item.");
                 }
                 if i + 1 < refs.len() && item.get("item").is_none() {

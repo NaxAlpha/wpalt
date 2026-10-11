@@ -2427,7 +2427,7 @@
         "provider profile change or retirement",
         "privacy, security or migration finding"
       ],
-      "status": "reviewed; D07 functional checkpoint, cumulative delivery pending"
+      "status": "reviewed; final native/browser local checks pass; PR #23 cumulative/reference/release gates pending"
     },
     {
       "feature_id": "D07-02",
@@ -2469,7 +2469,7 @@
         "provider profile change or retirement",
         "privacy, security or migration finding"
       ],
-      "status": "reviewed; D07 functional checkpoint, cumulative delivery pending"
+      "status": "reviewed; final native/browser local checks pass; PR #23 cumulative/reference/release gates pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

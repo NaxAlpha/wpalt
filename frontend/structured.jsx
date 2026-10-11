@@ -69,7 +69,6 @@ function preset(kind) {
     entities = {
       [kind]: entity(type, {
         name: bind("public_name"),
-        mainEntityOfPage: publication("url"),
         url: publication("url"),
       }),
     };
@@ -406,7 +405,7 @@ function BindingControl({
             "Number",
             "Boolean",
           ].map((t) => (
-            <option>{t}</option>
+            <option value={t}>{t}</option>
           ))}
         </SelectField>
       )}
@@ -441,7 +440,7 @@ function BindingControl({
               ? graph.entities
               : models[f?.target]?.structured?.entities || {},
           ).map((e) => (
-            <option>{e}</option>
+            <option value={e}>{e}</option>
           ))}
         </SelectField>
       )}
@@ -565,7 +564,7 @@ export function StructuredModel({ model, common, models, onChange }) {
             {Object.keys(graph.entities)
               .filter((key) => !graph.entities[key].scope?.length)
               .map((key) => (
-                <option>{key}</option>
+                <option value={key}>{key}</option>
               ))}
           </SelectField>
           {Object.entries(graph.entities).map(([name, e]) => {

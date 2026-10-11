@@ -552,8 +552,16 @@
         "discovery.md",
         "evidence/m3-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d07-contract.md",
+        "structured-data.md",
+        "evidence/d07-verification.md",
+        "../tests/structured.rs",
+        "../scripts/structured_acceptance.cjs"
+      ],
+      "d07_status": "native and browser verified locally; PR #23 exact-source delivery pending",
+      "d07_coverage": "Known named entities/properties, typed field/publication/relationship/image/enumeration bindings, finite cyclic identities, shared visible facts and JSON-LD, offline attributed Schema.org 30.1 lookup and selected dated guidance warnings.",
+      "d07_limits": "Bounded native admission policy and selected provider checks; no full ontology/search eligibility or licensed premium execution claim. Editorial price/availability/offers remain refused pending authoritative D16 commerce enrichment."
     },
     {
       "id": "F029",
@@ -570,8 +578,16 @@
         "discovery.md",
         "evidence/m3-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d07-contract.md",
+        "structured-data.md",
+        "evidence/d07-verification.md",
+        "../tests/structured.rs",
+        "../scripts/structured_acceptance.cjs"
+      ],
+      "d07_status": "native and browser verified locally; PR #23 exact-source delivery pending",
+      "d07_coverage": "Explicit published organization/location records with specific vocabulary business types, scoped actual addresses/coordinates/opening hours and native relationships; current related/media restriction and unpublication boundaries.",
+      "d07_limits": "Bounded native admission policy and selected provider checks; no full ontology/search eligibility or licensed premium execution claim. Editorial price/availability/offers remain refused pending authoritative D16 commerce enrichment."
     },
     {
       "id": "F030",

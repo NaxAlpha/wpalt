@@ -80,6 +80,10 @@ fn declaration_changes_refuse_wrong_ranges_missing_targets_and_incomplete_choice
     for (property, binding) in [
         ("author", json!({"kind":"entity","entity":"article"})),
         (
+            "datePublished",
+            json!({"kind":"publication","attribute":"title"}),
+        ),
+        (
             "author",
             json!({"kind":"relationship","path":["author"],"entity":"private_account"}),
         ),
@@ -254,7 +258,7 @@ fn provider_recommendations_are_distinct_from_requirements_and_catalog_authority
         json!({"@id":"article","@type":"Article","headline":"Story","author":{"@id":"person"},"datePublished":"not a date"}),
         json!({"@id":"person","@type":"Person","name":"Public author"}),
         json!({"@id":"location","@type":"LocalBusiness","name":"Actual business","address":{"@id":"address"}}),
-        json!({"@id":"address","@type":"PostalAddress"}),
+        json!({"@id":"address","@type":"PostalAddress","url":"https://example.test/profile"}),
         json!({"@id":"faq","@type":"FAQPage"}),
         json!({"@id":"breadcrumb","@type":"BreadcrumbList","itemListElement":{"@id":"crumb"}}),
         json!({"@id":"crumb","@type":"ListItem","name":"Page","position":1,"item":"https://example.test/actual-target"}),
@@ -277,6 +281,17 @@ fn provider_recommendations_are_distinct_from_requirements_and_catalog_authority
             .any(|w| w.contains("at least two ListItems"))
     );
     assert!(warnings.iter().any(|w| w.contains("retired in May 2026")));
+    let valid_breadcrumb = vec![
+        json!({"@id":"breadcrumb","@type":"BreadcrumbList","itemListElement":[{"@id":"first"},{"@id":"last"}]}),
+        json!({"@id":"first","@type":"ListItem","position":1,"item":{"@id":"named"}}),
+        json!({"@id":"named","@type":"WebPage","name":"Named page","url":"https://example.test/first"}),
+        json!({"@id":"last","@type":"ListItem","position":2,"name":"Last page"}),
+    ];
+    assert!(
+        wpalt::structured::guidance::warnings(&valid_breadcrumb, vocabulary::get().unwrap())
+            .is_empty(),
+        "Named Thing breadcrumb items satisfy the selected name check"
+    );
     let (mut registry, mut definitions) = fixtures();
     registry
         .models

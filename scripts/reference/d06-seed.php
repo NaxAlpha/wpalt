@@ -7,7 +7,7 @@ $attachment = wp_insert_attachment(['post_mime_type'=>'image/png','post_title'=>
 if (is_wp_error($attachment)) { throw new RuntimeException('Reference attachment creation failed'); }
 wp_update_attachment_metadata($attachment, wp_generate_attachment_metadata($attachment, $upload['file']));
 $url = wp_get_attachment_url($attachment);
-$post = wp_insert_post(['post_title'=>'D06 actual journal','post_name'=>'d06-actual-journal','post_content'=>'A relevant editorial image. <img src="'.esc_url($url).'" alt="D06 garden" />','post_status'=>'publish','post_type'=>'post'], true);
+$post = wp_insert_post(['post_author'=>1,'post_title'=>'D06 actual journal','post_name'=>'d06-actual-journal','post_content'=>'A relevant editorial image. <img src="'.esc_url($url).'" alt="D06 garden" />','post_status'=>'publish','post_type'=>'post'], true);
 if (is_wp_error($post)) { throw new RuntimeException('Reference publication failed'); }
 update_post_meta($post, '_yoast_wpseo_schema_article_type', 'Article');
 update_post_meta($post, '_yoast_wpseo_title', 'D06 truthful search title');

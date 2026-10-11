@@ -20,6 +20,10 @@ module.exports = async (owner, visitors, origin, output) => {
     await page.getByText('Published structured facts',{exact:true}).click();
     await page.getByLabel('Structured starting definition',{exact:true}).selectOption('location');
     await page.getByRole('button',{name:'Create structured definition',exact:true}).click();
+    assert.equal(await page.getByLabel('Primary entity',{exact:true}).inputValue(),'location','The visible primary selector must show the configured entity');
+    await page.getByText('location.name',{exact:true}).click();
+    assert.equal(await page.getByLabel('location.name datatype',{exact:true}).inputValue(),'Text','The visible scalar datatype must reflect its declared binding');
+    await page.getByText('location.name',{exact:true}).click();
     assert.equal(report.vocabulary_requests,0,'The builder does not load every term or search hidden controls');
     await page.getByText('Add type to location',{exact:true}).click();
     await page.getByLabel('Add type to location prefix',{exact:true}).fill('Restaurant');
@@ -28,7 +32,7 @@ module.exports = async (owner, visitors, origin, output) => {
     await page.getByRole('button',{name:'Remove LocalBusiness',exact:true}).click();
     assert.equal(report.vocabulary_requests,1);
     for(const width of [320,768,1440]) {
-      await page.setViewportSize({width,height:1000});
+      await page.setViewportSize({width,height:1000});await page.evaluate(()=>scrollTo(0,0));
       const measured=await ui.geometry(page);assert.deepEqual(measured.failures,[]);report.geometry.push({surface:'Location graph builder',...measured});
       await page.screenshot({path:path.join(output,`d07-structured-studio-${width}.png`),fullPage:true});
     }

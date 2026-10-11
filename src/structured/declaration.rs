@@ -274,7 +274,7 @@ impl Definition {
                             Attribute::Url => "URL",
                             Attribute::PublishedAt => "DateTime",
                         };
-                        if datatype != "Text" && !compatible(v, &[datatype.into()], &p.ranges) {
+                        if !compatible(v, &[datatype.into()], &p.ranges) {
                             return Err(bad(
                                 "The publication attribute does not match the property range.",
                             ));
