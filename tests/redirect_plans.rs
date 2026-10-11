@@ -153,6 +153,16 @@ fn rendered_html_parser_finds_real_edges_and_refuses_partial_work() {
             && parsed.ids.contains("legacy")
             && parsed.ids.contains("script-target")
     );
+    let fragments =
+        parse("<div id='percent%nothex'></div><div id='�'></div><a name='legacy anchor'></a>")
+            .unwrap();
+    for raw in ["%70ercent%nothex", "%FF", "legacy%20anchor", "%54OP"] {
+        assert!(
+            fragments.has_fragment(raw),
+            "Browser-resolvable fragment: {raw}"
+        );
+    }
+    assert!(!fragments.has_fragment("missing%nothex"));
     let long_id = "x".repeat(600);
     assert!(
         parse(&format!("<div id='{long_id}'></div>"))

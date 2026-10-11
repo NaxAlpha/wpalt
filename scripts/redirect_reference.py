@@ -28,7 +28,7 @@ def response(url):
 def path_of(location):return urllib.parse.urlsplit(location).path
 with tempfile.TemporaryDirectory(prefix='wpalt-d08-reference-') as temporary:
  root=Path(temporary);server=None;log=None
- report={'format':'wpalt-d08-redirection-reference-v1','binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'status':'incomplete','mode':'native-only' if args.native_only else 'actual-free-plugin-and-native','scope':'Actual pinned free Redirection exact/capture redirects, published slug monitoring and local 404 logging. Native independent workflow; intentional syntax/query/privacy and graph-scope differences. No paid-plugin or full-PCRE parity.'}
+ report={'format':'wpalt-d08-redirection-reference-v1','binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'status':'incomplete','mode':'native-only' if args.native_only else 'actual-free-plugin-and-native','scope':('Native fixture only; WordPress and Redirection were not executed.' if args.native_only else 'Actual pinned free Redirection exact/capture redirects, published slug monitoring and local 404 logging. Native independent workflow; intentional syntax/query/privacy and graph-scope differences. No paid-plugin or full-PCRE parity.')}
  try:
   if not args.native_only:
    for image in images:run('docker','pull',image)

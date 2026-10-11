@@ -210,21 +210,37 @@ pub fn parse(html: &str) -> Result<Parsed> {
     }
     Ok(out)
 }
-fn fragment(raw: &str) -> Option<String> {
+fn fragment(raw: &str) -> String {
     let bytes = raw.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut at = 0;
     while at < bytes.len() {
-        if bytes[at] == b'%' {
-            let pair = std::str::from_utf8(bytes.get(at + 1..at + 3)?).ok()?;
-            out.push(u8::from_str_radix(pair, 16).ok()?);
+        let escaped = bytes.get(at + 1..at + 3).and_then(|pair| {
+            let high = (pair[0] as char).to_digit(16)?;
+            let low = (pair[1] as char).to_digit(16)?;
+            Some((high * 16 + low) as u8)
+        });
+        if bytes[at] == b'%'
+            && let Some(decoded) = escaped
+        {
+            out.push(decoded);
             at += 3;
         } else {
             out.push(bytes[at]);
             at += 1;
         }
     }
-    String::from_utf8(out).ok()
+    // URL percent-decoding preserves malformed escapes; HTML fragment lookup
+    // uses UTF-8 replacement decoding rather than rejecting invalid bytes.
+    String::from_utf8_lossy(&out).into_owned()
+}
+impl Parsed {
+    pub fn has_fragment(&self, raw: &str) -> bool {
+        self.ids.contains(raw) || {
+            let decoded = fragment(raw);
+            self.ids.contains(&decoded) || decoded.eq_ignore_ascii_case("top")
+        }
+    }
 }
 #[derive(Clone)]
 struct Target {
@@ -479,11 +495,7 @@ async fn report_inner(app: &App) -> Result<Report> {
                                 // Browser text directives need client layout/text matching.
                                 edge.state = "fragment-directive-unscanned".into();
                             } else {
-                                let ids = &pages[destination].ids;
-                                let found = ids.contains(raw)
-                                    || fragment(raw).is_some_and(|id| {
-                                        ids.contains(&id) || id.eq_ignore_ascii_case("top")
-                                    });
+                                let found = pages[destination].has_fragment(raw);
                                 if !found {
                                     edge.state = "broken-fragment".into();
                                 }
