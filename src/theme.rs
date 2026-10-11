@@ -1469,7 +1469,7 @@ async fn public_values(
     let mut rows = sqlx::query_with(&sql, args).fetch(&app.db.pool);
     let mut values = Vec::new();
     while let Some(row) = rows.try_next().await? {
-        let value = json!({"id":row.get::<String,_>("id"),"kind":row.get::<String,_>("kind"),"title":row.get::<String,_>("published_title"),"url":discovery.path(&row.get::<String,_>("published_locale"), &row.get::<String,_>("published_slug")),"body":row.get::<String,_>("published_body"),"document":row.get::<String,_>("published_document"),"fields":serde_json::from_str::<Value>(&row.get::<String,_>("published_fields")).map_err(|_|Error::invalid("Invalid published fields."))?});
+        let value = json!({"id":row.get::<String,_>("id"),"kind":row.get::<String,_>("kind"),"published_at":row.get::<i64,_>("published_at"),"language":row.get::<String,_>("published_locale"),"title":row.get::<String,_>("published_title"),"url":discovery.path(&row.get::<String,_>("published_locale"), &row.get::<String,_>("published_slug")),"body":row.get::<String,_>("published_body"),"document":row.get::<String,_>("published_document"),"fields":serde_json::from_str::<Value>(&row.get::<String,_>("published_fields")).map_err(|_|Error::invalid("Invalid published fields."))?});
         *remaining = remaining
             .checked_sub(value.to_string().len())
             .ok_or(Error::invalid("Render data exceeds the 2-MiB budget."))?;
@@ -1478,7 +1478,7 @@ async fn public_values(
     Ok(values)
 }
 fn post_value(p: &Post, draft: bool, discovery: &crate::discovery::Definition) -> Value {
-    json!({"id":p.id,"kind":p.kind,"title":if draft{&p.title}else{&p.published_title},"body":if draft{&p.body}else{&p.published_body},"document":if draft{&p.document}else{&p.published_document},"url":discovery.path(if draft{&p.locale}else{&p.published_locale},if draft{&p.slug}else{&p.published_slug}),"fields":serde_json::from_str::<Value>(if draft{&p.fields}else{&p.published_fields}).unwrap_or(json!({}))})
+    json!({"id":p.id,"kind":p.kind,"published_at":p.published_at,"language":if draft{&p.locale}else{&p.published_locale},"title":if draft{&p.title}else{&p.published_title},"body":if draft{&p.body}else{&p.published_body},"document":if draft{&p.document}else{&p.published_document},"url":discovery.path(if draft{&p.locale}else{&p.published_locale},if draft{&p.slug}else{&p.published_slug}),"fields":serde_json::from_str::<Value>(if draft{&p.fields}else{&p.published_fields}).unwrap_or(json!({}))})
 }
 #[allow(clippy::too_many_arguments)] // Request template narrows dependency loading.
 pub async fn context(
@@ -1586,7 +1586,7 @@ pub async fn context_with_discovery(
     // Select published columns only; stream under one request-wide memory budget.
     for (kind, limit) in sets {
         let mut query = QueryBuilder::<Any>::new(
-            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND kind=",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields,published_at FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND kind=",
         );
         query
             .push_bind(&kind)
@@ -1668,7 +1668,7 @@ pub async fn context_with_discovery(
         }
         seen.extend(ids.iter().cloned());
         let mut q = QueryBuilder::<Any>::new(
-            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND id IN (",
+            "SELECT id,kind,published_slug,published_locale,published_title,published_body,published_document,published_fields,published_at FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND id IN (",
         );
         let mut list = q.separated(",");
         for id in &ids {
@@ -1751,6 +1751,25 @@ pub async fn context_with_discovery(
         }
         ctx.media_dimensions = crate::operations::media::dimensions(app, sources).await;
         ctx.queries += 1;
+    }
+    if post.is_some_and(|p| {
+        registry
+            .models
+            .get(&p.kind)
+            .is_some_and(|m| m.structured.is_some())
+    }) && let Some(output) = crate::structured::projection::project(
+        &registry.structured_definitions(),
+        &ctx.root["post"],
+        &ctx.relations,
+        &ctx.media,
+        &ctx.media_dimensions,
+        &app.config.origin(),
+    )? {
+        ctx.root["_structured"] = output.graph;
+        ctx.root["_structured_article"] = output.article.into();
+        ctx.root["_structured_organization"] = output.organization.into();
+        ctx.root["_structured_warnings"] = serde_json::to_value(output.warnings)
+            .map_err(|_| Error::invalid("Invalid structured guidance report."))?;
     }
     let bytes = serde_json::to_vec(&ctx.root)
         .map_err(|_| Error::invalid("Invalid render data."))?
@@ -2125,7 +2144,7 @@ pub fn document(
     let scripts = [&p.header, &p.footer, root]
         .into_iter()
         .any(|n| has_widgets(p, n));
-    let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";@if let Some(src)=priority_image{link rel="preload" href=(src) as="image";}@if preload{link rel="preload" href=(&style) as="style";}link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" tabindex="-1" class="theme-shell"{(body)(crate::discovery::publication::video(&ctx.root["_discovery"]))(extra)}(footer)(crate::business::engagement::markup(settings,draft))(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
+    let output=html!{(DOCTYPE)html lang=(ctx.root["language"].as_str().unwrap_or("en")) dir=(ctx.root["direction"].as_str().unwrap_or("ltr")){head{meta charset="utf-8";meta name="viewport" content="width=device-width,initial-scale=1";@if ctx.root["_discovery"].is_object(){(crate::discovery::head(&ctx.root["_discovery"],draft))}@else{title{(post.map(|p|if draft{p.title.as_str()}else{p.published_title.as_str()}).unwrap_or(&settings.title))}meta name="description" content=(settings.description);@if draft{meta name="robots" content="noindex,nofollow";}}link rel="stylesheet" href="/assets/app.css";@if let Some(src)=priority_image{link rel="preload" href=(src) as="image";}@if preload{link rel="preload" href=(&style) as="style";}link rel="stylesheet" href=(style);@if !draft&&scripts{script defer src="/assets/widgets.js"{}}}body class=(format!("theme-site {}",settings.theme)){a class="skip" href="#main"{"Skip to content"}(header)main id="main" tabindex="-1" class="theme-shell"{(body)(crate::structured::projection::visible(&ctx.root["_structured"]))(crate::structured::projection::inspection(&ctx.root["_structured"],&ctx.root["_structured_warnings"],draft))(crate::discovery::publication::video(&ctx.root["_discovery"]))(extra)}(footer)(crate::business::engagement::markup(settings,draft))(crate::discovery::business_footer(&ctx.root["_discovery"]))footer class="site-footer"{a href="/login"{"Manage site"}}}}}.into_string();
     if output.len() > 2 * 1024 * 1024 {
         return Err(Error::invalid("Rendered document exceeds 2 MiB."));
     }

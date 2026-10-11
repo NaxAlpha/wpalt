@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "checked": "2026-10-11",
+  "release": "30.1",
+  "release_date": "2026-09-16",
+  "source_url": "https://github.com/schemaorg/schemaorg/blob/5f2d8cdec99b7329459ef6584e94b6a840f88471/data/releases/30.1/schemaorg-current-https.jsonld",
+  "source_commit": "5f2d8cdec99b7329459ef6584e94b6a840f88471",
+  "source_git_blob": "d04621d491eff20f3a8defe7bd4351a16db75e42",
+  "source_sha256": "0a4b8c4c910fc831ec8695196510973390906a5ee34dc6b862dfec4d21a12f74",
+  "source_bytes": 1521575,
+  "generated_file": "assets/schemaorg-v30.1.json",
+  "generated_sha256": "82199ae61f4d7b4bc0c155d11fc20fa252de8bb690bd50d9eb59a4ef06e8ce6e",
+  "generated_bytes": 342376,
+  "license": "CC-BY-SA-3.0",
+  "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+  "attribution": "Schema.org contributors; normalized derivative vocabulary data, not copied plugin implementation.",
+  "changes": "Retain Schema.org-prefixed class/property/enumeration identities, hierarchy/domain/range relationships, pending and superseded status. Omit prose/examples and external namespaces. Sorted compact JSON with trailing newline.",
+  "counts": {
+    "types": 939,
+    "properties": 1538,
+    "enumerations": 546
+  },
+  "scope": "Pinned offline vocabulary is separate from current search-provider features and application code licensing."
+}

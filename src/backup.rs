@@ -1073,7 +1073,7 @@ pub fn safe_filename(name: &str) -> bool {
         && !name.contains('\\')
 }
 pub async fn capture(app: &App) -> Result<Vec<u8>> {
-    capture_format(app, 16).await
+    capture_format(app, 17).await
 }
 /// Only the stopped maintenance path may capture the original pre-change graph.
 pub(crate) async fn capture_maintenance(app: &App) -> Result<Vec<u8>> {
@@ -1090,8 +1090,10 @@ pub(crate) async fn capture_maintenance(app: &App) -> Result<Vec<u8>> {
             14
         } else if installed < 20 {
             15
-        } else {
+        } else if installed < 21 {
             16
+        } else {
+            17
         },
     )
     .await
@@ -1237,14 +1239,14 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v16"
+    if envelope.format != "wpalt-backup-v17"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 16
+    if snapshot.schema != 17
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -1762,6 +1764,7 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
             let value: Value = serde_json::from_str(row[column].as_str().unwrap())
                 .map_err(|_| Error::invalid("Invalid backup structured values."))?;
             registry.validate_values(&fields, &value)?;
+            registry.validate_structured_values(row["kind"].as_str().unwrap(), &value)?;
             registry.references(&fields, &value, &mut relationships, &mut references)?;
         }
     }
@@ -2204,7 +2207,7 @@ pub fn migrate_m6(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Archive migration failed."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v16".into(),
+        format: "wpalt-backup-v17".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2269,7 +2272,7 @@ pub fn migrate_v12(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let payload =
         serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot convert archive."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v16".into(),
+        format: "wpalt-backup-v17".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2307,7 +2310,7 @@ pub fn migrate_v13(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let payload =
         serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot convert archive."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v16".into(),
+        format: "wpalt-backup-v17".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2316,6 +2319,7 @@ pub fn migrate_v13(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     Ok(output)
 }
 fn upgrade_pre_asset_snapshot(snapshot: &mut Snapshot) -> Result<()> {
+    validate_pre_structured_models(snapshot)?;
     if snapshot.tables.contains_key("theme_assets")
         || snapshot.tables.contains_key("theme_asset_references")
     {
@@ -2323,7 +2327,7 @@ fn upgrade_pre_asset_snapshot(snapshot: &mut Snapshot) -> Result<()> {
             "Pre-asset recovery graph contains unsupported newer asset tables.",
         ));
     }
-    snapshot.schema = 16;
+    snapshot.schema = 17;
     snapshot.tables.insert("theme_assets".into(), vec![]);
     snapshot
         .tables
@@ -2380,7 +2384,7 @@ pub fn migrate_v14(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Archive migration failed."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v16".into(),
+        format: "wpalt-backup-v17".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2449,11 +2453,75 @@ pub fn migrate_v15(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
             )?;
         }
     }
-    snapshot.schema = 16;
+    validate_pre_structured_models(&snapshot)?;
+    snapshot.schema = 17;
     let payload =
         serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot convert archive."))?;
     let output = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v16".into(),
+        format: "wpalt-backup-v17".into(),
+        sha256: digest(payload.as_bytes()),
+        payload,
+    })
+    .map_err(|_| Error::invalid("Cannot convert archive."))?;
+    validate(config, &output)?;
+    Ok(output)
+}
+/// Old markers cannot smuggle current graph grammar, including empty/null keys.
+fn validate_pre_structured_models(snapshot: &Snapshot) -> Result<()> {
+    for row in snapshot
+        .tables
+        .get("content_models")
+        .ok_or_else(|| Error::invalid("Missing old content models."))?
+    {
+        let raw = row
+            .get("definition")
+            .and_then(Value::as_str)
+            .ok_or_else(|| Error::invalid("Invalid old model definition."))?;
+        let model: Value = serde_json::from_str(raw)
+            .map_err(|_| Error::invalid("Invalid old model definition."))?;
+        let object = model
+            .as_object()
+            .ok_or_else(|| Error::invalid("Invalid old model definition."))?;
+        if object.keys().any(|k| {
+            ![
+                "label",
+                "review_required",
+                "fields",
+                "taxonomies",
+                "taxonomy_parents",
+            ]
+            .contains(&k.as_str())
+        }) {
+            return Err(Error::invalid(
+                "Old model definitions contain unsupported newer fields.",
+            ));
+        }
+    }
+    Ok(())
+}
+/// Explicit one-way conversion; ordinary runtime/restore accepts only v17.
+pub fn migrate_v16(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<u8>> {
+    if encoded.len() > config.max_backup_bytes {
+        return Err(Error::invalid("Archive exceeds configured budget."));
+    }
+    let envelope: Envelope =
+        serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid v16 envelope."))?;
+    if envelope.format != "wpalt-backup-v16"
+        || digest(envelope.payload.as_bytes()) != envelope.sha256
+    {
+        return Err(Error::invalid("Invalid v16 format/checksum."));
+    }
+    let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
+        .map_err(|_| Error::invalid("Invalid v16 graph."))?;
+    if snapshot.schema != 16 {
+        return Err(Error::invalid("Archive is not an unmigrated v16 graph."));
+    }
+    validate_pre_structured_models(&snapshot)?;
+    snapshot.schema = 17;
+    let payload =
+        serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot convert archive."))?;
+    let output = serde_json::to_vec(&Envelope {
+        format: "wpalt-backup-v17".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -2469,6 +2537,7 @@ pub(crate) fn inspect_maintenance(config: &crate::config::Config, encoded: &[u8]
         "wpalt-backup-v13" => 13,
         "wpalt-backup-v14" => 14,
         "wpalt-backup-v15" => 15,
+        "wpalt-backup-v16" => 16,
         _ => return inspect(config, encoded),
     };
     let converted = if source == 12 {
@@ -2477,14 +2546,18 @@ pub(crate) fn inspect_maintenance(config: &crate::config::Config, encoded: &[u8]
         migrate_v13(config, encoded)?
     } else if source == 14 {
         migrate_v14(config, encoded)?
-    } else {
+    } else if source == 15 {
         migrate_v15(config, encoded)?
+    } else {
+        migrate_v16(config, encoded)?
     };
     let mut report = inspect(config, &converted)?;
     report["schema"] = source.into();
     if let Some(tables) = report["tables"].as_object_mut() {
-        tables.remove("theme_assets");
-        tables.remove("theme_asset_references");
+        if source < 15 {
+            tables.remove("theme_assets");
+            tables.remove("theme_asset_references");
+        }
         if source < 14 {
             tables.remove("user_preferences");
         }

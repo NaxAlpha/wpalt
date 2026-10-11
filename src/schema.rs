@@ -161,6 +161,9 @@ impl Definition {
 #[serde(deny_unknown_fields)]
 pub struct Model {
     pub label: String,
+    /// Optional publication-bound graph, independent of private account data.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structured: Option<crate::structured::declaration::Definition>,
     /// Publication requires an assigned, current review of this exact material.
     #[serde(default)]
     pub review_required: bool,
@@ -176,6 +179,7 @@ impl Model {
     pub fn initial(label: &str) -> Self {
         Self {
             label: label.into(),
+            structured: None,
             review_required: false,
             fields: BTreeMap::new(),
             taxonomies: [
@@ -284,6 +288,18 @@ impl Registry {
             ));
         }
         let mut budget = 2048;
+        let structured = self.structured_definitions();
+        if structured
+            .values()
+            .flat_map(|d| d.entities.values())
+            .map(|e| e.properties.len())
+            .sum::<usize>()
+            > 2048
+        {
+            return Err(Error::invalid(
+                "The registry may declare at most 2,048 structured properties.",
+            ));
+        }
         self.check_fields(&self.common.fields, 0, &mut Vec::new(), &mut budget)?;
         self.check_fields(&self.common.options, 0, &mut Vec::new(), &mut budget)?;
         for (name, fields) in &self.common.groups {
@@ -313,6 +329,9 @@ impl Registry {
             }
             let fields = self.fields_for(id)?;
             self.check_fields(&fields, 0, &mut Vec::new(), &mut budget)?;
+            if let Some(definition) = &model.structured {
+                definition.validate(self, id, &structured)?;
+            }
             for (taxonomy, parents) in &model.taxonomy_parents {
                 if !model.taxonomies.contains_key(taxonomy) || parents.len() > 128 {
                     return Err(Error::invalid(
@@ -350,6 +369,22 @@ impl Registry {
                     ));
                 }
             }
+        }
+        Ok(())
+    }
+    pub fn structured_definitions(
+        &self,
+    ) -> BTreeMap<String, crate::structured::declaration::Definition> {
+        self.models
+            .iter()
+            .filter_map(|(name, model)| {
+                model.structured.as_ref().map(|d| (name.clone(), d.clone()))
+            })
+            .collect()
+    }
+    pub fn validate_structured_values(&self, kind: &str, values: &Value) -> Result<()> {
+        if let Some(d) = self.models.get(kind).and_then(|m| m.structured.as_ref()) {
+            d.validate_values(values)?;
         }
         Ok(())
     }
@@ -762,6 +797,7 @@ async fn preflight(app: &App, registry: &Registry) -> Result<()> {
                     )
                 })?;
             registry.validate_values(&fields, &value)?;
+            registry.validate_structured_values(&row.get::<String, _>("kind"), &value)?;
             registry.references(&fields, &value, &mut relations, &mut media)?;
             if relations.len() > 4096 || media.len() > 8192 {
                 return Err(Error::invalid(

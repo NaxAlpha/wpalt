@@ -138,6 +138,7 @@ async function freePort() {
   if (process.env.WPALT_INTERFACE_ONLY) { await require('./interface_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_LANGUAGE_ONLY) { await require('./language_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_EDITORIAL_ONLY) { await require('./editorial_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
+  if (process.env.WPALT_STRUCTURED_ONLY) { await require('./structured_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d07-structured.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }
   if (process.env.WPALT_DISCOVERY_ONLY) { await require('./discovery_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d06-discovery.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }
   if (process.env.WPALT_ELEMENTOR_DESIGN_ONLY) { await require('./elementor_design_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d05-elementor-design.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }
   if (process.env.WPALT_THEME_ASSETS_ONLY) { await require('./theme_assets_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d04-theme-assets.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }
@@ -420,6 +421,7 @@ async function freePort() {
     .getByLabel("Add model identifier", { exact: true })
     .fill("project");
   await page.getByRole("button", { name: "Add model", exact: true }).click();
+  await page.getByText("Model field definitions", {exact:true}).click();
   await page
     .getByLabel("Add field identifier", { exact: true })
     .first()

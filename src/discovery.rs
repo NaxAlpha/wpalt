@@ -415,7 +415,9 @@ pub async fn metadata_with_settings(
 pub fn head(meta: &Value, draft: bool) -> Markup {
     let mut structures = vec![meta["structured"].clone()];
     let b = &meta["business"];
-    if b["name"].as_str().is_some_and(|s| !s.is_empty()) {
+    if meta["structured_overrides_business"] != true
+        && b["name"].as_str().is_some_and(|s| !s.is_empty())
+    {
         structures.push(json!({"@context":"https://schema.org","@type":"LocalBusiness","@id":format!("{}#business",meta["origin"].as_str().unwrap_or("")),"name":b["name"],"url":meta["origin"],"telephone":b["telephone"],"address":{"@type":"PostalAddress","streetAddress":b["street"],"addressLocality":b["city"],"postalCode":b["postal_code"],"addressCountry":b["country"]}}));
     }
     let script = serde_json::to_string(&structures)
@@ -423,7 +425,7 @@ pub fn head(meta: &Value, draft: bool) -> Markup {
         .replace('<', "\\u003c")
         .replace('>', "\\u003e")
         .replace('&', "\\u0026");
-    html! {title{(meta["title"].as_str().unwrap_or(""))}meta name="description" content=(meta["description"].as_str().unwrap_or(""));meta name="robots" content=(if draft||meta["noindex"]==true{"noindex,follow"}else{"index,follow"});@if !draft{link rel="canonical" href=(meta["canonical"].as_str().unwrap_or(""));@for a in meta["alternates"].as_array().into_iter().flatten(){link rel="alternate" hreflang=(a["language"].as_str().unwrap_or("")) href=(a["url"].as_str().unwrap_or(""));}meta property="og:title" content=(meta["title"].as_str().unwrap_or(""));meta property="og:description" content=(meta["description"].as_str().unwrap_or(""));meta property="og:url" content=(meta["canonical"].as_str().unwrap_or(""));meta property="og:type" content=(if meta["structured"]["@type"]=="Article"{"article"}else{"website"});@if let Some(image)=meta["social_image"]["url"].as_str(){meta property="og:image" content=(image);meta property="og:image:type" content=(meta["social_image"]["type"].as_str().unwrap_or(""));meta property="og:image:alt" content=(meta["social_image"]["alt"].as_str().unwrap_or(""));@if let Some(width)=meta["social_image"]["width"].as_u64(){meta property="og:image:width" content=(width);}@if let Some(height)=meta["social_image"]["height"].as_u64(){meta property="og:image:height" content=(height);}}meta name="twitter:card" content="summary";script type="application/ld+json"{(PreEscaped(script))}}}
+    html! {title{(meta["title"].as_str().unwrap_or(""))}meta name="description" content=(meta["description"].as_str().unwrap_or(""));meta name="robots" content=(if draft||meta["noindex"]==true{"noindex,follow"}else{"index,follow"});@if !draft{link rel="canonical" href=(meta["canonical"].as_str().unwrap_or(""));@for a in meta["alternates"].as_array().into_iter().flatten(){link rel="alternate" hreflang=(a["language"].as_str().unwrap_or("")) href=(a["url"].as_str().unwrap_or(""));}meta property="og:title" content=(meta["title"].as_str().unwrap_or(""));meta property="og:description" content=(meta["description"].as_str().unwrap_or(""));meta property="og:url" content=(meta["canonical"].as_str().unwrap_or(""));meta property="og:type" content=(if meta["structured_article"]==true||meta["structured"]["@type"]=="Article"{"article"}else{"website"});@if let Some(image)=meta["social_image"]["url"].as_str(){meta property="og:image" content=(image);meta property="og:image:type" content=(meta["social_image"]["type"].as_str().unwrap_or(""));meta property="og:image:alt" content=(meta["social_image"]["alt"].as_str().unwrap_or(""));@if let Some(width)=meta["social_image"]["width"].as_u64(){meta property="og:image:width" content=(width);}@if let Some(height)=meta["social_image"]["height"].as_u64(){meta property="og:image:height" content=(height);}}meta name="twitter:card" content="summary";@if meta["private"]!=true{script type="application/ld+json"{(PreEscaped(script))}}}}
 }
 pub fn language_nav(meta: &Value) -> Markup {
     html! { @if meta["alternates"].as_array().is_some_and(|a|a.len()>1){nav class="toolbar" aria-label="Languages"{@for a in meta["alternates"].as_array().unwrap(){a href=(a["url"].as_str().unwrap_or("")) hreflang=(a["language"].as_str().unwrap_or("")) lang=(a["language"].as_str().unwrap_or("")) aria-current=[(a["language"]==meta["language"]).then_some("page")]{(a["label"].as_str().unwrap_or(""))}}}}}
@@ -890,7 +892,7 @@ async fn edit_business(
 }
 pub fn business_footer(meta: &Value) -> Markup {
     let b = &meta["business"];
-    html! {@if b["name"].as_str().is_some_and(|s|!s.is_empty()){footer class="site-footer" aria-label="Business information"{address{strong{(b["name"].as_str().unwrap_or(""))}br;(b["street"].as_str().unwrap_or(""))br;(b["city"].as_str().unwrap_or(""))" "(b["postal_code"].as_str().unwrap_or(""))" · "(b["country"].as_str().unwrap_or(""))br;(b["telephone"].as_str().unwrap_or(""))}}}}
+    html! {@if meta["structured_overrides_business"]!=true && b["name"].as_str().is_some_and(|s|!s.is_empty()){footer class="site-footer" aria-label="Business information"{address{strong{(b["name"].as_str().unwrap_or(""))}br;(b["street"].as_str().unwrap_or(""))br;(b["city"].as_str().unwrap_or(""))" "(b["postal_code"].as_str().unwrap_or(""))" · "(b["country"].as_str().unwrap_or(""))br;(b["telephone"].as_str().unwrap_or(""))}}}}
 }
 #[derive(Deserialize, Default)]
 struct LinksQuery {

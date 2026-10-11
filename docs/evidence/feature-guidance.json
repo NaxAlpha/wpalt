@@ -2348,7 +2348,7 @@
         "upstream namespace/required-tag/date/language guideline change",
         "source plugin version or parser advisory"
       ],
-      "status": "Final 109-case Rust suite, 11 pipeline cases, Clippy, actual D05 stopped upgrade/fresh rollback, single-server/two-process browser, optimized plans and real SQLx counts pass. Reproduced XML-invalid recovery and Linux touch-target regressions are fixed. Corrected actual free WordPress/Yoast reference passes; exact final-head cumulative/reference/clean archive and actual-main release remain pending."
+      "status": "Defined scope verified locally and eight exact-head CI gates; merged PR #22 / actual-main public release independently verified."
     },
     {
       "feature_id": "D06-02",
@@ -2385,7 +2385,91 @@
         "Browser diagnostics/artifact disclosure changes",
         "Relevant logging/security guidance update"
       ],
-      "status": "Reproduced prior failure; repaired native/cumulative browser paths verified locally; exact-head Linux gates pending."
+      "status": "Defined scope verified locally and eight exact-head CI gates; merged PR #22 / actual-main public release independently verified."
+    },
+    {
+      "feature_id": "D07-01",
+      "area": "Offline vocabulary and typed structured entities",
+      "scope": "D07 F028/F029",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://schema.org/docs/datamodel.html",
+        "https://schema.org/docs/releases.html",
+        "https://schema.org/docs/terms.html",
+        "https://www.w3.org/TR/json-ld11/"
+      ],
+      "applicable_versions": [
+        "Schema.org 30.1, released 2026-09-16",
+        "JSON-LD 1.1",
+        "Selected Google documentation reviewed 2026-10-11",
+        "native 21 / portable v17"
+      ],
+      "last_checked": "2026-10-11",
+      "next_review": "2027-01-09",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Pin and attribute Schema.org vocabulary data separately from software; reproduce normalization offline and verify hashes.",
+        "Use published typed fields, public related identities and admitted assets; do not infer private accounts or duplicate catalog price/availability authority.",
+        "Known domain/range information is a hint; explicit Text/URL fallback is separate from scalar validation and provider profiles. No remote contexts or arbitrary scripts.",
+        "Bound declarations, cyclic identities and output; native 21/portable v17 migration must reject newer model keys through all older archive markers."
+      ],
+      "tests": [
+        "pinned_vocabulary_supports_real_business_ancestry_and_truthful_status",
+        "typed_location_hours_and_public_authors_admit_semantics_without_account_inference",
+        "structured_entities_publish_visible_facts_without_draft_or_account_leaks",
+        "old_archive_markers_cannot_admit_current_structured_model_grammar",
+        "test_offline_generation_preserves_ranges_status_and_refuses_changed_sources"
+      ],
+      "triggers": [
+        "affected release or milestone",
+        "vocabulary release, term deprecation or license change",
+        "provider profile change or retirement",
+        "privacy, security or migration finding"
+      ],
+      "status": "reviewed; D07 functional checkpoint, cumulative delivery pending"
+    },
+    {
+      "feature_id": "D07-02",
+      "area": "Selected dated search profiles and truthful multiple locations",
+      "scope": "D07 F028/F029",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developers.google.com/search/docs/appearance/structured-data/article",
+        "https://developers.google.com/search/docs/appearance/structured-data/organization",
+        "https://developers.google.com/search/docs/appearance/structured-data/local-business",
+        "https://developers.google.com/search/docs/appearance/structured-data/breadcrumb",
+        "https://developers.google.com/search/updates"
+      ],
+      "applicable_versions": [
+        "Schema.org 30.1, released 2026-09-16",
+        "JSON-LD 1.1",
+        "Selected Google documentation reviewed 2026-10-11",
+        "native 21 / portable v17"
+      ],
+      "last_checked": "2026-10-11",
+      "next_review": "2027-01-09",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Article/Organization do not have universally required properties; distinguish recommendations from LocalBusiness/Breadcrumb profile requirements.",
+        "Declare actual business name and physical addresses on each published location, with matching visible facts and public-resource access checks.",
+        "Breadcrumb items use actual target URLs and factual positions. Selected warnings are not exhaustive provider validation, indexing or rich-result promises.",
+        "Google FAQ rich results retired in May 2026; FAQPage remains a vocabulary type.",
+        "Review changed provider pages and vocabulary releases before changing offline rules; preserve dated fixtures and assess migration, release and rollback impact."
+      ],
+      "tests": [
+        "one_projection_drives_visible_facts_public_relationships_and_finite_identity_cycles",
+        "structured browser workflow",
+        "native-20 original-runtime maintenance and fresh rollback"
+      ],
+      "triggers": [
+        "affected release or milestone",
+        "vocabulary release, term deprecation or license change",
+        "provider profile change or retirement",
+        "privacy, security or migration finding"
+      ],
+      "status": "reviewed; D07 functional checkpoint, cumulative delivery pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

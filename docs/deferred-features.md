@@ -62,17 +62,17 @@ Verifiable future outcome: Selected real free/premium source fixtures preserve r
 
 ### D06 — SEO previews and sitemap extensions
 
-Origin: **M3** · Catalog: **F025/F027** · Status: **active; defined native implementation under final integrated verification**
+Origin: **M3** · Catalog: **F025/F027** · Status: **defined canonical publication-discovery delivery merged in PR #22; actual-main release independently verified**
 
-[D06 contract](d06-contract.md) governs social image/illustrative discovery-preview management and publication-aware image/video/news sitemap extensions. Implementation and verification remain in progress.
+[D06 contract](d06-contract.md) governs social image/illustrative discovery-preview management and publication-aware image/video/news sitemap extensions. Defined local preview/attachment/news/image-index/sitemap behavior is verified in [the ledger](evidence/d06-verification.md). Broader theme/dynamic/raw-HTML graphs, optional provider fields and full licensed plugin behavior remain explicit.
 
 Verifiable future outcome: Published/private boundaries, latest primary guidance and meaningful generated-output tests cover each extension; no ranking promise.
 
 ### D07 — Structured data and locations
 
-Origin: **M3** · Catalog: **F028/F029** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M3** · Catalog: **F028/F029** · Status: **active; publication-bound graph and multiple-location contract**
 
-Custom schema graph builder, richer supported rich-result types and multiple business locations.
+[D07 contract](d07-contract.md) governs a usable publication-bound graph builder, selected dated structured-data profiles and multiple business locations.
 
 Verifiable future outcome: Owner-authored visible entities produce validated publication-only structured output with guidance/version checks.
 

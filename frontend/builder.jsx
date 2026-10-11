@@ -4,6 +4,7 @@ import { FontFaces } from "./fonts.jsx";
 import { CompositionStyle } from "./styles.jsx";
 import { ThemePortability } from "./portability.jsx";
 import { ElementorImport } from "./elementor.jsx";
+import { StructuredModel } from "./structured.jsx";
 import { useState, useEffect, useRef } from "preact/hooks";
 import { Button, Field, Notice, Disclosure, SelectField } from "./ui.jsx";
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -1460,12 +1461,26 @@ function App() {
               setModels({ ...models, [model]: { ...models[model], label: v } })
             }
           />
-          <Fields
-            definition={models[model].fields}
-            groups={schema.groups}
+          <Disclosure key={model} summary="Model field definitions">
+            <Fields
+              definition={models[model].fields}
+              groups={schema.groups}
+              models={models}
+              onChange={(v) =>
+                setModels({
+                  ...models,
+                  [model]: { ...models[model], fields: v },
+                })
+              }
+            />
+          </Disclosure>
+          <StructuredModel
+            key={model}
+            model={models[model]}
             models={models}
-            onChange={(v) =>
-              setModels({ ...models, [model]: { ...models[model], fields: v } })
+            common={schema}
+            onChange={(definition) =>
+              setModels({ ...models, [model]: definition })
             }
           />
           <h3>Taxonomies</h3>
@@ -1589,57 +1604,59 @@ function App() {
           >
             Save model
           </Button>
-          <h3>Common fields</h3>
-          <Fields
-            definition={schema.fields}
-            groups={schema.groups}
-            models={models}
-            onChange={(v) => setCommon({ ...schema, fields: v })}
-          />
-          <h3>Reusable field groups</h3>
-          {Object.entries(schema.groups).map(([id, fields]) => (
-            <fieldset>
-              <legend>{id}</legend>
-              <Fields
-                definition={fields}
-                groups={schema.groups}
-                models={models}
-                onChange={(v) =>
-                  setCommon({
-                    ...schema,
-                    groups: { ...schema.groups, [id]: v },
-                  })
-                }
-              />
-            </fieldset>
-          ))}
-          <AddName
-            label="Add group"
-            onAdd={(id) =>
-              setCommon({ ...schema, groups: { ...schema.groups, [id]: {} } })
-            }
-          />
-          <h3>Shared option definitions</h3>
-          <Fields
-            definition={schema.options}
-            groups={schema.groups}
-            models={models}
-            onChange={(v) => setCommon({ ...schema, options: v })}
-          />
-          <Button
-            onClick={() =>
-              action(async () => {
-                await api("/api/admin/schema", {
-                  version: state.design.version,
-                  definition: common,
-                });
-                await reload(id);
-                setMessage("Shared definitions saved");
-              })
-            }
-          >
-            Save shared definitions
-          </Button>
+          <Disclosure summary="Shared field and option definitions">
+            <h3>Common fields</h3>
+            <Fields
+              definition={schema.fields}
+              groups={schema.groups}
+              models={models}
+              onChange={(v) => setCommon({ ...schema, fields: v })}
+            />
+            <h3>Reusable field groups</h3>
+            {Object.entries(schema.groups).map(([id, fields]) => (
+              <fieldset>
+                <legend>{id}</legend>
+                <Fields
+                  definition={fields}
+                  groups={schema.groups}
+                  models={models}
+                  onChange={(v) =>
+                    setCommon({
+                      ...schema,
+                      groups: { ...schema.groups, [id]: v },
+                    })
+                  }
+                />
+              </fieldset>
+            ))}
+            <AddName
+              label="Add group"
+              onAdd={(id) =>
+                setCommon({ ...schema, groups: { ...schema.groups, [id]: {} } })
+              }
+            />
+            <h3>Shared option definitions</h3>
+            <Fields
+              definition={schema.options}
+              groups={schema.groups}
+              models={models}
+              onChange={(v) => setCommon({ ...schema, options: v })}
+            />
+            <Button
+              onClick={() =>
+                action(async () => {
+                  await api("/api/admin/schema", {
+                    version: state.design.version,
+                    definition: common,
+                  });
+                  await reload(id);
+                  setMessage("Shared definitions saved");
+                })
+              }
+            >
+              Save shared definitions
+            </Button>
+          </Disclosure>
         </section>
       )}
       {tab === "options" && (

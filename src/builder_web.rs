@@ -25,6 +25,7 @@ pub fn routes() -> Router<App> {
         .route("/api/admin/design/{id}/restore/{version}", post(restore))
         .route("/api/admin/schema", post(common))
         .route("/api/admin/models/{id}", post(model))
+        .route("/api/admin/structured/vocabulary", get(vocabulary))
         .route("/api/admin/options", post(options))
         .route("/admin/design/{id}/preview", get(preview))
         .route("/admin/design/{id}/style.css", get(draft_css))
@@ -32,6 +33,27 @@ pub fn routes() -> Router<App> {
         .layer(DefaultBodyLimit::max(320 * 1024))
         .merge(crate::theme::asset_web::routes())
         .merge(crate::platform::elementor_design_web::routes())
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VocabularyQuery {
+    family: String,
+    #[serde(default)]
+    prefix: String,
+    #[serde(default)]
+    after: String,
+    #[serde(default)]
+    pending: bool,
+}
+async fn vocabulary(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Query(q): Query<VocabularyQuery>,
+) -> Result<Json<crate::structured::vocabulary::Page>> {
+    owner(&app, &headers, None).await?;
+    Ok(Json(
+        crate::structured::vocabulary::get()?.search(&q.family, &q.prefix, &q.after, q.pending)?,
+    ))
 }
 async fn owner(
     app: &App,

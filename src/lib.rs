@@ -16,6 +16,7 @@ pub mod model;
 pub mod operations;
 pub mod platform;
 pub mod schema;
+pub mod structured;
 pub mod theme;
 pub mod view;
 pub mod web;
@@ -157,7 +158,7 @@ impl App {
                     || (matches!(
                         startup_mode,
                         Startup::Maintenance | Startup::RebindMaintenance
-                    ) && matches!(version, 14..=19)),
+                    ) && matches!(version, 14..=20)),
                 "runtime schema is incompatible; stop all nodes and use the documented offline upgrade/recovery path"
             );
         } else {
