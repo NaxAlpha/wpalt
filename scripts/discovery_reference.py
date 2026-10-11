@@ -29,7 +29,13 @@ class Head(HTMLParser):
   if tag=='script' and a.get('type')=='application/ld+json':self.in_graph=True;self.graph_text=''
  def handle_endtag(self,tag):
   if tag=='title':self.in_title=False
-  if tag=='script' and self.in_graph:self.graphs.append(json.loads(self.graph_text));self.in_graph=False
+  if tag=='script' and self.in_graph:
+   value=json.loads(self.graph_text)
+   # JSON-LD admits an object or an array of objects at the document root.
+   # Yoast emits an object; native output combines its graph in an array.
+   documents=value if isinstance(value,list) else [value]
+   assert all(isinstance(document,dict) for document in documents)
+   self.graphs.extend(documents);self.in_graph=False
  def handle_data(self,data):
   if self.in_title:self.title+=data
   if self.in_graph:self.graph_text+=data
