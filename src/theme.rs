@@ -1060,7 +1060,21 @@ pub struct Stored {
     pub package: Package,
 }
 pub async fn load(app: &App, id: &str, draft: bool) -> Result<Stored> {
-    let row = sqlx::query("SELECT draft,live,version,published_version FROM themes WHERE id=$1")
+    let registry = Registry::load(app).await?;
+    load_with_registry(app, id, draft, &registry).await
+}
+pub async fn load_with_registry(
+    app: &App,
+    id: &str,
+    draft: bool,
+    registry: &Registry,
+) -> Result<Stored> {
+    let query = if draft {
+        "SELECT draft AS package,version,published_version FROM themes WHERE id=$1"
+    } else {
+        "SELECT live AS package,version,published_version FROM themes WHERE id=$1"
+    };
+    let row = sqlx::query(query)
         .bind(id)
         .fetch_optional(&app.db.pool)
         .await?
@@ -1070,12 +1084,12 @@ pub async fn load(app: &App, id: &str, draft: bool) -> Result<Stored> {
             "Publish the theme before activating or exporting its live version.",
         ));
     }
-    let raw: String = row.get(if draft { "draft" } else { "live" });
+    let raw: String = row.get("package");
     Ok(Stored {
         id: id.into(),
         version: row.get("version"),
         published_version: row.get("published_version"),
-        package: Package::parse(&raw, &Registry::load(app).await?)?,
+        package: Package::parse(&raw, registry)?,
     })
 }
 pub async fn validate_literal_references(app: &App, package: &Package) -> Result<()> {

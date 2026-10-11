@@ -20,3 +20,5 @@
 
 .embedded-form{padding:16px;background:var(--bg)}.embedded-form main{max-width:720px;margin-inline:auto}.embedded-form h1{font-size:1.5rem}.embedded-form #public-form{margin:16px 0}
 #engagement-controls label{display:flex;align-items:flex-start;gap:10px}#engagement-controls input[type=checkbox]{width:auto;flex:0 0 auto;margin:6px 0 0}
+
+.elementor-review{overflow-wrap:anywhere}.elementor-review details{margin-block:16px}.elementor-review li{margin-block:8px}

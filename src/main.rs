@@ -568,6 +568,19 @@ async fn shop_command(app: &App, command: ShopCommand) -> wpalt::error::Result<(
 }
 #[derive(Subcommand)]
 enum ThemeCommand {
+    /// Review an Elementor Request JSON against the saved native draft.
+    ElementorReview {
+        id: String,
+        input: PathBuf,
+        output: PathBuf,
+    },
+    /// Recompute and apply an exact reviewed plan as a private draft only.
+    ElementorApply {
+        id: String,
+        input: PathBuf,
+        #[arg(long)]
+        acknowledge_losses: bool,
+    },
     FontImport {
         input: PathBuf,
         #[arg(long)]
@@ -1661,6 +1674,45 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             use wpalt::{schema, theme};
             let result: wpalt::error::Result<()> = async {
                 match command {
+                    ThemeCommand::ElementorReview { id,input,output } => {
+                        use wpalt::platform::elementor_design;
+                        let data=backup::read_bounded(&input,elementor_design::MAX_BYTES+65536).await?;
+                        let permit=app.media_work.clone().acquire_owned().await.map_err(|_|wpalt::error::Error::invalid("Design review work unavailable."))?;
+                        let registry=schema::Registry::load(&app).await?;
+                        let stored=theme::load_with_registry(&app,&id,true,&registry).await?;
+                        let theme_id=id.clone();let version=stored.version;
+                        let (request,review)=tokio::task::spawn_blocking(move|| {
+                            let _permit=permit;
+                            let request:elementor_design::Request=serde_json::from_slice(&data).map_err(|_|wpalt::error::Error::invalid("Invalid design request."))?;
+                            let review=elementor_design::review(&theme_id,stored.package,version,request.clone(),&registry)?;
+                            Ok::<_,wpalt::error::Error>((request,review))
+                        }).await.map_err(|_|wpalt::error::Error::invalid("Design review failed."))??;
+                        elementor_design::validate_destination(&app,&review).await?;
+                        theme::validate_literal_references(&app,&review.package).await?;
+                        let plan=serde_json::json!({"format":1,"theme":id,"version":version,"request":request,"fingerprint":review.fingerprint,"report":review.report});
+                        backup::write_private(&output,&serde_json::to_vec_pretty(&plan).map_err(|_|wpalt::error::Error::invalid("Invalid review plan."))?).map_err(|_|wpalt::error::Error::invalid("Choose a new private review output file."))?;
+                    }
+                    ThemeCommand::ElementorApply { id,input,acknowledge_losses } => {
+                        use wpalt::platform::elementor_design;
+                        #[derive(serde::Deserialize)] #[serde(deny_unknown_fields)]
+                        struct Plan {format:u32,theme:String,version:i64,request:elementor_design::Request,fingerprint:String,report:serde_json::Value}
+                        let data=backup::read_bounded(&input,3*1024*1024).await?;
+                        let registry=schema::Registry::load(&app).await?;
+                        let stored=theme::load_with_registry(&app,&id,true,&registry).await?;
+                        let permit=app.media_work.clone().acquire_owned().await.map_err(|_|wpalt::error::Error::invalid("Design import work unavailable."))?;
+                        let theme_id=id.clone();let current_version=stored.version;
+                        let (version,review)=tokio::task::spawn_blocking(move|| {
+                            let _permit=permit;
+                            let plan:Plan=serde_json::from_slice(&data).map_err(|_|wpalt::error::Error::invalid("Invalid reviewed plan."))?;
+                            if plan.format!=1||plan.theme!=theme_id||plan.version!=current_version{return Err(wpalt::error::Error::invalid("Theme changed; review the design again."));}
+                            let review=elementor_design::review(&theme_id,stored.package,plan.version,plan.request,&registry)?;
+                            if review.fingerprint!=plan.fingerprint||review.report!=plan.report||(!review.report["losses"].as_array().is_some_and(Vec::is_empty)&&!acknowledge_losses){return Err(wpalt::error::Error::invalid("Confirm the exact review and reported losses with --acknowledge-losses."));}
+                            Ok::<_,wpalt::error::Error>((current_version,review))
+                        }).await.map_err(|_|wpalt::error::Error::invalid("Design import failed."))??;
+                        elementor_design::validate_destination(&app,&review).await?;
+                        theme::save(&app,&id,review.package,version,false).await?;
+                        println!("Reviewed design imported as a private draft. Publish separately after preview.");
+                    }
                     ThemeCommand::FontImport { input, label, source, license, rights } => {
                         if !rights { return Err(wpalt::error::Error::invalid("Confirm distribution permission with --rights.")); }
                         let data=backup::read_bounded(&input,theme::font::MAX_FONT_BYTES).await?;

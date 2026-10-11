@@ -2256,6 +2256,49 @@
         "Affected navigation/font/style grammar, container/parser dependency, public asset admission, language configuration, publication/recovery or authoritative guidance changes"
       ],
       "status": "native acceptance verified; final browser/CI/archive delivery gates pending; broader format/style/navigation scope retained"
+    },
+    {
+      "feature_id": "D05-01",
+      "area": "Reviewed Elementor design import",
+      "scope": "Explicit native mappings and source-loss accounting; full F024 remains incomplete",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developers.elementor.com/docs/data-structure/general-structure/",
+        "https://developers.elementor.com/docs/data-structure/atomic-elements/",
+        "https://developers.elementor.com/docs/data-structure/global-styles/",
+        "https://developers.elementor.com/docs/data-structure/responsive-data/",
+        "https://github.com/elementor/elementor/tree/840f5f54b774b8a04587501d9cd23706dc700024",
+        "https://wordpress.org/documentation/wordpress-version/version-7.1.3/"
+      ],
+      "applicable_versions": [
+        "Elementor free 4.3.4; export wrapper 0.4; selected atomic properties",
+        "wpalt native 19 / portable v15 / theme package 2",
+        "wpalt-elementor-design-review-v1"
+      ],
+      "last_checked": "2026-10-10",
+      "next_review": "2026-11-09",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Distinguish plugin release, source/export schema and runtime-observed data.",
+        "Bound aggregate source/native graph work, preserve exact mapped/unmapped properties and refuse executable source.",
+        "Map local dependencies and global styles explicitly; never infer source access grants or fetch foreign resources.",
+        "Bind exact base/theme/source/mappings/placement review; current-owner CAS saves private draft only.",
+        "Record actual free export/rendering separately from source inspection and inaccessible Pro behavior."
+      ],
+      "tests": [
+        "tests/elementor.rs",
+        "tests/acceptance.rs",
+        "scripts/elementor_design_acceptance.cjs",
+        "scripts/elementor_design_reference.py"
+      ],
+      "triggers": [
+        "affected release",
+        "source data/control/style/atomic change",
+        "source or native parser advisory",
+        "mapping/permission/publication/recovery change"
+      ],
+      "status": "Native connected SQLite/PostgreSQL and focused macOS browser passed; cumulative and current-free Linux container evidence pending."
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

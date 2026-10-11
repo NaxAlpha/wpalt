@@ -31,6 +31,7 @@ pub fn routes() -> Router<App> {
         .route("/themes/{id}/{version}/style.css", get(live_css))
         .layer(DefaultBodyLimit::max(320 * 1024))
         .merge(crate::theme::asset_web::routes())
+        .merge(crate::platform::elementor_design_web::routes())
 }
 async fn owner(
     app: &App,
