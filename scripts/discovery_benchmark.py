@@ -55,7 +55,19 @@ for engine in (['sqlite','postgres'] if args.postgres else ['sqlite']):
      with public.open(origin+path,timeout=15) as response:body=response.read();headers={k.lower():v for k,v in response.headers.items()}
      if i>=5:samples.append((time.perf_counter()-started)*1000)
     if name in ('image','news'):assert len(ET.fromstring(body))==100 and headers.get('link')
-    observations[name]={'samples':30,'p50_ms':round(statistics.median(samples),3),'p95_ms':round(sorted(samples)[27],3),'response_bytes':len(body)}
+    # Observe existing SQLx diagnostics for one additional isolated request.
+    offset=(root/'server.log').stat().st_size
+    with public.open(origin+path,timeout=15) as response:response.read()
+    time.sleep(.03)
+    with (root/'server.log').open() as diagnostics:diagnostics.seek(offset);logged=diagnostics.read(1024*1024)
+    selects=[]
+    for line in logged.splitlines():
+     try:event=json.loads(line)
+     except ValueError:continue
+     fields=event.get('fields',{});statement=fields.get('db.statement') or fields.get('summary','')
+     if event.get('target','').startswith('sqlx') and statement.lstrip().upper().startswith('SELECT'):selects.append(fields.get('summary',statement.splitlines()[0])[:200])
+    assert selects, 'Enabled SQLx SELECT diagnostics must be observed'
+    observations[name]={'samples':30,'p50_ms':round(statistics.median(samples),3),'p95_ms':round(sorted(samples)[27],3),'response_bytes':len(body),'observed_http_select_queries':len(selects),'observed_select_shapes':selects}
    plans={};at=int(time.time())
    for kind in ['image','video','news']:
     indexable="NOT COALESCE((published_seo::jsonb->>'noindex')::boolean,false)" if engine=='postgres' else "COALESCE(json_extract(published_seo,'$.noindex'),0)=0"

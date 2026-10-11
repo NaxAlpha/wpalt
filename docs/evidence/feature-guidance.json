@@ -2345,7 +2345,7 @@
         "upstream namespace/required-tag/date/language guideline change",
         "source plugin version or parser advisory"
       ],
-      "status": "Connected native SQLite/PostgreSQL tests passed; final integrated browser, migration, observations and CI reference gates pending."
+      "status": "Final native 109 Rust cases, 11 pipeline cases, real stopped D05 upgrade/rollback, single-server and two-process browser journeys, actual SQLx counts and optimized plans passed; exact-head CI/free-reference/clean archive and actual-main release pending."
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

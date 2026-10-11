@@ -61,7 +61,11 @@ with tempfile.TemporaryDirectory(prefix='wpalt-d06-reference-') as temporary:
   with client.open(source['url'],timeout=15) as response:source_html=response.read().decode()
   parsed=Head();parsed.feed(source_html)
   assert parsed.title==source['title'];assert parsed.meta['description']==source['description'];assert parsed.meta['og:image']==source['image']
-  with client.open(origin+'/?sitemap=post&sitemap_n=1',timeout=15) as response:source_xml=response.read()
+  # Yoast redirects explicit page 0/1 to rewritten URLs; use its admitted
+  # first-page query without a page number on the plain-permalink fixture.
+  with client.open(origin+'/?sitemap=post',timeout=15) as response:
+   assert 'xml' in response.headers.get('Content-Type','').lower(), 'Actual plugin sitemap must be XML'
+   source_xml=response.read()
   image_ns={'s':'http://www.sitemaps.org/schemas/sitemap/0.9','i':'http://www.google.com/schemas/sitemap-image/1.1'}
   sitemap=ET.fromstring(source_xml);reference_images=[n.text for n in sitemap.findall('.//i:loc',image_ns)];assert source['image'] in reference_images
   report['reference']={'html_sha256':hashlib.sha256(source_html.encode()).hexdigest(),'sitemap_sha256':hashlib.sha256(source_xml).hexdigest(),'title':parsed.title,'description':parsed.meta['description'],'social_image_present':True,'image_sitemap_present':True}

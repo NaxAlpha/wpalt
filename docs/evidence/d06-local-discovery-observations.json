@@ -1,0 +1,860 @@
+{
+  "profile": "debug",
+  "binary_sha256": "b8d916a17e00c0de2323728eb5585d939ab62c8d7bd6b2f5ae3d5e1f847d2b48",
+  "publication_source_sha256": "2ef90512c9aaec1cf3df4fda3fd74a9ddc06bee40714ead221f3482b2d3e1a63",
+  "scope": "Five warmups and 30 serial loopback samples/path. Debug logging enabled. Warm application RSS is not peak, database engine memory is excluded, database scopes differ. No TLS/throughput/CWV/equivalent WordPress efficiency claim. Plans record current handler SQL at declared population; empty video plan does not establish populated video scalability.",
+  "observations": [
+    {
+      "engine": "sqlite",
+      "fixture": "1500 seed publications plus 121 actual canonical image/news API publications; one admitted shared PNG; empty video population, real playback separately browser-verified",
+      "paths": {
+        "image": {
+          "samples": 30,
+          "p50_ms": 12.595,
+          "p95_ms": 15.233,
+          "response_bytes": 17780,
+          "observed_http_select_queries": 3,
+          "observed_select_shapes": [
+            "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts \u2026",
+            "SELECT definition FROM discovery_settings \u2026",
+            "SELECT r.post_id,r.media_id FROM published_image_refs \u2026"
+          ]
+        },
+        "news": {
+          "samples": 30,
+          "p50_ms": 4.805,
+          "p95_ms": 5.371,
+          "response_bytes": 30289,
+          "observed_http_select_queries": 2,
+          "observed_select_shapes": [
+            "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts \u2026",
+            "SELECT definition FROM discovery_settings \u2026"
+          ]
+        },
+        "video_empty": {
+          "samples": 30,
+          "p50_ms": 0.944,
+          "p95_ms": 1.066,
+          "response_bytes": 169,
+          "observed_http_select_queries": 2,
+          "observed_select_shapes": [
+            "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts \u2026",
+            "SELECT definition FROM discovery_settings \u2026"
+          ]
+        },
+        "index": {
+          "samples": 30,
+          "p50_ms": 9.907,
+          "p95_ms": 10.926,
+          "response_bytes": 737,
+          "observed_http_select_queries": 5,
+          "observed_select_shapes": [
+            "SELECT id,n FROM (SELECT \u2026",
+            "SELECT COUNT(*) FROM (SELECT \u2026",
+            "SELECT id,n FROM (SELECT \u2026",
+            "SELECT id,n FROM (SELECT \u2026",
+            "SELECT id,n FROM (SELECT \u2026"
+          ]
+        },
+        "public_attached": {
+          "samples": 30,
+          "p50_ms": 9.193,
+          "p95_ms": 11.486,
+          "response_bytes": 2642,
+          "observed_http_select_queries": 14,
+          "observed_select_shapes": [
+            "SELECT definition,version FROM discovery_settings \u2026",
+            "SELECT published_locale FROM posts \u2026",
+            "SELECT id FROM posts \u2026",
+            "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+            "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+            "SELECT COUNT(*) FROM member_resources \u2026",
+            "SELECT name,body FROM comments \u2026",
+            "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+            "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+            "SELECT published_version,version FROM themes \u2026",
+            "SELECT live_options FROM site_design \u2026",
+            "SELECT '' AS id,field_schema \u2026",
+            "SELECT id,alt,filename,sha256 FROM media \u2026",
+            "SELECT id,mime,filename,alt,sha256 FROM media \u2026"
+          ]
+        },
+        "public_without_attachment": {
+          "samples": 30,
+          "p50_ms": 8.25,
+          "p95_ms": 8.5,
+          "response_bytes": 3788,
+          "observed_http_select_queries": 12,
+          "observed_select_shapes": [
+            "SELECT definition,version FROM discovery_settings \u2026",
+            "SELECT published_locale FROM posts \u2026",
+            "SELECT id FROM posts \u2026",
+            "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+            "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+            "SELECT COUNT(*) FROM member_resources \u2026",
+            "SELECT name,body FROM comments \u2026",
+            "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+            "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+            "SELECT published_version,version FROM themes \u2026",
+            "SELECT live_options FROM site_design \u2026",
+            "SELECT '' AS id,field_schema \u2026"
+          ]
+        }
+      },
+      "query_plans": {
+        "image": {
+          "sql": "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0 AND EXISTS(SELECT 1 FROM published_image_refs r WHERE r.post_id=posts.id) AND id>'' ORDER BY id LIMIT 101",
+          "plan": [
+            "SEARCH posts USING INDEX published_sitemap (status=? AND id>?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH mr USING COVERING INDEX sqlite_autoindex_member_resources_1 (kind=? AND resource_id=?)",
+            "SEARCH r EXISTS USING COVERING INDEX sqlite_autoindex_published_image_refs_1 (post_id=?)"
+          ]
+        },
+        "video": {
+          "sql": "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0 AND COALESCE(json_extract(published_seo,'$.video.sitemap'),0)=1 AND id>'' ORDER BY id LIMIT 101",
+          "plan": [
+            "SEARCH posts USING INDEX discovery_video_identity (status=? AND id>?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH mr USING COVERING INDEX sqlite_autoindex_member_resources_1 (kind=? AND resource_id=?)"
+          ]
+        },
+        "news": {
+          "sql": "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0 AND json_type(published_seo,'$.news')='object' AND published_at>0 AND published_at>=1791512607 AND published_at<=1791685407 AND id>'' ORDER BY id LIMIT 101",
+          "plan": [
+            "SEARCH posts USING INDEX discovery_news_identity (status=? AND published_at>? AND published_at<?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH mr USING COVERING INDEX sqlite_autoindex_member_resources_1 (kind=? AND resource_id=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ]
+        }
+      },
+      "discovery_indexes": {
+        "discovery_video_identity": "CREATE INDEX discovery_video_identity ON posts(status,id) WHERE status='published' AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0 AND COALESCE(json_extract(published_seo,'$.video.sitemap'),0)=1",
+        "discovery_news_identity": "CREATE INDEX discovery_news_identity ON posts(status,published_at,id) WHERE status='published' AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0 AND json_type(published_seo,'$.news')='object'"
+      },
+      "warm_application_rss_bytes": 72564736,
+      "database_bytes": 29192968,
+      "database_scope": "SQLite DB/WAL/SHM"
+    },
+    {
+      "engine": "postgres",
+      "fixture": "1500 seed publications plus 121 actual canonical image/news API publications; one admitted shared PNG; empty video population, real playback separately browser-verified",
+      "paths": {
+        "image": {
+          "samples": 30,
+          "p50_ms": 7.375,
+          "p95_ms": 8.104,
+          "response_bytes": 17777,
+          "observed_http_select_queries": 3,
+          "observed_select_shapes": [
+            "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts \u2026",
+            "SELECT definition FROM discovery_settings \u2026",
+            "SELECT r.post_id,r.media_id FROM published_image_refs \u2026"
+          ]
+        },
+        "news": {
+          "samples": 30,
+          "p50_ms": 5.14,
+          "p95_ms": 5.697,
+          "response_bytes": 30283,
+          "observed_http_select_queries": 2,
+          "observed_select_shapes": [
+            "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts \u2026",
+            "SELECT definition FROM discovery_settings \u2026"
+          ]
+        },
+        "video_empty": {
+          "samples": 30,
+          "p50_ms": 1.398,
+          "p95_ms": 1.881,
+          "response_bytes": 169,
+          "observed_http_select_queries": 2,
+          "observed_select_shapes": [
+            "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts \u2026",
+            "SELECT definition FROM discovery_settings \u2026"
+          ]
+        },
+        "index": {
+          "samples": 30,
+          "p50_ms": 2.981,
+          "p95_ms": 3.937,
+          "response_bytes": 737,
+          "observed_http_select_queries": 5,
+          "observed_select_shapes": [
+            "SELECT id,n FROM (SELECT \u2026",
+            "SELECT COUNT(*) FROM (SELECT \u2026",
+            "SELECT id,n FROM (SELECT \u2026",
+            "SELECT id,n FROM (SELECT \u2026",
+            "SELECT id,n FROM (SELECT \u2026"
+          ]
+        },
+        "public_attached": {
+          "samples": 30,
+          "p50_ms": 4.002,
+          "p95_ms": 4.62,
+          "response_bytes": 2642,
+          "observed_http_select_queries": 14,
+          "observed_select_shapes": [
+            "SELECT definition,version FROM discovery_settings \u2026",
+            "SELECT published_locale FROM posts \u2026",
+            "SELECT id FROM posts \u2026",
+            "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+            "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+            "SELECT COUNT(*) FROM member_resources \u2026",
+            "SELECT name,body FROM comments \u2026",
+            "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+            "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+            "SELECT published_version,version FROM themes \u2026",
+            "SELECT live_options FROM site_design \u2026",
+            "SELECT '' AS id,field_schema \u2026",
+            "SELECT id,alt,filename,sha256 FROM media \u2026",
+            "SELECT id,mime,filename,alt,sha256 FROM media \u2026"
+          ]
+        },
+        "public_without_attachment": {
+          "samples": 30,
+          "p50_ms": 3.522,
+          "p95_ms": 4.411,
+          "response_bytes": 3788,
+          "observed_http_select_queries": 12,
+          "observed_select_shapes": [
+            "SELECT definition,version FROM discovery_settings \u2026",
+            "SELECT published_locale FROM posts \u2026",
+            "SELECT id FROM posts \u2026",
+            "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+            "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+            "SELECT COUNT(*) FROM member_resources \u2026",
+            "SELECT name,body FROM comments \u2026",
+            "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+            "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+            "SELECT published_version,version FROM themes \u2026",
+            "SELECT live_options FROM site_design \u2026",
+            "SELECT '' AS id,field_schema \u2026"
+          ]
+        }
+      },
+      "query_plans": {
+        "image": {
+          "sql": "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND NOT COALESCE((published_seo::jsonb->>'noindex')::boolean,false) AND EXISTS(SELECT 1 FROM published_image_refs r WHERE r.post_id=posts.id) AND id>'' ORDER BY id LIMIT 101",
+          "plan": [
+            {
+              "Plan": {
+                "Node Type": "Limit",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 449.91,
+                "Total Cost": 450.22,
+                "Plan Rows": 60,
+                "Plan Width": 110,
+                "Actual Startup Time": 1.762,
+                "Actual Total Time": 1.777,
+                "Actual Rows": 101,
+                "Actual Loops": 1,
+                "Shared Hit Blocks": 398,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Merge Join",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Join Type": "Anti",
+                    "Startup Cost": 449.91,
+                    "Total Cost": 450.22,
+                    "Plan Rows": 60,
+                    "Plan Width": 110,
+                    "Actual Startup Time": 1.761,
+                    "Actual Total Time": 1.772,
+                    "Actual Rows": 101,
+                    "Actual Loops": 1,
+                    "Inner Unique": false,
+                    "Merge Cond": "(posts.id = mr.resource_id)",
+                    "Shared Hit Blocks": 398,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Plans": [
+                      {
+                        "Node Type": "Sort",
+                        "Parent Relationship": "Outer",
+                        "Parallel Aware": false,
+                        "Async Capable": false,
+                        "Startup Cost": 449.9,
+                        "Total Cost": 450.05,
+                        "Plan Rows": 60,
+                        "Plan Width": 110,
+                        "Actual Startup Time": 1.755,
+                        "Actual Total Time": 1.759,
+                        "Actual Rows": 101,
+                        "Actual Loops": 1,
+                        "Sort Key": [
+                          "posts.id"
+                        ],
+                        "Sort Method": "quicksort",
+                        "Sort Space Used": 58,
+                        "Sort Space Type": "Memory",
+                        "Shared Hit Blocks": 398,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Local Hit Blocks": 0,
+                        "Local Read Blocks": 0,
+                        "Local Dirtied Blocks": 0,
+                        "Local Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0,
+                        "Plans": [
+                          {
+                            "Node Type": "Hash Join",
+                            "Parent Relationship": "Outer",
+                            "Parallel Aware": false,
+                            "Async Capable": false,
+                            "Join Type": "Semi",
+                            "Startup Cost": 4.72,
+                            "Total Cost": 448.12,
+                            "Plan Rows": 60,
+                            "Plan Width": 110,
+                            "Actual Startup Time": 1.506,
+                            "Actual Total Time": 1.697,
+                            "Actual Rows": 121,
+                            "Actual Loops": 1,
+                            "Inner Unique": false,
+                            "Hash Cond": "(posts.id = r.post_id)",
+                            "Shared Hit Blocks": 398,
+                            "Shared Read Blocks": 0,
+                            "Shared Dirtied Blocks": 0,
+                            "Shared Written Blocks": 0,
+                            "Local Hit Blocks": 0,
+                            "Local Read Blocks": 0,
+                            "Local Dirtied Blocks": 0,
+                            "Local Written Blocks": 0,
+                            "Temp Read Blocks": 0,
+                            "Temp Written Blocks": 0,
+                            "Plans": [
+                              {
+                                "Node Type": "Seq Scan",
+                                "Parent Relationship": "Outer",
+                                "Parallel Aware": false,
+                                "Async Capable": false,
+                                "Relation Name": "posts",
+                                "Alias": "posts",
+                                "Startup Cost": 0.0,
+                                "Total Cost": 440.61,
+                                "Plan Rows": 811,
+                                "Plan Width": 110,
+                                "Actual Startup Time": 0.009,
+                                "Actual Total Time": 1.526,
+                                "Actual Rows": 1622,
+                                "Actual Loops": 1,
+                                "Filter": "((id > ''::text) AND (status = 'published'::text) AND (NOT COALESCE((((published_seo)::jsonb ->> 'noindex'::text))::boolean, false)))",
+                                "Rows Removed by Filter": 0,
+                                "Shared Hit Blocks": 396,
+                                "Shared Read Blocks": 0,
+                                "Shared Dirtied Blocks": 0,
+                                "Shared Written Blocks": 0,
+                                "Local Hit Blocks": 0,
+                                "Local Read Blocks": 0,
+                                "Local Dirtied Blocks": 0,
+                                "Local Written Blocks": 0,
+                                "Temp Read Blocks": 0,
+                                "Temp Written Blocks": 0
+                              },
+                              {
+                                "Node Type": "Hash",
+                                "Parent Relationship": "Inner",
+                                "Parallel Aware": false,
+                                "Async Capable": false,
+                                "Startup Cost": 3.21,
+                                "Total Cost": 3.21,
+                                "Plan Rows": 121,
+                                "Plan Width": 37,
+                                "Actual Startup Time": 0.02,
+                                "Actual Total Time": 0.02,
+                                "Actual Rows": 121,
+                                "Actual Loops": 1,
+                                "Hash Buckets": 1024,
+                                "Original Hash Buckets": 1024,
+                                "Hash Batches": 1,
+                                "Original Hash Batches": 1,
+                                "Peak Memory Usage": 17,
+                                "Shared Hit Blocks": 2,
+                                "Shared Read Blocks": 0,
+                                "Shared Dirtied Blocks": 0,
+                                "Shared Written Blocks": 0,
+                                "Local Hit Blocks": 0,
+                                "Local Read Blocks": 0,
+                                "Local Dirtied Blocks": 0,
+                                "Local Written Blocks": 0,
+                                "Temp Read Blocks": 0,
+                                "Temp Written Blocks": 0,
+                                "Plans": [
+                                  {
+                                    "Node Type": "Seq Scan",
+                                    "Parent Relationship": "Outer",
+                                    "Parallel Aware": false,
+                                    "Async Capable": false,
+                                    "Relation Name": "published_image_refs",
+                                    "Alias": "r",
+                                    "Startup Cost": 0.0,
+                                    "Total Cost": 3.21,
+                                    "Plan Rows": 121,
+                                    "Plan Width": 37,
+                                    "Actual Startup Time": 0.002,
+                                    "Actual Total Time": 0.008,
+                                    "Actual Rows": 121,
+                                    "Actual Loops": 1,
+                                    "Shared Hit Blocks": 2,
+                                    "Shared Read Blocks": 0,
+                                    "Shared Dirtied Blocks": 0,
+                                    "Shared Written Blocks": 0,
+                                    "Local Hit Blocks": 0,
+                                    "Local Read Blocks": 0,
+                                    "Local Dirtied Blocks": 0,
+                                    "Local Written Blocks": 0,
+                                    "Temp Read Blocks": 0,
+                                    "Temp Written Blocks": 0
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "Node Type": "Sort",
+                        "Parent Relationship": "Inner",
+                        "Parallel Aware": false,
+                        "Async Capable": false,
+                        "Startup Cost": 0.01,
+                        "Total Cost": 0.02,
+                        "Plan Rows": 1,
+                        "Plan Width": 32,
+                        "Actual Startup Time": 0.005,
+                        "Actual Total Time": 0.005,
+                        "Actual Rows": 0,
+                        "Actual Loops": 1,
+                        "Sort Key": [
+                          "mr.resource_id"
+                        ],
+                        "Sort Method": "quicksort",
+                        "Sort Space Used": 25,
+                        "Sort Space Type": "Memory",
+                        "Shared Hit Blocks": 0,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Local Hit Blocks": 0,
+                        "Local Read Blocks": 0,
+                        "Local Dirtied Blocks": 0,
+                        "Local Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0,
+                        "Plans": [
+                          {
+                            "Node Type": "Seq Scan",
+                            "Parent Relationship": "Outer",
+                            "Parallel Aware": false,
+                            "Async Capable": false,
+                            "Relation Name": "member_resources",
+                            "Alias": "mr",
+                            "Startup Cost": 0.0,
+                            "Total Cost": 0.0,
+                            "Plan Rows": 1,
+                            "Plan Width": 32,
+                            "Actual Startup Time": 0.002,
+                            "Actual Total Time": 0.002,
+                            "Actual Rows": 0,
+                            "Actual Loops": 1,
+                            "Filter": "(kind = 'post'::text)",
+                            "Rows Removed by Filter": 0,
+                            "Shared Hit Blocks": 0,
+                            "Shared Read Blocks": 0,
+                            "Shared Dirtied Blocks": 0,
+                            "Shared Written Blocks": 0,
+                            "Local Hit Blocks": 0,
+                            "Local Read Blocks": 0,
+                            "Local Dirtied Blocks": 0,
+                            "Local Written Blocks": 0,
+                            "Temp Read Blocks": 0,
+                            "Temp Written Blocks": 0
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "Planning": {
+                "Shared Hit Blocks": 636,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              },
+              "Planning Time": 1.355,
+              "Triggers": [],
+              "Execution Time": 1.808
+            }
+          ]
+        },
+        "video": {
+          "sql": "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND NOT COALESCE((published_seo::jsonb->>'noindex')::boolean,false) AND COALESCE((published_seo::jsonb->'video'->>'sitemap')::boolean,false) AND id>'' ORDER BY id LIMIT 101",
+          "plan": [
+            {
+              "Plan": {
+                "Node Type": "Limit",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 0.12,
+                "Total Cost": 134.78,
+                "Plan Rows": 101,
+                "Plan Width": 110,
+                "Actual Startup Time": 0.002,
+                "Actual Total Time": 0.003,
+                "Actual Rows": 0,
+                "Actual Loops": 1,
+                "Shared Hit Blocks": 1,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Nested Loop",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Join Type": "Anti",
+                    "Startup Cost": 0.12,
+                    "Total Cost": 541.39,
+                    "Plan Rows": 406,
+                    "Plan Width": 110,
+                    "Actual Startup Time": 0.002,
+                    "Actual Total Time": 0.002,
+                    "Actual Rows": 0,
+                    "Actual Loops": 1,
+                    "Inner Unique": false,
+                    "Join Filter": "(mr.resource_id = posts.id)",
+                    "Rows Removed by Join Filter": 0,
+                    "Shared Hit Blocks": 1,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Plans": [
+                      {
+                        "Node Type": "Index Scan",
+                        "Parent Relationship": "Outer",
+                        "Parallel Aware": false,
+                        "Async Capable": false,
+                        "Scan Direction": "Forward",
+                        "Index Name": "discovery_video_identity",
+                        "Relation Name": "posts",
+                        "Alias": "posts",
+                        "Startup Cost": 0.12,
+                        "Total Cost": 536.32,
+                        "Plan Rows": 406,
+                        "Plan Width": 110,
+                        "Actual Startup Time": 0.001,
+                        "Actual Total Time": 0.001,
+                        "Actual Rows": 0,
+                        "Actual Loops": 1,
+                        "Index Cond": "(id > ''::text)",
+                        "Rows Removed by Index Recheck": 0,
+                        "Shared Hit Blocks": 1,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Local Hit Blocks": 0,
+                        "Local Read Blocks": 0,
+                        "Local Dirtied Blocks": 0,
+                        "Local Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0
+                      },
+                      {
+                        "Node Type": "Seq Scan",
+                        "Parent Relationship": "Inner",
+                        "Parallel Aware": false,
+                        "Async Capable": false,
+                        "Relation Name": "member_resources",
+                        "Alias": "mr",
+                        "Startup Cost": 0.0,
+                        "Total Cost": 0.0,
+                        "Plan Rows": 1,
+                        "Plan Width": 32,
+                        "Actual Startup Time": 0.0,
+                        "Actual Total Time": 0.0,
+                        "Actual Rows": 0,
+                        "Actual Loops": 0,
+                        "Filter": "(kind = 'post'::text)",
+                        "Rows Removed by Filter": 0,
+                        "Shared Hit Blocks": 0,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Local Hit Blocks": 0,
+                        "Local Read Blocks": 0,
+                        "Local Dirtied Blocks": 0,
+                        "Local Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              "Planning": {
+                "Shared Hit Blocks": 588,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              },
+              "Planning Time": 1.431,
+              "Triggers": [],
+              "Execution Time": 0.023
+            }
+          ]
+        },
+        "news": {
+          "sql": "SELECT id,published_slug,published_locale,published_seo,published_title,published_at FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND NOT COALESCE((published_seo::jsonb->>'noindex')::boolean,false) AND jsonb_typeof(published_seo::jsonb->'news')='object' AND published_at>0 AND published_at>=1791512617 AND published_at<=1791685417 AND id>'' ORDER BY id LIMIT 101",
+          "plan": [
+            {
+              "Plan": {
+                "Node Type": "Limit",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 13.67,
+                "Total Cost": 13.7,
+                "Plan Rows": 4,
+                "Plan Width": 110,
+                "Actual Startup Time": 0.155,
+                "Actual Total Time": 0.168,
+                "Actual Rows": 101,
+                "Actual Loops": 1,
+                "Shared Hit Blocks": 124,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Merge Join",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Join Type": "Anti",
+                    "Startup Cost": 13.67,
+                    "Total Cost": 13.7,
+                    "Plan Rows": 4,
+                    "Plan Width": 110,
+                    "Actual Startup Time": 0.154,
+                    "Actual Total Time": 0.163,
+                    "Actual Rows": 101,
+                    "Actual Loops": 1,
+                    "Inner Unique": false,
+                    "Merge Cond": "(posts.id = mr.resource_id)",
+                    "Shared Hit Blocks": 124,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Plans": [
+                      {
+                        "Node Type": "Sort",
+                        "Parent Relationship": "Outer",
+                        "Parallel Aware": false,
+                        "Async Capable": false,
+                        "Startup Cost": 13.66,
+                        "Total Cost": 13.67,
+                        "Plan Rows": 4,
+                        "Plan Width": 110,
+                        "Actual Startup Time": 0.149,
+                        "Actual Total Time": 0.151,
+                        "Actual Rows": 101,
+                        "Actual Loops": 1,
+                        "Sort Key": [
+                          "posts.id"
+                        ],
+                        "Sort Method": "quicksort",
+                        "Sort Space Used": 58,
+                        "Sort Space Type": "Memory",
+                        "Shared Hit Blocks": 124,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Local Hit Blocks": 0,
+                        "Local Read Blocks": 0,
+                        "Local Dirtied Blocks": 0,
+                        "Local Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0,
+                        "Plans": [
+                          {
+                            "Node Type": "Index Scan",
+                            "Parent Relationship": "Outer",
+                            "Parallel Aware": false,
+                            "Async Capable": false,
+                            "Scan Direction": "Forward",
+                            "Index Name": "discovery_news_identity",
+                            "Relation Name": "posts",
+                            "Alias": "posts",
+                            "Startup Cost": 0.27,
+                            "Total Cost": 13.62,
+                            "Plan Rows": 4,
+                            "Plan Width": 110,
+                            "Actual Startup Time": 0.021,
+                            "Actual Total Time": 0.091,
+                            "Actual Rows": 121,
+                            "Actual Loops": 1,
+                            "Index Cond": "((published_at > 0) AND (published_at >= 1791512617) AND (published_at <= 1791685417) AND (id > ''::text))",
+                            "Rows Removed by Index Recheck": 0,
+                            "Shared Hit Blocks": 124,
+                            "Shared Read Blocks": 0,
+                            "Shared Dirtied Blocks": 0,
+                            "Shared Written Blocks": 0,
+                            "Local Hit Blocks": 0,
+                            "Local Read Blocks": 0,
+                            "Local Dirtied Blocks": 0,
+                            "Local Written Blocks": 0,
+                            "Temp Read Blocks": 0,
+                            "Temp Written Blocks": 0
+                          }
+                        ]
+                      },
+                      {
+                        "Node Type": "Sort",
+                        "Parent Relationship": "Inner",
+                        "Parallel Aware": false,
+                        "Async Capable": false,
+                        "Startup Cost": 0.01,
+                        "Total Cost": 0.02,
+                        "Plan Rows": 1,
+                        "Plan Width": 32,
+                        "Actual Startup Time": 0.004,
+                        "Actual Total Time": 0.004,
+                        "Actual Rows": 0,
+                        "Actual Loops": 1,
+                        "Sort Key": [
+                          "mr.resource_id"
+                        ],
+                        "Sort Method": "quicksort",
+                        "Sort Space Used": 25,
+                        "Sort Space Type": "Memory",
+                        "Shared Hit Blocks": 0,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Local Hit Blocks": 0,
+                        "Local Read Blocks": 0,
+                        "Local Dirtied Blocks": 0,
+                        "Local Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0,
+                        "Plans": [
+                          {
+                            "Node Type": "Seq Scan",
+                            "Parent Relationship": "Outer",
+                            "Parallel Aware": false,
+                            "Async Capable": false,
+                            "Relation Name": "member_resources",
+                            "Alias": "mr",
+                            "Startup Cost": 0.0,
+                            "Total Cost": 0.0,
+                            "Plan Rows": 1,
+                            "Plan Width": 32,
+                            "Actual Startup Time": 0.002,
+                            "Actual Total Time": 0.002,
+                            "Actual Rows": 0,
+                            "Actual Loops": 1,
+                            "Filter": "(kind = 'post'::text)",
+                            "Rows Removed by Filter": 0,
+                            "Shared Hit Blocks": 0,
+                            "Shared Read Blocks": 0,
+                            "Shared Dirtied Blocks": 0,
+                            "Shared Written Blocks": 0,
+                            "Local Hit Blocks": 0,
+                            "Local Read Blocks": 0,
+                            "Local Dirtied Blocks": 0,
+                            "Local Written Blocks": 0,
+                            "Temp Read Blocks": 0,
+                            "Temp Written Blocks": 0
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "Planning": {
+                "Shared Hit Blocks": 594,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              },
+              "Planning Time": 1.25,
+              "Triggers": [],
+              "Execution Time": 0.193
+            }
+          ]
+        }
+      },
+      "discovery_indexes": "discovery_news_identity:CREATE INDEX discovery_news_identity ON wpalt_discovery_332ba9ceb36649eab9583c6a00889178.posts USING btree (status, published_at, id) WHERE ((status = 'published'::text) AND (NOT COALESCE((((published_seo)::jsonb ->> 'noindex'::text))::boolean, false)) AND (jsonb_typeof(((published_seo)::jsonb -> 'news'::text)) = 'object'::text))\ndiscovery_settings_pkey:CREATE UNIQUE INDEX discovery_settings_pkey ON wpalt_discovery_332ba9ceb36649eab9583c6a00889178.discovery_settings USING btree (id)\ndiscovery_video_identity:CREATE INDEX discovery_video_identity ON wpalt_discovery_332ba9ceb36649eab9583c6a00889178.posts USING btree (status, id) WHERE ((status = 'published'::text) AND (NOT COALESCE((((published_seo)::jsonb ->> 'noindex'::text))::boolean, false)) AND COALESCE(((((published_seo)::jsonb -> 'video'::text) ->> 'sitemap'::text))::boolean, false))",
+      "warm_application_rss_bytes": 60981248,
+      "database_bytes": 21250048,
+      "database_scope": "All fixture PostgreSQL relations including indexes; engine memory excluded"
+    }
+  ]
+}
