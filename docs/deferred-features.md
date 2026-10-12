@@ -86,9 +86,9 @@ Verifiable future outcome: Preview loops/conflicts and work budgets; a complete 
 
 ### D09 — Editorial tooling
 
-Origin: **M3/M9** · Catalog: **F031/F034** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M3/M9** · Catalog: **F031/F034** · Status: **active under the D09 editorial-insights contract**
 
-Administration screens for native link/orphan/text/keyword tools, richer language-aware advisory analysis and larger incremental graph workloads.
+[D09 contract](d09-contract.md) governs connected text/phrase insights and larger durable public analysis. Administration screens for native link/orphan/text/keyword tools, richer language-aware advisory analysis and larger incremental graph workloads.
 
 Verifiable future outcome: An editor reviews useful suggestions alongside content, understands omissions and receives no fabricated ranking score.
 

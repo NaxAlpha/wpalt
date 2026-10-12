@@ -1,0 +1,49 @@
+{
+  "pull_request": "https://github.com/NaxAlpha/wpalt/pull/24",
+  "final_head": "6c8ba148e99f7a02a20b5dd844b69ad3edbcc01c",
+  "tested_merge": "52bfa0115546f1a613c992df7dc56d21c2c9e06a",
+  "tested_parents": [
+    "f18bc86aee0a971017a34799f2ce1d55514182ea",
+    "6c8ba148e99f7a02a20b5dd844b69ad3edbcc01c"
+  ],
+  "actual_main": "9931dee6ae89f758a4a06691b1127a56f1d551ec",
+  "tree": "a060f0d1fc41caa89b2271c1c7b047927c0286f2",
+  "merged_at": "2026-10-12T00:43:40Z",
+  "pr_run": 38146599035,
+  "applicable_pr_gates": [
+    "application",
+    "clean-build",
+    "compiler-floor",
+    "dependency-audit",
+    "frontend",
+    "native-pitr",
+    "local-processes",
+    "discovery-reference"
+  ],
+  "all_applicable_pr_gates": "passed",
+  "strict_archive_verification": {
+    "source_commit": "52bfa0115546f1a613c992df7dc56d21c2c9e06a",
+    "tag": "nightly-202610111417-52bfa0115546",
+    "archive": "wpalt-x86_64-unknown-linux-gnu-52bfa0115546.tar.gz",
+    "archive_sha256": "ec7aed1b04da63bd4901efd37a2436b1d2d0e12b01959817366f7d2977badfdd",
+    "binary_sha256": "b86f0decaebaeb272c89f9fa5e68e96ef85707dc9c350835ad3d16d2f7fc0824",
+    "binary_bytes": 39413576,
+    "timestamp_basis": "commit time, UTC"
+  },
+  "actual_free_reference": {
+    "status": "passed",
+    "mode": "actual-free-plugin-and-native",
+    "binary_sha256": "b86f0decaebaeb272c89f9fa5e68e96ef85707dc9c350835ad3d16d2f7fc0824",
+    "receipt": "free-reference-delivery.json"
+  },
+  "local_retained_original": {
+    "source_commit": "6c8ba148e99f7a02a20b5dd844b69ad3edbcc01c",
+    "actual_main": "9931dee6ae89f758a4a06691b1127a56f1d551ec",
+    "build_scope": "Local macOS debug build from the final D08 Rust/Cargo/asset source tree; main has the same tree. Not the Linux release artifact.",
+    "binary_bytes": 118312856,
+    "binary_sha256": "c4f45a067bc389dbdbc402c1fe6f5bab5032292046d6c5e1ceeeaaf55503dd36",
+    "native_schema": 22,
+    "portable_schema": 18
+  },
+  "scope": "Final PR, tested merge and actual-main trees verified identical. Separate actual-main cumulative run and public release must be verified independently."
+}

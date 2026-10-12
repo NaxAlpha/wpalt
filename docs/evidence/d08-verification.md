@@ -1,6 +1,6 @@
-# D08 — Verification in progress
+# D08 — Verification and delivery
 
-Date: 2026-10-11. Branch `feature/d08-redirect-link-workspace`, based on independently verified D07 main `f18bc86aee0a971017a34799f2ce1d55514182ea`. Native 22 / portable v18 implementation. No readiness, release, full parity, coverage or performance claim yet.
+Date: 2026-10-11. Branch `feature/d08-redirect-link-workspace`, based on independently verified D07 main `f18bc86aee0a971017a34799f2ce1d55514182ea`. Native 22 / portable v18 implementation. D08 PR #24 is merged after final-source verification; actual-main/public-release evidence is recorded below. No full parity, coverage, release SLA or comparative-efficiency claim.
 
 The bounded rule component suite initially exposed an incorrect UTF-8 regex compilation option for `.*`. It was corrected while safe ASCII input/output admission remains enforced. Four meaningful cases passed: whole-path numbered captures, precedence/selected overlap, unsupported/dangerous patterns/results, and finite chains/loops/temporary semantics. The fifth component verifies real rendered edge extraction, named/long IDs and source/edge/tree/allocation work-limit refusal.
 
@@ -33,3 +33,11 @@ First final-source PR run38144598950 passed application, clean-build, compiler-f
 Final adversarial review corrected fragment percent-decoding to retain malformed escapes and replace invalid UTF-8 bytes, matching browser fragment lookup. The parser regression includes mixed valid/malformed escapes, replacement-character targets, named anchors and encoded `top`. Primary guidance: [URL percent-decoding](https://url.spec.whatwg.org/#percent-decode) and [HTML indicated-part lookup](https://html.spec.whatwg.org/multipage/browsing-the-web.html#the-indicated-part-of-the-document), reviewed 2026-10-11. Earlier local immutable measurements remain identified by their original hashes; final-head cumulative CI and its clean archive verify this final correction.
 
 The fragment correction passes all five component cases, the actual rendered-graph journey on both SQLite/PostgreSQL and warnings-denied all-target Clippy. The native-only fixture scope now explicitly states that no WordPress/plugin execution occurred.
+
+## Final PR and merge — 2026-10-12
+
+[PR #24](https://github.com/NaxAlpha/wpalt/pull/24) merged as `9931dee6ae89f758a4a06691b1127a56f1d551ec` after all eight applicable final-head gates passed. Final head `6c8ba148e99f7a02a20b5dd844b69ad3edbcc01c`, tested merge `52bfa0115546f1a613c992df7dc56d21c2c9e06a` and actual main have the same tree. The independently downloaded PR archive passes strict source, locked-assets/guide/file-set and checksum verification. The actual free WordPress7.1.3/Redirection5.10.1 reference passes with that exact verified Linux binary. [Final PR/merge receipt](d08/pr-delivery.json), [actual complete reference](d08/free-reference-delivery.json). Earlier failed/intermediate receipts remain scoped as development observations. Actual-main and the separate public release now independently verify below.
+
+## Actual-main and public release — 2026-10-12
+
+Actual-main run38189118032 passes all seven cumulative gates and the automatic release job. Separately downloaded CI/public archives pass strict verification and match; the release tag points to actual main. Linux executable39,413,576bytes, SHA-256 `b86f0decaebaeb272c89f9fa5e68e96ef85707dc9c350835ad3d16d2f7fc0824`; archive SHA-256 `0e48cf0764f5c5afd90e585f16eac67081de70c636e69d4c08755de596e911a2`. [Public development release](https://github.com/NaxAlpha/wpalt/releases/tag/nightly-202610120043-9931dee6ae89), [independent main/release receipt](d08-main-release.json). D08's defined local system is delivered; D09 resumes richer editorial observations and larger background graph workloads. No universal regex/provider, premium, coverage or production-support claim.
