@@ -2,7 +2,7 @@ use crate::{config::Config, error::Result, model::Settings};
 use sqlx::{Any, AnyPool, ConnectOptions, Execute, QueryBuilder, Row, any::AnyPoolOptions};
 use std::str::FromStr;
 
-pub const SCHEMA_VERSION: i64 = 22;
+pub const SCHEMA_VERSION: i64 = 23;
 
 #[derive(Clone)]
 pub struct Db {
@@ -128,6 +128,7 @@ impl Db {
                     || version == Some(19)
                     || version == Some(20)
                     || version == Some(21)
+                    || version == Some(22)
                     || version == Some(SCHEMA_VERSION),
                 "unsupported schema version; use the documented migration/reset path"
             );
@@ -359,6 +360,12 @@ impl Db {
             sqlx::raw_sql("CREATE INDEX IF NOT EXISTS indexable_identity ON posts(id,published_locale,published_at DESC) WHERE status='published' AND COALESCE(json_extract(published_seo,'$.noindex'),0)=0;").execute(&mut *tx).await?;
         }
         sqlx::query("INSERT INTO discovery_settings(id,definition,version) VALUES(1,$1,1) ON CONFLICT(id) DO NOTHING").bind(serde_json::to_string(&crate::discovery::Definition::default())?).execute(&mut *tx).await?;
+        crate::discovery::insights::epoch::initialize(&mut tx, self.postgres)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?;
+        sqlx::raw_sql(crate::discovery::insights::jobs::SCHEMA)
+            .execute(&mut *tx)
+            .await?;
         tx.commit().await?;
         crate::business::entries::prepare_search(self).await?;
         crate::membership::budget::prepare(self)

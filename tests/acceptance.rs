@@ -146,6 +146,41 @@ fn pre_asset_graph(graph: &mut serde_json::Value) {
     }
 }
 
+/// Reconstruct a pre-D09 fixture without triggers that did not exist in it.
+/// Authentic retained executable upgrade/rollback remains its own delivery gate.
+async fn remove_derived_analysis_from_old_fixture(app: &App) {
+    for table in ["analysis_inbound", "analysis_pages", "analysis_jobs"] {
+        sqlx::query(&format!("DROP TABLE {table}"))
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+    }
+    if app.db.postgres {
+        sqlx::query("DROP FUNCTION wpalt_analysis_changed() CASCADE")
+            .execute(&app.db.pool)
+            .await
+            .unwrap();
+    } else {
+        let names: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'wpalt_analysis_%'",
+        )
+        .fetch_all(&app.db.pool)
+        .await
+        .unwrap();
+        for name in names {
+            assert!(name.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_'));
+            sqlx::query(&format!("DROP TRIGGER {name}"))
+                .execute(&app.db.pool)
+                .await
+                .unwrap();
+        }
+    }
+    sqlx::query("DROP TABLE analysis_epoch")
+        .execute(&app.db.pool)
+        .await
+        .unwrap();
+}
+
 fn engines() -> Vec<bool> {
     let pg = std::env::var("TEST_DATABASE_URL").is_ok();
     if std::env::var("WPALT_REQUIRE_POSTGRES").is_ok() {
@@ -3263,6 +3298,7 @@ async fn schema_two_upgrade_preserves_publication_and_restorable_editor_history(
             .execute(&site.app.db.pool)
             .await
             .unwrap();
+        remove_derived_analysis_from_old_fixture(&site.app).await;
         for index in [
             "language_posts",
             "translation_drafts",
@@ -3445,6 +3481,7 @@ async fn structured_upgrade_rolls_back_unsupported_source_and_retries_after_corr
             .execute(&site.app.db.pool)
             .await
             .unwrap();
+        remove_derived_analysis_from_old_fixture(&site.app).await;
         for col in ["document", "published_document"] {
             sqlx::query(&format!("ALTER TABLE posts DROP COLUMN {col}"))
                 .execute(&site.app.db.pool)
@@ -11095,4 +11132,716 @@ async fn redirect_recovery_preserves_ownership_and_refuses_old_marker_smuggling(
         fresh.close().await;
         site.close().await;
     }
+}
+
+#[tokio::test]
+async fn editorial_render_authority_tracks_real_public_changes_and_transaction_rollback() {
+    use wpalt::theme;
+    for pg in engines() {
+        let site = Site::with_connections(pg, true, 1).await;
+        async fn epoch(app: &App) -> i64 {
+            sqlx::query_scalar("SELECT version FROM analysis_epoch WHERE id=1")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap()
+        }
+        let initial = epoch(&site.app).await;
+        let draft = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("epoch-draft", "save"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            epoch(&site.app).await,
+            initial,
+            "A private working draft is not a public render change"
+        );
+        let mut publish = input("epoch-draft", "publish");
+        publish.version = draft.version;
+        let published = content::save(&site.app, site.session(), Some(&draft.id), publish)
+            .await
+            .unwrap();
+        let public_epoch = epoch(&site.app).await;
+        assert!(public_epoch > initial);
+        let mut working = input("epoch-draft", "save");
+        working.version = published.version;
+        working.body = "Private unfinished working text".into();
+        content::save(&site.app, site.session(), Some(&draft.id), working)
+            .await
+            .unwrap();
+        content::publish_due(&site.app).await.unwrap();
+        assert_eq!(
+            epoch(&site.app).await,
+            public_epoch,
+            "Working-only edits and empty worker cycles must not starve analysis"
+        );
+        let mut design = theme::load(&site.app, "paper", true).await.unwrap();
+        design.package.name = "A private theme draft".into();
+        theme::save(&site.app, "paper", design.package, design.version, false)
+            .await
+            .unwrap();
+        assert_eq!(epoch(&site.app).await, public_epoch);
+        let design = theme::load(&site.app, "paper", true).await.unwrap();
+        theme::save(&site.app, "paper", design.package, design.version, true)
+            .await
+            .unwrap();
+        let live_epoch = epoch(&site.app).await;
+        assert!(live_epoch > public_epoch);
+        sqlx::query("UPDATE redirect_policy SET version=version WHERE id=1")
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO missing_paths(path,hits,first_seen,last_seen,version) VALUES('/operational-missing',1,1,1,1)").execute(&site.app.db.pool).await.unwrap();
+        let comment = uuid::Uuid::new_v4().to_string();
+        sqlx::query("INSERT INTO comments(id,post_id,name,body,status,created_at) VALUES($1,$2,'Reader','Pending words','pending',1)").bind(&comment).bind(&draft.id).execute(&site.app.db.pool).await.unwrap();
+        assert_eq!(
+            epoch(&site.app).await,
+            live_epoch,
+            "Operational aggregates and pending comments do not change readers' source"
+        );
+        sqlx::query("UPDATE comments SET status='approved' WHERE id=$1")
+            .bind(&comment)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        let approved_epoch = epoch(&site.app).await;
+        assert!(approved_epoch > live_epoch);
+        let mut tx = site.app.db.begin_write().await.unwrap();
+        sqlx::query("UPDATE settings SET title='Uncommitted source' WHERE id=1")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let uncommitted: i64 = sqlx::query_scalar("SELECT version FROM analysis_epoch WHERE id=1")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+        assert!(uncommitted > approved_epoch);
+        tx.rollback().await.unwrap();
+        assert_eq!(
+            epoch(&site.app).await,
+            approved_epoch,
+            "Source and invalidation roll back together"
+        );
+        sqlx::query(
+            "INSERT INTO member_policies(id,title) VALUES('epoch-private','Restricted source')",
+        )
+        .execute(&site.app.db.pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('post',$1,'epoch-private')").bind(&draft.id).execute(&site.app.db.pool).await.unwrap();
+        assert!(
+            epoch(&site.app).await > approved_epoch,
+            "Privacy revocation invalidates retained public observations"
+        );
+        site.close().await;
+    }
+}
+
+/// Editors distinguish unfinished work from what anonymous readers actually see.
+#[tokio::test]
+async fn editorial_insights_use_actual_selected_copy_and_current_editor_permission() {
+    use wpalt::discovery::insights;
+    for pg in engines() {
+        let site = Site::with_connections(pg, true, 1).await;
+        let mut first = input("editorial-copy", "publish");
+        first.title = "Published café".into();
+        first.body = "# Public heading\n\nCafé for readers.".into();
+        let published = content::save(&site.app, site.session(), None, first)
+            .await
+            .unwrap();
+        let mut working = input("editorial-copy", "save");
+        working.version = published.version;
+        working.title = "Unfinished working draft".into();
+        working.body = "# Private heading\n\nUnfinished text only editors may see.".into();
+        content::save(&site.app, site.session(), Some(&published.id), working)
+            .await
+            .unwrap();
+        let public = insights::analyze(&site.app, site.session(), &published.id, "public", "CAFÉ")
+            .await
+            .unwrap();
+        let draft = insights::analyze(
+            &site.app,
+            site.session(),
+            &published.id,
+            "working",
+            "unfinished",
+        )
+        .await
+        .unwrap();
+        assert!(public.text.body.contains("Café for readers"));
+        assert!(!public.text.body.contains("Unfinished"));
+        assert!(draft.text.body.contains("Unfinished text"));
+        assert!(!draft.text.body.contains("Café for readers"));
+        assert_ne!(public.html_sha256, draft.html_sha256);
+        assert_eq!(public.observations.locations[0].occurrences, 1);
+        let url = format!("/admin/insights/{}", published.id);
+        let (status, page) = get(&site.app, &url, Some(&site.token)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(page.contains("Save changes in the editor first"));
+        let (status, body) = form(
+            &site.app,
+            &url,
+            Some(&site.token),
+            &[
+                ("csrf", &site.session().csrf),
+                ("copy", "public"),
+                ("focus", "one two three four five six seven eight nine"),
+            ],
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        let page = String::from_utf8(body).unwrap();
+        assert!(page.contains("value=\"one two three four five six seven eight nine\""));
+        assert!(page.contains("value=\"public\" selected"));
+        let api = format!("/api/admin/insights/{}", published.id);
+        let data =
+            serde_json::json!({"csrf":site.session().csrf,"copy":"working","focus":"unfinished"});
+        let (status, _, body) = request(
+            &site.app,
+            "POST",
+            &api,
+            Some(&site.token),
+            "application/json",
+            serde_json::to_vec(&data).unwrap(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap()["copy"],
+            "working"
+        );
+        let (status, _) = form(
+            &site.app,
+            &url,
+            Some(&site.token),
+            &[("csrf", "invalid"), ("copy", "working")],
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let mut integration = site.session().clone();
+        integration.hash = "integration:scoped".into();
+        assert_eq!(
+            insights::analyze(&site.app, &integration, &published.id, "working", "")
+                .await
+                .err()
+                .unwrap()
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        sqlx::query(
+            "INSERT INTO member_policies(id,title) VALUES('editorial-private','Readers only')",
+        )
+        .execute(&site.app.db.pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO member_resources(kind,resource_id,policy_id) VALUES('post',$1,'editorial-private')").bind(&published.id).execute(&site.app.db.pool).await.unwrap();
+        assert_eq!(
+            insights::analyze(&site.app, site.session(), &published.id, "public", "")
+                .await
+                .err()
+                .unwrap()
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        assert!(
+            insights::analyze(&site.app, site.session(), &published.id, "working", "")
+                .await
+                .is_ok()
+        );
+        sqlx::query("UPDATE users SET role='subscriber' WHERE id=$1")
+            .bind(&site.session().user.id)
+            .execute(&site.app.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            insights::analyze(&site.app, site.session(), &published.id, "working", "")
+                .await
+                .err()
+                .unwrap()
+                .0,
+            StatusCode::FORBIDDEN,
+            "A retained session value cannot reveal working text after role revocation"
+        );
+        assert_eq!(
+            insights::jobs::start_for_owner(&site.app, "", site.session())
+                .await
+                .err()
+                .unwrap()
+                .0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            get(&site.app, &url, Some(&site.token)).await.0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            request(
+                &site.app,
+                "POST",
+                &api,
+                Some(&site.token),
+                "application/json",
+                serde_json::to_vec(&data).unwrap()
+            )
+            .await
+            .0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(get(&site.app, &url, None).await.0, StatusCode::SEE_OTHER);
+        site.close().await;
+    }
+}
+
+/// A completed public run is useful to owners, finite, reusable and recoverable.
+#[tokio::test]
+async fn editorial_public_runs_connect_progress_links_reuse_privacy_and_fresh_recovery() {
+    use wpalt::discovery::insights::{epoch, jobs};
+    for pg in engines() {
+        let site = Site::with_connections(pg, true, 1).await;
+        let mut first = input("insight-source", "publish");
+        first.body="Café for readers. [Useful destination](/insight-target) [Missing destination](/missing-insight-target)".into();
+        let source = content::save(&site.app, site.session(), None, first)
+            .await
+            .unwrap();
+        let target = content::save(
+            &site.app,
+            site.session(),
+            None,
+            input("insight-target", "publish"),
+        )
+        .await
+        .unwrap();
+        let job = jobs::start(&site.app, "café").await.unwrap();
+        assert!(
+            jobs::start(&site.app, "").await.is_err(),
+            "Only one active job is admitted"
+        );
+        assert!(
+            jobs::sources(&site.app, &job, -1).await.is_err(),
+            "Incomplete graphs cannot report orphans"
+        );
+        assert_eq!(jobs::tick(&site.app).await.unwrap(), 3);
+        assert_eq!(jobs::list(&site.app).await.unwrap()[0].state, "classifying");
+        // Resume with an independently opened runtime and one database connection.
+        let resumed = App::open_runtime((*site.app.config).clone()).await.unwrap();
+        assert_eq!(jobs::tick(&resumed).await.unwrap(), 3);
+        let run = jobs::list(&resumed)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|j| j.id == job)
+            .unwrap();
+        assert_eq!(run.state, "complete");
+        assert!(run.current);
+        let sources = jobs::sources(&resumed, &job, -1).await.unwrap();
+        let a = sources.iter().find(|p| p.publication == source.id).unwrap();
+        let b = sources.iter().find(|p| p.publication == target.id).unwrap();
+        assert!(
+            !b.without_inbound,
+            "Actual server-rendered anchor establishes inbound authority"
+        );
+        let detail = jobs::details(&resumed, &job, a.ordinal).await.unwrap();
+        assert!(detail.text.body.contains("Café for readers"));
+        assert!(
+            detail
+                .issues
+                .iter()
+                .any(|e| e.target == "/missing-insight-target" && e.state == "broken-local")
+        );
+        assert_eq!(detail.observations.focus, "café");
+        assert_eq!(
+            get(&site.app, "/admin/analysis", Some(&site.token)).await.0,
+            StatusCode::OK
+        );
+        assert!(
+            get(
+                &site.app,
+                &format!("/admin/analysis/{job}"),
+                Some(&site.token)
+            )
+            .await
+            .1
+            .contains("Completed public sources")
+        );
+        let before = epoch::current(&site.app).await.unwrap();
+        let mut working = input("insight-source", "save");
+        working.version = source.version;
+        working.body = "PRIVATE UNFINISHED EDITORIAL".into();
+        content::save(&site.app, site.session(), Some(&source.id), working)
+            .await
+            .unwrap();
+        assert_eq!(epoch::current(&site.app).await.unwrap(), before);
+        let reused = jobs::start(&site.app, "different phrase").await.unwrap();
+        jobs::tick(&site.app).await.unwrap();
+        jobs::tick(&site.app).await.unwrap();
+        let run = jobs::list(&site.app)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|j| j.id == reused)
+            .unwrap();
+        assert_eq!(
+            run.reused, 3,
+            "Reuse requires freshly rendered identical HTML, even after working edits"
+        );
+        let policy = wpalt::membership::policy(&site.app, "Protected", "analysis-readers", "")
+            .await
+            .unwrap();
+        wpalt::membership::protect(&site.app, "post", &source.id, &policy, 0, 0)
+            .await
+            .unwrap();
+        let runs = jobs::list(&site.app).await.unwrap();
+        assert!(runs.iter().all(|r| !r.current && r.focus.is_none()));
+        assert!(
+            jobs::details(&site.app, &job, a.ordinal).await.is_err(),
+            "Privacy changes hide all retained source facts"
+        );
+        let current = jobs::start(&site.app, "").await.unwrap();
+        jobs::tick(&site.app).await.unwrap();
+        jobs::tick(&site.app).await.unwrap();
+        assert!(
+            !jobs::sources(&site.app, &current, -1)
+                .await
+                .unwrap()
+                .iter()
+                .any(|p| p.publication == source.id)
+        );
+        assert_eq!(
+            jobs::list(&site.app).await.unwrap().len(),
+            2,
+            "Derived history stays finite"
+        );
+        assert_eq!(
+            jobs::sources(&site.app, &job, -1).await.err().unwrap().0,
+            StatusCode::NOT_FOUND,
+            "Starting a third run removes the oldest retained run"
+        );
+        let archive = backup::capture(&site.app).await.unwrap();
+        let graph: serde_json::Value = serde_json::from_slice(&archive).unwrap();
+        let payload: serde_json::Value =
+            serde_json::from_str(graph["payload"].as_str().unwrap()).unwrap();
+        assert!(payload["tables"].get("analysis_jobs").is_none());
+        assert!(payload["tables"].get("analysis_pages").is_none());
+        let restored = Site::with_connections(pg, false, 1).await;
+        backup::restore(&restored.app, &archive).await.unwrap();
+        assert!(
+            jobs::list(&restored.app).await.unwrap().is_empty(),
+            "Fresh recovery rebuilds rather than trusts old observations"
+        );
+        assert!(content::get(&restored.app, &target.id).await.is_ok());
+        restored.close().await;
+        resumed.db.pool.close().await;
+        site.close().await;
+    }
+}
+
+/// Competing runtime instances cannot revive cancellation or double-commit a batch.
+#[tokio::test]
+async fn editorial_workers_fence_late_cancellation_claim_expiry_and_source_changes() {
+    use wpalt::discovery::insights::jobs;
+    for pg in engines() {
+        let site = Site::with_connections(pg, true, 1).await;
+        for n in 0..32 {
+            content::save(
+                &site.app,
+                site.session(),
+                None,
+                input(&format!("analysis-race-{n}"), "publish"),
+            )
+            .await
+            .unwrap();
+        }
+        let other = App::open_runtime((*site.app.config).clone()).await.unwrap();
+        let id = jobs::start(&site.app, "").await.unwrap();
+        let worker = site.app.clone();
+        let pending = tokio::spawn(async move { jobs::tick(&worker).await });
+        let started = std::time::Instant::now();
+        loop {
+            let token: String = sqlx::query_scalar("SELECT token FROM analysis_jobs WHERE id=$1")
+                .bind(&id)
+                .fetch_one(&other.db.pool)
+                .await
+                .unwrap();
+            if !token.is_empty() {
+                break;
+            }
+            assert!(
+                started.elapsed() < std::time::Duration::from_secs(5),
+                "Observe the real committed claim before cancellation"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        }
+        // Saturate only the rendering instance's one-connection pool. Its live
+        // render is paused, while an independent owner can cancel its claim.
+        let connection = site.app.db.pool.acquire().await.unwrap();
+        let row = sqlx::query("SELECT token,version,state FROM analysis_jobs WHERE id=$1")
+            .bind(&id)
+            .fetch_one(&other.db.pool)
+            .await
+            .unwrap();
+        assert!(
+            !row.get::<String, _>("token").is_empty(),
+            "Cancellation races a live claimed batch"
+        );
+        jobs::change(&other, &id, row.get("version"), false)
+            .await
+            .unwrap();
+        drop(connection);
+        assert_eq!(pending.await.unwrap().unwrap(), 0);
+        let row = sqlx::query("SELECT state,cursor FROM analysis_jobs WHERE id=$1")
+            .bind(&id)
+            .fetch_one(&other.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(row.get::<String, _>("state"), "cancelled");
+        assert_eq!(row.get::<i64, _>("cursor"), 0);
+        let written: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM analysis_pages WHERE job_id=$1 AND text<>''")
+                .bind(&id)
+                .fetch_one(&other.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            written, 0,
+            "Late rendering never resurrects cancelled facts"
+        );
+        let retry = jobs::start(&other, "").await.unwrap();
+        sqlx::query("UPDATE analysis_jobs SET token='interrupted-claim',lease_until=$1,version=version+1 WHERE id=$2").bind(wpalt::now()+60).bind(&retry).execute(&other.db.pool).await.unwrap();
+        let restarted = App::open_runtime((*site.app.config).clone()).await.unwrap();
+        assert_eq!(
+            jobs::tick(&restarted).await.unwrap(),
+            0,
+            "A live lease prevents stolen work after restart"
+        );
+        sqlx::query("UPDATE analysis_jobs SET lease_until=$1 WHERE id=$2")
+            .bind(wpalt::now() - 1)
+            .bind(&retry)
+            .execute(&other.db.pool)
+            .await
+            .unwrap();
+        let (left, right) = tokio::join!(jobs::tick(&restarted), jobs::tick(&other));
+        let committed = left.unwrap() + right.unwrap();
+        assert!((8..=16).contains(&committed));
+        let run = jobs::list(&other)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|j| j.id == retry)
+            .unwrap();
+        assert_eq!(run.cursor, committed as i64);
+        let written: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM analysis_pages WHERE job_id=$1 AND text<>''")
+                .bind(&retry)
+                .fetch_one(&other.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            written, run.cursor,
+            "Exactly the committed cursor survives independent-worker contention"
+        );
+        sqlx::query(
+            "UPDATE settings SET title='Actual changed publication environment' WHERE id=1",
+        )
+        .execute(&other.db.pool)
+        .await
+        .unwrap();
+        assert_eq!(jobs::tick(&restarted).await.unwrap(), 0);
+        assert_eq!(
+            jobs::list(&other)
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|j| j.id == retry)
+                .unwrap()
+                .state,
+            "stale"
+        );
+        assert!(jobs::sources(&other, &retry, -1).await.is_err());
+        let unfinished = jobs::start(&other, "").await.unwrap();
+        sqlx::query(
+            "UPDATE settings SET description='A new real source while a job is active' WHERE id=1",
+        )
+        .execute(&other.db.pool)
+        .await
+        .unwrap();
+        let replacement = jobs::start(&other, "").await.unwrap();
+        assert_eq!(
+            jobs::list(&other)
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|r| r.id == unfinished)
+                .unwrap()
+                .state,
+            "stale",
+            "Fresh admission fences obsolete unfinished work without waiting for the scheduler"
+        );
+        sqlx::query("DELETE FROM analysis_pages WHERE job_id=$1 AND ordinal=0")
+            .bind(&replacement)
+            .execute(&other.db.pool)
+            .await
+            .unwrap();
+        assert_eq!(jobs::tick(&restarted).await.unwrap(), 0);
+        let damaged = jobs::list(&other)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|r| r.id == replacement)
+            .unwrap();
+        assert_eq!(damaged.state, "failed");
+        assert_eq!(
+            damaged.cursor, 0,
+            "Missing declarations cannot advance an apparently complete graph"
+        );
+        assert!(jobs::sources(&other, &replacement, -1).await.is_err());
+        restarted.db.pool.close().await;
+        other.db.pool.close().await;
+        site.close().await;
+    }
+}
+
+/// A real graph above the synchronous ceiling completes without omitted sources;
+/// admission/work refusals never become partial inbound conclusions.
+#[tokio::test]
+async fn editorial_large_public_graph_pages_all_sources_and_refuses_excess_work() {
+    use wpalt::discovery::{insights::jobs, rendered_links};
+    let mut evidence = Vec::new();
+    for pg in engines() {
+        let site = Site::with_connections(pg, true, 1).await;
+        let mut source = input("large-analysis-base", "publish");
+        source.body =
+            "An actual published paragraph with a [local destination](/large-analysis-base)."
+                .into();
+        let base = content::save(&site.app, site.session(), None, source)
+            .await
+            .unwrap();
+        let mut tx = site.app.db.begin_write().await.unwrap();
+        for n in 0..1004 {
+            sqlx::query("INSERT INTO posts(id,slug,kind,title,body,fields,blocks,status,version,published_slug,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo,document,published_document) SELECT $1,$2,kind,title,body,fields,blocks,status,version,$2,published_title,published_body,published_fields,published_blocks,publish_at,published_at,updated_at,author_id,locale,published_locale,seo,published_seo,document,published_document FROM posts WHERE id=$3").bind(uuid::Uuid::new_v4().to_string()).bind(format!("large-analysis-{n}")).bind(&base.id).execute(&mut *tx).await.unwrap();
+        }
+        tx.commit().await.unwrap();
+        assert!(
+            rendered_links::report(&site.app).await.is_err(),
+            "The bounded D08 workspace refuses a graph beyond 1000 publications"
+        );
+        let mut config = (*site.app.config).clone();
+        config.analysis.batch_sources = 32;
+        config.analysis.batch_seconds = 10;
+        config.validate().unwrap();
+        let worker = App::open_runtime(config.clone()).await.unwrap();
+        let started = std::time::Instant::now();
+        let id = jobs::start(&worker, "").await.unwrap();
+        let mut batches = Vec::new();
+        for _ in 0..80 {
+            let begin = std::time::Instant::now();
+            jobs::tick(&worker).await.unwrap();
+            batches.push(begin.elapsed().as_secs_f64() * 1000.0);
+            let run = jobs::list(&worker)
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|j| j.id == id)
+                .unwrap();
+            assert!(
+                !["failed", "stale"].contains(&run.state.as_str()),
+                "A supported populated graph must complete: {} {}",
+                run.state,
+                run.error
+            );
+            if run.state == "complete" {
+                break;
+            }
+        }
+        let elapsed = started.elapsed().as_secs_f64() * 1000.0;
+        let run = jobs::list(&worker)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|j| j.id == id)
+            .unwrap();
+        assert_eq!(run.state, "complete");
+        assert_eq!(run.total, 1006);
+        let mut after = -1;
+        let mut seen = HashSet::new();
+        loop {
+            let page = jobs::sources(&worker, &id, after).await.unwrap();
+            for p in page.iter().take(40) {
+                assert!(seen.insert(p.path.clone()));
+                after = p.ordinal;
+            }
+            if page.len() <= 40 {
+                break;
+            }
+        }
+        assert_eq!(
+            seen.len(),
+            1006,
+            "Every declared publication and language home is reachable through pagination"
+        );
+        if pg {
+            sqlx::query("ANALYZE analysis_pages")
+                .execute(&worker.db.pool)
+                .await
+                .unwrap();
+        }
+        let plan = if pg {
+            sqlx::query_scalar::<_,String>("EXPLAIN (ANALYZE, BUFFERS) SELECT ordinal,path,publication FROM analysis_pages WHERE job_id=$1 AND ordinal>=$2 ORDER BY ordinal LIMIT 32").bind(&id).bind(500i64).fetch_all(&worker.db.pool).await.unwrap().join("\n")
+        } else {
+            sqlx::query("EXPLAIN QUERY PLAN SELECT ordinal,path,publication FROM analysis_pages WHERE job_id=$1 AND ordinal>=$2 ORDER BY ordinal LIMIT 32").bind(&id).bind(500i64).fetch_all(&worker.db.pool).await.unwrap().iter().map(|r|r.get::<String,_>("detail")).collect::<Vec<_>>().join("\n")
+        };
+        evidence.push(serde_json::json!({"engine":if pg{"postgres"}else{"sqlite"},"publications":1005,"sources":run.total,"edges":run.edge_count,"html_bytes":run.html_bytes,"serialized_derived_bytes":run.facts_bytes,"batches":batches,"total_debug_ms":elapsed,"cursor_query_plan":plan,"scope":"Debug in-process real database/anonymous server renderer, one connection per App. No peak RSS, HTTP throughput or release-binary SLA claim."}));
+        config.analysis.max_publications = 1000;
+        let limited = App::open_runtime(config.clone()).await.unwrap();
+        assert!(jobs::start(&limited, "").await.is_err());
+        assert_eq!(
+            jobs::list(&limited).await.unwrap().len(),
+            1,
+            "Admission refusal does not create or delete a run"
+        );
+        limited.db.pool.close().await;
+        config.analysis.max_publications = 5000;
+        config.analysis.max_edges = 1;
+        let limited = App::open_runtime(config.clone()).await.unwrap();
+        let refused = jobs::start(&limited, "").await.unwrap();
+        assert_eq!(jobs::tick(&limited).await.unwrap(), 0);
+        let failed = jobs::list(&limited)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|j| j.id == refused)
+            .unwrap();
+        assert_eq!(failed.state, "failed");
+        assert_eq!(failed.cursor, 0);
+        assert!(jobs::sources(&limited, &refused, -1).await.is_err());
+        limited.db.pool.close().await;
+        config.analysis.enabled = false;
+        let disabled = App::open_runtime(config).await.unwrap();
+        assert!(jobs::start(&disabled, "").await.is_err());
+        assert_eq!(jobs::tick(&disabled).await.unwrap(), 0);
+        let disabled_run = jobs::list(&disabled)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|r| r.id == refused)
+            .unwrap();
+        jobs::change(&disabled, &refused, disabled_run.version, true)
+            .await
+            .unwrap();
+        assert!(
+            jobs::details(&disabled, &refused, 0).await.is_err(),
+            "Disabling analysis must still permit removing retained private data"
+        );
+        disabled.db.pool.close().await;
+        worker.db.pool.close().await;
+        site.close().await;
+    }
+    std::fs::create_dir_all("work").unwrap();
+    std::fs::write(
+        "work/d09-populated-analysis.json",
+        serde_json::to_vec_pretty(&evidence).unwrap(),
+    )
+    .unwrap();
 }

@@ -1,6 +1,6 @@
 # Running and recovering wpalt
 
-D08 development uses native schema 22 / portable recovery v18. Older sites need a reviewed stopped upgrade and retained old executable/recovery key; explicit archive conversion is separate from ordinary restore. D07 main and its public release are independently verified. See [D08 upgrade guidance](distributed-operations.md#d08-route-policy-and-report-grammar) and [redirect/link controls](redirects-and-links.md). D08 delivery verification is in progress.
+Current D09 development uses native schema23 / portable recoveryv18. D08 actual main and its public release are independently verified in [the delivery receipt](evidence/d08-main-release.json). Older sites need a reviewed stopped upgrade and the retained original executable/configuration/recovery key; portable archive conversion is separate from ordinary restore. D09 preserves thev18 grammar and excludes derived editorial caches from recovery. See [current upgrade guidance](distributed-operations.md#d09-derived-analysis-boundary) and [editorial operations](editorial-insights.md). D09 exact-source delivery gates remain pending.
 
 ## Build and initialize
 
@@ -109,3 +109,7 @@ See [membership-learning.md](membership-learning.md) for local policies, course 
 ## M6 commerce and reservations
 
 See [commerce-reservations.md](commerce-reservations.md) for authenticated store/booking flows, actual offline payments/refunds, paid subscriptions, CLI/configuration, optional hosted Stripe and schema-9/archive-v8 recovery. Currency is fixed at initialization. The local scheduler never fabricates collection; external tax/carrier/calendar services remain explicit boundaries. Stop the old runtime and retain an independent backup before the documented upgrade. [M6 verification](evidence/m6-verification.md) separates deterministic connector tests from actual provider-account certification.
+
+## Editorial insights and durable analysis
+
+Saved editors offer [editorial insights](editorial-insights.md); the editorial queue connects owners to the larger bounded public-analysis workspace. Native schema23 retains portable grammarv18 and excludes derived job data from fresh recovery. Follow stopped maintenance, keep the original executable/recovery key and verify current delivery evidence before adoption.

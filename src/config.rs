@@ -22,6 +22,7 @@ pub struct Config {
     pub headers: crate::operations::headers::Config,
     pub video: crate::operations::video::Config,
     pub assets: crate::operations::assets::Config,
+    pub analysis: crate::discovery::insights::jobs::Config,
     pub media: crate::operations::media::Config,
     pub spam: crate::operations::spam::Config,
     pub protection: crate::operations::protection::Config,
@@ -62,6 +63,7 @@ impl Default for Config {
             headers: Default::default(),
             video: Default::default(),
             assets: Default::default(),
+            analysis: Default::default(),
             media: Default::default(),
             spam: Default::default(),
             protection: Default::default(),
@@ -159,6 +161,7 @@ impl Config {
         self.cache.validate()?;
         self.recovery.validate()?;
         self.integration_events.validate()?;
+        self.analysis.validate()?;
         self.commerce.validate()?;
         ensure!(
             !self.commerce.stripe.enabled || self.base_url.starts_with("https://"),

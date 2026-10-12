@@ -78,7 +78,7 @@ Verifiable future outcome: Owner-authored visible entities produce validated pub
 
 ### D08 — Redirects and link analysis
 
-Origin: **M3** · Catalog: **F030/F032** · Status: **active; redirect and rendered-link workspace contract**
+Origin: **M3** · Catalog: **F030/F032** · Status: **defined redirect/link workspace delivered in merged PR24; actual-main/public release independently verified**
 
 [D08 contract](d08-contract.md) governs bounded regex rules, safe automatic slug redirects, actionable 404 reporting and graph coverage of theme/navigation/raw HTML/server-resolved dynamic links.
 
@@ -86,9 +86,9 @@ Verifiable future outcome: Preview loops/conflicts and work budgets; a complete 
 
 ### D09 — Editorial tooling
 
-Origin: **M3/M9** · Catalog: **F031/F034** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M3/M9** · Catalog: **F031/F034** · Status: **active under the D09 editorial-insights contract**
 
-Administration screens for native link/orphan/text/keyword tools, richer language-aware advisory analysis and larger incremental graph workloads.
+[D09 contract](d09-contract.md) governs connected text/phrase insights and larger durable public analysis. Administration screens for native link/orphan/text/keyword tools, richer language-aware advisory analysis and larger incremental graph workloads.
 
 Verifiable future outcome: An editor reviews useful suggestions alongside content, understands omissions and receives no fabricated ranking score.
 

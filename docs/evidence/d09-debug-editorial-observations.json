@@ -1,0 +1,137 @@
+{
+  "profile": "debug",
+  "binary_sha256": "87cd2abe4f9ce75169b03412a7142a8ee72c58c7c8601f5e136be69a61d67e19",
+  "binary_bytes": 120214488,
+  "scope": "1004 seeded posts plus about publication and language home; actual single-connection database, stopped-CLI batch and restarted HTTP application, finite manual native batches, five warmups/30 serial selected-copy requests. Debug SQL logging enabled even for a release executable. RSS is a warm process sample, neither peak nor per-feature attribution; PostgreSQL process memory excluded. No throughput, TLS, CWV, universal latency or WordPress efficiency claim. Byte budgets describe serialized data, not on-disk or peak allocations.",
+  "observations": [
+    {
+      "engine": "sqlite",
+      "publications": 1005,
+      "sources": 1006,
+      "edges": 8067,
+      "html_bytes": 3842476,
+      "serialized_derived_bytes": 3121169,
+      "resumed_after_stopped_cli_batch": true,
+      "debug_secret_and_focus_redaction": true,
+      "first_http_batches": {
+        "samples": 63,
+        "p50_ms": 38.501,
+        "p95_ms": 336.223,
+        "max_ms": 354.226
+      },
+      "identical_html_reuse_batches": {
+        "samples": 64,
+        "p50_ms": 59.423,
+        "p95_ms": 169.905,
+        "max_ms": 196.483
+      },
+      "individual_public_insight": {
+        "samples": 30,
+        "p50_ms": 20.006,
+        "p95_ms": 21.495,
+        "max_ms": 27.491
+      },
+      "batch_queries": {
+        "first_observed_batch_selects": 394,
+        "distinct_select_shapes": [
+          "SELECT '' AS id,field_schema \u2026",
+          "SELECT COUNT(*) FROM analysis_jobs \u2026",
+          "SELECT COUNT(*) FROM member_resources \u2026",
+          "SELECT COUNT(*) FROM users \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT id FROM posts \u2026",
+          "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+          "SELECT id,state,epoch,version,cursor,total,html_bytes,facts_bytes,edge_count,reused FROM analysis_jobs \u2026",
+          "SELECT live_options FROM site_design \u2026",
+          "SELECT name,body FROM comments \u2026",
+          "SELECT ordinal,path,locale,slug FROM analysis_pages \u2026",
+          "SELECT p.text,p.ids,p.links FROM analysis_pages \u2026",
+          "SELECT package FROM theme_revisions \u2026",
+          "SELECT published_version,version FROM themes \u2026",
+          "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+          "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+          "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+          "SELECT u.id,u.email,u.name,u.role,s.csrf,COALESCE(p.locale,'en') AS interface_locale \u2026",
+          "SELECT version FROM analysis_epoch \u2026"
+        ],
+        "phase": "rendering"
+      },
+      "cursor_query_plan": [
+        [
+          5,
+          0,
+          113,
+          "SEARCH analysis_pages USING INDEX sqlite_autoindex_analysis_pages_1 (job_id=? AND ordinal>?)"
+        ]
+      ],
+      "retained_runs": 2,
+      "reused_sources": 1006,
+      "warm_application_rss_before_analysis_bytes": 57294848,
+      "warm_application_rss_after_analysis_bytes": 68534272,
+      "database_bytes": 30053272,
+      "derived_postgres_relations_bytes": null,
+      "database_scope": "SQLite DB/WAL/SHM"
+    },
+    {
+      "engine": "postgres",
+      "publications": 1005,
+      "sources": 1006,
+      "edges": 8067,
+      "html_bytes": 3842348,
+      "serialized_derived_bytes": 3120793,
+      "resumed_after_stopped_cli_batch": true,
+      "debug_secret_and_focus_redaction": true,
+      "first_http_batches": {
+        "samples": 63,
+        "p50_ms": 47.466,
+        "p95_ms": 169.881,
+        "max_ms": 190.014
+      },
+      "identical_html_reuse_batches": {
+        "samples": 64,
+        "p50_ms": 46.613,
+        "p95_ms": 117.031,
+        "max_ms": 123.785
+      },
+      "individual_public_insight": {
+        "samples": 30,
+        "p50_ms": 17.913,
+        "p95_ms": 18.125,
+        "max_ms": 18.929
+      },
+      "batch_queries": {
+        "first_observed_batch_selects": 394,
+        "distinct_select_shapes": [
+          "SELECT '' AS id,field_schema \u2026",
+          "SELECT COUNT(*) FROM analysis_jobs \u2026",
+          "SELECT COUNT(*) FROM member_resources \u2026",
+          "SELECT COUNT(*) FROM users \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT id FROM posts \u2026",
+          "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+          "SELECT id,state,epoch,version,cursor,total,html_bytes,facts_bytes,edge_count,reused FROM analysis_jobs \u2026",
+          "SELECT live_options FROM site_design \u2026",
+          "SELECT name,body FROM comments \u2026",
+          "SELECT ordinal,path,locale,slug FROM analysis_pages \u2026",
+          "SELECT p.text,p.ids,p.links FROM analysis_pages \u2026",
+          "SELECT package FROM theme_revisions \u2026",
+          "SELECT published_version,version FROM themes \u2026",
+          "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+          "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+          "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+          "SELECT u.id,u.email,u.name,u.role,s.csrf,COALESCE(p.locale,'en') AS interface_locale \u2026",
+          "SELECT version FROM analysis_epoch \u2026"
+        ],
+        "phase": "rendering"
+      },
+      "cursor_query_plan": "Limit  (cost=0.28..94.72 rows=32 width=56) (actual time=0.018..0.061 rows=32 loops=1)\n  Buffers: shared hit=68\n  ->  Index Scan using analysis_pages_pkey on analysis_pages  (cost=0.28..1493.64 rows=506 width=56) (actual time=0.017..0.058 rows=32 loops=1)\n        Index Cond: ((job_id = '2f040d57-1b37-4677-b5f5-914134cef865'::text) AND (ordinal >= 500))\n        Buffers: shared hit=68\nPlanning:\n  Buffers: shared hit=185\nPlanning Time: 0.310 ms\nExecution Time: 0.070 ms",
+      "retained_runs": 2,
+      "reused_sources": 1006,
+      "warm_application_rss_before_analysis_bytes": 55181312,
+      "warm_application_rss_after_analysis_bytes": 64045056,
+      "database_bytes": 22454272,
+      "derived_postgres_relations_bytes": 7602176,
+      "database_scope": "All fixture PostgreSQL relations/indexes; database process memory excluded"
+    }
+  ]
+}

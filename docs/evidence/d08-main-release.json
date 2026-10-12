@@ -1,0 +1,37 @@
+{
+  "actual_main": "9931dee6ae89f758a4a06691b1127a56f1d551ec",
+  "pr": "https://github.com/NaxAlpha/wpalt/pull/24",
+  "run": 38189118032,
+  "gates": {
+    "application": "passed",
+    "clean-build": "passed",
+    "compiler-floor": "passed",
+    "dependency-audit": "passed",
+    "frontend": "passed",
+    "native-pitr": "passed",
+    "local-processes": "passed",
+    "release": "passed"
+  },
+  "ci_archive_verification": {
+    "source_commit": "9931dee6ae89f758a4a06691b1127a56f1d551ec",
+    "tag": "nightly-202610120043-9931dee6ae89",
+    "archive": "wpalt-x86_64-unknown-linux-gnu-9931dee6ae89.tar.gz",
+    "archive_sha256": "0e48cf0764f5c5afd90e585f16eac67081de70c636e69d4c08755de596e911a2",
+    "binary_sha256": "b86f0decaebaeb272c89f9fa5e68e96ef85707dc9c350835ad3d16d2f7fc0824",
+    "binary_bytes": 39413576,
+    "timestamp_basis": "commit time, UTC"
+  },
+  "separate_public_archive_verification": {
+    "source_commit": "9931dee6ae89f758a4a06691b1127a56f1d551ec",
+    "tag": "nightly-202610120043-9931dee6ae89",
+    "archive": "wpalt-x86_64-unknown-linux-gnu-9931dee6ae89.tar.gz",
+    "archive_sha256": "0e48cf0764f5c5afd90e585f16eac67081de70c636e69d4c08755de596e911a2",
+    "binary_sha256": "b86f0decaebaeb272c89f9fa5e68e96ef85707dc9c350835ad3d16d2f7fc0824",
+    "binary_bytes": 39413576,
+    "timestamp_basis": "commit time, UTC"
+  },
+  "tag_commit": "9931dee6ae89f758a4a06691b1127a56f1d551ec",
+  "public_release": "https://github.com/NaxAlpha/wpalt/releases/tag/nightly-202610120043-9931dee6ae89",
+  "published_at": "2026-10-12T00:57:12Z",
+  "scope": "Separately downloaded CI and public archives pass strict source, lock/assets/guides/file-set/checksum verification and match exactly. Development Linux x86_64/glibc prerelease, not universal plugin parity or public production support."
+}

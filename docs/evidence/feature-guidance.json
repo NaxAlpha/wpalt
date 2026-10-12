@@ -2484,7 +2484,7 @@
         "https://docs.rs/regex/latest/regex/struct.RegexBuilder.html"
       ],
       "applicable_versions": [
-        "Redirection 5.10.1 free source; isolated execution pending",
+        "Redirection 5.10.1 free actual pinned WordPress execution verified in final PR",
         "regex 1.13.1",
         "Google guidance reviewed 2026-10-11",
         "native 22 / portable v18"
@@ -2512,7 +2512,7 @@
       "next_review": "2027-01-09",
       "review_interval_days": 90,
       "maintenance_owner": "wpalt maintainers",
-      "status": "reviewed; implementation and connected verification in progress; final delivery gates pending"
+      "status": "reviewed; defined native scope delivered in merged PR24; final PR/main/public-release evidence independently verified"
     },
     {
       "feature_id": "D08-02",
@@ -2539,7 +2539,7 @@
       "tests": [
         "rendered_html_parser_finds_real_edges_and_refuses_partial_work",
         "rendered_link_graph_uses_anonymous_templates_bindings_and_current_privacy",
-        "D08 browser responsive and native-form journey (pending)"
+        "D08 browser responsive and native-form journey; final PR and actual-main gates passed"
       ],
       "triggers": [
         "affected release or milestone",
@@ -2551,7 +2551,83 @@
       "next_review": "2027-01-09",
       "review_interval_days": 90,
       "maintenance_owner": "wpalt maintainers",
-      "status": "reviewed; implementation and connected verification in progress; final delivery gates pending"
+      "status": "reviewed; defined native scope delivered in merged PR24; final PR/main/public-release evidence independently verified"
+    },
+    {
+      "feature_id": "D09-01",
+      "area": "Declared editorial text and focus-phrase observations",
+      "scope": "D09 F031/F034",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://unicode.org/reports/tr29/",
+        "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+        "https://developers.google.com/search/docs/crawling-indexing/links-crawlable",
+        "https://developer.yoast.com/features/analysis/overview/"
+      ],
+      "applicable_versions": [
+        "Current guidance reviewed 2026-10-12",
+        "Unicode UAX29 18/revision49; initial declared implementation data17.0.0 (not latest-data conformity)",
+        "unicode-segmentation1.13.3 / unicode-normalization0.1.25",
+        "SQLite and PostgreSQL17; native23 / portable18 planned"
+      ],
+      "requirements": [
+        "Identify actual analyzed snapshot, server main/body scope, hidden/inert/navigation omissions and algorithm/data versions.",
+        "Use bounded NFC/Unicode lowercase/whitespace observations with word boundaries; disclose default-boundary and dictionary/locale limitations.",
+        "Keep useful advice people-first without preferred word count, density target or invented ranking/quality grade.",
+        "Current editor permission protects working copies; private/draft text never enters public graph."
+      ],
+      "tests": [
+        "phrase_locations_follow_actual_main_text_and_unicode_boundaries",
+        "malformed_or_oversized_advice_inputs_produce_no_partial_observation"
+      ],
+      "triggers": [
+        "affected release or milestone",
+        "segmentation/normalization/security dependency update",
+        "rendering input or privacy authority change",
+        "worker/source consistency or guideline finding"
+      ],
+      "last_checked": "2026-10-12",
+      "next_review": "2027-01-10",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "status": "reviewed; active functional implementation; integrated delivery not yet verified"
+    },
+    {
+      "feature_id": "D09-02",
+      "area": "Durable bounded public analysis and source authority",
+      "scope": "D09 F031/F034",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://www.sqlite.org/lang_createtrigger.html",
+        "https://www.postgresql.org/docs/17/sql-createtrigger.html",
+        "https://developers.google.com/search/docs/crawling-indexing/links-crawlable"
+      ],
+      "applicable_versions": [
+        "Current guidance reviewed 2026-10-12",
+        "Unicode UAX29 18/revision49; initial declared implementation data17.0.0 (not latest-data conformity)",
+        "unicode-segmentation1.13.3 / unicode-normalization0.1.25",
+        "SQLite and PostgreSQL17; native23 / portable18 planned"
+      ],
+      "requirements": [
+        "Source transactions atomically invalidate analyses; harmless operational activity and working-only changes do not.",
+        "Database compare-and-swap ownership, finite batches/retention/budgets and exact current-source completion prevent stale, duplicate or cancelled progress.",
+        "Refuse partial/stale/overflow graph and inbound conclusions; current privacy applies to retained result views.",
+        "Reuse parser facts only after current actual HTML digest equality; re-resolve current targets and preserve separate recoverability of core content."
+      ],
+      "tests": [
+        "editorial_render_authority_tracks_real_public_changes_and_transaction_rollback"
+      ],
+      "triggers": [
+        "affected release or milestone",
+        "segmentation/normalization/security dependency update",
+        "rendering input or privacy authority change",
+        "worker/source consistency or guideline finding"
+      ],
+      "last_checked": "2026-10-12",
+      "next_review": "2027-01-10",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "status": "reviewed; active functional implementation; integrated delivery not yet verified"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

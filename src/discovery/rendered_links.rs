@@ -5,7 +5,7 @@ use crate::{
 };
 use html5ever::tendril::TendrilSink;
 use markup5ever_rcdom::{Handle, NodeData, RcDom};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -19,7 +19,8 @@ pub struct Source {
     pub html_bytes: usize,
     pub html_sha256: String,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Edge {
     pub source: String,
     pub target: String,
@@ -39,7 +40,8 @@ pub struct Report {
     pub html_bytes: usize,
     pub elapsed_ms: f64,
 }
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Parsed {
     pub ids: BTreeSet<String>,
     pub links: Vec<(String, String, String)>,
@@ -136,6 +138,9 @@ fn allocation_preflight(html: &str) -> Result<()> {
 }
 /// Parse only bounded, already-rendered HTML. Head/scripts/styles are not graph edges.
 pub fn parse(html: &str) -> Result<Parsed> {
+    document(html).map(|(_, parsed)| parsed)
+}
+pub(crate) fn document(html: &str) -> Result<(RcDom, Parsed)> {
     if html.len() > 2 * 1024 * 1024 {
         return Err(Error::invalid(
             "Rendered source exceeds 2 MiB; no complete graph was produced.",
@@ -208,7 +213,7 @@ pub fn parse(html: &str) -> Result<Parsed> {
         }
         return Err(error);
     }
-    Ok(out)
+    Ok((dom, out))
 }
 fn fragment(raw: &str) -> String {
     let bytes = raw.as_bytes();
@@ -243,18 +248,18 @@ impl Parsed {
     }
 }
 #[derive(Clone)]
-struct Target {
-    state: String,
-    destination: Option<String>,
+pub(crate) struct Target {
+    pub state: String,
+    pub destination: Option<String>,
 }
-async fn target(
+pub(crate) async fn target(
     app: &App,
     plan: &super::redirects::Plan,
     discovery: &super::Definition,
     path: &str,
-    pages: &BTreeMap<String, Parsed>,
+    pages: &BTreeSet<String>,
 ) -> Result<Target> {
-    if pages.contains_key(path) {
+    if pages.contains(path) {
         return Ok(Target {
             state: "resolved-source".into(),
             destination: Some(path.into()),
@@ -336,13 +341,13 @@ async fn target(
                 &row.get::<String, _>("published_slug"),
             );
             return Ok(Target {
-                state: if pages.contains_key(&canonical) {
+                state: if pages.contains(&canonical) {
                     "resolved-publication-alias"
                 } else {
                     "public-route-unscanned"
                 }
                 .into(),
-                destination: pages.contains_key(&canonical).then_some(canonical),
+                destination: pages.contains(&canonical).then_some(canonical),
             });
         }
         super::redirects::RouteState::Public(None) => {
@@ -354,7 +359,7 @@ async fn target(
         super::redirects::RouteState::Missing => {}
     }
     match super::redirects::resolve_runtime(app, plan, path).await {
-        Ok(Some(resolved)) if pages.contains_key(&resolved.destination) => Ok(Target {
+        Ok(Some(resolved)) if pages.contains(&resolved.destination) => Ok(Target {
             state: "resolved-redirect".into(),
             destination: Some(resolved.destination),
         }),
@@ -453,6 +458,7 @@ async fn report_inner(app: &App) -> Result<Report> {
     let mut resolved = BTreeMap::new();
     let mut inbound = BTreeSet::new();
     let mut edges = Vec::new();
+    let declared_paths = pages.keys().cloned().collect();
     for (source, parsed) in &pages {
         let base = origin
             .join(source)
@@ -483,7 +489,7 @@ async fn report_inner(app: &App) -> Result<Report> {
                     if !resolved.contains_key(path) {
                         resolved.insert(
                             path.to_string(),
-                            target(app, &plan, &discovery, path, &pages).await?,
+                            target(app, &plan, &discovery, path, &declared_paths).await?,
                         );
                     }
                     let outcome = &resolved[path];

@@ -366,3 +366,11 @@ D07 local implementation now supplies publication-bound typed entities, offline 
 
 ### D07 delivery — 2026-10-11
 Defined publication-bound structured entities and multiple locations merged in PR #23. Actual-main f18bc86aee0a971017a34799f2ce1d55514182ea passes seven cumulative gates plus automatic release; separate public/archive/source proof is in [the receipt](evidence/d07-main-release.json). Pinned actual free Yoast comparison passes; no premium execution claim. D08 now resumes the redirect/rendered-link workspace under [its contract](d08-contract.md).
+
+### D08 merge; D09 preparation — 2026-10-12
+
+PR #24 merges the defined redirect/missing-path/rendered-link workspace after all eight final PR gates and independent tested-source/archive/reference proof. Actual-main `9931dee6ae89f758a4a06691b1127a56f1d551ec` runs its separate cumulative delivery/release gates. D09 prepares editorial insights, language-aware observations and larger bounded background analysis; implementation waits for independent D08 actual-main/public-release verification. [D08 ledger](evidence/d08-verification.md).
+
+### D08 released; D09 active — 2026-10-12
+
+Actual-main D08 passes all seven cumulative gates plus automatic release, and separate CI/public archives independently verify. [Release receipt](evidence/d08-main-release.json). D09 now delivers connected editorial insights and bounded durable public analysis under its new contract; broader language/dictionary/provider parity remains explicitly scoped.
