@@ -46,7 +46,7 @@ async fn render(
         Some(s),
         html! {
             (view::heading("Publishing", "Editorial insights", "Review the text readers receive, or your saved work, without a ranking score."))
-            p {a href=(format!("/admin/posts/{id}")) {"Return to editor"} " · " (p.title)}
+            p {a href=(format!("/admin/posts/{id}")) {"Return to editor"} " · Editing: " (p.title)}
         @if s.is_admin(){p {a href="/admin/analysis" {"Analyze the complete public site"}}}
             @if let Some(error)=error {p class="notice error" role="alert" {(error)}}
             section class="panel" {
@@ -66,7 +66,7 @@ async fn render(
             @if let Some(r)=result {
                 section class="panel" {
                     h2 { @if r.copy=="working" {"Saved working copy"} @else {"Public publication"} }
-                    p {"Content version " (r.content_version) " · " (r.html_bytes) " rendered bytes"}
+                    p {"Content record version " (r.content_version) " · " (r.html_bytes) " rendered bytes"}
                     p {a href=(r.path) target="_blank" rel="noopener" {"Open analyzed source"}}
                     div class="table-scroll" {table {caption {"Text observations"}thead {tr {th {"Measure"}th {"Observed"}}}tbody {
                         tr {th scope="row" {"Unicode word segments"}td {(r.observations.word_segments)}}

@@ -6,7 +6,7 @@ pub mod text;
 pub mod web;
 
 use crate::{
-    App, content,
+    App,
     error::{Error, Result},
     model::Session,
 };
@@ -52,8 +52,18 @@ pub async fn analyze(
     let _read = app.mutations.lock().await;
     crate::auth::current_editor(app, session).await?;
     let source_epoch = epoch::current(app).await?;
-    let versions = working_versions(app, id).await?;
-    let p = content::get(app, id).await?;
+    let versions = if copy == "working" {
+        Some(working_versions(app, id).await?)
+    } else {
+        None
+    };
+    // The public choice never loads private working body/fields/documents.
+    let p =
+        sqlx::query("SELECT version,status,published_locale,published_slug FROM posts WHERE id=$1")
+            .bind(id)
+            .fetch_optional(&app.db.pool)
+            .await?
+            .ok_or_else(Error::not_found)?;
     let (discovery, _) = crate::discovery::load(app).await?;
     let (path, html) = if copy == "working" {
         (
@@ -61,16 +71,19 @@ pub async fn analyze(
             crate::web::render_working_source(app, id).await?,
         )
     } else {
-        if p.status != "published" {
+        if p.get::<String, _>("status") != "published" {
             return Err(Error::not_found());
         }
         crate::membership::require(app, "post", id, None).await?;
         (
-            discovery.path(&p.published_locale, &p.published_slug),
+            discovery.path(
+                &p.get::<String, _>("published_locale"),
+                &p.get::<String, _>("published_slug"),
+            ),
             crate::web::render_anonymous_source(
                 app,
-                p.published_locale.clone(),
-                Some(p.published_slug.clone()),
+                p.get("published_locale"),
+                Some(p.get("published_slug")),
             )
             .await?,
         )
@@ -80,7 +93,9 @@ pub async fn analyze(
     let page = tokio::task::spawn_blocking(move || text::parse(&html))
         .await
         .map_err(|_| Error::invalid("Editorial text worker interrupted."))??;
-    if source_epoch != epoch::current(app).await? || versions != working_versions(app, id).await? {
+    if source_epoch != epoch::current(app).await?
+        || (versions.is_some() && versions != Some(working_versions(app, id).await?))
+    {
         return Err(Error::conflict());
     }
     crate::auth::current_editor(app, session).await?;
@@ -89,7 +104,7 @@ pub async fn analyze(
     Ok(Analysis {
         copy: copy.into(),
         path,
-        content_version: p.version,
+        content_version: p.get("version"),
         source_epoch,
         html_sha256,
         html_bytes,
