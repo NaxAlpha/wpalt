@@ -236,8 +236,24 @@ module.exports = async (owner, visitors, origin, output) => {
       "Explicit requested/confirmed safe partial response, no unconfirmed owner workspace disclosure, withdrawal/delete; ordinary/private drafts grant no consent.",
     );
     await page.goto(origin + `/offline/#form/${id}`);
-    await page.getByText(/Choose Save on this device/).waitFor();
+    await page.locator("#status").filter({ hasText: /Choose Save on this device|could not be prepared|cannot coordinate/ }).waitFor();
+    assert((await page.locator("#status").innerText()).includes("Choose Save on this device"), await page.locator("#status").innerText());
     assert.equal(await page.locator("#library li").count(), 0);
+    // Hold a real origin-wide Web Lock in this browser storage partition.
+    await page.evaluate(() => {
+      window.__d12LockHeld = false;
+      navigator.locks.request("wpalt-offline-storage", () => {
+        window.__d12LockHeld = true;
+        return new Promise(resolve => { window.__d12ReleaseLock = resolve; });
+      });
+    });
+    await page.waitForFunction(() => window.__d12LockHeld);
+    await page.getByRole("button", { name: "Save on this device", exact: true }).click();
+    await page.getByRole("alert").filter({ hasText: /busy in another tab or update/ }).waitFor();
+    assert.equal(await page.locator("#library li").count(), 0);
+    await page.evaluate(() => window.__d12ReleaseLock());
+    await page.waitForFunction(async () => !(await navigator.locks.query()).held.some(lock => lock.name === "wpalt-offline-storage"));
+    report.assertions.push("A real shared-origin browser lock excludes worker storage admission while held in another context; release allows deliberate retry. No mocked lock/cache API.");
     await page
       .getByRole("button", { name: "Save on this device", exact: true })
       .click();
@@ -285,6 +301,7 @@ module.exports = async (owner, visitors, origin, output) => {
     await visitors.setOffline(true);
     await page.close();
     page = await visitors.newPage();
+    await page.setViewportSize({ width: 320, height: 1000 });
     errors(page);
     await page.goto(origin + `/offline/#open/form/${id}`);
     await page.getByLabel("Your name", { exact: true }).waitFor();
@@ -438,6 +455,7 @@ module.exports = async (owner, visitors, origin, output) => {
     await page.reload();
     await page.getByRole("alert").filter({ hasText: /live publication is unavailable/ }).waitFor();
     assert(await page.locator("#reading").isHidden());
+    assert.equal(await page.locator("#library li").count(), 0, "Live denial also removes the stale library row");
     assert.equal(await page.evaluate(async (source) => (await caches.open("wpalt-offline-v1-public")).match(`/offline/snapshots/${source}`).then(Boolean), source), false);
     await page.screenshot({ path: path.join(output, "d12-live-denial.png"), fullPage: true });
     // Inject an expired, otherwise genuine saved record; no artificial clock or mock cache implementation.
@@ -490,6 +508,8 @@ module.exports = async (owner, visitors, origin, output) => {
   } catch (e) {
     report.status = "failed";
     report.failure = e.message;
+    report.offline_status = await page.locator("#status").textContent().catch(() => null);
+    report.worker_state = await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).map(r => ({ active: r.active?.state, waiting: r.waiting?.state, installing: r.installing?.state }))).catch(() => null);
     throw e;
   } finally {
     await visitors.setOffline(false);

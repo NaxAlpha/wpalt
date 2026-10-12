@@ -492,6 +492,20 @@ async fn versioned_survey_reports_preserve_branch_denominators_and_canonical_not
             .await
             .unwrap();
         for path in [format!("/forms/{form}"), format!("/forms/{form}/native")] {
+            let response = router
+                .clone()
+                .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(
+                response.headers()["referrer-policy"],
+                if path.ends_with("/native") {
+                    "strict-origin"
+                } else {
+                    "no-referrer"
+                }
+            );
             assert!(matches!(
                 wpalt::discovery::redirects::route(&app, &discovery, &path)
                     .await

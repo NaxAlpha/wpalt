@@ -2741,7 +2741,10 @@
         "https://wpforms.com/docs/how-to-install-and-set-up-the-offline-forms-addon/",
         "https://wpforms.com/docs/how-to-install-and-use-form-abandonment-with-wpforms/",
         "https://developer.mozilla.org/en-US/docs/Web/API/Request/credentials",
-        "https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_response_header_name"
+        "https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_response_header_name",
+        "https://developer.mozilla.org/en-US/docs/Web/API/WorkerNavigator/locks",
+        "https://developer.mozilla.org/en-US/docs/Web/API/LockManager/request",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Origin"
       ],
       "applicable_versions": [
         "Service Worker/Cache secure-context browser APIs; actual browser version recorded by verification",
@@ -2757,7 +2760,9 @@
         "Preserve exact unresolved submission payload/identifier across scalar-device reload and publication conflict; no covert capture or automatic marketing.",
         "Specific original policy/safe fields, explicit visitor request plus mailbox confirmation, withdrawal/delete/completion and current worker preflight.",
         "New consent state is included in bounded recovery, maintenance and private export/delete; ordinary requests never interpret an old graph.",
-        "Credential omission suppresses request cookies and response-cookie processing; do not pretend JavaScript can inspect forbidden Set-Cookie headers. Native snapshot routes never set cookies."
+        "Credential omission suppresses request cookies and response-cookie processing; do not pretend JavaScript can inspect forbidden Set-Cookie headers. Native snapshot routes never set cookies.",
+        "Use a stable origin-wide Web Lock to prevent cross-worker/tab admission races; busy admission refuses promptly, cleanup waits finitely, unsupported coordination offers live navigation.",
+        "Wait for activated worker state before storage commands. Keep strict-origin on native form navigation to avoid Origin:null caused by no-referrer, without broadening Origin admission; hide full paths/queries."
       ],
       "tests": [
         "anonymous_snapshots_exclude_private_working_copies_actions_and_protected_publications",

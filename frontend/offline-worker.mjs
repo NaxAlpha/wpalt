@@ -17,6 +17,24 @@ const sourcePattern =
   /^(article|form)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const endpoint = (source) =>
   `${self.location.origin}/offline/snapshots/${source}`;
+// Keep this origin-wide name stable across worker/cache grammar upgrades.
+async function storage(operation, wait = false) {
+  if (!navigator.locks)
+    throw Error(
+      "This browser cannot coordinate offline storage. Visit the live site.",
+    );
+  return navigator.locks.request(
+    "wpalt-offline-storage",
+    wait ? { signal: AbortSignal.timeout(15000) } : { ifAvailable: true },
+    (lock) => {
+      if (!lock)
+        throw Error(
+          "Local storage is busy in another tab or update. Try again.",
+        );
+      return operation();
+    },
+  );
+}
 let work = Promise.resolve();
 let outstanding = 0;
 async function bounded(response, limit) {
@@ -140,10 +158,15 @@ self.addEventListener("install", (event) =>
 self.addEventListener("activate", (event) =>
   event.waitUntil(
     (async () => {
-      for (const name of await caches.keys())
-        if (name.startsWith("wpalt-offline-") && ![SHELL, DATA].includes(name))
-          await caches.delete(name);
-      await records();
+      await storage(async () => {
+        for (const name of await caches.keys())
+          if (
+            name.startsWith("wpalt-offline-") &&
+            ![SHELL, DATA].includes(name)
+          )
+            await caches.delete(name);
+        await records();
+      }, true);
       await self.clients.claim();
     })(),
   ),
@@ -246,7 +269,7 @@ self.addEventListener("message", (event) => {
     }
     throw Error("Unknown library operation.");
   };
-  const next = work.then(operation);
+  const next = work.then(() => storage(operation));
   work = next
     .catch(() => {})
     .finally(() => {

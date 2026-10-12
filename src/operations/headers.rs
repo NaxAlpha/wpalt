@@ -123,6 +123,11 @@ impl Policy {
         {
             headers.insert("referrer-policy", HeaderValue::from_static("no-referrer"));
         }
+        // Native form navigation must preserve Origin while withholding path/query.
+        // no-referrer would make Chromium's legitimate non-CORS POST use Origin:null.
+        if route == "/forms/{id}/native" {
+            headers.insert("referrer-policy", HeaderValue::from_static("strict-origin"));
+        }
         let csp = if ["/admin/design/{id}/preview", "/admin/preview/{id}"].contains(&route) {
             &self.preview_csp
         } else if route == "/forms/{id}" {

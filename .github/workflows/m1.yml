@@ -515,6 +515,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release download nightly-202610121346-22e29f7d3a31 --repo NaxAlpha/wpalt --dir work/d11-original-runtime
+          git fetch --depth=1 origin 22e29f7d3a310f565a97107bbb5b5f328ec1d39b
           git show 22e29f7d3a310f565a97107bbb5b5f328ec1d39b:scripts/release_build.py > work/d11-original-release-verify.py
           python3 work/d11-original-release-verify.py --directory work/d11-original-runtime --source 22e29f7d3a310f565a97107bbb5b5f328ec1d39b --extract work/d11-runtime-app
           python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d11-runtime-app/wpalt" --source-schema 24

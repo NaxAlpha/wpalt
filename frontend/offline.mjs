@@ -15,6 +15,15 @@ function clearReading() {
   reading.replaceChildren();
   reading.hidden = true;
 }
+async function readFailure(error) {
+  clearReading();
+  if (worker) {
+    try {
+      await list();
+    } catch {}
+  }
+  notice(error.message, true);
+}
 function element(tag, text) {
   const n = document.createElement(tag);
   if (text !== undefined) n.textContent = text;
@@ -36,7 +45,18 @@ function command(action, source) {
       channel.port1.close();
       data.error ? reject(Error(data.error)) : resolve(data.value);
     };
-    worker.postMessage({ action, source }, [channel.port2]);
+    try {
+      worker.postMessage({ action, source }, [channel.port2]);
+    } catch {
+      clearTimeout(timer);
+      channel.port1.close();
+      channel.port2.close();
+      reject(
+        Error(
+          "The offline library updated. Reload and retry. Your saved work remains on this device.",
+        ),
+      );
+    }
   });
 }
 async function list() {
@@ -171,26 +191,43 @@ document.querySelector("#clear").onclick = async () => {
     notice(e.message, true);
   }
 };
-window.addEventListener("hashchange", () =>
-  hash().catch((e) => {
-    clearReading();
-    notice(e.message, true);
-  }),
-);
+window.addEventListener("hashchange", () => hash().catch(readFailure));
 (async () => {
   try {
     if (!isSecureContext || !("serviceWorker" in navigator))
       throw Error(
         "Offline storage requires HTTPS or localhost and a supporting browser. Visit the live site.",
       );
-    const registration = await navigator.serviceWorker.register(
-      "/offline/worker.js",
-      { scope: "/offline/", updateViaCache: "none" },
-    );
-    let readyTimer;
+    await navigator.serviceWorker.register("/offline/worker.js", {
+      scope: "/offline/",
+      updateViaCache: "none",
+    });
+    let readyTimer, removeStateListener;
     try {
-      await Promise.race([
-        navigator.serviceWorker.ready,
+      worker = await Promise.race([
+        (async () => {
+          const registration = await navigator.serviceWorker.ready;
+          const candidate = registration.active;
+          if (!candidate)
+            throw Error("Offline storage is unavailable. Reload and retry.");
+          if (candidate.state !== "activated")
+            await new Promise((resolve, reject) => {
+              const changed = () => {
+                if (candidate.state === "activated") resolve();
+                else if (candidate.state === "redundant")
+                  reject(
+                    Error(
+                      "The offline library updated. Reload and retry. Your saved work remains on this device.",
+                    ),
+                  );
+              };
+              removeStateListener = () =>
+                candidate.removeEventListener("statechange", changed);
+              candidate.addEventListener("statechange", changed);
+              changed();
+            });
+          return candidate;
+        })(),
         new Promise((_, reject) => {
           readyTimer = setTimeout(
             () =>
@@ -205,12 +242,12 @@ window.addEventListener("hashchange", () =>
       ]);
     } finally {
       clearTimeout(readyTimer);
+      removeStateListener?.();
     }
-    worker = registration.active;
     await list();
     notice("Ready. Only publications you deliberately save are retained.");
     await hash();
   } catch (e) {
-    notice(e.message, true);
+    await readFailure(e);
   }
 })();
