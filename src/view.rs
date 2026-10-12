@@ -65,7 +65,7 @@ fn layout_inner(
         } @else {
             header class="site-header" {a class="site-brand" href="/" {(settings.title)} nav aria-label="Website" {
                 @for item in nav {a href=(item.url) {(item.label)}}
-                a href="/search" {"Search"}
+                a href="/search" {"Search"} a href="/offline/" {"Offline library"}
             }}
         }
         main id="main" lang=(content_locale) dir=(content_direction) class=(if admin || member{"workspace"}else{"site-main"}) {(body)}
@@ -111,6 +111,7 @@ pub fn public_body_with_dimensions(
     html! { article class="article" {
         @if preview {p class="notice" {"Private preview — unpublished changes. " a href=(format!("/admin/posts/{}",post.id)) {"Back to editor"}}}
         p class="eyebrow" {(post.kind)} h1 {(title)}
+        @if !preview {p {a href=(format!("/offline/#article/{}",post.id)) {"Save for offline reading"}}}
         @if let Some(subtitle)=fields.get("subtitle").and_then(|v|v.as_str()) {p class="lead" {(subtitle)}}
         div class="prose" {(PreEscaped(rendered))}
     }}

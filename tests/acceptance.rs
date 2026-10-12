@@ -117,9 +117,18 @@ impl Site {
     }
 }
 
+/// Remove newly introduced consent tables when constructing historical fixtures.
+/// Original-executable migration remains a separate integration gate.
+fn pre_recovery_graph(graph: &mut serde_json::Value) {
+    let tables = graph["tables"].as_object_mut().unwrap();
+    tables.remove("form_recovery_policies");
+    tables.remove("form_recoveries");
+}
+
 /// Construct the actual pre-asset grammar when exercising explicit old archive
 /// conversion. Merely relabeling a current graph would be a malformed fixture.
 fn pre_asset_graph(graph: &mut serde_json::Value) {
+    pre_recovery_graph(graph);
     let tables = graph["tables"].as_object_mut().unwrap();
     tables.remove("redirect_policy");
     tables.remove("missing_paths");
@@ -228,6 +237,7 @@ async fn old_archive_markers_cannot_admit_current_structured_model_grammar() {
     ] {
         let mut old = base.clone();
         old["schema"] = schema.into();
+        pre_recovery_graph(&mut old);
         if marker < 15 {
             pre_asset_graph(&mut old);
         }
@@ -260,7 +270,7 @@ async fn old_archive_markers_cannot_admit_current_structured_model_grammar() {
             .expect("Valid historical grammar must pass before testing a new-key attack");
         assert_eq!(
             backup::inspect(&site.app.config, &converted).unwrap()["schema"],
-            19
+            20
         );
         assert!(backup::inspect(&site.app.config, &encode(&old)).is_err());
         for injected in [Value::Null, json!({})] {
@@ -4534,7 +4544,7 @@ async fn migration_and_incremental_restore_preserve_owned_graph_before_any_targe
         let migrated = backup::migrate_m6(&original.app.config, &legacy).unwrap();
         assert_eq!(
             backup::inspect(&original.app.config, &migrated).unwrap()["schema"],
-            19
+            20
         );
         let destination = tempfile::tempdir().unwrap();
         let key = encryption::generate_key();
@@ -8167,7 +8177,7 @@ async fn assigned_review_binds_material_and_recovers_without_public_note_leaks()
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            19
+            20
         );
         // The explicit previous graph conversion retains meaningful private review history.
         let mut previous: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -9020,7 +9030,7 @@ async fn account_interface_preferences_recover_without_changing_content_authorit
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            19
+            20
         );
         let restored = Site::new(pg, false).await;
         backup::restore(&restored.app, &bytes).await.unwrap();
@@ -10198,7 +10208,7 @@ async fn discovery_formats_have_explicit_conversion_validation_and_private_draft
         let mut envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         let mut graph: serde_json::Value =
             serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
-        assert_eq!(graph["schema"], 19);
+        assert_eq!(graph["schema"], 20);
         assert!(
             graph["tables"].get("published_image_refs").is_none(),
             "Derived index is rebuilt from canonical publication, not separately trusted"
@@ -10230,6 +10240,7 @@ async fn discovery_formats_have_explicit_conversion_validation_and_private_draft
             .as_object_mut()
             .unwrap()
             .remove("missing_paths");
+        pre_recovery_graph(&mut graph);
         graph["schema"] = 15.into();
         let payload = graph.to_string();
         envelope["payload"] = payload.clone().into();
@@ -10240,7 +10251,7 @@ async fn discovery_formats_have_explicit_conversion_validation_and_private_draft
         let converted = backup::migrate_v15(&site.app.config, &old).unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &converted).unwrap()["schema"],
-            19
+            20
         );
         // An attacker cannot relabel newly extended SEO as an older accepted format.
         graph["tables"]["posts"][0]["seo"] = r#"{"social_alt":"new field"}"#.into();
@@ -11076,7 +11087,7 @@ async fn redirect_recovery_preserves_ownership_and_refuses_old_marker_smuggling(
         let bytes = backup::capture(&site.app).await.unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &bytes).unwrap()["schema"],
-            19
+            20
         );
         let fresh = Site::new(pg, false).await;
         backup::restore(&fresh.app, &bytes).await.unwrap();
@@ -11111,10 +11122,11 @@ async fn redirect_recovery_preserves_ownership_and_refuses_old_marker_smuggling(
             .as_object_mut()
             .unwrap()
             .remove("missing_paths");
+        pre_recovery_graph(&mut graph);
         let converted = backup::migrate_v17(&site.app.config, &encode(&graph)).unwrap();
         assert_eq!(
             backup::inspect(&site.app.config, &converted).unwrap()["schema"],
-            19
+            20
         );
         let converted_envelope: Value = serde_json::from_slice(&converted).unwrap();
         let converted_graph: Value =

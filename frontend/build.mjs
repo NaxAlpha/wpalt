@@ -126,3 +126,53 @@ await build({
   target: ["es2020"],
   outfile: "../assets/generated/spam.js",
 });
+
+// One content-bound release shell; worker changes whenever its embedded assets do.
+const offlineCss = await transform(
+  `:root{${declarations}}\n${await readFile(new URL("../assets/offline.css", import.meta.url), "utf8")}`,
+  { loader: "css", minify: true },
+);
+await writeFile(
+  new URL("../assets/generated/offline.css", import.meta.url),
+  offlineCss.code,
+);
+await build({
+  entryPoints: ["offline.mjs"],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: ["es2022"],
+  outfile: "../assets/generated/offline.js",
+});
+const { createHash } = await import("node:crypto");
+const offlineAssets = Object.fromEntries(
+  await Promise.all(
+    [
+      ["/offline/", "../assets/offline.html"],
+      ["/offline/app.js", "../assets/generated/offline.js"],
+      ["/offline/style.css", "../assets/generated/offline.css"],
+      ["/offline/forms.js", "../assets/generated/forms.js"],
+    ].map(async ([route, file]) => [
+      route,
+      createHash("sha256")
+        .update(await readFile(new URL(file, import.meta.url)))
+        .digest("hex"),
+    ]),
+  ),
+);
+const offlineBuild = createHash("sha256")
+  .update(JSON.stringify(offlineAssets))
+  .digest("hex")
+  .slice(0, 16);
+await build({
+  entryPoints: ["offline-worker.mjs"],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: ["es2022"],
+  outfile: "../assets/generated/offline-worker.js",
+  define: {
+    __WPALT_OFFLINE_BUILD__: JSON.stringify(offlineBuild),
+    __WPALT_OFFLINE_ASSETS__: JSON.stringify(offlineAssets),
+  },
+});

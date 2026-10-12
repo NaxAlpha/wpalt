@@ -1,0 +1,40 @@
+{
+  "actual_main": "22e29f7d3a310f565a97107bbb5b5f328ec1d39b",
+  "pr": "https://github.com/NaxAlpha/wpalt/pull/27",
+  "final_head": "245851c21971d28fe3598e632c1d8a08cc06e672",
+  "tested_merge": "4fa05d2a4b7769edb25f6891b7565594b1911c89",
+  "identical_tree": "f1c1ddcfb60f01c2ae2650766ddc94a060cb5f4a",
+  "final_pr_run": 38245197499,
+  "run": 38258069027,
+  "gates": {
+    "clean-build": "success",
+    "dependency-audit": "success",
+    "application": "success",
+    "compiler-floor": "success",
+    "native-pitr": "success",
+    "local-processes": "success",
+    "frontend": "success",
+    "release": "success"
+  },
+  "ci_archive_verification": {
+    "source_commit": "22e29f7d3a310f565a97107bbb5b5f328ec1d39b",
+    "tag": "nightly-202610121346-22e29f7d3a31",
+    "archive": "wpalt-x86_64-unknown-linux-gnu-22e29f7d3a31.tar.gz",
+    "archive_sha256": "d76e2cdbe7f7709d1e14bef679d40ecb1ff690f515cc4311048417b4fadf01dd",
+    "binary_sha256": "4ce3023dd63f74b3084870f7dd582f46a32820ae1d200cd59ee214e183044578",
+    "binary_bytes": 41153544,
+    "timestamp_basis": "commit time, UTC"
+  },
+  "separate_public_archive_verification": {
+    "source_commit": "22e29f7d3a310f565a97107bbb5b5f328ec1d39b",
+    "tag": "nightly-202610121346-22e29f7d3a31",
+    "archive": "wpalt-x86_64-unknown-linux-gnu-22e29f7d3a31.tar.gz",
+    "archive_sha256": "d76e2cdbe7f7709d1e14bef679d40ecb1ff690f515cc4311048417b4fadf01dd",
+    "binary_sha256": "4ce3023dd63f74b3084870f7dd582f46a32820ae1d200cd59ee214e183044578",
+    "binary_bytes": 41153544,
+    "timestamp_basis": "commit time, UTC"
+  },
+  "tag_commit": "22e29f7d3a310f565a97107bbb5b5f328ec1d39b",
+  "public_release": "https://github.com/NaxAlpha/wpalt/releases/tag/nightly-202610121346-22e29f7d3a31",
+  "scope": "Separately downloaded main CI/public archives pass strict source/lock/embedded-assets/guides/file-set/ELF/checksum verification and match exactly. Linux development prerelease, not whole-plugin parity or certified identity."
+}

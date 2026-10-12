@@ -122,6 +122,39 @@ pub fn clone_package(config: &Config, encoded: &[u8], source: &str) -> Result<Pr
     // Password accounts and financial identities remain stable for owner review.
     // Sessions are deliberately excluded from all full-site recovery packages.
     snapshot.tables.get_mut("user_passkeys").unwrap().clear();
+    // Recovery permission is specific to its original publication/site purpose.
+    // A held clone needs new visitor consent; never transfer these intents.
+    let removed = std::mem::take(snapshot.tables.get_mut("form_recoveries").unwrap());
+    snapshot
+        .tables
+        .get_mut("form_recovery_policies")
+        .unwrap()
+        .clear();
+    if let Some(usage) = snapshot
+        .tables
+        .get_mut("business_usage")
+        .unwrap()
+        .iter_mut()
+        .find(|r| r["kind"] == "drafts")
+    {
+        let items = usage["items"].as_i64().unwrap() - removed.len() as i64;
+        let bytes = usage["bytes"].as_i64().unwrap()
+            - removed
+                .iter()
+                .map(|r| r["values_json"].as_str().unwrap().len() as i64)
+                .sum::<i64>();
+        usage.insert("items".into(), items.into());
+        usage.insert("bytes".into(), bytes.into());
+    }
+    for row in snapshot.tables.get_mut("mail_jobs").unwrap() {
+        let dedupe = row["dedupe"].as_str().unwrap();
+        if (dedupe.starts_with("recovery-confirm:") || dedupe.starts_with("recovery-reminder:"))
+            && ["pending", "retry", "spooled"].contains(&row["state"].as_str().unwrap())
+        {
+            row.insert("state".into(), "cancelled".into());
+        }
+    }
+
     // Cloned presentation material must earn new approval on its destination.
     for row in snapshot.tables.get_mut("editorial_work").unwrap() {
         row.insert("state".into(), "draft".into());
@@ -134,7 +167,7 @@ pub fn clone_package(config: &Config, encoded: &[u8], source: &str) -> Result<Pr
     let payload =
         serde_json::to_string(&snapshot).map_err(|_| Error::invalid("Cannot serialize clone."))?;
     let bytes = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v19".into(),
+        format: "wpalt-backup-v20".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })
@@ -365,7 +398,7 @@ pub fn prepare(config: &Config, encoded: &[u8], requested: &[String]) -> Result<
     let payload = serde_json::to_string(&snapshot)
         .map_err(|_| Error::invalid("Cannot serialize selected recovery graph."))?;
     let bytes = serde_json::to_vec(&Envelope {
-        format: "wpalt-backup-v19".into(),
+        format: "wpalt-backup-v20".into(),
         sha256: digest(payload.as_bytes()),
         payload,
     })

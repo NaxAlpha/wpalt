@@ -27,3 +27,5 @@ pub mod consent_scripts;
 
 pub mod clone_hold;
 pub mod privacy;
+
+pub mod offline;

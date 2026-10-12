@@ -30,6 +30,16 @@ pub async fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>> {
 }
 
 // Types and table names are an allowlist, never supplied by an archive.
+type TableDefinition = (&'static str, &'static [(&'static str, bool)]);
+static PRE_RECOVERY_TABLES: std::sync::LazyLock<Vec<TableDefinition>> =
+    std::sync::LazyLock::new(|| {
+        TABLES
+            .iter()
+            .copied()
+            .filter(|(name, _)| !["form_recovery_policies", "form_recoveries"].contains(name))
+            .collect()
+    });
+
 pub(crate) const TABLES: &[(&str, &[(&str, bool)])] = &[
     (
         "redirect_policy",
@@ -416,6 +426,33 @@ pub(crate) const TABLES: &[(&str, &[(&str, bool)])] = &[
             ("contact_id", false),
             ("list_id", false),
             ("created_at", true),
+        ],
+    ),
+    (
+        "form_recovery_policies",
+        &[
+            ("form_id", false),
+            ("form_version", true),
+            ("policy_id", false),
+            ("definition", false),
+        ],
+    ),
+    (
+        "form_recoveries",
+        &[
+            ("id", false),
+            ("form_id", false),
+            ("form_version", true),
+            ("policy_id", false),
+            ("token_hash", false),
+            ("confirmation_hash", false),
+            ("request_key", false),
+            ("email", false),
+            ("policy_definition", false),
+            ("values_json", false),
+            ("state", false),
+            ("created_at", true),
+            ("expires_at", true),
         ],
     ),
     (
@@ -1087,7 +1124,7 @@ pub fn safe_filename(name: &str) -> bool {
         && !name.contains('\\')
 }
 pub async fn capture(app: &App) -> Result<Vec<u8>> {
-    capture_format(app, 19).await
+    capture_format(app, 20).await
 }
 /// Only the stopped maintenance path may capture the original pre-change graph.
 pub(crate) async fn capture_maintenance(app: &App) -> Result<Vec<u8>> {
@@ -1110,8 +1147,10 @@ pub(crate) async fn capture_maintenance(app: &App) -> Result<Vec<u8>> {
             17
         } else if installed < 24 {
             18
-        } else {
+        } else if installed < 25 {
             19
+        } else {
+            20
         },
     )
     .await
@@ -1127,7 +1166,8 @@ async fn capture_format(app: &App, graph: i64) -> Result<Vec<u8>> {
     let mut tables = BTreeMap::new();
     let mut budget = 0_usize;
     for (name, columns) in TABLES {
-        if (graph < 18 && ["redirect_policy", "missing_paths"].contains(name))
+        if (graph < 20 && ["form_recovery_policies", "form_recoveries"].contains(name))
+            || (graph < 18 && ["redirect_policy", "missing_paths"].contains(name))
             || (graph < 13 && ["editorial_work", "editorial_decisions"].contains(name))
             || (graph < 14 && *name == "user_preferences")
             || (graph < 15 && ["theme_assets", "theme_asset_references"].contains(name))
@@ -1258,14 +1298,14 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v19"
+    if envelope.format != "wpalt-backup-v20"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 19
+    if snapshot.schema != 20
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -2261,8 +2301,8 @@ pub fn migrate_v12(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid v12 graph."))?;
     if snapshot.schema != 12
-        || snapshot.tables.len() != TABLES.len() - 7
-        || TABLES
+        || snapshot.tables.len() != PRE_RECOVERY_TABLES.len() - 7
+        || PRE_RECOVERY_TABLES
             .iter()
             .filter(|(n, _)| {
                 ![
@@ -2325,9 +2365,9 @@ pub fn migrate_v13(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid v13 graph."))?;
     if snapshot.schema != 13
-        || snapshot.tables.len() != TABLES.len() - 5
+        || snapshot.tables.len() != PRE_RECOVERY_TABLES.len() - 5
         || snapshot.tables.contains_key("user_preferences")
-        || TABLES
+        || PRE_RECOVERY_TABLES
             .iter()
             .filter(|(name, _)| {
                 ![
@@ -2578,10 +2618,10 @@ pub fn migrate_v17(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid v17 graph."))?;
     if snapshot.schema != 17
-        || snapshot.tables.len() != TABLES.len() - 2
+        || snapshot.tables.len() != PRE_RECOVERY_TABLES.len() - 2
         || snapshot.tables.contains_key("redirect_policy")
         || snapshot.tables.contains_key("missing_paths")
-        || TABLES
+        || PRE_RECOVERY_TABLES
             .iter()
             .filter(|(n, _)| !["redirect_policy", "missing_paths"].contains(n))
             .any(|(n, _)| !snapshot.tables.contains_key(*n))
@@ -2603,7 +2643,7 @@ pub fn migrate_v17(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     .map_err(|_| Error::invalid("Cannot encode v18 graph."))?;
     migrate_v18(config, &output)
 }
-/// Explicit old-content conversion. Runtime and ordinary restore accept only v19.
+/// Explicit old-content conversion. Runtime and ordinary restore accept only v20.
 pub fn migrate_v18(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<u8>> {
     if encoded.len() > config.max_backup_bytes {
         return Err(Error::invalid("Archive exceeds configured budget."));
@@ -2618,8 +2658,8 @@ pub fn migrate_v18(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid v18 graph."))?;
     if snapshot.schema != 18
-        || snapshot.tables.len() != TABLES.len()
-        || TABLES
+        || snapshot.tables.len() != PRE_RECOVERY_TABLES.len()
+        || PRE_RECOVERY_TABLES
             .iter()
             .any(|(name, _)| !snapshot.tables.contains_key(*name))
     {
@@ -2705,9 +2745,47 @@ pub fn migrate_v18(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
     .map_err(|_| Error::invalid("Cannot encode v19 graph."))?;
     // Unchanged historical answers must remain canonical under the corrected
     // numeric comparison policy; never infer or rewrite missing answers.
+    migrate_v19(config, &output)
+}
+/// Explicit original D11 conversion; ordinary restore accepts only portable20.
+pub fn migrate_v19(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<u8>> {
+    if encoded.len() > config.max_backup_bytes {
+        return Err(Error::invalid("Archive exceeds configured budget."));
+    }
+    let envelope: Envelope =
+        serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid v19 envelope."))?;
+    if envelope.format != "wpalt-backup-v19"
+        || digest(envelope.payload.as_bytes()) != envelope.sha256
+    {
+        return Err(Error::invalid("Invalid original v19 checksum/format."));
+    }
+    let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
+        .map_err(|_| Error::invalid("Invalid v19 graph."))?;
+    if snapshot.schema != 19
+        || snapshot.tables.len() != PRE_RECOVERY_TABLES.len()
+        || PRE_RECOVERY_TABLES
+            .iter()
+            .any(|(n, _)| !snapshot.tables.contains_key(*n))
+    {
+        return Err(Error::invalid("Archive is not an original D11 table set."));
+    }
+    snapshot.schema = 20;
+    snapshot
+        .tables
+        .insert("form_recovery_policies".into(), vec![]);
+    snapshot.tables.insert("form_recoveries".into(), vec![]);
+    let payload = serde_json::to_string(&snapshot)
+        .map_err(|_| Error::invalid("Cannot convert original graph."))?;
+    let output = serde_json::to_vec(&Envelope {
+        format: "wpalt-backup-v20".into(),
+        sha256: digest(payload.as_bytes()),
+        payload,
+    })
+    .map_err(|_| Error::invalid("Cannot encode current graph."))?;
     validate(config, &output)?;
     Ok(output)
 }
+
 pub(crate) fn inspect_maintenance(config: &crate::config::Config, encoded: &[u8]) -> Result<Value> {
     let envelope: Envelope = serde_json::from_slice(encoded)
         .map_err(|_| Error::invalid("Invalid maintenance graph."))?;
@@ -2719,6 +2797,7 @@ pub(crate) fn inspect_maintenance(config: &crate::config::Config, encoded: &[u8]
         "wpalt-backup-v16" => 16,
         "wpalt-backup-v17" => 17,
         "wpalt-backup-v18" => 18,
+        "wpalt-backup-v19" => 19,
         _ => return inspect(config, encoded),
     };
     let converted = if source == 12 {
@@ -2733,12 +2812,18 @@ pub(crate) fn inspect_maintenance(config: &crate::config::Config, encoded: &[u8]
         migrate_v16(config, encoded)?
     } else if source == 17 {
         migrate_v17(config, encoded)?
-    } else {
+    } else if source == 18 {
         migrate_v18(config, encoded)?
+    } else {
+        migrate_v19(config, encoded)?
     };
     let mut report = inspect(config, &converted)?;
     report["schema"] = source.into();
     if let Some(tables) = report["tables"].as_object_mut() {
+        if source < 20 {
+            tables.remove("form_recovery_policies");
+            tables.remove("form_recoveries");
+        }
         if source < 18 {
             tables.remove("redirect_policy");
             tables.remove("missing_paths");

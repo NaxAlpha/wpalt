@@ -115,6 +115,7 @@ pub async fn submit(app: &App, id: &str, version: i64, key: &str, input: &Value)
     // upgrade failures and serializing publication with submission validation.
     let row = sqlx::query("UPDATE business_forms SET updated_at=updated_at WHERE id=$1 AND published_version>0 RETURNING live,published_version,entry_count")
         .bind(id).fetch_optional(&mut *tx).await?.ok_or_else(Error::not_found)?;
+    super::quotas::release(&mut tx, "drafts", 0, 0).await?;
     let raw: String = row.get("live");
     let hash = crate::auth::digest(format!("{version}:{}", input).as_bytes());
     if let Some(existing) =
@@ -128,6 +129,7 @@ pub async fn submit(app: &App, id: &str, version: i64, key: &str, input: &Value)
             return Err(Error::conflict());
         }
         let entry = existing.get("id");
+        super::recovery::complete(&mut tx, id, key).await?;
         tx.commit().await?;
         return Ok(entry);
     }
@@ -185,6 +187,7 @@ pub async fn submit(app: &App, id: &str, version: i64, key: &str, input: &Value)
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    super::recovery::complete(&mut tx, id, key).await?;
     tx.commit().await?;
     tracing::info!(event="form_entry_recorded", form_id=id, entry_id=%entry, form_version=version);
     Ok(entry)
