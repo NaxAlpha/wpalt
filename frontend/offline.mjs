@@ -122,7 +122,12 @@ async function open(source) {
       new CustomEvent("wpalt:offline-form", { detail: host }),
     );
   }
-  reading.scrollIntoView({ behavior: "smooth", block: "start" });
+  reading.scrollIntoView({
+    behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "auto"
+      : "smooth",
+    block: "start",
+  });
 }
 async function hash() {
   const match = location.hash.match(
@@ -182,7 +187,25 @@ window.addEventListener("hashchange", () =>
       "/offline/worker.js",
       { scope: "/offline/", updateViaCache: "none" },
     );
-    await navigator.serviceWorker.ready;
+    let readyTimer;
+    try {
+      await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, reject) => {
+          readyTimer = setTimeout(
+            () =>
+              reject(
+                Error(
+                  "Offline storage could not be prepared. Reconnect and retry, or visit the live site.",
+                ),
+              ),
+            20000,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(readyTimer);
+    }
     worker = registration.active;
     await list();
     notice("Ready. Only publications you deliberately save are retained.");

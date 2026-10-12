@@ -461,6 +461,30 @@ module.exports = async (owner, visitors, origin, output) => {
     await page.getByRole("alert").filter({ hasText: /Use article\/identifier/ }).waitFor();
     assert.equal(await page.locator("#library li").count(), 0);
     report.assertions.push("Actual public article save/disconnected reopen excludes working text; real unpublication denies and deletes its saved copy; persisted-expiry fixture is removed; invalid source/keyboard submission cannot cache private routes.");
+    // Exercise the real count ceiling using actual published resources and the visitor interface.
+    for (let item = 0; item < 31; item++) {
+      const created = await saveArticle(null, { title: `Finite reading ${item + 1}`, slug: `d12-finite-reading-${item}`, body: `Reading ${item + 1}`, action: "publish" });
+      await page.locator("#source").fill(`article/${created.id}`);
+      await page.getByRole("button", { name: "Save on this device", exact: true }).click();
+      if (item < 30) await page.waitForFunction((count) => document.querySelectorAll("#library li").length === count, item + 1);
+      else await page.getByRole("alert").filter({ hasText: /Library full/ }).waitFor();
+    }
+    assert.equal(await page.locator("#library li").count(), 30);
+    await page.getByRole("button", { name: "Clear library and device form drafts", exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll("#library li").length === 0);
+    report.assertions.push("31 actual publications exercise the 30-item ceiling through visitor controls; excess admission preserves all saved items, and Clear removes the library.");
+    // A genuine first installation with altered stylesheet bytes must fail closed and explain the wait.
+    const failedContext = await owner.browser().newContext();
+    try {
+      await failedContext.route(origin + "/offline/style.css", route => route.fulfill({ contentType: "text/css", body: "/* controlled changed release asset */" }));
+      const failedPage = await failedContext.newPage(); errors(failedPage);
+      await failedPage.goto(origin + "/offline/");
+      await failedPage.getByRole("alert").filter({ hasText: /Offline storage could not be prepared/ }).waitFor({ timeout: 25000 });
+      assert.equal(await failedPage.evaluate(() => navigator.serviceWorker.controller), null);
+      await failedPage.getByRole("link", { name: "Visit live site", exact: true }).click();
+      assert.equal(new URL(failedPage.url()).pathname, "/");
+      report.assertions.push("Controlled changed shell asset prevents first worker activation; real setup deadline reports failure and ordinary live navigation remains usable. This is a shell-integrity failure fixture, not an OS storage-denial claim.");
+    } finally { await failedContext.close(); }
     assert.deepEqual(report.errors, []);
     report.status = "passed";
   } catch (e) {

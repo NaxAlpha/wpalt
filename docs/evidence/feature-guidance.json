@@ -71,23 +71,28 @@
       "basis": "external-and-internal",
       "sources": [
         "https://developer.wordpress.org/rest-api/reference/posts/",
-        "https://www.w3.org/WAI/standards-guidelines/wcag/"
+        "https://www.w3.org/WAI/standards-guidelines/wcag/",
+        "https://raw.githubusercontent.com/RustSec/advisory-db/main/crates/ammonia/RUSTSEC-2021-0157.md"
       ],
       "applicable_versions": [
         "Current WordPress REST contract",
-        "M1 working/public snapshot contract"
+        "M1 working/public snapshot contract",
+        "Ammonia 4.2.3 pinned remediation; default sanitization, no CSS style-attribute filtering"
       ],
-      "last_checked": "2026-09-30",
-      "next_review": "2026-12-29",
+      "last_checked": "2026-10-13",
+      "next_review": "2027-01-11",
       "review_interval_days": 90,
       "maintenance_owner": "wpalt maintainers",
       "requirements": [
-        "Drafts and revisions are private; meaningful labels, keyboard paths and escaped output. WCAG reference guides review, not a certification claim."
+        "Drafts and revisions are private; meaningful labels, keyboard paths and escaped output. WCAG reference guides review, not a certification claim.",
+        "Keep the compiled sanitizer on a RustSec-fixed release (4.2.3 for RUSTSEC-2021-0157); retain default CSS/style rejection and the unchanged selected-graph advisory gate."
       ],
       "tests": [
         "author_preview_publish_autosave_and_restore_without_leaking_drafts",
         "concurrent_editors_never_silently_overwrite_each_other",
-        "browser acceptance"
+        "browser acceptance",
+        "scripts/audit_dependencies.py",
+        "reviewed_elementor_design_preserves_live_pages_and_exact_owner_review"
       ],
       "triggers": [
         "affected milestone/release",

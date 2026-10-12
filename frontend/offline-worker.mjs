@@ -108,6 +108,7 @@ self.addEventListener("install", (event) =>
           credentials: "omit",
           redirect: "error",
           cache: "no-store",
+          signal: AbortSignal.timeout(10000),
         });
         if (!response.ok || response.redirected)
           throw Error("Offline shell unavailable");
