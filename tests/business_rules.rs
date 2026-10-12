@@ -2243,3 +2243,277 @@ async fn confirmed_subscribers_receive_matching_trigger_once_and_withdrawal_canc
         }
     }
 }
+
+/// A protocol fixture exercises refusal paths; a separate actual ClamAV journey
+/// establishes real engine integration. Neither claims complete malware safety.
+#[cfg(unix)]
+#[tokio::test]
+async fn configured_scanning_refuses_before_storage_and_guards_existing_private_downloads() {
+    use axum::{
+        body::{Body, Bytes},
+        extract::{Path, State},
+        http::{HeaderMap, Request, StatusCode},
+    };
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::UnixListener,
+    };
+    use tower::ServiceExt;
+    use wpalt::{
+        App, auth,
+        business::{attachment_scanning, attachments, store},
+    };
+    async fn reply(listener: &UnixListener, answer: Vec<u8>, delay: bool, expected: Option<&[u8]>) {
+        let (mut connection, _) = listener.accept().await.unwrap();
+        let mut command = [0; 10];
+        connection.read_exact(&mut command).await.unwrap();
+        assert_eq!(&command, b"zINSTREAM\0");
+        let mut received = Vec::new();
+        loop {
+            let length = connection.read_u32().await.unwrap();
+            if length == 0 {
+                break;
+            }
+            assert!(length <= 16 * 1024);
+            let mut chunk = vec![0; length as usize];
+            connection.read_exact(&mut chunk).await.unwrap();
+            received.extend(chunk);
+            assert!(received.len() <= 2 * 1024 * 1024);
+        }
+        if let Some(expected) = expected {
+            assert_eq!(received, expected);
+        } else {
+            assert!(received.starts_with(b"\x89PNG\r\n\x1a\n"));
+            assert!(received.len() > 8);
+        }
+        if delay {
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        }
+        // A client legitimately drops after a deadline or over-budget result.
+        let _ = connection.write_all(&answer).await;
+    }
+    let postgres = std::env::var("TEST_DATABASE_URL").ok();
+    if std::env::var("WPALT_REQUIRE_POSTGRES").is_ok() {
+        assert!(postgres.is_some());
+    }
+    for engine in std::iter::once(None).chain(postgres.as_deref().map(Some)) {
+        let data = tempfile::tempdir().unwrap();
+        let (mut config, schema) = database_config(&data, "scanner", engine).await;
+        let endpoint = std::path::PathBuf::from(format!(
+            "{}/wpalt-scan-{}.sock",
+            if cfg!(target_os = "macos") {
+                "/private/tmp"
+            } else {
+                "/tmp"
+            },
+            uuid::Uuid::new_v4().simple()
+        ));
+        config.attachment_scanning = attachment_scanning::Config {
+            enabled: true,
+            socket: endpoint.clone(),
+            deadline_seconds: 1,
+            concurrency: 1,
+        };
+        let app = App::open(config).await.unwrap();
+        auth::initialize(
+            &app,
+            "owner@example.test",
+            "Owner",
+            "a strong local password",
+        )
+        .await
+        .unwrap();
+        let (token, session) = auth::login(&app, "owner@example.test", "a strong local password")
+            .await
+            .unwrap();
+        let definition: FormDefinition = serde_json::from_value(json!({"title":"Scanned private documents","fields":[{"name":"file","schema":{"kind":"string","required":true},"widget":{"kind":"Upload"}}]})).unwrap();
+        let form = store::create(&app, &session.user.id, &definition)
+            .await
+            .unwrap();
+        store::save(&app, &form, 1, &definition, true)
+            .await
+            .unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert("content-type", "text/plain".parse().unwrap());
+        headers.insert("x-form-version", "2".parse().unwrap());
+        headers.insert("x-file-name", "private.txt".parse().unwrap());
+        let upload = || {
+            attachments::upload(
+                State(app.clone()),
+                Path((form.clone(), "file".into())),
+                headers.clone(),
+                Bytes::from_static(b"private application notes"),
+            )
+        };
+        assert!(upload().await.unwrap_err().1.contains("unavailable"));
+        let listener = UnixListener::bind(&endpoint).unwrap();
+        for (answer, delay, expected) in [
+            (
+                b"stream: Controlled.UNOFFICIAL FOUND\0".to_vec(),
+                false,
+                "detected",
+            ),
+            (b"stream: OK".to_vec(), false, "invalid result"),
+            (
+                b"stream: OK\0trailing failure\0".to_vec(),
+                false,
+                "invalid result",
+            ),
+            (vec![b'x'; 1025], false, "invalid result"),
+            (b"stream: OK\0".to_vec(), true, "deadline"),
+        ] {
+            let (result, ()) = tokio::join!(
+                upload(),
+                reply(&listener, answer, delay, Some(b"private application notes"))
+            );
+            assert!(result.unwrap_err().1.contains(expected));
+            assert_eq!(
+                sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM form_attachments")
+                    .fetch_one(&app.db.pool)
+                    .await
+                    .unwrap(),
+                0,
+                "Refusal never issues a capability or stores a record"
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, i64>(
+                    "SELECT items+bytes FROM business_usage WHERE kind='uploads'"
+                )
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+                0,
+                "Refusal reserves no quota"
+            );
+            assert_eq!(
+                std::fs::read_dir(app.config.data_dir.join("attachments"))
+                    .unwrap()
+                    .count(),
+                0,
+                "Refusal leaves no private file"
+            );
+        }
+        let original = include_bytes!("fixtures/green.png");
+        let mut image_headers = headers.clone();
+        image_headers.insert("content-type", "image/png".parse().unwrap());
+        image_headers.insert("x-file-name", "private.png".parse().unwrap());
+        let (result, ()) = tokio::join!(
+            attachments::upload(
+                State(app.clone()),
+                Path((form.clone(), "file".into())),
+                image_headers,
+                Bytes::from_static(original)
+            ),
+            async {
+                reply(&listener, b"stream: OK\0".to_vec(), false, Some(original)).await;
+                reply(
+                    &listener,
+                    b"stream: Controlled.UNOFFICIAL FOUND\0".to_vec(),
+                    false,
+                    None,
+                )
+                .await;
+            }
+        );
+        assert!(
+            result.unwrap_err().1.contains("detected"),
+            "Normalized image bytes must pass a second scan before commitment"
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM form_attachments")
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            std::fs::read_dir(app.config.data_dir.join("attachments"))
+                .unwrap()
+                .count(),
+            0
+        );
+        let permit = app
+            .attachment_scan_work
+            .clone()
+            .acquire_owned()
+            .await
+            .unwrap();
+        assert!(upload().await.unwrap_err().1.contains("busy"));
+        drop(permit);
+        let (result, ()) = tokio::join!(
+            upload(),
+            reply(
+                &listener,
+                b"stream: OK\0".to_vec(),
+                false,
+                Some(b"private application notes")
+            )
+        );
+        let capability = result.unwrap().0["capability"].as_str().unwrap().to_owned();
+        let attachment = capability.split(':').next().unwrap();
+        let entry = store::submit(
+            &app,
+            &form,
+            2,
+            &uuid::Uuid::new_v4().to_string(),
+            &json!({"file":capability}),
+        )
+        .await
+        .unwrap();
+        let route = format!("/admin/forms/{form}/entries/{entry}/attachments/{attachment}");
+        let router = wpalt::web::router(app.clone());
+        let download = || {
+            router.clone().oneshot(
+                Request::builder()
+                    .uri(&route)
+                    .header("cookie", format!("wpalt_session={token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+        };
+        let (result, ()) = tokio::join!(
+            download(),
+            reply(
+                &listener,
+                b"stream: Controlled.UNOFFICIAL FOUND\0".to_vec(),
+                false,
+                Some(b"private application notes")
+            )
+        );
+        assert_eq!(
+            result.unwrap().status(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Previously accepted files still obey current scan policy"
+        );
+        let (result, ()) = tokio::join!(
+            download(),
+            reply(
+                &listener,
+                b"stream: OK\0".to_vec(),
+                false,
+                Some(b"private application notes")
+            )
+        );
+        assert_eq!(result.unwrap().status(), StatusCode::OK);
+        assert_ne!(
+            router
+                .oneshot(Request::builder().uri(&route).body(Body::empty()).unwrap())
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::OK,
+            "Private file never becomes public"
+        );
+        drop(listener);
+        std::fs::remove_file(endpoint).unwrap();
+        app.db.pool.close().await;
+        if let Some(root) = engine {
+            let pool = sqlx::PgPool::connect(root).await.unwrap();
+            sqlx::query(&format!("DROP SCHEMA {} CASCADE", schema.unwrap()))
+                .execute(&pool)
+                .await
+                .unwrap();
+            pool.close().await;
+        }
+    }
+}

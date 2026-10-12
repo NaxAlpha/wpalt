@@ -26,6 +26,8 @@ use tokio::sync::{Mutex, Semaphore};
 
 #[derive(Clone)]
 pub struct App {
+    pub documents: Arc<business::documents::Authority>,
+    pub document_work: Arc<Semaphore>,
     pub config: Arc<config::Config>,
     pub node_id: Arc<String>,
     pub local_coordinator: Option<Arc<platform::local_processes::Coordinator>>,
@@ -49,6 +51,7 @@ pub struct App {
     pub password_work: Arc<Semaphore>,
     pub media_reads: Arc<Semaphore>,
     pub media_work: Arc<Semaphore>,
+    pub attachment_scan_work: Arc<Semaphore>,
     pub request_work: Arc<Semaphore>,
     pub login_limits: Arc<Mutex<auth::LoginLimits>>,
     pub dummy_hash: Arc<String>,
@@ -119,6 +122,13 @@ impl App {
         } else {
             None
         };
+        let documents = match &local_coordinator {
+            Some(c) => c.documents.clone(),
+            None => Arc::new(
+                business::documents::Authority::load(&config.documents)
+                    .map_err(|e| anyhow::anyhow!(e.1))?,
+            ),
+        };
         let startup = if let Some(c) = &local_coordinator {
             Some(c.lock().await.map_err(|e| anyhow::anyhow!(e.1))?)
         } else {
@@ -129,6 +139,7 @@ impl App {
         } else {
             operations::encryption::generate_key()
         };
+        let scanner_workers = config.attachment_scanning.concurrency;
         let workers = config.worker_concurrency;
         let requests = config.request_concurrency;
         let db = db::Db::open(&config).await?;
@@ -207,6 +218,8 @@ impl App {
         .await??;
         drop(startup);
         Ok(Self {
+            documents,
+            document_work: Arc::new(Semaphore::new(1)),
             local_coordinator,
             node_id: Arc::new(uuid::Uuid::new_v4().to_string()),
             clone_held: Arc::new(std::sync::atomic::AtomicBool::new(clone_held)),
@@ -229,6 +242,7 @@ impl App {
             redirect_cache: Arc::new(Mutex::new(None)),
             password_work: Arc::new(Semaphore::new(workers)),
             media_reads: Arc::new(Semaphore::new(workers)),
+            attachment_scan_work: Arc::new(Semaphore::new(scanner_workers)),
             media_work: Arc::new(Semaphore::new(workers)),
             request_work: Arc::new(Semaphore::new(requests)),
             login_limits: Arc::new(Mutex::new(auth::LoginLimits::default())),

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M9 and defined D01–D05 deliveries merged with independently verified releases; D06 publication discovery is undergoing final integrated verification. Full plugin breadth remains tracked.",
+  "milestone": "M9 and defined D01\u2013D05 deliveries merged with independently verified releases; D06 publication discovery is undergoing final integrated verification. Full plugin breadth remains tracked.",
   "capabilities": [
     {
       "id": "F001",
@@ -808,7 +808,7 @@
       "capability": "File uploads and protected attachments",
       "deployment": "L",
       "milestone": "M4",
-      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
+      "status": "D11-defined-local-workflow-verified; final-source-CI-and-release-pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Scoped expiring upload capabilities; private UTF-8 text/PDF/image files, bounded decoding/re-encoding, authenticated integrity-checked downloads and backup; no malware scanner.",
@@ -819,8 +819,14 @@
         "../tests/business_rules.rs",
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
-        "../scripts/workflows_acceptance.cjs"
-      ]
+        "../scripts/workflows_acceptance.cjs",
+        "d11-contract.md",
+        "private-documents.md",
+        "evidence/d11-verification.md",
+        "../tests/attested_documents.rs",
+        "../scripts/attested_documents_reference.py"
+      ],
+      "d11_coverage": "Optional owner-hosted fail-closed ClamAV upload/download admission; frozen private response printable HTML/optional actual local PDF, Ed25519 exact-byte server attestation and independent-key native/WebCrypto/OpenSSL verification. No respondent identity certification, PAdES/qualified signature, complete malware guarantee or premium plugin parity."
     },
     {
       "id": "F042",
@@ -850,7 +856,7 @@
       "capability": "Signatures and signed-document records",
       "deployment": "L",
       "milestone": "M4",
-      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
+      "status": "D11-defined-local-workflow-verified; final-source-CI-and-release-pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Typed-name signature and acknowledgment with frozen statement and accepted response; no cryptographic signature/identity certification or generated signed PDF.",
@@ -861,8 +867,14 @@
         "../tests/business_rules.rs",
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
-        "../scripts/workflows_acceptance.cjs"
-      ]
+        "../scripts/workflows_acceptance.cjs",
+        "d11-contract.md",
+        "private-documents.md",
+        "evidence/d11-verification.md",
+        "../tests/attested_documents.rs",
+        "../scripts/attested_documents_reference.py"
+      ],
+      "d11_coverage": "Optional owner-hosted fail-closed ClamAV upload/download admission; frozen private response printable HTML/optional actual local PDF, Ed25519 exact-byte server attestation and independent-key native/WebCrypto/OpenSSL verification. No respondent identity certification, PAdES/qualified signature, complete malware guarantee or premium plugin parity."
     },
     {
       "id": "F044",
@@ -1080,7 +1092,7 @@
       "status": "verified-local-defined-M5-scope; exact-CI-and-artifact-status-on-PR-10",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2–8 choices), 1–10 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
+      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2\u20138 choices), 1\u201310 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
       "evidence": [
         "m5-contract.md",
         "membership-learning.md",
@@ -1383,7 +1395,7 @@
       "status": "M7-verified-defined-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0–3600 seconds, default revalidation. Private/publication browser responses no-store.",
+      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0\u20133600 seconds, default revalidation. Private/publication browser responses no-store.",
       "evidence": [
         "resilient-operations.md",
         "../tests/acceptance.rs",

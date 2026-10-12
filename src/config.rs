@@ -35,6 +35,8 @@ pub struct Config {
     pub commerce: crate::commerce::Config,
     pub identity: crate::membership::identity::Config,
     pub business_limits: crate::business::quotas::Config,
+    pub attachment_scanning: crate::business::attachment_scanning::Config,
+    pub documents: crate::business::documents::Config,
     pub mail: crate::business::mail::MailConfig,
     pub engagement: crate::business::engagement::Config,
     pub database_connections: u32,
@@ -76,6 +78,8 @@ impl Default for Config {
             commerce: Default::default(),
             identity: Default::default(),
             business_limits: Default::default(),
+            attachment_scanning: Default::default(),
+            documents: Default::default(),
             mail: crate::business::mail::MailConfig::default(),
             engagement: crate::business::engagement::Config::default(),
             database_connections: 4,
@@ -177,6 +181,8 @@ impl Config {
             "OIDC sign-in requires an HTTPS site origin"
         );
         self.business_limits.validate()?;
+        self.attachment_scanning.validate()?;
+        self.documents.validate()?;
         self.mail.validate()?;
         self.engagement.validate()?;
         ensure!(

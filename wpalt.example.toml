@@ -133,3 +133,17 @@ batch_sources = 8
 batch_seconds = 5
 lease_seconds = 120
 retention_seconds = 604800
+
+# Optional owner-hosted private attachment scanning. Unix hosts only.
+[attachment_scanning]
+enabled = false
+socket = "" # Absolute ClamAV Unix socket; daemon permission/signatures are operator-owned.
+deadline_seconds = 5 # Complete INSTREAM operation, 1..15.
+concurrency = 2 # Per application process, 1..8; scanner/global capacity needs host policy.
+
+# Optional exact-byte response-document attestations. See private-documents.md.
+[documents]
+enabled = false
+key_file = "" # Absolute private Ed25519 PKCS#8 file created by `document-key`.
+pdf_enabled = false
+chromium = "" # Absolute optional owner-installed Chromium/headless-shell executable.

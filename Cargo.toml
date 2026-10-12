@@ -42,7 +42,7 @@ base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "avif"] }
 quick-xml = "0.42.0"
-rustix = { version = "1.1", features = ["fs"] }
+rustix = { version = "1.1", features = ["fs", "process"] }
 html5ever = "0.39"
 markup5ever_rcdom = "0.39"
 read-fonts = { version = "=0.45.0", default-features = false, features = ["std"] }

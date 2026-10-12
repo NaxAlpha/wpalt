@@ -104,6 +104,7 @@ pub(crate) fn executable_identity() -> Result<String> {
 }
 
 pub struct Coordinator {
+    pub(crate) documents: Arc<crate::business::documents::Authority>,
     directory: PathBuf,
     fingerprint: String,
     pub admission: tokio::sync::Semaphore,
@@ -166,7 +167,10 @@ fn replace(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 impl Coordinator {
     pub fn new(c: &Config) -> Result<Self> {
+        let documents = Arc::new(crate::business::documents::Authority::load(&c.documents)?);
         let mut value = serde_json::to_value(c).map_err(|_| unavailable())?;
+        value["document_public_key_sha256"] =
+            serde_json::to_value(documents.identity()).map_err(|_| unavailable())?;
         value["listen"] = serde_json::Value::Null;
         value["debug"] = serde_json::Value::Null;
         value["runtime_version"] = env!("CARGO_PKG_VERSION").into();
@@ -183,6 +187,7 @@ impl Coordinator {
             serde_json::to_value(std::fs::canonicalize(&c.data_dir).map_err(|_| unavailable())?)
                 .map_err(|_| unavailable())?;
         Ok(Self {
+            documents,
             directory: c.data_dir.clone(),
             fingerprint: auth::digest(&serde_json::to_vec(&value).map_err(|_| unavailable())?),
             admission: tokio::sync::Semaphore::new(c.request_concurrency),

@@ -104,9 +104,9 @@ Verifiable future outcome: Server and UI agree on calculations and visibility; e
 
 Origin: **M4** · Catalog: **F041/F043** · Status: **active under [D11 contract](d11-contract.md); delivery not complete**
 
-Optional isolated malware scanning, cryptographic signature/identity integrations and generated signed-document artifacts.
+Defined local D11 implementation: owner-hosted fail-closed ClamAV private admission/download policy, frozen response printable HTML/optional local PDF and exact-byte Ed25519 server attestations with independent verification. Local evidence is in [D11 verification](evidence/d11-verification.md); final-source CI/public delivery remain pending. Certified respondent identity, qualified/legal/PAdES signatures and real identity/provider interoperability remain explicit external follow-ups.
 
-Verifiable future outcome: Untrusted files remain private/quarantined; identity and cryptographic claims require real provider/standard evidence.
+Verifiable outcome: refused uploads issue no file/quota/capability; current scanning governs private downloads. Original frozen statements/attachment digests survive fresh recovery and exact artifacts refuse tampering/wrong trusted keys. Server attestation never upgrades a typed declaration into certified identity.
 
 ### D12 — Offline and resumable workflows
 

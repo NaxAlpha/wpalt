@@ -26,6 +26,7 @@ pub fn routes(app: &App) -> Router<App> {
     Router::new()
         .merge(super::native_forms::routes())
         .merge(super::surveys_web::routes())
+        .merge(super::documents_web::routes())
         .merge(super::audience_web::routes())
         .merge(super::workflows_web::routes())
         .merge(super::registration_web::routes())
@@ -286,7 +287,7 @@ async fn public(
         .map_err(|_| Error::invalid("Stored form requires repair."))?;
     let settings = app.db.settings().await?;
     if embed.embedded {
-        return Ok(Html(html!{(maud::DOCTYPE)html lang="en"{head{meta charset="utf-8";meta name="viewport" content="width=device-width, initial-scale=1";title {(definition.form.title)}link rel="stylesheet" href="/assets/app.css";}body class=(format!("{} embedded-form",settings.theme)){main{h1 {(definition.form.title)}div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) data-spam=(if app.config.spam.enabled {"true"} else {"false"}){p{"Loading form…"}noscript{a href=(format!("/forms/{id}/native")){"Use the server-rendered form"}}}}script defer src="/assets/forms.js"{}script defer src="/assets/form-embed.js"{}}}}.into_string()));
+        return Ok(Html(html!{(maud::DOCTYPE)html lang="en"{head{meta charset="utf-8";meta name="viewport" content="width=device-width, initial-scale=1";title {(definition.form.title)}link rel="stylesheet" href="/assets/app.css";}body class=(format!("{} embedded-form",settings.theme)){main{h1 {(definition.form.title)}div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) data-scanning=(if app.config.attachment_scanning.enabled {"true"} else {"false"}) data-spam=(if app.config.spam.enabled {"true"} else {"false"}){p{"Loading form…"}noscript{a href=(format!("/forms/{id}/native")){"Use the server-rendered form"}}}}script defer src="/assets/forms.js"{}script defer src="/assets/form-embed.js"{}}}}.into_string()));
     }
     Ok(Html(view::layout(
         &definition.form.title,
@@ -295,7 +296,7 @@ async fn public(
         html! {
             h1 {(definition.form.title)}
             (super::engagement::markup(&settings,false))
-            div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) data-spam=(if app.config.spam.enabled {"true"} else {"false"}) {p {"Loading form…"}noscript {a href=(format!("/forms/{id}/native")) {"Use the server-rendered form"}}}
+            div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) data-scanning=(if app.config.attachment_scanning.enabled {"true"} else {"false"}) data-spam=(if app.config.spam.enabled {"true"} else {"false"}) {p {"Loading form…"}noscript {a href=(format!("/forms/{id}/native")) {"Use the server-rendered form"}}}
             script defer src="/assets/forms.js" {}
         },
     )))
@@ -424,6 +425,7 @@ async fn entry(
         html! {
             (view::heading("Business", &publication.form.title, "A preserved response to the published form."))
             p {a href=(format!("/admin/forms/{id}/entries")) {"All responses"} " · version " (row.get::<i64,_>("form_version"))}
+            (super::documents_web::controls(&app,&session,&id,&entry))
             section class="panel" {h2 {"Follow up"} form method="post" {(view::csrf(&session)) input type="hidden" name="version" value=(version); label {"Private notes" textarea name="notes" maxlength="8000" {(notes)}} label {"Assigned to" select name="assignee" {option value="" {"Unassigned"} @for person in editors {option value=(person.get::<String,_>("id")) selected[person.get::<String,_>("id")==assignee] {(person.get::<String,_>("name"))}}}} button {"Save follow-up"}}}
             section class="panel" {
                 @for field in &publication.form.fields {
@@ -490,6 +492,8 @@ async fn attachment_download(
     {
         return Err(Error::invalid("Attachment integrity check failed."));
     }
+    super::attachment_scanning::scan(&app, &data).await?;
+    editor_session(&app, &headers).await?;
     Ok((
         [
             (header::CONTENT_TYPE, "application/octet-stream"),

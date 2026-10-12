@@ -65,6 +65,14 @@ async function freePort() {
     process.env.WPALT_VIDEO_TOOL_VERSION = spawnSync(ffmpeg,["-version"],{encoding:"utf8"}).stdout.split("\n")[0];
     process.env.WPALT_VIDEO_FIXTURE = fixture;
   }
+  let documentTrust;
+  if (process.env.WPALT_DOCUMENTS_ONLY) {
+    const key=path.join(temporary,"document-signing.pk8");
+    documentTrust=JSON.parse(command(config,["document-key",key])).public_key_sha256;
+    const scanner=process.env.WPALT_TEST_CLAMD_SOCKET, renderer=process.env.WPALT_TEST_PDF_CHROMIUM;
+    assert(scanner && renderer,"Document journey requires an actual isolated scanner and renderer");
+    fs.appendFileSync(config,`\n[attachment_scanning]\nenabled=true\nsocket=${JSON.stringify(scanner)}\n[documents]\nenabled=true\nkey_file=${JSON.stringify(key)}\npdf_enabled=true\nchromium=${JSON.stringify(renderer)}\n`);
+  }
   command(
     config,
     ["init", "--admin-email", "owner@example.test"],
@@ -139,6 +147,7 @@ async function freePort() {
   if (process.env.WPALT_INTERFACE_ONLY) { await require('./interface_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_LANGUAGE_ONLY) { await require('./language_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_EDITORIAL_ONLY) { await require('./editorial_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
+  if (process.env.WPALT_DOCUMENTS_ONLY) {await require('./attested_documents_acceptance.cjs')(owner,publicContext,origin,output,{binary,trust:documentTrust});assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);const file=path.join(output,'d11-attested-documents.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.binary_sha256=crypto.createHash('sha256').update(fs.readFileSync(binary)).digest('hex');if(localFixture)report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));return;}
   if (process.env.WPALT_ADVANCED_FORMS_ONLY) {await require('./advanced_forms_acceptance.cjs')(owner,publicContext,origin,output);assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);const file=path.join(output,'d10-advanced-forms.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.binary_sha256=crypto.createHash('sha256').update(fs.readFileSync(binary)).digest('hex');if(localFixture)report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));return;}
   if (process.env.WPALT_INSIGHTS_ONLY) {await require('./editorial_insights_acceptance.cjs')(owner,publicContext,origin,output);assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);{const file=path.join(output,'d09-editorial-insights.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.binary_sha256=crypto.createHash('sha256').update(fs.readFileSync(binary)).digest('hex');if(localFixture)report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return;}
   if (process.env.WPALT_REDIRECT_LINKS_ONLY) { await require('./redirect_links_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d08-redirect-links.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }

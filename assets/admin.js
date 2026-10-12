@@ -128,3 +128,74 @@ for (const form of document.querySelectorAll('[data-privacy-submit]')) {
     finally{busy=false;submit.disabled=false;form.removeAttribute('aria-busy');}
   });
 }
+
+// Private document preparation preserves the page and verifies before extraction.
+for (const form of document.querySelectorAll('[data-attested-document]')) {
+  const button = form.querySelector('button');
+  const status = form.querySelector('[data-document-status]');
+  const downloads = form.querySelector('[data-document-downloads]');
+  const format = form.elements.namedItem('kind');
+  const urls = [];
+  let busy = false;
+  const clear = () => {
+    for (const url of urls.splice(0)) URL.revokeObjectURL(url);
+    downloads.replaceChildren();downloads.hidden = true;
+  };
+  window.addEventListener('pagehide', clear);
+  form.addEventListener('submit', async event => {
+    if (!globalThis.crypto?.subtle) return;
+    event.preventDefault();if (busy) return;
+    const body = new URLSearchParams(new FormData(form));
+    busy = true;button.disabled = true;format.disabled = true;form.setAttribute('aria-busy','true');clear();
+    status.hidden = false;status.className = 'notice';status.setAttribute('role','status');
+    status.textContent = 'Preparing and checking your private document…';
+    const abort = new AbortController();const timer = setTimeout(() => abort.abort(),45000);
+    try {
+      const response = await fetch(form.action,{method:'POST',body,credentials:'same-origin',redirect:'error',signal:abort.signal,headers:{Accept:'application/json'}});
+      const reader = response.body.getReader();const chunks = [];let length = 0;
+      try {
+        for (;;) {
+          const {value,done} = await reader.read();if (done) break;
+          length += value.length;if (length > 12*1024*1024) throw new Error('Document response exceeds its byte limit.');chunks.push(value);
+        }
+      } finally {await reader.cancel().catch(() => {});}
+      const raw = new Uint8Array(length);let offset = 0;for (const chunk of chunks) {raw.set(chunk,offset);offset += chunk.length;}
+      const bundle = JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));
+      if (!response.ok) throw new Error(typeof bundle.error === 'string' ? bundle.error : 'Document preparation failed.');
+      const invalid = () => new Error('Document verification failed. No artifact was extracted.');
+      const hex = bytes => Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join('');
+      const unhex = (value,size) => {
+        if (typeof value !== 'string' || !new RegExp(`^[0-9a-f]{${size*2}}$`).test(value)) throw invalid();
+        return Uint8Array.from(value.match(/../g),x=>parseInt(x,16));
+      };
+      const decode = (value,limit) => {
+        if (typeof value !== 'string' || value.length > Math.ceil(limit/3)*4) throw invalid();
+        const bytes = Uint8Array.from(atob(value),x=>x.charCodeAt(0));if(bytes.length>limit)throw invalid();return bytes;
+      };
+      if(bundle.format !== 'wpalt-attested-document-bundle-v1')throw invalid();
+      const publicKey = unhex(bundle.public_key,32), signature = unhex(bundle.signature,64);
+      if(hex(new Uint8Array(await crypto.subtle.digest('SHA-256',publicKey))) !== form.dataset.attestedDocument)throw invalid();
+      const manifestBytes = decode(bundle.manifest,256*1024);
+      const domain = new TextEncoder().encode('wpalt-response-document-attestation-v1\0');
+      const message = new Uint8Array(domain.length+manifestBytes.length);message.set(domain);message.set(manifestBytes,domain.length);
+      const key = await crypto.subtle.importKey('raw',publicKey,{name:'Ed25519'},false,['verify']);
+      if(!await crypto.subtle.verify('Ed25519',key,signature,message))throw invalid();
+      const manifest = JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(manifestBytes));
+      const artifact = decode(bundle.artifact,8*1024*1024);
+      if(manifest.source?.form_id !== form.dataset.documentForm || manifest.source?.entry_id !== form.dataset.documentEntry || manifest.media_type !== (body.get('kind') === 'pdf' ? 'application/pdf':'text/html') || manifest.format !== 'wpalt-response-document-v1' || !['text/html','application/pdf'].includes(manifest.media_type) || manifest.authority !== 'Server attestation only; respondent identity is unverified.' || !artifact.length || artifact.length !== manifest.artifact_bytes || hex(new Uint8Array(await crypto.subtle.digest('SHA-256',artifact))) !== manifest.artifact_sha256)throw invalid();
+      const addDownload = (bytes,type,name,label) => {
+        const link = document.createElement('a');link.href = URL.createObjectURL(new Blob([bytes],{type}));urls.push(link.href);
+        link.download = name;link.textContent = label;downloads.append(link);
+      };
+      const pdf = manifest.media_type === 'application/pdf';
+      addDownload(artifact,manifest.media_type,pdf?'response.pdf':'response.html',pdf?'Download PDF':'Download HTML');
+      addDownload(raw,'application/json','response-document.json','Download verification bundle');
+      downloads.hidden = false;status.textContent = 'Document checked against this site’s configured key. Keep both downloads. Respondent identity remains unverified.';
+    } catch (error) {
+      clear();status.className = 'notice error';status.setAttribute('role','alert');
+      status.textContent = error.name === 'AbortError' ? 'Document preparation timed out. Your response and format choice remain here.' : (error.message || 'Document preparation failed. Your response remains here.');
+    } finally {
+      clearTimeout(timer);busy = false;button.disabled = false;format.disabled = false;form.removeAttribute('aria-busy');
+    }
+  });
+}
