@@ -689,6 +689,26 @@ async fn route_on(
     {
         return Ok(RouteState::Public(None));
     }
+    // Both form surfaces are real public routes. Their server-rendered answers
+    // are not publication graph sources, so fragment inspection remains unscanned.
+    if app.config.business_enabled
+        && let Some(rest) = path.strip_prefix("/forms/")
+    {
+        let id = rest.strip_suffix("/native").unwrap_or(rest);
+        if uuid::Uuid::parse_str(id).is_ok() && !id.contains('/') {
+            let published: Option<i64> = sqlx::query_scalar(
+                "SELECT published_version FROM business_forms WHERE id=$1 AND published_version>0",
+            )
+            .bind(id)
+            .fetch_optional(&mut *connection)
+            .await?;
+            return Ok(if published.is_some() {
+                RouteState::Public(None)
+            } else {
+                RouteState::Missing
+            });
+        }
+    }
     if app.config.commerce.enabled {
         if path == "/shop" {
             return Ok(RouteState::Public(None));

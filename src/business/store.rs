@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS business_forms(id TEXT PRIMARY KEY,owner_id TEXT NOT 
 CREATE INDEX IF NOT EXISTS business_forms_updated ON business_forms(updated_at DESC,id DESC);
 CREATE TABLE IF NOT EXISTS form_publications(form_id TEXT NOT NULL REFERENCES business_forms(id),version BIGINT NOT NULL,definition TEXT NOT NULL,created_at BIGINT NOT NULL,PRIMARY KEY(form_id,version));
 CREATE TABLE IF NOT EXISTS form_entries(id TEXT PRIMARY KEY,form_id TEXT NOT NULL REFERENCES business_forms(id),request_key TEXT NOT NULL,request_hash TEXT NOT NULL,form_version BIGINT NOT NULL,values_json TEXT NOT NULL,created_at BIGINT NOT NULL,UNIQUE(form_id,request_key),FOREIGN KEY(form_id,form_version) REFERENCES form_publications(form_id,version));
+CREATE INDEX IF NOT EXISTS form_entries_cohort ON form_entries(form_id,form_version,created_at,id);
 CREATE INDEX IF NOT EXISTS form_entries_recent ON form_entries(form_id,created_at DESC,id DESC);
 "#;
 

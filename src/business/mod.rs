@@ -10,9 +10,13 @@ pub mod engagement_web;
 pub mod entries;
 pub mod forms;
 pub mod mail;
+pub mod native_forms;
 pub mod promotions;
 pub mod promotions_web;
+pub mod rules;
 pub mod store;
+pub mod surveys;
+pub mod surveys_web;
 pub mod web;
 
 pub mod workflows;

@@ -1,0 +1,140 @@
+{
+  "status": "passed",
+  "browser": "155.0.8059.39",
+  "geometry": [
+    {
+      "surface": "composer",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "composer",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "composer",
+      "viewport": 1440,
+      "document_width": 1440
+    },
+    {
+      "surface": "working-preview",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "working-preview",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "working-preview",
+      "viewport": 1440,
+      "document_width": 1440
+    },
+    {
+      "surface": "notification-routing",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "notification-routing",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "notification-routing",
+      "viewport": 1440,
+      "document_width": 1440
+    },
+    {
+      "surface": "public-calculator",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "public-calculator",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "public-calculator",
+      "viewport": 1440,
+      "document_width": 1440
+    },
+    {
+      "surface": "versioned-report",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "versioned-report",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "versioned-report",
+      "viewport": 1440,
+      "document_width": 1440
+    }
+  ],
+  "accessibility": [
+    {
+      "surface": "composer",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 24
+    },
+    {
+      "surface": "working-preview",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 29
+    },
+    {
+      "surface": "notification-routing",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 27
+    },
+    {
+      "surface": "public-calculator",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 22
+    },
+    {
+      "surface": "versioned-report",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 22
+    }
+  ],
+  "assertions": [
+    "Visual recursive calculator and all-rules composer save actual typed structure; private working preview is invalidated by edits and records no response",
+    "Actual public calculator and no-JavaScript canonical submission share visibility and arithmetic; reports exclude private response text and distinguish skipped answers",
+    "Private versioned HTML/JSON/CSV require permission; invalid CSRF cannot invoke working preview"
+  ],
+  "errors": [],
+  "binary_sha256": "c46046618844033c5f821817f2dd85ea7f207aeb9331be09aec1ecc7cda799ef",
+  "additional_verified_cases": [
+    "Near-tie rounding agrees in browser and canonical server preview",
+    "Actual saved message recovery synchronizes valid rules, refuses malformed rules, and allows deliberate recomposition",
+    "JavaScript-disabled number control accepts 01.0 and reports canonical 1"
+  ],
+  "local_processes": {
+    "processes": 2,
+    "workers": 1,
+    "worker_ready": true,
+    "routing": "round-robin-no-retry-no-stickiness",
+    "requests_by_node": [
+      42,
+      42
+    ]
+  }
+}

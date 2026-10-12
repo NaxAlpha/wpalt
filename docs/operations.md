@@ -1,6 +1,6 @@
 # Running and recovering wpalt
 
-Current D09 development uses native schema23 / portable recoveryv18. D08 actual main and its public release are independently verified in [the delivery receipt](evidence/d08-main-release.json). Older sites need a reviewed stopped upgrade and the retained original executable/configuration/recovery key; portable archive conversion is separate from ordinary restore. D09 preserves thev18 grammar and excludes derived editorial caches from recovery. See [current upgrade guidance](distributed-operations.md#d09-derived-analysis-boundary) and [editorial operations](editorial-insights.md). D09 exact-source delivery gates remain pending.
+D10 development uses native schema24 / portable recoveryv19 for composable forms and survey reporting. D09 native23/v18 is delivered and its actual-main/public release is independently verified in [the delivery receipt](evidence/d09-main-release.json). Older sites need a reviewed stopped upgrade and the retained original executable/configuration/recovery key; portable archive conversion is separate from ordinary restore. D10 delivery verification is in progress; do not infer full survey-plugin parity. See [D10 contract](d10-contract.md) for grammar, comparison correction, preservation and work budgets. Existing derived editorial caches remain excluded from portable recovery.
 
 ## Build and initialize
 

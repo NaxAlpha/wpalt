@@ -1,0 +1,94 @@
+{
+  "profile": "debug",
+  "binary_sha256": "a08f5428fef4a6a85d842baa91e13dd21262d52a43f233af62b4bef0a43401c9",
+  "binary_bytes": 121654536,
+  "scope": "2,000 real serial canonical HTTP collections, four fields with nested arithmetic/conditional private answers; single database connection. Five warmups/30 measured serial reports/previews, with debug SQL logging enabled even in release. Warm RSS sample is not peak memory or per-feature attribution; PostgreSQL process memory excluded. No throughput/TLS/CWV/WordPress efficiency/SLA claim.",
+  "observations": [
+    {
+      "engine": "sqlite",
+      "actual_http_responses": 2000,
+      "canonical_value_bytes": 140000,
+      "fields": 4,
+      "report": {
+        "samples": 30,
+        "p50_ms": 33.879,
+        "p95_ms": 35.128,
+        "max_ms": 152.564
+      },
+      "working_preview": {
+        "samples": 30,
+        "p50_ms": 11.593,
+        "p95_ms": 12.183,
+        "max_ms": 13.273
+      },
+      "serial_collection": {
+        "samples": 2000,
+        "p50_ms": 1.79,
+        "p95_ms": 2.638,
+        "max_ms": 10.978
+      },
+      "report_selects": 4,
+      "report_select_shapes": [
+        "SELECT definition FROM form_publications \u2026",
+        "SELECT u.id,u.email,u.name,u.role,s.csrf,COALESCE(p.locale,'en') AS interface_locale \u2026",
+        "SELECT values_json FROM form_entries \u2026"
+      ],
+      "cohort_query_plan": [
+        [
+          5,
+          0,
+          126,
+          "SEARCH form_entries USING INDEX form_entries_cohort (form_id=? AND form_version=? AND created_at>? AND created_at<?)"
+        ]
+      ],
+      "empty_future_cohort_query_plan": [
+        [
+          5,
+          0,
+          45,
+          "SEARCH form_entries USING INDEX form_entries_cohort (form_id=? AND form_version=? AND created_at>? AND created_at<?)"
+        ]
+      ],
+      "warm_application_rss_bytes": 65290240,
+      "database_bytes": 7536528,
+      "database_scope": "SQLite DB/WAL/SHM",
+      "debug_secret_and_answer_redaction": true
+    },
+    {
+      "engine": "postgres",
+      "actual_http_responses": 2000,
+      "canonical_value_bytes": 140000,
+      "fields": 4,
+      "report": {
+        "samples": 30,
+        "p50_ms": 35.323,
+        "p95_ms": 36.496,
+        "max_ms": 36.617
+      },
+      "working_preview": {
+        "samples": 30,
+        "p50_ms": 10.671,
+        "p95_ms": 12.235,
+        "max_ms": 14.01
+      },
+      "serial_collection": {
+        "samples": 2000,
+        "p50_ms": 1.82,
+        "p95_ms": 2.611,
+        "max_ms": 8.535
+      },
+      "report_selects": 4,
+      "report_select_shapes": [
+        "SELECT definition FROM form_publications \u2026",
+        "SELECT u.id,u.email,u.name,u.role,s.csrf,COALESCE(p.locale,'en') AS interface_locale \u2026",
+        "SELECT values_json FROM form_entries \u2026"
+      ],
+      "cohort_query_plan": "Limit  (cost=223.66..228.66 rows=2000 width=116) (actual time=1.634..1.762 rows=2000 loops=1)\n  Buffers: shared hit=80\n  ->  Sort  (cost=223.66..228.66 rows=2000 width=116) (actual time=1.633..1.678 rows=2000 loops=1)\n        Sort Key: created_at, id\n        Sort Method: quicksort  Memory: 439kB\n        Buffers: shared hit=80\n        ->  Seq Scan on form_entries  (cost=0.00..114.00 rows=2000 width=116) (actual time=0.005..0.351 rows=2000 loops=1)\n              Filter: ((created_at >= 0) AND (created_at < '9223372036854775807'::bigint) AND (form_id = '61bafe18-9c58-459e-9771-5eb482bc3122'::text) AND (form_version = 2))\n              Buffers: shared hit=74\nPlanning:\n  Buffers: shared hit=220\nPlanning Time: 0.366 ms\nExecution Time: 1.830 ms",
+      "empty_future_cohort_query_plan": "Limit  (cost=0.28..8.30 rows=1 width=116) (actual time=0.011..0.011 rows=0 loops=1)\n  Buffers: shared hit=2\n  ->  Index Scan Backward using form_entries_recent on form_entries  (cost=0.28..8.30 rows=1 width=116) (actual time=0.010..0.010 rows=0 loops=1)\n        Index Cond: ((form_id = '61bafe18-9c58-459e-9771-5eb482bc3122'::text) AND (created_at >= '4070908800'::bigint) AND (created_at < '9223372036854775807'::bigint))\n        Filter: (form_version = 2)\n        Buffers: shared hit=2\nPlanning:\n  Buffers: shared hit=216\nPlanning Time: 0.440 ms\nExecution Time: 0.022 ms",
+      "warm_application_rss_bytes": 60112896,
+      "database_bytes": 6062080,
+      "database_scope": "All fixture PostgreSQL relations/indexes; database process memory excluded",
+      "debug_secret_and_answer_redaction": true
+    }
+  ]
+}

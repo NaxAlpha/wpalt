@@ -1087,7 +1087,7 @@ pub fn safe_filename(name: &str) -> bool {
         && !name.contains('\\')
 }
 pub async fn capture(app: &App) -> Result<Vec<u8>> {
-    capture_format(app, 18).await
+    capture_format(app, 19).await
 }
 /// Only the stopped maintenance path may capture the original pre-change graph.
 pub(crate) async fn capture_maintenance(app: &App) -> Result<Vec<u8>> {
@@ -1108,8 +1108,10 @@ pub(crate) async fn capture_maintenance(app: &App) -> Result<Vec<u8>> {
             16
         } else if installed < 22 {
             17
-        } else {
+        } else if installed < 24 {
             18
+        } else {
+            19
         },
     )
     .await
@@ -1256,14 +1258,14 @@ fn validate(config: &crate::config::Config, encoded: &[u8]) -> Result<Snapshot> 
     }
     let envelope: Envelope =
         serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid backup envelope."))?;
-    if envelope.format != "wpalt-backup-v18"
+    if envelope.format != "wpalt-backup-v19"
         || digest(envelope.payload.as_bytes()) != envelope.sha256
     {
         return Err(Error::invalid("Backup checksum or format is invalid."));
     }
     let snapshot: Snapshot = serde_json::from_str(&envelope.payload)
         .map_err(|_| Error::invalid("Invalid backup payload."))?;
-    if snapshot.schema != 18
+    if snapshot.schema != 19
         || snapshot.tables.len() != TABLES.len()
         || TABLES
             .iter()
@@ -2599,6 +2601,110 @@ pub fn migrate_v17(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec
         payload,
     })
     .map_err(|_| Error::invalid("Cannot encode v18 graph."))?;
+    migrate_v18(config, &output)
+}
+/// Explicit old-content conversion. Runtime and ordinary restore accept only v19.
+pub fn migrate_v18(config: &crate::config::Config, encoded: &[u8]) -> Result<Vec<u8>> {
+    if encoded.len() > config.max_backup_bytes {
+        return Err(Error::invalid("Archive exceeds configured budget."));
+    }
+    let envelope: Envelope =
+        serde_json::from_slice(encoded).map_err(|_| Error::invalid("Invalid v18 envelope."))?;
+    if envelope.format != "wpalt-backup-v18"
+        || digest(envelope.payload.as_bytes()) != envelope.sha256
+    {
+        return Err(Error::invalid("Invalid v18 format/checksum."));
+    }
+    let mut snapshot: Snapshot = serde_json::from_str(&envelope.payload)
+        .map_err(|_| Error::invalid("Invalid v18 graph."))?;
+    if snapshot.schema != 18
+        || snapshot.tables.len() != TABLES.len()
+        || TABLES
+            .iter()
+            .any(|(name, _)| !snapshot.tables.contains_key(*name))
+    {
+        return Err(Error::invalid(
+            "Archive is not an unmigrated v18 table set.",
+        ));
+    }
+    // Do not admit a current grammar disguised with an older format number.
+    fn old_form(value: &Value) -> Result<()> {
+        let form = value.get("form").unwrap_or(value);
+        let fields = form
+            .get("fields")
+            .and_then(Value::as_array)
+            .ok_or_else(|| Error::invalid("Invalid original form grammar."))?;
+        let old_condition = |condition: &Value| {
+            condition.is_null()
+                || matches!(
+                    condition.get("operation").and_then(Value::as_str),
+                    Some("Equal" | "Present")
+                )
+        };
+        for field in fields {
+            if field
+                .get("visible_when")
+                .is_some_and(|condition| !old_condition(condition))
+                || field.get("calculation").is_some_and(|calculation| {
+                    !calculation.is_null()
+                        && !matches!(
+                            calculation.get("operation").and_then(Value::as_str),
+                            Some("Sum" | "Product" | "Score")
+                        )
+                })
+            {
+                return Err(Error::invalid(
+                    "Original v18 recovery cannot contain newer form rules.",
+                ));
+            }
+        }
+        if form
+            .get("notifications")
+            .and_then(Value::as_array)
+            .is_some_and(|notifications| {
+                notifications.iter().any(|notification| {
+                    notification
+                        .get("when")
+                        .is_some_and(|condition| !old_condition(condition))
+                })
+            })
+        {
+            return Err(Error::invalid(
+                "Original v18 recovery cannot contain newer notification rules.",
+            ));
+        }
+        Ok(())
+    }
+    for (table, columns) in [
+        ("business_forms", &["draft", "live"][..]),
+        ("form_publications", &["definition"][..]),
+    ] {
+        for row in &snapshot.tables[table] {
+            for column in columns {
+                let raw = row
+                    .get(*column)
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| Error::invalid("Invalid original form snapshot."))?;
+                if !raw.is_empty() {
+                    old_form(
+                        &serde_json::from_str(raw)
+                            .map_err(|_| Error::invalid("Invalid original form snapshot."))?,
+                    )?;
+                }
+            }
+        }
+    }
+    snapshot.schema = 19;
+    let payload = serde_json::to_string(&snapshot)
+        .map_err(|_| Error::invalid("Cannot convert v18 graph."))?;
+    let output = serde_json::to_vec(&Envelope {
+        format: "wpalt-backup-v19".into(),
+        sha256: digest(payload.as_bytes()),
+        payload,
+    })
+    .map_err(|_| Error::invalid("Cannot encode v19 graph."))?;
+    // Unchanged historical answers must remain canonical under the corrected
+    // numeric comparison policy; never infer or rewrite missing answers.
     validate(config, &output)?;
     Ok(output)
 }
@@ -2612,6 +2718,7 @@ pub(crate) fn inspect_maintenance(config: &crate::config::Config, encoded: &[u8]
         "wpalt-backup-v15" => 15,
         "wpalt-backup-v16" => 16,
         "wpalt-backup-v17" => 17,
+        "wpalt-backup-v18" => 18,
         _ => return inspect(config, encoded),
     };
     let converted = if source == 12 {
@@ -2624,14 +2731,18 @@ pub(crate) fn inspect_maintenance(config: &crate::config::Config, encoded: &[u8]
         migrate_v15(config, encoded)?
     } else if source == 16 {
         migrate_v16(config, encoded)?
-    } else {
+    } else if source == 17 {
         migrate_v17(config, encoded)?
+    } else {
+        migrate_v18(config, encoded)?
     };
     let mut report = inspect(config, &converted)?;
     report["schema"] = source.into();
     if let Some(tables) = report["tables"].as_object_mut() {
-        tables.remove("redirect_policy");
-        tables.remove("missing_paths");
+        if source < 18 {
+            tables.remove("redirect_policy");
+            tables.remove("missing_paths");
+        }
         if source < 15 {
             tables.remove("theme_assets");
             tables.remove("theme_asset_references");

@@ -1,0 +1,79 @@
+{
+  "profile": "release",
+  "binary_sha256": "2ac0a2c941e6ef53dc7de8f0365b3140ab5c14210bcafb76148c590d386d21c7",
+  "binary_bytes": 40581864,
+  "scope": "1004 seeded posts plus about publication and language home; actual single-connection database, real first embedded-worker cycle and restarted HTTP application, finite manual native batches, five warmups/30 serial selected-copy requests. Debug SQL logging enabled even for a release executable. RSS is a warm process sample, neither peak nor per-feature attribution; PostgreSQL process memory excluded. No throughput, TLS, CWV, universal latency or WordPress efficiency claim. Byte budgets describe serialized data, not on-disk or peak allocations.",
+  "observations": [
+    {
+      "engine": "sqlite",
+      "publications": 1005,
+      "sources": 1006,
+      "edges": 8067,
+      "html_bytes": 3842416,
+      "serialized_derived_bytes": 3121005,
+      "resumed_after_normal_worker_batch": true,
+      "normal_worker_stage_sources": 32,
+      "debug_secret_and_focus_redaction": true,
+      "first_http_batches": {
+        "samples": 63,
+        "p50_ms": 19.547,
+        "p95_ms": 140.541,
+        "max_ms": 153.017
+      },
+      "identical_html_reuse_batches": {
+        "samples": 64,
+        "p50_ms": 35.241,
+        "p95_ms": 143.316,
+        "max_ms": 150.278
+      },
+      "individual_public_insight": {
+        "samples": 30,
+        "p50_ms": 5.027,
+        "p95_ms": 5.55,
+        "max_ms": 9.119
+      },
+      "batch_queries": {
+        "first_observed_batch_selects": 394,
+        "distinct_select_shapes": [
+          "SELECT '' AS id,field_schema \u2026",
+          "SELECT COUNT(*) FROM analysis_jobs \u2026",
+          "SELECT COUNT(*) FROM member_resources \u2026",
+          "SELECT COUNT(*) FROM users \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT id FROM posts \u2026",
+          "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+          "SELECT id,state,epoch,version,cursor,total,html_bytes,facts_bytes,edge_count,reused FROM analysis_jobs \u2026",
+          "SELECT live_options FROM site_design \u2026",
+          "SELECT name,body FROM comments \u2026",
+          "SELECT ordinal,path,locale,slug FROM analysis_pages \u2026",
+          "SELECT p.text,p.ids,p.links FROM analysis_pages \u2026",
+          "SELECT package FROM theme_revisions \u2026",
+          "SELECT published_version,version FROM themes \u2026",
+          "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+          "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+          "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+          "SELECT u.id,u.email,u.name,u.role,s.csrf,COALESCE(p.locale,'en') AS interface_locale \u2026",
+          "SELECT version FROM analysis_epoch \u2026"
+        ],
+        "phase": "rendering"
+      },
+      "cursor_query_plan": [
+        [
+          5,
+          0,
+          0,
+          "SEARCH analysis_pages USING INDEX sqlite_autoindex_analysis_pages_1 (job_id=? AND ordinal>?)"
+        ]
+      ],
+      "retained_runs": 2,
+      "reused_sources": 1006,
+      "warm_application_rss_before_analysis_bytes": 44351488,
+      "warm_application_rss_after_analysis_bytes": 51683328,
+      "database_bytes": 30380880,
+      "derived_postgres_relations_bytes": null,
+      "database_scope": "SQLite DB/WAL/SHM"
+    }
+  ],
+  "delivery_source_commit": "328c302317ce7767392bbf366c269c79445c1f63",
+  "delivery_ci_run": 38197348806
+}

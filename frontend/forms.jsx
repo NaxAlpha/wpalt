@@ -1,3 +1,5 @@
+import { ConditionEditor, ExpressionEditor } from "./form-rules-editor.jsx";
+import { evaluated } from "./form-rules.mjs";
 import { h, render, Fragment } from "preact";
 import { proof } from "./spam.mjs";
 import { useEffect, useState, useRef } from "preact/hooks";
@@ -526,71 +528,12 @@ function Designer({ host }) {
             </fieldset>
           )}
           <Disclosure summary="Visibility and calculation">
-            <Select
-              label="Show when a previous field has a value"
-              value={item.visible_when?.field || ""}
-              onChange={(event) =>
-                field(index, {
-                  visible_when: event.currentTarget.value
-                    ? { operation: "Present", field: event.currentTarget.value }
-                    : null,
-                })
-              }
-            >
-              <option value="">Always visible</option>
-              {definition.fields.slice(0, index).map((previous) => (
-                <option value={previous.name}>
-                  {previous.schema.label || previous.name}
-                </option>
-              ))}
-            </Select>
-            {item.visible_when && (
-              <Select
-                label="Condition"
-                value={item.visible_when.operation}
-                onChange={(event) =>
-                  field(index, {
-                    visible_when:
-                      event.currentTarget.value === "Equal"
-                        ? {
-                            operation: "Equal",
-                            field: item.visible_when.field,
-                            value: true,
-                          }
-                        : {
-                            operation: "Present",
-                            field: item.visible_when.field,
-                          },
-                  })
-                }
-              >
-                <option value="Present">Has a value</option>
-                <option value="Equal">Equals a value</option>
-              </Select>
-            )}
-            {item.visible_when?.operation === "Equal" && (
-              <Field
-                label="Value to match"
-                value={String(item.visible_when.value)}
-                onInput={(event) => {
-                  const kind = definition.fields.find(
-                    (previous) => previous.name === item.visible_when.field,
-                  )?.schema.kind;
-                  const raw = event.currentTarget.value;
-                  field(index, {
-                    visible_when: {
-                      ...item.visible_when,
-                      value:
-                        kind === "boolean"
-                          ? raw === "true"
-                          : kind === "number"
-                            ? Number(raw)
-                            : raw,
-                    },
-                  });
-                }}
-              />
-            )}
+            <ConditionEditor
+              value={item.visible_when || null}
+              fields={definition.fields.slice(0, index)}
+              optional
+              update={(visible_when) => field(index, { visible_when })}
+            />
             {item.schema.kind === "number" && (
               <>
                 <Select
@@ -599,7 +542,12 @@ function Designer({ host }) {
                   onChange={(event) =>
                     field(index, {
                       calculation: event.currentTarget.value
-                        ? { operation: event.currentTarget.value, fields: [] }
+                        ? event.currentTarget.value === "Expression"
+                          ? {
+                              operation: "Expression",
+                              expression: { operation: "Literal", value: 0 },
+                            }
+                          : { operation: event.currentTarget.value, fields: [] }
                         : null,
                     })
                   }
@@ -608,45 +556,60 @@ function Designer({ host }) {
                   <option value="Sum">Sum</option>
                   <option value="Product">Product</option>
                   <option value="Score">Survey score</option>
+                  <option value="Expression">Compose a calculation</option>
                 </Select>
-                {item.calculation && (
-                  <fieldset>
-                    <legend>Earlier numbers to calculate</legend>
-                    {definition.fields
-                      .slice(0, index)
-                      .filter((previous) =>
-                        item.calculation.operation === "Score"
-                          ? previous.widget?.kind === "Choice"
-                          : previous.schema.kind === "number",
-                      )
-                      .map((previous) => (
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={item.calculation.fields.includes(
-                              previous.name,
-                            )}
-                            onChange={(event) =>
-                              field(index, {
-                                calculation: {
-                                  ...item.calculation,
-                                  fields: event.currentTarget.checked
-                                    ? [
-                                        ...item.calculation.fields,
-                                        previous.name,
-                                      ]
-                                    : item.calculation.fields.filter(
-                                        (name) => name !== previous.name,
-                                      ),
-                                },
-                              })
-                            }
-                          />{" "}
-                          {previous.schema.label || previous.name}
-                        </label>
-                      ))}
-                  </fieldset>
+                {item.calculation?.operation === "Expression" && (
+                  <ExpressionEditor
+                    value={item.calculation.expression}
+                    fields={definition.fields.slice(0, index)}
+                    update={(expression) =>
+                      field(index, {
+                        calculation: { operation: "Expression", expression },
+                      })
+                    }
+                  />
                 )}
+                {item.calculation &&
+                  item.calculation.operation !== "Expression" && (
+                    <fieldset>
+                      <legend>Earlier numbers to calculate</legend>
+                      {definition.fields
+                        .slice(0, index)
+                        .filter((previous) =>
+                          item.calculation.operation === "Score"
+                            ? previous.widget?.kind === "Choice"
+                            : ["number", "integer"].includes(
+                                previous.schema.kind,
+                              ),
+                        )
+                        .map((previous) => (
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={item.calculation.fields.includes(
+                                previous.name,
+                              )}
+                              onChange={(event) =>
+                                field(index, {
+                                  calculation: {
+                                    ...item.calculation,
+                                    fields: event.currentTarget.checked
+                                      ? [
+                                          ...item.calculation.fields,
+                                          previous.name,
+                                        ]
+                                      : item.calculation.fields.filter(
+                                          (name) => name !== previous.name,
+                                        ),
+                                  },
+                                })
+                              }
+                            />{" "}
+                            {previous.schema.label || previous.name}
+                          </label>
+                        ))}
+                    </fieldset>
+                  )}
               </>
             )}
           </Disclosure>
@@ -710,46 +673,123 @@ function Designer({ host }) {
       >
         Add field
       </Button>
+      <WorkingPreview
+        definition={definition}
+        groups={state.groups || {}}
+        endpoint={endpoint}
+        csrf={host.dataset.csrf}
+      />
     </>
   );
 }
-function evaluated(fields, input) {
-  const values = {};
-  const visible = [];
-  for (const field of fields) {
-    const condition = field.visible_when;
-    const shown =
-      !condition ||
-      (condition.operation === "Equal"
-        ? values[condition.field] === condition.value
-        : values[condition.field] !== undefined &&
-          values[condition.field] !== null &&
-          String(values[condition.field]).trim() !== "");
-    if (!shown) continue;
-    visible.push(field);
-    if (field.calculation) {
-      const operands = field.calculation.fields.map((name) =>
-        field.calculation.operation === "Score"
-          ? fields
-              .find((f) => f.name === name)
-              ?.widget?.options?.find((o) => o.value === values[name])?.score
-          : values[name],
-      );
-      if (
-        operands.every(
-          (value) => typeof value === "number" && Number.isFinite(value),
-        )
-      ) {
-        const value = ["Sum", "Score"].includes(field.calculation.operation)
-          ? operands.reduce((a, b) => a + b, 0)
-          : operands.reduce((a, b) => a * b, 1);
-        if (Number.isFinite(value)) values[field.name] = value;
-      }
-    } else if (Object.hasOwn(input, field.name))
-      values[field.name] = input[field.name];
+function WorkingPreview({ definition, groups, endpoint, csrf }) {
+  const [input, setInput] = useState({});
+  const [checked, setChecked] = useState(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const source = JSON.stringify([definition, groups, input]);
+  const values = Object.fromEntries(
+    definition.fields
+      .filter((field) => !field.calculation)
+      .map((field) => [
+        field.name,
+        Object.hasOwn(input, field.name)
+          ? input[field.name]
+          : field.schema.kind === "boolean"
+            ? false
+            : undefined,
+      ])
+      .filter(([, value]) => value !== undefined),
+  );
+  const current = evaluated(definition.fields, values);
+  async function verify() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await request(endpoint + "/preview", {
+        csrf,
+        definition,
+        values,
+      });
+      setChecked({ source, result });
+    } catch (failure) {
+      setError(failure.message);
+      setChecked(null);
+    } finally {
+      setBusy(false);
+    }
   }
-  return { values, visible };
+  return (
+    <Disclosure summary="Try the working form">
+      <p>
+        Try conditional fields and calculations before publishing. Checking uses
+        server validation and never records a response or runs an action. Upload
+        and signature collection remain in the published workflow.
+      </p>
+      {current.visible.map((field) =>
+        field.calculation ? (
+          <p key={field.name}>
+            <strong>{field.schema.label || field.name}: </strong>
+            <output>
+              {current.errors[field.name] ||
+                (current.values[field.name] ?? "Complete the earlier inputs")}
+            </output>
+          </p>
+        ) : ["Upload", "Signature"].includes(field.widget?.kind) ? (
+          <p key={field.name}>
+            {field.schema.label || field.name}: use the published workflow for
+            this field.
+          </p>
+        ) : (
+          <ValueInput
+            key={field.name}
+            schema={field.schema}
+            widget={field.widget}
+            groups={groups}
+            name={field.name}
+            value={current.values[field.name]}
+            update={(value) => {
+              setInput((previous) => ({ ...previous, [field.name]: value }));
+              setError("");
+            }}
+          />
+        ),
+      )}
+      {error && <Notice error>{error}</Notice>}
+      {checked?.source === source && (
+        <Notice>
+          Server validation passed. Review the authoritative values below; no
+          response was saved.
+        </Notice>
+      )}
+      {checked?.source === source && (
+        <dl>
+          {Object.entries(checked.result.values).map(([name, value]) => (
+            <Fragment key={name}>
+              <dt>
+                {definition.fields.find((field) => field.name === name)?.schema
+                  .label || name}
+              </dt>
+              <dd>
+                {typeof value === "object"
+                  ? JSON.stringify(value)
+                  : String(value)}
+              </dd>
+            </Fragment>
+          ))}
+        </dl>
+      )}
+      <Button
+        busy={busy}
+        disabled={Object.keys(current.errors).length > 0}
+        onClick={verify}
+      >
+        Check working form on server
+      </Button>
+    </Disclosure>
+  );
 }
+
 function ValueInput({
   schema,
   widget,
@@ -1190,7 +1230,7 @@ function VisitorForm({ host }) {
   const last = Math.max(...definition.fields.map((field) => field.step || 0));
   async function submit(event) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || Object.keys(current.errors).length) return;
     if (step < last) {
       setStep(step + 1);
       return;
@@ -1239,6 +1279,13 @@ function VisitorForm({ host }) {
         </p>
       )}
       {error && <Notice error>{error}</Notice>}
+      {Object.entries(current.errors).map(([name, message]) => (
+        <Notice error key={name}>
+          {definition.fields.find((field) => field.name === name)?.schema
+            .label || name}
+          : {message}
+        </Notice>
+      ))}
       {recoveryNotice && <Notice>{recoveryNotice}</Notice>}
       {published.subscription_purpose && (
         <p>
@@ -1315,7 +1362,11 @@ function VisitorForm({ host }) {
             Back
           </Button>
         )}
-        <Button type="submit" busy={busy} disabled={uploads > 0}>
+        <Button
+          type="submit"
+          busy={busy}
+          disabled={uploads > 0 || Object.keys(current.errors).length > 0}
+        >
           {step < last ? "Continue" : "Send response"}
         </Button>
       </div>
@@ -1331,4 +1382,116 @@ const publicForm = document.querySelector("#public-form");
 if (publicForm) {
   publicForm.replaceChildren();
   render(<VisitorForm host={publicForm} />, publicForm);
+}
+
+function WorkflowCondition({ fields, host }) {
+  const [condition, setCondition] = useState(null);
+  const [invalidRecovery, setInvalidRecovery] = useState(null);
+  useEffect(() => {
+    const form = host.closest("form");
+    const recover = () => {
+      const raw = form.elements.condition_json.value;
+      try {
+        if (new TextEncoder().encode(raw).length > 128 * 1024) throw Error();
+        const rule = JSON.parse(raw);
+        let nodes = 0;
+        const scalar = (value) =>
+          value === null ||
+          typeof value === "boolean" ||
+          typeof value === "string" ||
+          (typeof value === "number" && Number.isFinite(value));
+        function visit(value, depth = 1) {
+          if (++nodes > 128 || depth > 8 || !value || typeof value !== "object")
+            throw Error();
+          if (["All", "Any"].includes(value.operation)) {
+            if (
+              !Array.isArray(value.conditions) ||
+              value.conditions.length < 1 ||
+              value.conditions.length > 32
+            )
+              throw Error();
+            value.conditions.forEach((child) => visit(child, depth + 1));
+          } else if (value.operation === "Not")
+            visit(value.condition, depth + 1);
+          else {
+            if (!fields.some((field) => field.name === value.field))
+              throw Error();
+            if (value.operation === "Present") return;
+            if (value.operation === "OneOf") {
+              if (
+                !Array.isArray(value.values) ||
+                value.values.length < 1 ||
+                value.values.length > 32 ||
+                !value.values.every(scalar)
+              )
+                throw Error();
+            } else if (value.operation === "Equal") {
+              if (!scalar(value.value)) throw Error();
+            } else if (
+              ["Greater", "AtLeast", "Less", "AtMost"].includes(value.operation)
+            ) {
+              if (
+                typeof value.value !== "number" ||
+                !Number.isFinite(value.value)
+              )
+                throw Error();
+            } else throw Error();
+          }
+        }
+        if (rule !== null) visit(rule);
+        setCondition(rule);
+        setInvalidRecovery(null);
+      } catch {
+        setInvalidRecovery(raw);
+      }
+    };
+    form.addEventListener("wpalt:recovery", recover);
+    return () => form.removeEventListener("wpalt:recovery", recover);
+  }, [fields, host]);
+  useEffect(() => {
+    host.closest("form").querySelector("[data-add-notification]").disabled =
+      invalidRecovery !== null;
+  }, [invalidRecovery, host]);
+  return (
+    <>
+      <p>
+        Route using the canonical accepted answers, including calculated values.
+      </p>
+      {invalidRecovery !== null && (
+        <Notice error>
+          The recovered notification rule needs review. Recompose its rule
+          before saving.
+        </Notice>
+      )}
+      <ConditionEditor
+        value={condition}
+        fields={fields}
+        update={(value) => {
+          setCondition(value);
+          setInvalidRecovery(null);
+        }}
+        optional
+        legend="Notification rule"
+        fieldLabel="Notify when an accepted field has a value"
+        alwaysLabel="Every accepted response"
+        clearLabel="Send for every accepted response"
+      />
+      <input
+        type="hidden"
+        name="condition_json"
+        value={invalidRecovery ?? JSON.stringify(condition)}
+      />
+    </>
+  );
+}
+const workflowCondition = document.querySelector("#form-workflow-condition");
+if (workflowCondition) {
+  const fields = JSON.parse(workflowCondition.dataset.fields);
+  render(
+    <WorkflowCondition fields={fields} host={workflowCondition} />,
+    workflowCondition,
+  );
+  workflowCondition
+    .closest("form")
+    .querySelector("[data-simple-condition]").hidden = true;
 }

@@ -159,7 +159,7 @@ impl App {
                     || (matches!(
                         startup_mode,
                         Startup::Maintenance | Startup::RebindMaintenance
-                    ) && matches!(version, 14..=22)),
+                    ) && matches!(version, 14..=23)),
                 "runtime schema is incompatible; stop all nodes and use the documented offline upgrade/recovery path"
             );
         } else {

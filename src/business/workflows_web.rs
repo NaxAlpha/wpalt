@@ -51,13 +51,15 @@ async fn editor(
         section class="panel" {h2 {"Current routes"}@for rule in &f.notifications {p {(rule.recipient) " · " (rule.subject)}}
         form method="post" data-editor data-owner=(&s.user.id){(view::csrf(&s))input type="hidden" name="version" value=(row.get::<i64,_>("version"));input type="hidden" name="locale" value="en";input type="hidden" name="action" value="add";
         label {"Recipient" input name="recipient" type="email" required maxlength="254";}label {"Subject" input name="subject" required maxlength="200";}
-        label {"Condition field (empty means every accepted response)" select name="condition_field" {option value="" {"Every response"}@for field in &f.fields{option value=(&field.name){(&field.name)}}}}label {"Condition" select name="operation" {option value="present" {"Has a value"}option value="equal" {"Equals"}}}label {"Comparison value (JSON scalar)" input name="comparison" value="true" maxlength="8000";}
-        input type="hidden" name="document" value=(crate::document::empty());div data-writing-canvas hidden {}label {"Notification message" textarea name="body" class="editor-body" {}}label data-markdown-replacement {input type="checkbox" name="import_markdown" value="true";"Replace using Markdown"}button {"Add conditional route"}}
+        div id="form-workflow-condition" data-fields=(serde_json::to_string(&f.fields).unwrap_or_default()) {}
+        div data-simple-condition {label {"Condition field (empty means every accepted response)" select name="condition_field" {option value="" {"Every response"}@for field in &f.fields{option value=(&field.name){(&field.name)}}}}label {"Condition" select name="operation" {option value="present" {"Has a value"}option value="equal" {"Equals"}}}label {"Comparison value (JSON scalar)" input name="comparison" value="true" maxlength="8000";}}
+        input type="hidden" name="document" value=(crate::document::empty());div data-writing-canvas hidden {}label {"Notification message" textarea name="body" class="editor-body" {}}label data-markdown-replacement {input type="checkbox" name="import_markdown" value="true";"Replace using Markdown"}button data-add-notification {"Add conditional route"}}
         form method="post" {(view::csrf(&s))input type="hidden" name="version" value=(row.get::<i64,_>("version"));input type="hidden" name="action" value="clear";button {"Remove all notification routes"}}}
         section class="panel" {h2 {"Moderated contributions"}p {"Accepted values create a private draft owned by the form owner. No visitor can publish, choose a role or supply a post identifier."}form method="post" {(view::csrf(&s))input type="hidden" name="version" value=(row.get::<i64,_>("version"));input type="hidden" name="action" value="post";
         @for(name,label)in [("title_field","Title field"),("body_field","Body field")]{label {(label)select name=(name){option value="" {"Disable draft creation"}@for field in f.fields.iter().filter(|f|f.schema.kind=="string"){option value=(&field.name) selected[f.draft_post.as_ref().is_some_and(|a|if name=="title_field"{a.title_field==field.name}else{a.body_field==field.name})]{(&field.name)}}}}}button {"Save contribution mapping"}}}
         section class="panel" {h2 {"Account requests"}p {a href="/admin/registrations" {"Review verified requests"}}p {"The applicant proves mailbox ownership and chooses a password using a private email link. You must approve a subscriber account; it has no administration privileges."}form method="post" {(view::csrf(&s))input type="hidden" name="version" value=(row.get::<i64,_>("version"));input type="hidden" name="action" value="registration";@for(name,label)in [("email_field","Email field"),("name_field","Name field")]{label {(label)select name=(name){option value="" {"Disable account requests"}@for field in f.fields.iter().filter(|f|f.schema.kind=="string"){option value=(&field.name) selected[f.registration.as_ref().is_some_and(|a|if name=="email_field"{a.email_field==field.name}else{a.name_field==field.name})]{(&field.name)}}}}}button {"Save account request mapping"}}}
         script defer src="/assets/editor.js" {}
+        script defer src="/assets/forms.js" {}
         },
     )))
 }
@@ -72,6 +74,8 @@ struct Save {
     subject: String,
     #[serde(default)]
     condition_field: String,
+    #[serde(default)]
+    condition_json: String,
     #[serde(default)]
     operation: String,
     #[serde(default)]
@@ -129,7 +133,10 @@ async fn save(
             }
         }
         "add" => {
-            let when = if i.condition_field.is_empty() {
+            let when = if !i.condition_json.is_empty() {
+                serde_json::from_str::<Option<Condition>>(&i.condition_json)
+                    .map_err(|_| Error::invalid("Check the composed notification condition."))?
+            } else if i.condition_field.is_empty() {
                 None
             } else {
                 Some(match i.operation.as_str() {

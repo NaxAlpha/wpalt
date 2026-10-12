@@ -1,0 +1,88 @@
+{
+  "source": {
+    "date": "2026-10-12",
+    "plugin": "Forminator",
+    "version": "1.58.0",
+    "download": "https://downloads.wordpress.org/plugin/forminator.1.58.0.zip",
+    "sha256": "2acd3a0536c5481e5f24fab02a5a79ce0601d8c55d44469274221f3b3bc584f7",
+    "bytes": 11414674,
+    "selected_source_members": 31,
+    "selected_source_bytes": 49363,
+    "bundle_sha256": "14d089c3b2544d5675826c7cc452a03a35e9ddcf1ef2dc7191a27e2e1be18140",
+    "bundler": "locked esbuild0.28.2",
+    "scope": "Pinned source-built free calculator component preparation. Browser execution is separate evidence; no PHP/admin/premium parity or plugin code incorporated into wpalt."
+  },
+  "browser": "155.0.8059.39",
+  "cases": [
+    {
+      "formula": "2+3*4",
+      "free": 14,
+      "native": 14,
+      "difference": "Controlled result agrees"
+    },
+    {
+      "formula": "(2+3)*4",
+      "free": 20,
+      "native": 20,
+      "difference": "Controlled result agrees"
+    },
+    {
+      "formula": "min(5,2,8)",
+      "free": 2,
+      "native": 2,
+      "difference": "Controlled result agrees"
+    },
+    {
+      "formula": "max(5,2,8)",
+      "free": 8,
+      "native": 8,
+      "difference": "Controlled result agrees"
+    },
+    {
+      "formula": "avg(2,4,6)",
+      "free": 4,
+      "native": 4,
+      "difference": "Controlled result agrees"
+    },
+    {
+      "formula": "abs(-3)",
+      "free": 3,
+      "native": 3,
+      "difference": "Controlled result agrees"
+    },
+    {
+      "formula": "round(-2.5)",
+      "free": -2,
+      "native": -3,
+      "difference": "Native explicitly rounds ties away from zero"
+    },
+    {
+      "formula": "round(0.49999999999999994)",
+      "free": 0,
+      "native": 0,
+      "difference": "Controlled result agrees"
+    },
+    {
+      "formula": "ceil(-2.3)",
+      "free": -2,
+      "native": -2,
+      "difference": "Controlled result agrees"
+    },
+    {
+      "formula": "floor(-2.3)",
+      "free": -3,
+      "native": -3,
+      "difference": "Controlled result agrees"
+    },
+    {
+      "formula": "3/0",
+      "free": "Infinity",
+      "native": {
+        "refused": "A calculation cannot divide by zero."
+      },
+      "difference": "Native refuses non-finite division"
+    }
+  ],
+  "requests": [],
+  "scope": "Actual source-built free frontend calculator in an isolated browser and actual native canonical HTTP preview. No WordPress PHP/admin/conditional-widget or paid-plugin execution and no universal parity. No plugin code incorporated into wpalt."
+}

@@ -64,7 +64,9 @@ module.exports = async function formsJourney(owner, origin, output) {
       .nth(2)
       .selectOption({ label: "Business customer" });
     await page.getByLabel("Condition", { exact: true }).selectOption("Equal");
-    await page.getByLabel("Value to match", { exact: true }).fill("true");
+    await page
+      .getByLabel("Value to match", { exact: true })
+      .selectOption("true");
     await page
       .getByRole("button", { name: "Publish form", exact: true })
       .click();
