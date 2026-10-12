@@ -17,6 +17,7 @@ const STAGES: &[&str] = &[
     "engagement-retention",
     "quota-retention",
     "missing-path-retention",
+    "editorial-analysis",
     "maintenance",
 ];
 

@@ -30,6 +30,8 @@ pub fn router(app: App) -> Router {
     Router::new()
         .merge(crate::builder_web::routes())
         .merge(crate::editorial_web::routes())
+        .merge(crate::discovery::insights::web::routes())
+        .merge(crate::discovery::insights::jobs_web::routes())
         .merge(crate::platform::language_web::routes())
         .merge(crate::platform::interface_web::routes())
         .merge(crate::platform::web::routes())
@@ -1227,7 +1229,7 @@ fn editor_form(
                 label {"Custom taxonomies (JSON)" textarea name="taxonomies" {(p.taxonomies)}small {"Declared taxonomy identifiers mapped to arrays of term names."}}
                 label {"Schedule time" input type="datetime-local" data-schedule-time;small {"Uses your browser's local time. Scheduling removes this item from the live site until publication."}}
                 div class="toolbar" {button name="action" value="save" {"Save draft"}button class="secondary" name="action" value="publish" {"Publish now"}button class="secondary" name="action" value="schedule" {"Schedule"}}
-                @if let Some(id)=id {div class="toolbar" {a class="button secondary" href=(format!("/admin/preview/{id}")) target="_blank" rel="noopener" {"Preview"}button class="secondary" name="action" value="unpublish" {"Unpublish"}}}
+                @if let Some(id)=id {div class="toolbar" {a class="button secondary" href=(format!("/admin/preview/{id}")) target="_blank" rel="noopener" {"Preview"}a class="button secondary" href=(format!("/admin/insights/{id}")) {"Editorial insights"}button class="secondary" name="action" value="unpublish" {"Unpublish"}}}
                 (review.request_controls())
                 p class="save-status" data-save-status {"Saved working copies do not update the live page."}
             }}
@@ -1480,11 +1482,15 @@ async fn preview(
 ) -> Result<Html<String>> {
     let s = admin_session(&app, &headers).await?;
     editor(&s)?;
-    let p = content::get(&app, &id).await?;
+    Ok(Html(render_working_source(&app, &id).await?))
+}
+/// Shared saved-working preview; callers must establish current editor authority.
+pub(crate) async fn render_working_source(app: &App, id: &str) -> Result<String> {
+    let p = content::get(app, id).await?;
     let settings = app.db.settings().await?;
-    let stored = crate::theme::load(&app, &settings.theme, true).await?;
+    let stored = crate::theme::load(app, &settings.theme, true).await?;
     let mut ctx = crate::theme::context(
-        &app,
+        app,
         &settings,
         &stored.package,
         Some(&p),
@@ -1501,15 +1507,15 @@ async fn preview(
     working.published_seo = p.seo.clone();
     working.published_translation_group.clear();
     ctx.root["_discovery"] =
-        crate::discovery::metadata(&app, Some(&working), &p.locale, "/", false).await?;
+        crate::discovery::metadata(app, Some(&working), &p.locale, "/", false).await?;
     crate::discovery::publication::enrich(
-        &app,
+        app,
         &crate::discovery::Seo::parse(&p.seo)?,
         &mut ctx.root["_discovery"],
         true,
     )
     .await?;
-    Ok(Html(crate::theme::document(
+    crate::theme::document(
         &stored,
         &settings,
         &ctx,
@@ -1517,7 +1523,7 @@ async fn preview(
         true,
         &p.kind,
         html! {p class="notice"{"Private content and theme draft preview. " a href=(format!("/admin/posts/{}",p.id)){"Back to editor"}}},
-    )?))
+    )
 }
 /// Bounded editor picker; names/visibility are available only to content editors.
 async fn media_picker(

@@ -46,6 +46,7 @@ async function freePort() {
     config,
     `database_url = ${JSON.stringify(databaseUrl)}\ndata_dir = "${temporary}/data"\nlisten = "127.0.0.1:${port}"\nbase_url = "${origin}"\n`,
   );
+  if (process.env.WPALT_INSIGHTS_ONLY) fs.appendFileSync(config,"scheduler_seconds=3600\n");
   if (process.env.WPALT_SPAM_ONLY) fs.appendFileSync(config, "\n[spam]\nenabled = true\nproof_bits = 8\n");
   if (process.env.WPALT_SCRIPTS_ONLY) {
     const script=path.join(temporary,'optional-example.js');
@@ -138,6 +139,7 @@ async function freePort() {
   if (process.env.WPALT_INTERFACE_ONLY) { await require('./interface_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_LANGUAGE_ONLY) { await require('./language_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
   if (process.env.WPALT_EDITORIAL_ONLY) { await require('./editorial_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); return; }
+  if (process.env.WPALT_INSIGHTS_ONLY) {await require('./editorial_insights_acceptance.cjs')(owner,publicContext,origin,output);assert.deepEqual(errors,[]);assert.deepEqual(remote,[]);{const file=path.join(output,'d09-editorial-insights.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.binary_sha256=crypto.createHash('sha256').update(fs.readFileSync(binary)).digest('hex');if(localFixture)report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return;}
   if (process.env.WPALT_REDIRECT_LINKS_ONLY) { await require('./redirect_links_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d08-redirect-links.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }
   if (process.env.WPALT_STRUCTURED_ONLY) { await require('./structured_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d07-structured.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }
   if (process.env.WPALT_DISCOVERY_ONLY) { await require('./discovery_acceptance.cjs')(owner,publicContext,origin,output); assert.deepEqual(errors,[]); assert.deepEqual(remote,[]); if(localFixture){const file=path.join(output,'d06-discovery.json'),report=JSON.parse(fs.readFileSync(file,'utf8'));report.local_processes=localFixture.report(1);fs.writeFileSync(file,JSON.stringify(report,null,2));}return; }

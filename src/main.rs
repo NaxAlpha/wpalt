@@ -45,6 +45,11 @@ enum Command {
         #[arg(long)]
         execute: Option<String>,
     },
+    /// Manage durable public analysis while the site is stopped.
+    EditorialAnalysis {
+        #[command(subcommand)]
+        command: AnalysisCommand,
+    },
     /// Independently observe owner-selected sites from a private fleet manifest.
     FleetInspect { manifest: PathBuf },
     /// Stopped-site public content-link graph and advisory editorial measurements.
@@ -648,6 +653,32 @@ enum ThemeCommand {
     },
     Activate {
         id: String,
+    },
+}
+#[derive(Subcommand)]
+enum AnalysisCommand {
+    Start {
+        #[arg(long, default_value = "")]
+        focus: String,
+    },
+    Tick,
+    Status,
+    Sources {
+        id: String,
+        #[arg(long,default_value_t=-1)]
+        after: i64,
+    },
+    Source {
+        id: String,
+        ordinal: i64,
+    },
+    Cancel {
+        id: String,
+        version: i64,
+    },
+    Remove {
+        id: String,
+        version: i64,
     },
 }
 #[derive(Subcommand)]
@@ -1274,6 +1305,7 @@ async fn main() -> anyhow::Result<()> {
             execute: Some(_), ..
         } => Some("cli:translation-prepare"),
         Command::Integration { .. } => Some("cli:integration"),
+        Command::EditorialAnalysis { .. } => Some("cli:editorial-analysis"),
         Command::Init { .. } => Some("cli:init"),
         Command::Backup { .. } => Some("cli:backup"),
         Command::WordPressPrepare {
@@ -1597,6 +1629,31 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
             )
             .await?;
             println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Command::EditorialAnalysis { command } => {
+            use wpalt::discovery::insights::jobs;
+            let value = match command {
+                AnalysisCommand::Start { focus } => {
+                    serde_json::json!({"id":jobs::start(&app,&focus).await?})
+                }
+                AnalysisCommand::Tick => serde_json::json!({"processed":jobs::tick(&app).await?}),
+                AnalysisCommand::Status => serde_json::to_value(jobs::list(&app).await?)?,
+                AnalysisCommand::Sources { id, after } => {
+                    serde_json::to_value(jobs::sources(&app, &id, after).await?)?
+                }
+                AnalysisCommand::Source { id, ordinal } => {
+                    serde_json::to_value(jobs::details(&app, &id, ordinal).await?)?
+                }
+                AnalysisCommand::Cancel { id, version } => {
+                    jobs::change(&app, &id, version, false).await?;
+                    serde_json::json!({"cancelled":true})
+                }
+                AnalysisCommand::Remove { id, version } => {
+                    jobs::change(&app, &id, version, true).await?;
+                    serde_json::json!({"removed":true})
+                }
+            };
+            println!("{}", serde_json::to_string_pretty(&value)?);
         }
         Command::ContentAudit { keyword } => {
             let report = wpalt::platform::content_audit::report(&app, &keyword).await?;
@@ -1925,6 +1982,11 @@ async fn worker_loop(
                 stage(
                     "missing-path-retention",
                     wpalt::discovery::redirects::retention(&app),
+                )
+                .await,
+                stage(
+                    "editorial-analysis",
+                    wpalt::discovery::insights::jobs::tick(&app),
                 )
                 .await,
                 stage_unit("maintenance", cleanup(&app)).await,

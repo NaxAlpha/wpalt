@@ -109,3 +109,7 @@ See [membership-learning.md](membership-learning.md) for local policies, course 
 ## M6 commerce and reservations
 
 See [commerce-reservations.md](commerce-reservations.md) for authenticated store/booking flows, actual offline payments/refunds, paid subscriptions, CLI/configuration, optional hosted Stripe and schema-9/archive-v8 recovery. Currency is fixed at initialization. The local scheduler never fabricates collection; external tax/carrier/calendar services remain explicit boundaries. Stop the old runtime and retain an independent backup before the documented upgrade. [M6 verification](evidence/m6-verification.md) separates deterministic connector tests from actual provider-account certification.
+
+## Editorial insights and durable analysis
+
+Saved editors offer [editorial insights](editorial-insights.md); the editorial queue connects owners to the larger bounded public-analysis workspace. Native schema23 retains portable grammarv18 and excludes derived job data from fresh recovery. Follow stopped maintenance, keep the original executable/recovery key and verify current delivery evidence before adoption.

@@ -235,6 +235,7 @@ async fn queue(
     let rows = app.db.fetch_builder(&mut q).await?;
     let body = html! {
      (view::heading("Publishing","Editorial queue","Review saved content, respond privately and return to the shared editor."))
+     p {a href="/admin/posts" {"Choose content for editorial insights"} @if s.is_admin(){" · " a href="/admin/analysis" {"Public site analysis"}}}
      form method="get" class="toolbar" {label {"Queue" select name="scope" {option value="assigned" selected[scope=="assigned"] {"Assigned to me"}option value="requested" selected[scope=="requested"] {"Requested by me"}option value="all" selected[scope=="all"] {"All editorial work"}}}label {"Review state" select name="state" {@for value in ["pending","approved","changes","draft","scheduled","published"] {option value=(value) selected[state==value] {(value)}}}}button class="secondary" {"Show work"}}
      section class="panel" {@if rows.is_empty(){p {"No saved work in this queue."}} @for r in rows.iter().take(40){article {h2 {a href=(format!("/admin/posts/{}",r.get::<String,_>("post_id"))) {(r.get::<String,_>("title"))}}p {span class="status" {(r.get::<String,_>("state"))} " · " (r.get::<String,_>("kind"))}p {(r.get::<String,_>("notes"))}}}}
      @if rows.len()>40 {@let r=&rows[39];a class="button secondary" href=(format!("/admin/editorial?scope={scope}&state={state}&after={}:{}",r.get::<i64,_>("requested_at"),r.get::<String,_>("post_id"))) {"Older review requests →"}}

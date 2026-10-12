@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use sqlx::Row;
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod insights;
 pub mod publication;
 mod redirect_web;
 pub mod redirects;

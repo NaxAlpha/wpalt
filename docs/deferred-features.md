@@ -78,7 +78,7 @@ Verifiable future outcome: Owner-authored visible entities produce validated pub
 
 ### D08 — Redirects and link analysis
 
-Origin: **M3** · Catalog: **F030/F032** · Status: **active; redirect and rendered-link workspace contract**
+Origin: **M3** · Catalog: **F030/F032** · Status: **defined redirect/link workspace delivered in merged PR24; actual-main/public release independently verified**
 
 [D08 contract](d08-contract.md) governs bounded regex rules, safe automatic slug redirects, actionable 404 reporting and graph coverage of theme/navigation/raw HTML/server-resolved dynamic links.
 

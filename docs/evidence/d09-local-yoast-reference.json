@@ -1,0 +1,131 @@
+{
+  "status": "passed",
+  "pins": {
+    "wordpress": "7.1.3",
+    "yoast_free": "28.6",
+    "archives": {
+      "wordpress-7.1.3.zip": {
+        "sha256": "eb58a90ed55147f90f7bd55d0d3334960a69b7e8a4cc142c8ddfea8965218227",
+        "bytes": 37226383,
+        "url": "https://wordpress.org/wordpress-7.1.3.zip"
+      },
+      "wordpress-seo-28.6.zip": {
+        "sha256": "ebb6e2a89d697cabecf2348a06d1efe807fd13ee1faeddcd06e354b98ee2a4d5",
+        "bytes": 5107782,
+        "url": "https://downloads.wordpress.org/plugin/wordpress-seo.28.6.zip"
+      }
+    },
+    "bundles": {
+      "wp-lodash.js": {
+        "member": "wordpress/wp-includes/js/dist/vendor/lodash.min.js",
+        "sha256": "a8d7e6291ad80256f976ace90824a71018d2f706992c9107b20bdced97bee27b",
+        "bytes": 73234
+      },
+      "wp-hooks.js": {
+        "member": "wordpress/wp-includes/js/dist/hooks.min.js",
+        "sha256": "fc774906082b59dedcfc55b8ef127783b6d056578ff4586a8ebbdb81bbe286f1",
+        "bytes": 5107
+      },
+      "wp-i18n.js": {
+        "member": "wordpress/wp-includes/js/dist/i18n.min.js",
+        "sha256": "5083905862c2b7aa8a84c4f2313d359d2288fb25fbe1ff577fa7325eff2ed2d9",
+        "bytes": 5791
+      },
+      "yoast-feature.js": {
+        "member": "wordpress-seo/js/dist/externals/featureFlag.js",
+        "sha256": "530ec8a88ac4999ca6a023e3d274823b467c93c5cc7e68e30eb244176a3e630d",
+        "bytes": 522
+      },
+      "yoast-analysis.js": {
+        "member": "wordpress-seo/js/dist/externals/analysis.js",
+        "sha256": "46b58212c2e62c1e54961972625d3fae5db04a067d4bcdd2fb89f04e0435476d",
+        "bytes": 884557
+      },
+      "yoast-researcher.js": {
+        "member": "wordpress-seo/js/dist/languages/en.js",
+        "sha256": "ae7fc42872ed99ae63e7c63e6679f74a180439dd548784ace21015a87db12500",
+        "bytes": 74562
+      }
+    }
+  },
+  "browser": "155.0.8059.39",
+  "execution": "Actual pinned free Yoast analysis/English researcher plus actual WordPress dependency bundles in Chrome; no requests allowed. This is component execution, not a WordPress PHP/admin workflow or premium assessment comparison.",
+  "controlled": {
+    "words": {
+      "text": "<p>A café guide. A cat, cathedral and education.</p>",
+      "count": 8,
+      "unit": "word"
+    },
+    "phrase": 1,
+    "title": {
+      "exactMatchFound": true,
+      "allWordsFound": true,
+      "position": 0,
+      "exactMatchKeyphrase": false
+    },
+    "description": 1,
+    "anchors": 0
+  },
+  "connected": {
+    "words": {
+      "text": "<main id='main' tabindex='-1' class='theme-shell'><article class='article'><p class='eyebrow'>post</p><h1>Café editorial guide</h1><div class='prose'><h1>Café</h1><p>Café for actual readers. <a href='/editorial-missing' rel='noopener noreferrer'>Missing resource</a></p></div></article><section class='comments'><p class='muted'></p><h2>Conversation</h2><form method='post' action='/editorial-actual-copy/comments'><label>Your name<input name='name' required='' maxlength='100'></input></label><label>Comment</label><p class='muted'>Comments are reviewed before publication.</p><button>Submit for review</button></form></section></main>",
+      "count": 23,
+      "unit": "word"
+    },
+    "phrase": 3,
+    "title": {
+      "exactMatchFound": true,
+      "allWordsFound": true,
+      "position": 0,
+      "exactMatchKeyphrase": false
+    },
+    "description": 1,
+    "anchors": 0
+  },
+  "native": {
+    "html_sha256": "9fa7329346c32af89cc2a9b5a1cf2b45406180e2659aa0995d8c3fcd8bca95c0",
+    "html_bytes": 2383,
+    "observations": {
+      "algorithm": "wpalt-editorial-text-v1",
+      "unicode_version": "17.0.0",
+      "normalization_unicode_version": "(17, 0, 0)",
+      "lowercase_unicode_version": "(17, 0, 0)",
+      "scope": "Server HTML main text, or body fallback, excluding navigation/footer/inert/explicitly hidden markup. Default Unicode boundaries are not dictionary word recognition. NFC, Unicode lowercase and normalized whitespace matching; no stemming, full case folding or locale-specific casing. CSS/layout/client-generated text is not evaluated. No score, preferred length or density target.",
+      "graphemes": 195,
+      "word_segments": 22,
+      "sentence_segments": 9,
+      "blocks": 7,
+      "main_element": true,
+      "focus": "café",
+      "locations": [
+        {
+          "label": "title",
+          "occurrences": 1
+        },
+        {
+          "label": "description",
+          "occurrences": 2
+        },
+        {
+          "label": "main text",
+          "occurrences": 3
+        },
+        {
+          "label": "headings",
+          "occurrences": 2
+        },
+        {
+          "label": "image alternatives",
+          "occurrences": 0
+        },
+        {
+          "label": "link labels",
+          "occurrences": 0
+        }
+      ]
+    }
+  },
+  "differences": "The shared fixture verifies literal café occurrences. Yoast English analysis and wpalt default Unicode segmentation have different language/boundary/markup scopes; word counts are recorded independently, with no universal score or complete parity inference.",
+  "errors": [],
+  "requests": []
+}

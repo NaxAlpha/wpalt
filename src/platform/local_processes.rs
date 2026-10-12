@@ -74,7 +74,7 @@ fn unavailable_reason(reason: &'static str) -> Error {
     )
 }
 
-fn executable_identity() -> Result<String> {
+pub(crate) fn executable_identity() -> Result<String> {
     use sha2::{Digest, Sha256};
     static IDENTITY: std::sync::OnceLock<std::result::Result<String, ()>> =
         std::sync::OnceLock::new();

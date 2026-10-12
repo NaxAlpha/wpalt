@@ -121,3 +121,15 @@ window_seconds = 60
 # Replay is bounded by event count; gaps require explicit reconciliation.
 [integration_events]
 retained_events = 4096
+
+# Durable local public-analysis engineering ceilings; no network crawler.
+[analysis]
+enabled = true
+max_publications = 5000
+max_edges = 100000
+max_html_bytes = 134217728
+max_facts_bytes = 268435456
+batch_sources = 8
+batch_seconds = 5
+lease_seconds = 120
+retention_seconds = 604800

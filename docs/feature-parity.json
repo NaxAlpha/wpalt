@@ -614,9 +614,12 @@
         "d08-contract.md",
         "redirects-and-links.md",
         "evidence/d08-verification.md",
-        "../tests/redirect_plans.rs"
+        "../tests/redirect_plans.rs",
+        "evidence/d08/pr-delivery.json",
+        "evidence/d08-main-release.json",
+        "evidence/d08/free-reference-delivery.json"
       ],
-      "d08_status": "in development; native forms and route engine implemented; connected checks progressing; delivery pending",
+      "d08_status": "defined local redirect/rendered-link workspace delivered in merged PR24; actual-main/public release independently verified",
       "d08_limits": "Bounded local ASCII-path Rust regex and declared anonymous publication/language graph. No full PCRE, external redirect/crawler, query-forwarding or infinite/client-generated link-state claim."
     },
     {
@@ -633,10 +636,12 @@
         "discovery.md",
         "../src/platform/content_audit.rs",
         "evidence/d08-verification.md",
-        "../src/discovery/rendered_links.rs"
+        "../src/discovery/rendered_links.rs",
+        "d09-contract.md"
       ],
       "deferred_work": "deferred-features.md",
-      "d08_overlap": "Bounded owner analysis of actual anonymous canonical publication and language-landing HTML, including navigation/theme/raw/dynamic edges, explicit target states and no-inbound candidates within declared sources. Broader editorial and incremental workloads remain D09."
+      "d08_overlap": "Bounded owner analysis of actual anonymous canonical publication and language-landing HTML, including navigation/theme/raw/dynamic edges, explicit target states and no-inbound candidates within declared sources. Broader editorial and incremental workloads remain D09.",
+      "d09_status": "active implementation under d09-contract.md; text observations and durable rendering authority first; integrated delivery not yet verified"
     },
     {
       "id": "F032",
@@ -657,9 +662,12 @@
         "d08-contract.md",
         "redirects-and-links.md",
         "evidence/d08-verification.md",
-        "../tests/redirect_plans.rs"
+        "../tests/redirect_plans.rs",
+        "evidence/d08/pr-delivery.json",
+        "evidence/d08-main-release.json",
+        "evidence/d08/free-reference-delivery.json"
       ],
-      "d08_status": "in development; native forms and route engine implemented; connected checks progressing; delivery pending",
+      "d08_status": "defined local redirect/rendered-link workspace delivered in merged PR24; actual-main/public release independently verified",
       "d08_limits": "Bounded local ASCII-path Rust regex and declared anonymous publication/language graph. No full PCRE, external redirect/crawler, query-forwarding or infinite/client-generated link-state claim."
     },
     {
@@ -684,9 +692,11 @@
       "m9_coverage": "Advisory published-text whitespace/sentence/paragraph/keyword counts; language-sensitive, no ranking grade, preferred length or density target.",
       "evidence": [
         "discovery.md",
-        "../src/platform/content_audit.rs"
+        "../src/platform/content_audit.rs",
+        "d09-contract.md"
       ],
-      "deferred_work": "deferred-features.md"
+      "deferred_work": "deferred-features.md",
+      "d09_status": "active implementation under d09-contract.md; text observations and durable rendering authority first; integrated delivery not yet verified"
     },
     {
       "id": "F035",
