@@ -2687,13 +2687,15 @@
         "https://datatracker.ietf.org/doc/html/rfc8410",
         "https://docs.openssl.org/3.0/man1/openssl-pkeyutl/",
         "https://www.w3.org/TR/WebCryptoAPI/",
-        "https://developer.chrome.com/docs/automation-and-testing/headless"
+        "https://developer.chrome.com/docs/automation-and-testing/headless",
+        "https://www.w3.org/TR/css-break-3/"
       ],
       "applicable_versions": [
         "ClamAV1.5.4 controlled-signature reference; no current official intelligence claim",
         "ring0.17.14 Ed25519; exact serialized domain-separated manifest bytes",
-        "Chrome155 browser, Chromium148 headless shell PDF on local Mac; actual CI renderer/version recorded separately",
-        "native24 / portable19 unchanged; original frozen source records retained"
+        "Chrome155 browser; separately verified Chromium148 and locked Playwright1.62.1 Chromium151 headless shell PDF on local Mac; actual CI renderer/version recorded separately",
+        "native24 / portable19 unchanged; original frozen source records retained",
+        "CSS Fragmentation Level3 published CR (work in progress), reviewed 2026-10-12; actual renderer pagination is separate verification."
       ],
       "last_checked": "2026-10-12",
       "next_review": "2026-11-11",

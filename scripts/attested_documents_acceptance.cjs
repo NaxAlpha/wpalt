@@ -67,10 +67,14 @@ module.exports = async (owner, visitors, origin, output, { binary, trust }) => {
     await page
       .getByRole("button", { name: "Prepare document", exact: true })
       .click();
-    await page
-      .getByRole("status")
-      .filter({ hasText: "Document checked against" })
-      .waitFor({ timeout: 35000 });
+    await page.waitForFunction(() => {
+      const status = document.querySelector("[data-document-status]");
+      return status && !status.hidden &&
+        (status.getAttribute("role") === "alert" ||
+         status.textContent.includes("Document checked against"));
+    }, null, { timeout: 35000 });
+    const status = page.locator("[data-document-status]");
+    assert.equal(await status.getAttribute("role"), "status", await status.innerText());
     const [download] = await Promise.all([
       page.waitForEvent("download"),
       page
@@ -411,6 +415,140 @@ module.exports = async (owner, visitors, origin, output, { binary, trust }) => {
     }
     report.assertions.push(
       "Keyboard focus and prepared/error states retain format and current page; WebCrypto refuses tampered artifacts, signatures and keys before extraction; JavaScript-disabled native bundle verifies independently",
+    );
+    // Supported long unbroken headings and multi-page content must be real
+    // accepted source records, not a modified already-signed artifact.
+    const create = await owner.request.post(origin + "/admin/forms", {
+      headers: { Origin: origin },
+      form: { csrf, title: "Long document boundary" },
+      maxRedirects: 0,
+    });
+    assert.equal(create.status(), 303);
+    const longId = create.headers().location.split("/").pop();
+    const longStatement =
+      "Review this original multilingual statement · 日本語 · مرحبا. ".repeat(
+        30,
+      );
+    const longNote = "Long original answer · Zoë · 日本語 · مرحبا.\n".repeat(
+      40,
+    );
+    const longDefinition = {
+      title: "X".repeat(150),
+      fields: [
+        {
+          name: "note",
+          schema: { kind: "string", label: "W".repeat(90), required: true },
+        },
+        {
+          name: "signature",
+          schema: {
+            kind: "object",
+            label: "Acknowledgment",
+            required: true,
+            fields: {
+              name: { kind: "string", required: true },
+              accepted: { kind: "boolean", required: true },
+            },
+          },
+          widget: { kind: "Signature", statement: longStatement },
+        },
+      ],
+    };
+    assert(
+      (
+        await owner.request.post(origin + `/api/admin/forms/${longId}`, {
+          headers: { Origin: origin },
+          data: { csrf, version: 1, publish: true, definition: longDefinition },
+        })
+      ).ok(),
+    );
+    const accepted = await visitors.request.post(
+      origin + `/api/forms/${longId}/entries`,
+      {
+        headers: { Origin: origin },
+        data: {
+          version: 2,
+          key: crypto.randomUUID(),
+          values: {
+            note: longNote,
+            signature: { name: "Long declaration · Zoë", accepted: true },
+          },
+        },
+      },
+    );
+    assert(accepted.ok());
+    const longEntry = (await accepted.json()).entry;
+    for (const kind of ["html", "pdf"]) {
+      const response = await owner.request.post(
+        origin + `/admin/forms/${longId}/entries/${longEntry}/document`,
+        { headers: { Origin: origin }, form: { csrf, kind } },
+      );
+      assert(response.ok());
+      const file = path.join(output, `long-response-${kind}.json`),
+        artifact = path.join(output, `long-response.${kind}`);
+      fs.writeFileSync(file, await response.body());
+      assert(
+        native([
+          "document-verify",
+          file,
+          "--trusted-key-sha256",
+          trust,
+          "--output",
+          artifact,
+        ]).valid,
+      );
+      if (kind === "html") {
+        const context = await owner.browser().newContext();
+        try {
+          const printed = await context.newPage();
+          await printed.setContent(fs.readFileSync(artifact, "utf8"));
+          for (const width of [320, 768, 1440]) {
+            await printed.setViewportSize({ width, height: 1000 });
+            const m = await printed.evaluate(() => ({
+              viewport: innerWidth,
+              document_width: document.documentElement.scrollWidth,
+            }));
+            assert(m.document_width <= m.viewport + 1);
+            report.geometry.push({ surface: "long-printable-document", ...m });
+            await printed.screenshot({
+              path: path.join(
+                output,
+                `d11-long-printable-document-${width}.png`,
+              ),
+              fullPage: true,
+            });
+          }
+        } finally {
+          await context.close();
+        }
+      } else {
+        const text = path.join(output, "long-pdf-text.txt");
+        assert.equal(
+          spawnSync(process.env.WPALT_TEST_PDFTOTEXT || "pdftotext", [
+            artifact,
+            text,
+          ]).status,
+          0,
+        );
+        const extracted = fs.readFileSync(text, "utf8");
+        assert(
+          extracted
+            .split("\f")
+            .some(
+              (page) =>
+                page.includes("Acknowledgment") &&
+                page.includes("Review this original multilingual"),
+            ),
+          "The acknowledgment heading must stay with its statement in actual PDF pagination",
+        );
+        assert(
+          extracted.includes("Acknowledgment") &&
+            extracted.includes("Long declaration"),
+        );
+      }
+    }
+    report.assertions.push(
+      "Actual signed accepted long-title/label/multilingual documents fit all three widths and actual multi-page PDF retains the final acknowledgment",
     );
     const staticContext = await owner.browser().newContext();
     try {

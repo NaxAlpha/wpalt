@@ -1,0 +1,7 @@
+{
+  "renderer": "Google Chrome for Testing 151.0.7922.34",
+  "renderer_binary_sha256": "7687bff7cb2db075f250e6d5848bbc8838cac3802ac3952a899c574f8eccab45",
+  "scanner": "ClamAV 1.5.4",
+  "scanner_binary_sha256": "41d135cdfb4eca13a13d39f8670b140228ef97ae79e25208847e7b8c992fdfcb",
+  "scope": "Actual local ClamAV and Chromium/application integration with one harmless controlled signature. No current official intelligence, complete malware coverage, certified identity, physical-host or universal PDF font claim."
+}

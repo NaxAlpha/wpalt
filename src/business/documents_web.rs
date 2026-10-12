@@ -204,7 +204,7 @@ pub fn printable(source: &Value) -> Result<String> {
         meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
         meta name="viewport" content="width=device-width,initial-scale=1";
         title {(source["title"].as_str().unwrap_or("Response document"))}
-        style {"body{font:16px/1.6 system-ui,sans-serif;margin:48px;color:#263034}main{max-width:820px;margin:auto}h1{font-size:30px;line-height:1.2}section{border-top:1px solid #dadeda;padding:20px 0}p,pre{overflow-wrap:anywhere;white-space:pre-wrap}pre{font:inherit}small{color:#46545a}@page{margin:20mm}"}
+        style {"body{font:16px/1.6 system-ui,sans-serif;margin:48px;color:#263034}main{max-width:820px;margin:auto}h1{font-size:30px;line-height:1.2}section{border-top:1px solid #dadeda;padding:20px 0}h1,h2{break-after:avoid}h1,h2,p,pre{overflow-wrap:anywhere}p,pre{white-space:pre-wrap}pre{font:inherit}small{color:#46545a}@page{margin:20mm}"}
     }body {main {h1 {(source["title"].as_str().unwrap_or("Response document"))}
         p {"Response " (source["entry_id"].as_str().unwrap_or("")) " · published version " (source["form_version"].as_i64().unwrap_or(0))}
         @if let Some(time)=source["accepted_at"].as_i64().and_then(|value|chrono::DateTime::from_timestamp(value,0)) {p {"Accepted " (time.format("%Y-%m-%d %H:%M:%S UTC"))}}
