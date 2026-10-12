@@ -38,32 +38,16 @@ impl Notification {
         }
         Document::parse(&self.document)?;
         if let Some(condition) = &self.when {
-            let field = match condition {
-                Condition::Equal { field, .. } | Condition::Present { field } => field,
-            };
-            if !fields.iter().any(|f| &f.name == field) {
-                return Err(Error::invalid(
-                    "Route conditions must refer to a declared field.",
-                ));
-            }
-            if let Condition::Equal { value, .. } = condition
-                && !value.is_boolean()
-                && !value.is_number()
-                && !value.is_string()
-            {
-                return Err(Error::invalid("Route comparison must be a scalar."));
-            }
+            condition.validate(fields)?;
         }
         Ok(())
     }
     fn matches(&self, values: &Value) -> bool {
-        match &self.when {
-            None => true,
-            Some(Condition::Equal { field, value }) => values.get(field) == Some(value),
-            Some(Condition::Present { field }) => values
-                .get(field)
-                .is_some_and(|v| !v.is_null() && v.as_str() != Some("")),
-        }
+        self.when.as_ref().is_none_or(|condition| {
+            values
+                .as_object()
+                .is_some_and(|values| condition.matches(values))
+        })
     }
 }
 pub async fn apply(

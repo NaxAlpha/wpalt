@@ -24,6 +24,8 @@ pub fn routes(app: &App) -> Router<App> {
         Router::new()
     };
     Router::new()
+        .merge(super::native_forms::routes())
+        .merge(super::surveys_web::routes())
         .merge(super::audience_web::routes())
         .merge(super::workflows_web::routes())
         .merge(super::registration_web::routes())
@@ -42,6 +44,7 @@ pub fn routes(app: &App) -> Router<App> {
             get(attachment_download),
         )
         .route("/api/admin/forms/{id}", get(state).post(save))
+        .route("/api/admin/forms/{id}/preview", post(preview))
         .route("/api/forms/{id}/entries", post(submit))
         .route(
             "/api/forms/{id}/attachments/{field}",
@@ -53,7 +56,10 @@ pub fn routes(app: &App) -> Router<App> {
         .route("/assets/forms.js", get(bundle))
         .layer(DefaultBodyLimit::max(128 * 1024))
 }
-async fn editor_session(app: &App, headers: &HeaderMap) -> Result<crate::model::Session> {
+pub(super) async fn editor_session(
+    app: &App,
+    headers: &HeaderMap,
+) -> Result<crate::model::Session> {
     let session = auth::session(app, headers).await?;
     if !session.can_edit() {
         return Err(Error::forbidden());
@@ -162,7 +168,7 @@ async fn editor(
         Some(&session),
         html! {
             (view::heading("Business", "Edit form", "Save the working copy before publishing changes to visitors."))
-            p {a href=(format!("/admin/forms/{id}/entries")) {"View responses"}}
+            p {a href=(format!("/admin/forms/{id}/entries")) {"View responses"} " · " a href=(format!("/admin/forms/{id}/report")) {"Survey report"}}
         div id="forms-studio" data-id=(id) data-csrf=(session.csrf) {p {"Loading local form designer…"}}
             script defer src="/assets/forms.js" {}
         },
@@ -180,8 +186,40 @@ async fn state(
         .await?
         .ok_or_else(Error::not_found)?;
     let lists = sqlx::query("SELECT id,title,purpose,policy FROM audience_lists ORDER BY created_at DESC,id DESC LIMIT 100").fetch_all(&app.db.pool).await?.into_iter().map(|r| json!({"id":r.get::<String,_>("id"),"title":r.get::<String,_>("title"),"purpose":r.get::<String,_>("purpose"),"policy":r.get::<String,_>("policy")})).collect::<Vec<_>>();
+    let groups = crate::schema::Registry::load(&app).await?.common.groups;
     Ok(Json(
-        json!({"lists":lists,"definition":serde_json::from_str::<Value>(&row.get::<String,_>("draft")).map_err(|_| Error::invalid("Stored form requires repair."))?,"version":row.get::<i64,_>("version"),"published_version":row.get::<i64,_>("published_version")}),
+        json!({"groups":groups,"lists":lists,"definition":serde_json::from_str::<Value>(&row.get::<String,_>("draft")).map_err(|_| Error::invalid("Stored form requires repair."))?,"version":row.get::<i64,_>("version"),"published_version":row.get::<i64,_>("published_version")}),
+    ))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Preview {
+    csrf: String,
+    definition: FormDefinition,
+    values: Value,
+}
+async fn preview(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(input): Json<Preview>,
+) -> Result<Json<Value>> {
+    let session = editor_session(&app, &headers).await?;
+    auth::csrf(&session, &input.csrf)?;
+    sqlx::query_scalar::<_, String>("SELECT id FROM business_forms WHERE id=$1")
+        .bind(id)
+        .fetch_optional(&app.db.pool)
+        .await?
+        .ok_or_else(Error::not_found)?;
+    let common = crate::schema::Registry::load(&app).await?.common;
+    let values = input.definition.evaluate(&common, &input.values, false)?;
+    let source = crate::auth::digest(
+        &serde_json::to_vec(&json!([input.definition, common.groups]))
+            .map_err(|_| Error::invalid("Invalid preview definition."))?,
+    );
+    editor_session(&app, &headers).await?;
+    Ok(Json(
+        json!({"values":values,"source_sha256":source,"scope":"Unsaved working definition and current shared groups; server validation only, no response, notification, consent, registration or commerce action."}),
     ))
 }
 #[derive(Deserialize)]
@@ -248,7 +286,7 @@ async fn public(
         .map_err(|_| Error::invalid("Stored form requires repair."))?;
     let settings = app.db.settings().await?;
     if embed.embedded {
-        return Ok(Html(html!{(maud::DOCTYPE)html lang="en"{head{meta charset="utf-8";meta name="viewport" content="width=device-width, initial-scale=1";title {(definition.form.title)}link rel="stylesheet" href="/assets/app.css";}body class=(format!("{} embedded-form",settings.theme)){main{h1 {(definition.form.title)}div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) data-spam=(if app.config.spam.enabled {"true"} else {"false"}){p{"Loading form…"}noscript{"Enable JavaScript to complete this form."}}}script defer src="/assets/forms.js"{}script defer src="/assets/form-embed.js"{}}}}.into_string()));
+        return Ok(Html(html!{(maud::DOCTYPE)html lang="en"{head{meta charset="utf-8";meta name="viewport" content="width=device-width, initial-scale=1";title {(definition.form.title)}link rel="stylesheet" href="/assets/app.css";}body class=(format!("{} embedded-form",settings.theme)){main{h1 {(definition.form.title)}div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) data-spam=(if app.config.spam.enabled {"true"} else {"false"}){p{"Loading form…"}noscript{a href=(format!("/forms/{id}/native")){"Use the server-rendered form"}}}}script defer src="/assets/forms.js"{}script defer src="/assets/form-embed.js"{}}}}.into_string()));
     }
     Ok(Html(view::layout(
         &definition.form.title,
@@ -257,7 +295,7 @@ async fn public(
         html! {
             h1 {(definition.form.title)}
             (super::engagement::markup(&settings,false))
-            div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) data-spam=(if app.config.spam.enabled {"true"} else {"false"}) {p {"Loading form…"}noscript {"Enable JavaScript to complete this form."}}
+            div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) data-spam=(if app.config.spam.enabled {"true"} else {"false"}) {p {"Loading form…"}noscript {a href=(format!("/forms/{id}/native")) {"Use the server-rendered form"}}}
             script defer src="/assets/forms.js" {}
         },
     )))

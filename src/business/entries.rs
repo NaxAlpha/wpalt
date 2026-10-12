@@ -47,7 +47,7 @@ pub async fn follow_up(
     tx.commit().await?;
     Ok(())
 }
-fn cell(value: &str) -> String {
+pub(super) fn cell(value: &str) -> String {
     // Spreadsheet import must not interpret visitor-controlled text as a formula.
     let prefixed = if value.trim_start().starts_with(['=', '+', '-', '@']) {
         format!("'{value}")

@@ -58,19 +58,7 @@ pub struct Choice {
     pub value: String,
     pub score: i32,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "operation", deny_unknown_fields)]
-pub enum Condition {
-    Equal { field: String, value: Value },
-    Present { field: String },
-}
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "operation", deny_unknown_fields)]
-pub enum Calculation {
-    Sum { fields: Vec<String> },
-    Product { fields: Vec<String> },
-    Score { fields: Vec<String> },
-}
+pub use super::rules::{Calculation, Condition, Expression};
 impl FormDefinition {
     /// Dependencies must precede the field: evaluation is linear, with no cycles.
     pub fn validate(&self, common: &Definition) -> Result<Registry> {
@@ -133,49 +121,17 @@ impl FormDefinition {
             if fields.is_empty() && field.step != 0 {
                 return Err(Error::invalid("The first form step must be zero."));
             }
+            let earlier = &self.fields[..fields.len()];
             if let Some(condition) = &field.visible_when {
-                let name = match condition {
-                    Condition::Equal { field, .. } | Condition::Present { field } => field,
-                };
-                if !fields.contains_key(name) {
-                    return Err(Error::invalid(
-                        "Conditions must reference an earlier field.",
-                    ));
-                }
-                if let Condition::Equal { value, .. } = condition
-                    && (value.is_object() || value.is_array() || value.to_string().len() > 8000)
-                {
-                    return Err(Error::invalid("Conditions compare bounded scalar values."));
-                }
+                condition.validate(earlier)?;
             }
             if let Some(calculation) = &field.calculation {
-                let names = match calculation {
-                    Calculation::Sum { fields }
-                    | Calculation::Product { fields }
-                    | Calculation::Score { fields } => fields,
-                };
-                if field.schema.kind != "number"
-                    || names.is_empty()
-                    || names.len() > 32
-                    || names.iter().any(|name| {
-                        if matches!(calculation, Calculation::Score { .. }) {
-                            !self
-                                .fields
-                                .iter()
-                                .take_while(|f| f.name != field.name)
-                                .any(|f| {
-                                    &f.name == name
-                                        && matches!(f.widget, Some(Widget::Choice { .. }))
-                                })
-                        } else {
-                            fields.get(name).is_none_or(|s| s.kind != "number")
-                        }
-                    })
-                {
+                if field.schema.kind != "number" {
                     return Err(Error::invalid(
-                        "Calculations require earlier numeric fields and a numeric result.",
+                        "A calculated result must be a number field.",
                     ));
                 }
+                calculation.validate(earlier)?;
             }
             if let Some(widget) = &field.widget {
                 let valid = match widget {
@@ -263,6 +219,14 @@ impl FormDefinition {
     /// existing shared value grammar. Partial drafts may omit required fields.
     pub fn evaluate(&self, common: &Definition, input: &Value, partial: bool) -> Result<Value> {
         let registry = self.validate(common)?;
+        self.evaluate_validated(&registry, input, partial)
+    }
+    pub(super) fn evaluate_validated(
+        &self,
+        registry: &Registry,
+        input: &Value,
+        partial: bool,
+    ) -> Result<Value> {
         let input = input
             .as_object()
             .ok_or(Error::invalid("Form values must be an object."))?;
@@ -276,53 +240,20 @@ impl FormDefinition {
         let mut values = Map::new();
         let mut active = BTreeMap::new();
         for field in &self.fields {
-            let visible = match &field.visible_when {
-                None => true,
-                Some(Condition::Equal { field, value }) => values.get(field) == Some(value),
-                Some(Condition::Present { field }) => values.get(field).is_some_and(|v| {
-                    !v.is_null() && v.as_str().is_none_or(|s| !s.trim().is_empty())
-                }),
-            };
-            if !visible {
+            if field
+                .visible_when
+                .as_ref()
+                .is_some_and(|rule| !rule.matches(&values))
+            {
                 continue;
             }
             let value = if let Some(calculation) = &field.calculation {
-                let names = match calculation {
-                    Calculation::Sum { fields }
-                    | Calculation::Product { fields }
-                    | Calculation::Score { fields } => fields,
-                };
-                let operands: Option<Vec<f64>> = names
-                    .iter()
-                    .map(|name| {
-                        if matches!(calculation, Calculation::Score { .. }) {
-                            let value = values.get(name)?.as_str()?;
-                            let previous = self.fields.iter().find(|f| &f.name == name)?;
-                            if let Some(Widget::Choice { options }) = &previous.widget {
-                                options
-                                    .iter()
-                                    .find(|o| o.value == value)
-                                    .map(|o| f64::from(o.score))
-                            } else {
-                                None
-                            }
-                        } else {
-                            values.get(name).and_then(Value::as_f64)
-                        }
-                    })
-                    .collect();
-                match operands {
-                    Some(operands) => {
-                        let result = match calculation {
-                            Calculation::Sum { .. } | Calculation::Score { .. } => {
-                                operands.iter().sum()
-                            }
-                            Calculation::Product { .. } => operands.iter().product(),
-                        };
-                        Some(Value::Number(serde_json::Number::from_f64(result).ok_or(
-                            Error::invalid("A calculation exceeded its numeric range."),
-                        )?))
-                    }
+                match calculation.evaluate(&self.fields, &values)? {
+                    Some(result) => Some(Value::Number(
+                        serde_json::Number::from_f64(result).ok_or_else(|| {
+                            Error::invalid("A calculation exceeded its numeric range.")
+                        })?,
+                    )),
                     None if partial => None,
                     None => {
                         return Err(Error::invalid(
@@ -378,7 +309,7 @@ impl FormDefinition {
             }
             active.insert(field.name.clone(), schema);
         }
-        let mut validation = registry;
+        let mut validation = registry.clone();
         if partial {
             for fields in validation.common.groups.values_mut() {
                 for field in fields.values_mut() {

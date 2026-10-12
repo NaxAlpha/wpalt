@@ -2590,7 +2590,7 @@
       "next_review": "2027-01-10",
       "review_interval_days": 90,
       "maintenance_owner": "wpalt maintainers",
-      "status": "reviewed; active functional implementation; integrated delivery not yet verified"
+      "status": "reviewed; defined delivery independently verified in PR25 actual-main release; richer linguistic scope explicit"
     },
     {
       "feature_id": "D09-02",
@@ -2627,7 +2627,49 @@
       "next_review": "2027-01-10",
       "review_interval_days": 90,
       "maintenance_owner": "wpalt maintainers",
-      "status": "reviewed; active functional implementation; integrated delivery not yet verified"
+      "status": "reviewed; defined delivery independently verified in PR25 actual-main release; richer linguistic scope explicit"
+    },
+    {
+      "feature_id": "D10-FORM-SURVEY",
+      "area": "Composable canonical questionnaires/calculations and frozen-version aggregate reporting",
+      "scope": "D10 F038/F042/F044 in development",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.gravityforms.com/using-calculations/",
+        "https://docs.gravityforms.com/enable-conditional-logic/",
+        "https://wordpress.org/plugins/forminator/",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html",
+        "https://www.postgresql.org/docs/17/transaction-iso.html",
+        "https://sqlite.org/isolation.html"
+      ],
+      "applicable_versions": [
+        "Pinned free Forminator1.58.0 calculator component; paid Gravity Forms vendor descriptions only",
+        "PostgreSQL17 repeatable-read; SQLite snapshot isolation",
+        "D10 finite declarative rules and binary64 calculations, ties away from zero; engineering limits not externally mandated"
+      ],
+      "last_checked": "2026-10-12",
+      "next_review": "2026-11-11",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Recompute canonical visible/derived values on server before storage or queued actions; never eval owner code or accept visitor-computed commerce totals.",
+        "Bound recursive declarations/work/results, validate types/dependencies, expose useful errors while preserving work.",
+        "One frozen publication version and consistent response snapshot; eligible/answered/unanswered/skipped counts remain distinct; never silently sample over-budget reports.",
+        "Preserve original definitions/answers across explicit versioned migration and fresh recovery; no guessed historic values or perpetual legacy runtime.",
+        "Actual free component execution and normative guidance are distinct from premium/runtime/admin parity."
+      ],
+      "tests": [
+        "branching_calculators_discard_forgery_and_evaluate_only_the_selected_branch",
+        "numeric_boundaries_missing_values_and_rule_budgets_refuse_unsafe_declarations",
+        "versioned_survey_reports_preserve_branch_denominators_and_canonical_notifications"
+      ],
+      "triggers": [
+        "affected feature/release",
+        "plugin/standard/database change",
+        "rule grammar/rounding/report cohort changes",
+        "security finding"
+      ],
+      "status": "reviewed primary sources; implementation active, integrated delivery gates pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

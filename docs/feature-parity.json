@@ -628,7 +628,7 @@
       "capability": "Internal-link graph / orphan detection",
       "deployment": "L",
       "milestone": "M3",
-      "status": "verified-defined-local-M9-scope; broader-remainder-deferred-by-owner",
+      "status": "D09-defined-scope-delivered; merged-PR25; actual-main/public-release-independently-verified",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m9_coverage": "Bounded complete public canonical published-document content-link graph with redirects, deduplicated non-self edges and inbound-link candidates; navigation/theme/dynamic graphs excluded.",
@@ -637,7 +637,8 @@
         "../src/platform/content_audit.rs",
         "evidence/d08-verification.md",
         "../src/discovery/rendered_links.rs",
-        "d09-contract.md"
+        "d09-contract.md",
+        "evidence/d09-main-release.json"
       ],
       "deferred_work": "deferred-features.md",
       "d08_overlap": "Bounded owner analysis of actual anonymous canonical publication and language-landing HTML, including navigation/theme/raw/dynamic edges, explicit target states and no-inbound candidates within declared sources. Broader editorial and incremental workloads remain D09.",
@@ -686,14 +687,15 @@
       "capability": "Readability and keyword heuristics",
       "deployment": "L",
       "milestone": "M3",
-      "status": "verified-defined-local-M9-scope; broader-remainder-deferred-by-owner",
+      "status": "D09-defined-scope-delivered; merged-PR25; actual-main/public-release-independently-verified",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m9_coverage": "Advisory published-text whitespace/sentence/paragraph/keyword counts; language-sensitive, no ranking grade, preferred length or density target.",
       "evidence": [
         "discovery.md",
         "../src/platform/content_audit.rs",
-        "d09-contract.md"
+        "d09-contract.md",
+        "evidence/d09-main-release.json"
       ],
       "deferred_work": "deferred-features.md",
       "d09_status": "active implementation under d09-contract.md; text observations and durable rendering authority first; integrated delivery not yet verified"
@@ -744,7 +746,7 @@
       "capability": "Conditional fields / notification routing",
       "deployment": "L",
       "milestone": "M4",
-      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
+      "status": "D10-active; defined earlier scopes retained; advanced behavior not yet delivery-verified",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Earlier-field visibility and fixed-recipient canonical notification rules using presence/scalar equality; no arbitrary executable expressions.",
@@ -755,8 +757,10 @@
         "../tests/business_rules.rs",
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
-        "../scripts/workflows_acceptance.cjs"
-      ]
+        "../scripts/workflows_acceptance.cjs",
+        "d10-contract.md"
+      ],
+      "d10_coverage": "docs/d10-contract.md; bounded composable conditions/calculations and frozen-version survey reporting in development"
     },
     {
       "id": "F039",
@@ -824,7 +828,7 @@
       "capability": "Calculations and pricing logic",
       "deployment": "L",
       "milestone": "M4",
-      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
+      "status": "D10-active; defined earlier scopes retained; advanced behavior not yet delivery-verified",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Server-authoritative finite sum/product/choice-score calculation; exact currency and payment pricing remain M6.",
@@ -835,8 +839,10 @@
         "../tests/business_rules.rs",
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
-        "../scripts/workflows_acceptance.cjs"
-      ]
+        "../scripts/workflows_acceptance.cjs",
+        "d10-contract.md"
+      ],
+      "d10_coverage": "docs/d10-contract.md; bounded composable conditions/calculations and frozen-version survey reporting in development"
     },
     {
       "id": "F043",
@@ -864,7 +870,7 @@
       "capability": "Surveys, polls and scoring",
       "deployment": "L",
       "milestone": "M4",
-      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
+      "status": "D10-active; defined earlier scopes retained; advanced behavior not yet delivery-verified",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Choice questionnaires, scores and boolean acknowledgment inputs; responses/export support local evaluation, no specialized statistical survey designer.",
@@ -875,8 +881,10 @@
         "../tests/business_rules.rs",
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
-        "../scripts/workflows_acceptance.cjs"
-      ]
+        "../scripts/workflows_acceptance.cjs",
+        "d10-contract.md"
+      ],
+      "d10_coverage": "docs/d10-contract.md; bounded composable conditions/calculations and frozen-version survey reporting in development"
     },
     {
       "id": "F045",

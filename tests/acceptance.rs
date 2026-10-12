@@ -10198,7 +10198,7 @@ async fn discovery_formats_have_explicit_conversion_validation_and_private_draft
         let mut envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         let mut graph: serde_json::Value =
             serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
-        assert_eq!(graph["schema"], 18);
+        assert_eq!(graph["schema"], 19);
         assert!(
             graph["tables"].get("published_image_refs").is_none(),
             "Derived index is rebuilt from canonical publication, not separately trusted"

@@ -86,7 +86,7 @@ Verifiable future outcome: Preview loops/conflicts and work budgets; a complete 
 
 ### D09 — Editorial tooling
 
-Origin: **M3/M9** · Catalog: **F031/F034** · Status: **active under the D09 editorial-insights contract**
+Origin: **M3/M9** · Catalog: **F031/F034** · Status: **defined editorial-insights system merged in PR25; actual-main/public release independently verified; richer linguistic breadth retained**
 
 [D09 contract](d09-contract.md) governs connected text/phrase insights and larger durable public analysis. Administration screens for native link/orphan/text/keyword tools, richer language-aware advisory analysis and larger incremental graph workloads.
 
@@ -94,9 +94,9 @@ Verifiable future outcome: An editor reviews useful suggestions alongside conten
 
 ### D10 — Advanced forms and surveys
 
-Origin: **M4** · Catalog: **F038/F042/F044** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M4** · Catalog: **F038/F042/F044** · Status: **active under the D10 advanced-forms contract**
 
-Richer declarative conditional/calculation grammar and specialized survey reporting beyond bounded presence/equality/sum/product/choice score.
+[D10 contract](d10-contract.md) governs richer declarative conditional/calculation grammar and specialized survey reporting beyond bounded presence/equality/sum/product/choice score.
 
 Verifiable future outcome: Server and UI agree on calculations and visibility; expressions cannot execute owner/server code or alter reviewed pricing.
 
