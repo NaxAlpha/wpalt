@@ -2427,7 +2427,7 @@
         "provider profile change or retirement",
         "privacy, security or migration finding"
       ],
-      "status": "reviewed; final native/browser local checks pass; PR #23 cumulative/reference/release gates pending"
+      "status": "reviewed; merged PR #23; actual-main and separate public release verified; pinned free Yoast reference passed"
     },
     {
       "feature_id": "D07-02",
@@ -2469,7 +2469,89 @@
         "provider profile change or retirement",
         "privacy, security or migration finding"
       ],
-      "status": "reviewed; final native/browser local checks pass; PR #23 cumulative/reference/release gates pending"
+      "status": "reviewed; merged PR #23; actual-main and separate public release verified; pinned free Yoast reference passed"
+    },
+    {
+      "feature_id": "D08-01",
+      "area": "Bounded owner redirect and publication authority",
+      "scope": "D08 F030",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://developers.google.com/search/docs/crawling-indexing/301-redirects",
+        "https://redirection.me/support/redirect-regular-expressions/",
+        "https://redirection.me/support/matching-a-url/",
+        "https://wordpress.org/plugins/redirection/",
+        "https://docs.rs/regex/latest/regex/struct.RegexBuilder.html"
+      ],
+      "applicable_versions": [
+        "Redirection 5.10.1 free source; isolated execution pending",
+        "regex 1.13.1",
+        "Google guidance reviewed 2026-10-11",
+        "native 22 / portable v18"
+      ],
+      "requirements": [
+        "Distinguish permanent/temporary server redirects without promising rankings or indexing.",
+        "Bound whole ASCII path matching, captures, regex compilation and resolution; validate every expanded local target and discard queries. Rust semantics deliberately differ from PCRE.",
+        "Actual and scheduled publication commit alias ownership atomically with the current plan; stale edits and conflicting manual ownership must roll back.",
+        "Keep opt-in 404 counts finite, private-route aware and free of query/header/client-address/body retention; public slugs can still contain personal information."
+      ],
+      "tests": [
+        "numbered_capture_moves_only_a_whole_safe_local_path",
+        "unsupported_patterns_missing_captures_and_dangerous_expansions_are_refused",
+        "redirect_publication_aliases_are_atomic_across_drafts_conflicts_and_scheduling",
+        "redirect_workspace_preview_policy_and_opt_in_report_share_real_authority",
+        "redirect_concurrent_writers_cannot_commit_a_combined_cycle"
+      ],
+      "triggers": [
+        "affected release or milestone",
+        "regex security finding or dependency update",
+        "search redirect guidance or free reference release change",
+        "publication privacy, concurrency or migration finding"
+      ],
+      "last_checked": "2026-10-11",
+      "next_review": "2027-01-09",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "status": "reviewed; implementation and connected verification in progress; final delivery gates pending"
+    },
+    {
+      "feature_id": "D08-02",
+      "area": "Actual rendered-publication link graph",
+      "scope": "D08 F032",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://html.spec.whatwg.org/multipage/browsing-the-web.html#scroll-to-fragid",
+        "https://www.w3.org/TR/WCAG22/",
+        "https://www.w3.org/WAI/WCAG22/Understanding/reflow.html",
+        "https://html.spec.whatwg.org/multipage/browsing-the-web.html#the-indicated-part-of-the-document"
+      ],
+      "applicable_versions": [
+        "Current HTML Standard and WCAG 2.2 reviewed 2026-10-11",
+        "native 22 / portable v18"
+      ],
+      "requirements": [
+        "Analyze actual anonymous server HTML, including admitted navigation/templates and resolved bindings, without external fetching or client JavaScript.",
+        "Declare enumerated source and target-state scope; refuse complete/orphan results after source, byte, edge, tree, time or generation work limits.",
+        "Check current publication/media authority and distinguish private, external and unscanned targets from broken local links.",
+        "Keep native forms and useful failures readable at 320/768/1440 pixels under the existing calm design and measurement contract.",
+        "Check actual fragment IDs and named anchors, original and percent-decoded forms, and case-insensitive top; keep browser text directives explicitly unscanned."
+      ],
+      "tests": [
+        "rendered_html_parser_finds_real_edges_and_refuses_partial_work",
+        "rendered_link_graph_uses_anonymous_templates_bindings_and_current_privacy",
+        "D08 browser responsive and native-form journey (pending)"
+      ],
+      "triggers": [
+        "affected release or milestone",
+        "HTML fragment or accessibility guidance change",
+        "public route, media, theme or composition semantics change",
+        "work-budget, concurrent publication or geometry finding"
+      ],
+      "last_checked": "2026-10-11",
+      "next_review": "2027-01-09",
+      "review_interval_days": 90,
+      "maintenance_owner": "wpalt maintainers",
+      "status": "reviewed; implementation and connected verification in progress; final delivery gates pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

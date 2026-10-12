@@ -70,7 +70,7 @@ Verifiable future outcome: Published/private boundaries, latest primary guidance
 
 ### D07 — Structured data and locations
 
-Origin: **M3** · Catalog: **F028/F029** · Status: **active; publication-bound graph and multiple-location contract**
+Origin: **M3** · Catalog: **F028/F029** · Status: **defined structured publication/location delivery merged in PR #23; actual-main release independently verified**
 
 [D07 contract](d07-contract.md) governs a usable publication-bound graph builder, selected dated structured-data profiles and multiple business locations.
 
@@ -78,9 +78,9 @@ Verifiable future outcome: Owner-authored visible entities produce validated pub
 
 ### D08 — Redirects and link analysis
 
-Origin: **M3** · Catalog: **F030/F032** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M3** · Catalog: **F030/F032** · Status: **active; redirect and rendered-link workspace contract**
 
-Bounded regex rules, safe automatic slug redirects, actionable 404 reporting and graph coverage of theme/navigation/raw HTML/dynamic links.
+[D08 contract](d08-contract.md) governs bounded regex rules, safe automatic slug redirects, actionable 404 reporting and graph coverage of theme/navigation/raw HTML/server-resolved dynamic links.
 
 Verifiable future outcome: Preview loops/conflicts and work budgets; a complete claimed graph includes documented edge sources without unauthorized external fetching.
 
@@ -144,7 +144,7 @@ Verifiable future outcome: Idempotent orders/refunds/reversals reconcile commiss
 
 Origin: **M6** · Catalog: **F060–F069** · Status: **queued for dependency-ordered autonomous resumption**
 
-Guest checkout, additional currencies/pricing/shipping/tax models, richer refund/fulfillment/provider workflows and broader booking calendars beyond current defined store scope.
+Guest checkout, additional currencies/pricing/shipping/tax models, richer refund/fulfillment/provider workflows and broader booking calendars beyond current defined store scope. Authoritative catalog price/currency/availability/offers enrichment for structured output remains here; D07 editorial declarations deliberately refuse those properties.
 
 Verifiable future outcome: Concurrent stock/capacity, checked money, stale totals, revocation, repeat receipts and recovery remain correct under every added workflow.
 

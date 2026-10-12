@@ -557,9 +557,12 @@
         "structured-data.md",
         "evidence/d07-verification.md",
         "../tests/structured.rs",
-        "../scripts/structured_acceptance.cjs"
+        "../scripts/structured_acceptance.cjs",
+        "evidence/d07-main-release.json",
+        "evidence/d07-free-reference.json",
+        "evidence/d07-clean-release-observations.json"
       ],
-      "d07_status": "native and browser verified locally; PR #23 exact-source delivery pending",
+      "d07_status": "merged PR #23; actual-main cumulative gates and independent public release verification passed",
       "d07_coverage": "Known named entities/properties, typed field/publication/relationship/image/enumeration bindings, finite cyclic identities, shared visible facts and JSON-LD, offline attributed Schema.org 30.1 lookup and selected dated guidance warnings.",
       "d07_limits": "Bounded native admission policy and selected provider checks; no full ontology/search eligibility or licensed premium execution claim. Editorial price/availability/offers remain refused pending authoritative D16 commerce enrichment."
     },
@@ -583,9 +586,12 @@
         "structured-data.md",
         "evidence/d07-verification.md",
         "../tests/structured.rs",
-        "../scripts/structured_acceptance.cjs"
+        "../scripts/structured_acceptance.cjs",
+        "evidence/d07-main-release.json",
+        "evidence/d07-free-reference.json",
+        "evidence/d07-clean-release-observations.json"
       ],
-      "d07_status": "native and browser verified locally; PR #23 exact-source delivery pending",
+      "d07_status": "merged PR #23; actual-main cumulative gates and independent public release verification passed",
       "d07_coverage": "Explicit published organization/location records with specific vocabulary business types, scoped actual addresses/coordinates/opening hours and native relationships; current related/media restriction and unpublication boundaries.",
       "d07_limits": "Bounded native admission policy and selected provider checks; no full ontology/search eligibility or licensed premium execution claim. Editorial price/availability/offers remain refused pending authoritative D16 commerce enrichment."
     },
@@ -604,8 +610,14 @@
         "discovery.md",
         "evidence/m3-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d08-contract.md",
+        "redirects-and-links.md",
+        "evidence/d08-verification.md",
+        "../tests/redirect_plans.rs"
+      ],
+      "d08_status": "in development; native forms and route engine implemented; connected checks progressing; delivery pending",
+      "d08_limits": "Bounded local ASCII-path Rust regex and declared anonymous publication/language graph. No full PCRE, external redirect/crawler, query-forwarding or infinite/client-generated link-state claim."
     },
     {
       "id": "F031",
@@ -619,9 +631,12 @@
       "m9_coverage": "Bounded complete public canonical published-document content-link graph with redirects, deduplicated non-self edges and inbound-link candidates; navigation/theme/dynamic graphs excluded.",
       "evidence": [
         "discovery.md",
-        "../src/platform/content_audit.rs"
+        "../src/platform/content_audit.rs",
+        "evidence/d08-verification.md",
+        "../src/discovery/rendered_links.rs"
       ],
-      "deferred_work": "deferred-features.md"
+      "deferred_work": "deferred-features.md",
+      "d08_overlap": "Bounded owner analysis of actual anonymous canonical publication and language-landing HTML, including navigation/theme/raw/dynamic edges, explicit target states and no-inbound candidates within declared sources. Broader editorial and incremental workloads remain D09."
     },
     {
       "id": "F032",
@@ -638,8 +653,14 @@
         "discovery.md",
         "evidence/m3-verification.md",
         "../tests/acceptance.rs",
-        "../scripts/browser_acceptance.cjs"
-      ]
+        "../scripts/browser_acceptance.cjs",
+        "d08-contract.md",
+        "redirects-and-links.md",
+        "evidence/d08-verification.md",
+        "../tests/redirect_plans.rs"
+      ],
+      "d08_status": "in development; native forms and route engine implemented; connected checks progressing; delivery pending",
+      "d08_limits": "Bounded local ASCII-path Rust regex and declared anonymous publication/language graph. No full PCRE, external redirect/crawler, query-forwarding or infinite/client-generated link-state claim."
     },
     {
       "id": "F033",

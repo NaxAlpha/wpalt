@@ -402,6 +402,17 @@ async fn security_and_trace_inner(
             Err(error) => response = error.into_response(),
         }
     }
+    if response.status() == StatusCode::NOT_FOUND
+        && method == axum::http::Method::GET
+        && crate::discovery::redirects::record_missing(&app, &requested_path)
+            .await
+            .is_err()
+    {
+        tracing::warn!(
+            event = "missing_path_aggregate_failed",
+            reason = "bounded-storage-operation"
+        );
+    }
     if route.starts_with("/admin")
         && method == axum::http::Method::GET
         && response.status() == StatusCode::UNAUTHORIZED
@@ -961,6 +972,40 @@ async fn localized_post(
         return Ok(Redirect::permanent(&d.path(&locale, &slug)).into_response());
     }
     render_post(app, headers, locale, slug, d).await
+}
+/// Internal reader rendering for bounded owner analysis; no router recursion,
+/// owner session, presentation cookie or external request is introduced.
+pub(crate) async fn render_anonymous_source(
+    app: &App,
+    locale: String,
+    slug: Option<String>,
+) -> Result<String> {
+    if let Some(slug) = slug {
+        let (discovery, _) = crate::discovery::load(app).await?;
+        let response = render_post(app.clone(), HeaderMap::new(), locale, slug, discovery).await?;
+        let bytes = axum::body::to_bytes(response.into_body(), 2 * 1024 * 1024)
+            .await
+            .map_err(|_| {
+                Error::invalid("Rendered source exceeds 2 MiB; no complete graph was produced.")
+            })?;
+        String::from_utf8(bytes.to_vec()).map_err(|_| Error::invalid("Invalid rendered UTF-8."))
+    } else {
+        let page = render_home(
+            app.clone(),
+            ListQuery {
+                lang: Some(locale),
+                ..Default::default()
+            },
+            HeaderMap::new(),
+        )
+        .await?;
+        if page.0.len() > 2 * 1024 * 1024 {
+            return Err(Error::invalid(
+                "Rendered source exceeds 2 MiB; no complete graph was produced.",
+            ));
+        }
+        Ok(page.0)
+    }
 }
 async fn render_post(
     app: App,

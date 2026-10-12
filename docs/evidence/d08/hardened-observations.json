@@ -1,0 +1,164 @@
+{
+  "profile": "debug",
+  "binary_sha256": "26b4b5085c98e8323ba39fd70d6f8805be668e097534098e01159965c284813d",
+  "binary_bytes": 118165752,
+  "scope": "Synthetic actual API publications, 128 regex rules, 150 seeded stories, the seeded about page, and one real publication. Debug SQL logging on; five warmups and 30 serial anonymous loopback requests; capture observations include the followed destination. Graph scanned 153 sources, then refuses an independent directly inserted >1000-publication DB fixture. RSS is warm application process memory, not peak or database-engine memory; database storage scopes differ. No throughput, CWV or relative WordPress efficiency claim.",
+  "observations": [
+    {
+      "engine": "sqlite",
+      "rules": 128,
+      "configuration_ms": [
+        349.047,
+        360.595,
+        345.594
+      ],
+      "report_disabled": {
+        "samples": 30,
+        "p50_ms": 1.569,
+        "p95_ms": 2.128,
+        "response_bytes": 22,
+        "observed_sql": 4,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026"
+        ],
+        "warm_rss_bytes": 70221824
+      },
+      "report_enabled": {
+        "samples": 30,
+        "p50_ms": 4.216,
+        "p95_ms": 4.458,
+        "response_bytes": 22,
+        "observed_sql": 10,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "UPDATE redirect_policy SET version=version \u2026",
+          "SELECT definition FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "DELETE FROM missing_paths WHERE \u2026",
+          "SELECT COUNT(*) FROM missing_paths \u2026",
+          "INSERT INTO missing_paths(path,hits,first_seen,last_seen,version) VALUES($1,1,$2,$2,1) \u2026"
+        ],
+        "warm_rss_bytes": 74334208
+      },
+      "last_capture_with_destination": {
+        "samples": 30,
+        "p50_ms": 5.419,
+        "p95_ms": 6.177,
+        "response_bytes": 2181,
+        "observed_sql": 16,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT id FROM posts \u2026",
+          "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+          "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+          "SELECT COUNT(*) FROM member_resources \u2026",
+          "SELECT name,body FROM comments \u2026",
+          "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+          "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+          "SELECT published_version,version FROM themes \u2026",
+          "SELECT live_options FROM site_design \u2026",
+          "SELECT '' AS id,field_schema \u2026"
+        ],
+        "warm_rss_bytes": 71319552
+      },
+      "graph": {
+        "request_ms": 613.471,
+        "rendered_ms": 588.236,
+        "sources": 153,
+        "edges": 1240,
+        "html_bytes": 583246
+      },
+      "over_1000_publications_refusal_ms": 23.967,
+      "database_bytes_after_larger_fixture": 16623808
+    },
+    {
+      "engine": "postgres",
+      "rules": 128,
+      "configuration_ms": [
+        351.509,
+        350.184,
+        350.566
+      ],
+      "report_disabled": {
+        "samples": 30,
+        "p50_ms": 1.759,
+        "p95_ms": 2.484,
+        "response_bytes": 22,
+        "observed_sql": 4,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026"
+        ],
+        "warm_rss_bytes": 64552960
+      },
+      "report_enabled": {
+        "samples": 30,
+        "p50_ms": 4.195,
+        "p95_ms": 4.712,
+        "response_bytes": 22,
+        "observed_sql": 10,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "UPDATE redirect_policy SET version=version \u2026",
+          "SELECT definition FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "DELETE FROM missing_paths WHERE \u2026",
+          "SELECT COUNT(*) FROM missing_paths \u2026",
+          "INSERT INTO missing_paths(path,hits,first_seen,last_seen,version) VALUES($1,1,$2,$2,1) \u2026"
+        ],
+        "warm_rss_bytes": 68354048
+      },
+      "last_capture_with_destination": {
+        "samples": 30,
+        "p50_ms": 6.126,
+        "p95_ms": 6.887,
+        "response_bytes": 2181,
+        "observed_sql": 16,
+        "sql_shapes": [
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "SELECT p.id,p.published_locale,CASE WHEN EXISTS(SELECT \u2026",
+          "SELECT definition,version FROM discovery_settings \u2026",
+          "SELECT published_locale FROM posts \u2026",
+          "SELECT id FROM posts \u2026",
+          "SELECT r.policy_id,r.opens_at,r.delay_seconds,r.course_id,r.lesson_id,p.entitlement,p.group_id,p.enabled FROM member_resources \u2026",
+          "SELECT id,kind,author_id,version,status,publish_at,published_at,updated_at,'' AS slug,'' \u2026",
+          "SELECT COUNT(*) FROM member_resources \u2026",
+          "SELECT name,body FROM comments \u2026",
+          "SELECT t.kind,t.name,t.slug FROM terms \u2026",
+          "SELECT s.title,s.description,s.theme,s.navigation,s.field_schema,e.enabled AS analytics_enabled,e.recording \u2026",
+          "SELECT published_version,version FROM themes \u2026",
+          "SELECT live_options FROM site_design \u2026",
+          "SELECT '' AS id,field_schema \u2026"
+        ],
+        "warm_rss_bytes": 65437696
+      },
+      "graph": {
+        "request_ms": 712.75,
+        "rendered_ms": 688.887,
+        "sources": 153,
+        "edges": 1240,
+        "html_bytes": 583073
+      },
+      "over_1000_publications_refusal_ms": 19.82,
+      "database_bytes_after_larger_fixture": 10534912
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "status": "passed",
+  "errors": [],
+  "assertions": [
+    "No-JavaScript preview/save; preview is read-only; invalid and stale rule/settings/exact forms retain inputs; actual publication aliases flatten the capture chain",
+    "Opt-in report aggregates paths without queries; rendered report and full download use the current anonymous publication graph"
+  ],
+  "graph": {
+    "sources": 11,
+    "edges": 99,
+    "html_bytes": 40843,
+    "elapsed_ms": 48.980541
+  },
+  "local_processes": {
+    "processes": 2,
+    "workers": 1,
+    "worker_ready": true,
+    "routing": "round-robin-no-retry-no-stickiness",
+    "requests_by_node": [
+      39,
+      39
+    ]
+  },
+  "geometry": [
+    {
+      "surface": "route-workspace",
+      "viewport": 320,
+      "document_width": 320,
+      "failures": []
+    },
+    {
+      "surface": "route-workspace",
+      "viewport": 768,
+      "document_width": 768,
+      "failures": []
+    },
+    {
+      "surface": "route-workspace",
+      "viewport": 1440,
+      "document_width": 1440,
+      "failures": []
+    },
+    {
+      "surface": "rendered-links",
+      "viewport": 320,
+      "document_width": 320,
+      "failures": []
+    },
+    {
+      "surface": "rendered-links",
+      "viewport": 768,
+      "document_width": 768,
+      "failures": []
+    },
+    {
+      "surface": "rendered-links",
+      "viewport": 1440,
+      "document_width": 1440,
+      "failures": []
+    }
+  ],
+  "accessibility": [
+    {
+      "surface": "route-workspace",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": 0,
+      "passed_rules": 23
+    },
+    {
+      "surface": "rendered-links",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": 0,
+      "passed_rules": 19
+    }
+  ],
+  "scope": "Final implementation c5da5068a4a7c40bd266998ddf5322d79db4aee9; immutable debug executable; Chrome155 scoped responsive/a11y observations, not full conformance or physical multi-host certification.",
+  "binary_sha256": "35f2c842a742983dcec0ad8c93d9ebb31633c7e788717578e2d72f152cf92029"
+}

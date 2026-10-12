@@ -38,6 +38,7 @@ pub struct App {
     pub protection_limits: Arc<Mutex<operations::protection::Limits>>,
     pub media_cache: Arc<Mutex<operations::cache::Cache>>,
     pub page_cache: Arc<Mutex<operations::cache::Cache>>,
+    pub redirect_cache: Arc<Mutex<discovery::redirects::CachedPlan>>,
     pub spam_secret: Arc<[u8; 32]>,
     pub spam_used: Arc<Mutex<operations::spam::Used>>,
     pub passkey_ceremonies: Arc<Mutex<operations::passkeys::Ceremonies>>,
@@ -158,7 +159,7 @@ impl App {
                     || (matches!(
                         startup_mode,
                         Startup::Maintenance | Startup::RebindMaintenance
-                    ) && matches!(version, 14..=20)),
+                    ) && matches!(version, 14..=21)),
                 "runtime schema is incompatible; stop all nodes and use the documented offline upgrade/recovery path"
             );
         } else {
@@ -225,6 +226,7 @@ impl App {
             protection_limits: Arc::new(Mutex::new(operations::protection::Limits::default())),
             media_cache: Arc::new(Mutex::new(operations::cache::Cache::default())),
             page_cache: Arc::new(Mutex::new(operations::cache::Cache::default())),
+            redirect_cache: Arc::new(Mutex::new(None)),
             password_work: Arc::new(Semaphore::new(workers)),
             media_reads: Arc::new(Semaphore::new(workers)),
             media_work: Arc::new(Semaphore::new(workers)),

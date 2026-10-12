@@ -8,7 +8,7 @@ use crate::{
 use axum::{
     Router,
     extract::{Form, Query, State},
-    http::{HeaderMap, StatusCode},
+    http::HeaderMap,
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -19,6 +19,9 @@ use sqlx::Row;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod publication;
+mod redirect_web;
+pub mod redirects;
+pub mod rendered_links;
 
 /// Shared single-line publication text must also be representable in XML 1.0.
 /// Rust strings already exclude surrogates; U+FFFE/U+FFFF are not controls.
@@ -247,8 +250,20 @@ pub async fn validate_content(app: &App, p: &PostInput) -> Result<()> {
 pub async fn configure(app: &App, d: Definition, version: i64) -> Result<i64> {
     d.validate()?;
     let _guard = app.mutation().await?;
-    let (old, _) = load(app).await?;
-    let mut tx = app.db.pool.begin().await?;
+    let mut tx = app.db.begin_write().await?;
+    let (redirect_policy, _) = redirects::lock(&mut tx).await?;
+    let old = redirects::discovery_in(&mut tx).await?;
+    if redirect_policy.aliases.keys().any(|source| {
+        d.languages.iter().any(|l| {
+            source == &format!("/{}", l.code)
+                || source == &d.path(&l.code, "")
+                || source == &d.path(&l.code, "search")
+        })
+    }) {
+        return Err(Error::invalid(
+            "Remove automatic aliases conflicting with the proposed language routes.",
+        ));
+    }
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM posts")
         .fetch_one(&mut *tx)
         .await?;
@@ -581,13 +596,24 @@ pub async fn save_redirect(
     code: i64,
     version: i64,
 ) -> Result<()> {
-    if !safe_path(source) || !safe_path(target) || source == target || ![301, 302].contains(&code) {
+    if !redirects::safe_path(source)
+        || !redirects::safe_path(target)
+        || source == target
+        || ![301, 302].contains(&code)
+    {
         return Err(Error::invalid(
             "Use distinct exact local paths and 301 or 302.",
         ));
     }
     let _guard = app.mutation().await?;
-    let (d, _) = load(app).await?;
+    let mut tx = app.db.begin_write().await?;
+    let (policy, _) = redirects::lock(&mut tx).await?;
+    let d = redirects::discovery_in(&mut tx).await?;
+    if policy.aliases.contains_key(source) {
+        return Err(Error::invalid(
+            "Remove the owned automatic alias before assigning a manual rule.",
+        ));
+    }
     if source == "/"
         || source == "/search"
         || d.languages.iter().any(|l| {
@@ -600,19 +626,39 @@ pub async fn save_redirect(
             "Redirect cannot replace a discovery landing route.",
         ));
     }
-    let rows = sqlx::query("SELECT source,target FROM redirects LIMIT 1001")
-        .fetch_all(&app.db.pool)
+    let rows = sqlx::query("SELECT source,target,code FROM redirects LIMIT 1001")
+        .fetch_all(&mut *tx)
         .await?;
     if rows.len() >= 1000 && !rows.iter().any(|r| r.get::<String, _>("source") == source) {
         return Err(Error::invalid("Redirect budget is 1,000 exact rules."));
     }
+    let mut exact: BTreeMap<String, redirects::Exact> = rows
+        .iter()
+        .map(|r| {
+            (
+                r.get("source"),
+                redirects::Exact {
+                    target: r.get("target"),
+                    code: r.get("code"),
+                },
+            )
+        })
+        .collect();
+    exact.insert(
+        source.into(),
+        redirects::Exact {
+            target: target.into(),
+            code,
+        },
+    );
+    redirects::Plan::new(policy, exact)?;
     let mut graph: BTreeMap<String, String> = rows
         .into_iter()
         .map(|r| (r.get("source"), r.get("target")))
         .collect();
     graph.insert(source.into(), target.into());
     validate_redirect_graph(&graph)?;
-    let posts=sqlx::query("SELECT published_slug,published_locale FROM posts WHERE status='published' AND NOT EXISTS(SELECT 1 FROM member_resources mr WHERE mr.kind='post' AND mr.resource_id=posts.id) AND published_slug=$1").bind(source.rsplit('/').next().unwrap_or("")).fetch_all(&app.db.pool).await?;
+    let posts=sqlx::query("SELECT published_slug,published_locale FROM posts WHERE status='published' AND published_slug=$1").bind(source.rsplit('/').next().unwrap_or("")).fetch_all(&mut *tx).await?;
     if posts.iter().any(|r| {
         d.path(
             &r.get::<String, _>("published_locale"),
@@ -627,7 +673,7 @@ pub async fn save_redirect(
     let scheduled =
         sqlx::query("SELECT slug,locale FROM posts WHERE status='scheduled' AND slug=$1")
             .bind(source.rsplit('/').next().unwrap_or(""))
-            .fetch_all(&app.db.pool)
+            .fetch_all(&mut *tx)
             .await?;
     if scheduled.iter().any(|r| {
         d.path(&r.get::<String, _>("locale"), &r.get::<String, _>("slug")) == source
@@ -642,36 +688,19 @@ pub async fn save_redirect(
             .bind(source)
             .bind(target)
             .bind(code)
-            .execute(&app.db.pool)
+            .execute(&mut *tx)
             .await?
     } else {
-        sqlx::query("UPDATE redirects SET target=$1,code=$2,version=version+1 WHERE source=$3 AND version=$4").bind(target).bind(code).bind(source).bind(version).execute(&app.db.pool).await?
+        sqlx::query("UPDATE redirects SET target=$1,code=$2,version=version+1 WHERE source=$3 AND version=$4").bind(target).bind(code).bind(source).bind(version).execute(&mut *tx).await?
     };
     if result.rows_affected() != 1 {
         return Err(Error::conflict());
     }
+    tx.commit().await?;
     Ok(())
 }
 pub async fn redirect_response(app: &App, path: &str) -> Result<Option<Response>> {
-    if !safe_path(path) {
-        return Ok(None);
-    }
-    let Some(r) = sqlx::query("SELECT target,code FROM redirects WHERE source=$1")
-        .bind(path)
-        .fetch_optional(&app.db.pool)
-        .await?
-    else {
-        return Ok(None);
-    };
-    let target: String = r.get("target");
-    let code: i64 = r.get("code");
-    Ok(Some(
-        (
-            StatusCode::from_u16(code as u16).unwrap(),
-            [("location", target)],
-        )
-            .into_response(),
-    ))
+    redirects::response(app, path).await
 }
 async fn admin_session(app: &App, headers: &HeaderMap) -> Result<crate::model::Session> {
     let s = crate::auth::session(app, headers).await?;
@@ -706,6 +735,8 @@ async fn save_config(
 }
 #[derive(Deserialize)]
 struct RedirectForm {
+    #[serde(default)]
+    return_workspace: Option<String>,
     csrf: String,
     source: String,
     target: String,
@@ -722,20 +753,40 @@ async fn edit_redirect(
 ) -> Result<Response> {
     let s = admin_session(&app, &headers).await?;
     crate::auth::csrf(&s, &f.csrf)?;
-    if f.action == "delete" {
-        let _guard = app.mutation().await?;
-        let r = sqlx::query("DELETE FROM redirects WHERE source=$1 AND version=$2")
-            .bind(&f.source)
-            .bind(f.version)
-            .execute(&app.db.pool)
-            .await?;
-        if r.rows_affected() != 1 {
-            return Err(Error::conflict());
+    let result: Result<()> = async {
+        if f.action == "delete" {
+            let _guard = app.mutation().await?;
+            let mut tx = app.db.begin_write().await?;
+            redirects::lock(&mut tx).await?;
+            let r = sqlx::query("DELETE FROM redirects WHERE source=$1 AND version=$2")
+                .bind(&f.source)
+                .bind(f.version)
+                .execute(&mut *tx)
+                .await?;
+            if r.rows_affected() != 1 {
+                return Err(Error::conflict());
+            }
+            tx.commit().await?;
+        } else {
+            save_redirect(&app, &f.source, &f.target, f.code, f.version).await?;
         }
-    } else {
-        save_redirect(&app, &f.source, &f.target, f.code, f.version).await?;
+        Ok(())
     }
-    Ok(axum::response::Redirect::to("/admin/discovery").into_response())
+    .await;
+    if let Err(error) = result {
+        if f.return_workspace.is_some() {
+            return redirect_web::exact_error(&app, &s, f, error).await;
+        }
+        return Err(error);
+    }
+    Ok(
+        axum::response::Redirect::to(if f.return_workspace.is_some() {
+            "/admin/discovery/routes"
+        } else {
+            "/admin/discovery"
+        })
+        .into_response(),
+    )
 }
 async fn admin_page(State(app): State<App>, headers: HeaderMap) -> Result<Response> {
     let s = admin_session(&app, &headers).await?;
@@ -770,6 +821,7 @@ async fn admin_page(State(app): State<App>, headers: HeaderMap) -> Result<Respon
         }
         section class="panel" {
             h2 {"Exact redirects"}
+            p {a href="/admin/discovery/routes" {"Open redirect & missing-link workspace"}}
             form class="field-row" method="post" action="/admin/discovery/redirects" {
                 (view::csrf(&s))
                 label {"Source path" input name="source" required placeholder="/old-page";}
@@ -799,6 +851,7 @@ async fn admin_page(State(app): State<App>, headers: HeaderMap) -> Result<Respon
 }
 pub fn routes() -> Router<App> {
     Router::new()
+        .merge(redirect_web::routes())
         .route("/admin/discovery", get(admin_page).post(save_config))
         .route("/admin/discovery/redirects", post(edit_redirect))
         .route("/admin/discovery/languages", post(edit_language))
@@ -1015,7 +1068,7 @@ async fn links_page(
             !known.contains(target)
         })
         .collect();
-    let body = html! {(view::heading("Discovery","Published link check","Checks up to 20 published items and 200 links per batch against local publication and public media. External URLs are skipped; no HTTP crawler runs."))section class="panel"{p{(broken.len())" unresolved local links in this batch."}@for(title,path)in broken{p{strong{(title)}" → "code{(path)}}}@if rows.len()>20{a class="button secondary" href=(format!("/admin/discovery/links?after={}",rows[19].get::<String,_>("id"))){"Check next batch"}}a class="button secondary" href="/admin/discovery"{"Back to discovery"}}};
+    let body = html! {(view::heading("Discovery","Published link check","Checks up to 20 published items and 200 links per batch against local publication and public media. External URLs are skipped; no HTTP crawler runs."))section class="panel"{p{a href="/admin/discovery/rendered-links"{"Analyze actual rendered publications, navigation and templates"}}p{(broken.len())" unresolved local links in this batch."}@for(title,path)in broken{p{strong{(title)}" → "code{(path)}}}@if rows.len()>20{a class="button secondary" href=(format!("/admin/discovery/links?after={}",rows[19].get::<String,_>("id"))){"Check next batch"}}a class="button secondary" href="/admin/discovery"{"Back to discovery"}}};
     Ok(axum::response::Html(view::layout(
         "Published link check",
         &app.db.settings().await?,
