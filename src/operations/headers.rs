@@ -110,6 +110,9 @@ impl Policy {
         );
         headers.insert("referrer-policy", self.referrer.clone());
         if [
+            "/offline/",
+            "/forms/",
+            "/api/forms/",
             "/audience/",
             "/registration/",
             "/members/gifts",

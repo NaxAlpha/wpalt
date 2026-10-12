@@ -200,6 +200,11 @@ async fn eligible(app: &App, row: &sqlx::any::AnyRow) -> Result<bool> {
     if active.is_none() {
         return Ok(false);
     }
+    if let Some(permitted) =
+        super::recovery::mail_permitted(app, &row.get::<String, _>("dedupe")).await?
+    {
+        return Ok(permitted);
+    }
     let contact: String = row.get("contact_id");
     if !contact.is_empty() {
         let exists: Option<String> =

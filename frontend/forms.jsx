@@ -132,6 +132,11 @@ function Designer({ host }) {
           Publish form
         </Button>
         {state.published_version > 0 && (
+          <a href={`/admin/forms/${host.dataset.id}/recovery`}>
+            Response recovery policy
+          </a>
+        )}
+        {state.published_version > 0 && (
           <a href={`/forms/${host.dataset.id}`}>Open published form ↗</a>
         )}
       </div>
@@ -1119,7 +1124,17 @@ function FieldsDesigner({ fields, change, depth = 0 }) {
 function VisitorForm({ host }) {
   const published = JSON.parse(host.dataset.definition);
   const definition = published.form;
-  const [values, setValues] = useState(() =>
+  const offline = host.dataset.offline === "true";
+  const safeFields = definition.fields.filter(
+    (field) =>
+      ["string", "number", "boolean"].includes(field.schema.kind) &&
+      !["Upload", "Signature", "Acknowledgment"].includes(field.widget?.kind),
+  );
+  const deviceSafe = safeFields.length === definition.fields.length;
+  const [versionConflict, setVersionConflict] = useState(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const expiry = useRef(Date.now() + 7 * 86400000);
+  const [values, setRenderedValues] = useState(() =>
     Object.fromEntries(
       definition.fields
         .filter((field) => field.schema.kind === "boolean")
@@ -1137,20 +1152,64 @@ function VisitorForm({ host }) {
   const [device, setDevice] = useState(false);
   const [recoveryNotice, setRecoveryNotice] = useState("");
   const storageKey = `wpalt:form:${host.dataset.id}`;
+  const valuesRef = useRef(values),
+    deviceRef = useRef(false),
+    conflictRef = useRef(false);
+  function persistDraft() {
+    if (!deviceRef.current || !deviceSafe || conflictRef.current) return;
+    try {
+      const record = JSON.stringify({
+        version: Number(host.dataset.version),
+        expires: expiry.current,
+        values: Object.fromEntries(
+          safeFields
+            .filter((f) => valuesRef.current[f.name] !== undefined)
+            .map((f) => [f.name, valuesRef.current[f.name]]),
+        ),
+        key: key.current,
+        recovery: recovery.current,
+        pending: pending.current,
+      });
+      if (new TextEncoder().encode(record).length > 150000)
+        throw Error("Draft too large");
+      localStorage.setItem(storageKey, record);
+    } catch {
+      setRecoveryNotice(
+        "This browser could not store the draft. Your current work is still here.",
+      );
+    }
+  }
+  function setValues(next) {
+    valuesRef.current =
+      typeof next === "function" ? next(valuesRef.current) : next;
+    setRenderedValues(valuesRef.current);
+    persistDraft();
+  }
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw && raw.length <= 150000) {
         const saved = JSON.parse(raw);
         if (
-          saved.version === Number(host.dataset.version) &&
-          saved.expires > Date.now()
+          Number.isFinite(saved.expires) &&
+          saved.expires > Date.now() &&
+          saved.expires <= Date.now() + 7 * 86400000 &&
+          saved.values &&
+          typeof saved.values === "object" &&
+          /^[0-9a-f-]{36}$/.test(saved.key || "") &&
+          deviceSafe
         ) {
-          setDevice(true);
-          setValues(saved.values);
+          expiry.current = saved.expires;
+          deviceRef.current = true;
+          valuesRef.current = saved.values;
+          conflictRef.current = saved.version !== Number(host.dataset.version);
           key.current = saved.key;
           recovery.current = saved.recovery || { token: null, revision: 0 };
           pending.current = saved.pending || null;
+          setDevice(true);
+          setRenderedValues(saved.values);
+          if (conflictRef.current) setVersionConflict(saved);
           setRecoveryNotice(
             "A device draft is available. Review your values before continuing. An interrupted submission retries the original response.",
           );
@@ -1159,26 +1218,13 @@ function VisitorForm({ host }) {
     } catch {
       setRecoveryNotice("The device draft could not be loaded.");
     }
+    setDraftReady(true);
   }, []);
   useEffect(() => {
-    if (!device || accepted) return;
-    try {
-      const record = JSON.stringify({
-        version: Number(host.dataset.version),
-        expires: Date.now() + 7 * 86400000,
-        values,
-        key: key.current,
-        recovery: recovery.current,
-        pending: pending.current,
-      });
-      if (record.length > 150000) throw new Error("draft too large");
-      localStorage.setItem(storageKey, record);
-    } catch {
-      setRecoveryNotice(
-        "This browser could not store the draft. Your current work is still here.",
-      );
-    }
-  }, [device, values, busy, accepted]);
+    const flush = () => persistDraft();
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, []);
   async function saveDraft() {
     setBusy(true);
     try {
@@ -1196,6 +1242,7 @@ function VisitorForm({ host }) {
         values: current.values,
       });
       recovery.current.revision = saved.revision;
+      persistDraft();
       setRecoveryNotice(
         `Server draft saved for seven days. Keep this private recovery link: ${location.origin}/forms/${host.dataset.id}#draft=${recovery.current.token}`,
       );
@@ -1236,8 +1283,14 @@ function VisitorForm({ host }) {
   const last = Math.max(...definition.fields.map((field) => field.step || 0));
   async function submit(event) {
     event.preventDefault();
-    if (busy || Object.keys(current.errors).length) return;
-    if (step < last) {
+    if (
+      offline ||
+      busy ||
+      (!pending.current &&
+        (versionConflict || Object.keys(current.errors).length))
+    )
+      return;
+    if (!pending.current && step < last) {
       setStep(step + 1);
       return;
     }
@@ -1249,6 +1302,7 @@ function VisitorForm({ host }) {
         version: Number(host.dataset.version),
         values: current.values,
       };
+      persistDraft();
       const payload =
         host.dataset.spam === "true"
           ? {
@@ -1261,17 +1315,20 @@ function VisitorForm({ host }) {
           : pending.current;
       await request(`/api/forms/${host.dataset.id}/entries`, payload);
       pending.current = null;
+      deviceRef.current = false;
       try {
         localStorage.removeItem(storageKey);
       } catch {}
       setAccepted(true);
     } catch (err) {
-      if (err.status && err.status < 500) pending.current = null;
+      // Preserve the exact unresolved payload even on a publication conflict.
+      // A deliberate reset is the only way to begin a different submission.
       setError(err.message);
     } finally {
       setBusy(false);
     }
   }
+  if (!draftReady) return <p role="status">Checking private device draft…</p>;
   if (accepted)
     return <Notice>Your response has been received. Thank you.</Notice>;
   return (
@@ -1293,6 +1350,52 @@ function VisitorForm({ host }) {
         </Notice>
       ))}
       {recoveryNotice && <Notice>{recoveryNotice}</Notice>}
+      {versionConflict && (
+        <Notice error>
+          The published form changed. Your original saved answers have not been
+          remapped.
+          <pre class="offline-original-values">
+            {JSON.stringify(versionConflict.values, null, 2)}
+          </pre>
+          {pending.current && (
+            <p>
+              You may retry the exact interrupted response to find out whether
+              it was accepted.
+            </p>
+          )}
+        </Notice>
+      )}
+      {(versionConflict || pending.current) && (
+        <Button
+          variant="secondary"
+          disabled={busy}
+          onClick={() => {
+            pending.current = null;
+            key.current = crypto.randomUUID();
+            recovery.current = { token: null, revision: 0 };
+            conflictRef.current = false;
+            setVersionConflict(null);
+            setValues({});
+            setError("");
+            expiry.current = Date.now() + 7 * 86400000;
+            try {
+              localStorage.removeItem(storageKey);
+            } catch {}
+            setRecoveryNotice(
+              "Original draft deliberately abandoned. Review the current form before creating a new response.",
+            );
+          }}
+        >
+          Abandon original draft and start again
+        </Button>
+      )}
+      {offline && (
+        <Notice>
+          Offline draft only. Reconnect and{" "}
+          <a href={`/forms/${host.dataset.id}`}>review the live form</a> before
+          sending.
+        </Notice>
+      )}
       {published.subscription_purpose && (
         <p>
           Optional subscription purpose: {published.subscription_purpose}. You
@@ -1300,13 +1403,45 @@ function VisitorForm({ host }) {
           box.
         </p>
       )}
+      {!offline && (
+        <RecoveryRequest
+          id={host.dataset.id}
+          version={Number(host.dataset.version)}
+          values={current.values}
+          spam={host.dataset.spam === "true"}
+          requestKey={key.current}
+          blocked={busy || !!pending.current || !!versionConflict}
+          restore={(record) => {
+            if (pending.current) {
+              setRecoveryNotice(
+                "Resolve the original interrupted response before loading another partial response.",
+              );
+              return;
+            }
+            key.current = record.request_key;
+            if (record.version !== Number(host.dataset.version)) {
+              conflictRef.current = true;
+              setVersionConflict({ ...record, pending: null });
+            }
+            setValues(record.values);
+            setRecoveryNotice(
+              "Requested recovery restored. Review before sending; only a completed response is a submission.",
+            );
+          }}
+        />
+      )}
       <Disclosure summary="Save and resume">
         <label>
           <input
             type="checkbox"
             checked={device}
+            disabled={
+              !deviceSafe || busy || !!pending.current || !!versionConflict
+            }
             onChange={(event) => {
+              deviceRef.current = event.currentTarget.checked;
               setDevice(event.currentTarget.checked);
+              if (event.currentTarget.checked) persistDraft();
               if (!event.currentTarget.checked) {
                 try {
                   localStorage.removeItem(storageKey);
@@ -1320,11 +1455,24 @@ function VisitorForm({ host }) {
           Device drafts contain your response. Use a private device. You can
           keep editing without a connection and retry when online.
         </p>
-        <Button variant="secondary" busy={busy} onClick={saveDraft}>
-          Save private server draft
-        </Button>
+        {!deviceSafe && (
+          <p>
+            Attachment capabilities, signatures and acknowledgments stay out of
+            device storage.
+          </p>
+        )}
+        {!offline && (
+          <Button
+            variant="secondary"
+            busy={busy}
+            disabled={!!versionConflict || !!pending.current}
+            onClick={saveDraft}
+          >
+            Save private server draft
+          </Button>
+        )}
       </Disclosure>
-      <fieldset disabled={busy || !!pending.current}>
+      <fieldset disabled={busy || !!pending.current || !!versionConflict}>
         {current.visible
           .filter((field) => (field.step || 0) === step)
           .map((field) => {
@@ -1372,14 +1520,263 @@ function VisitorForm({ host }) {
         <Button
           type="submit"
           busy={busy}
-          disabled={uploads > 0 || Object.keys(current.errors).length > 0}
+          disabled={
+            offline ||
+            uploads > 0 ||
+            (!pending.current &&
+              (!!versionConflict || Object.keys(current.errors).length > 0))
+          }
         >
-          {step < last ? "Continue" : "Send response"}
+          {pending.current
+            ? "Retry original response"
+            : step < last
+              ? "Continue"
+              : "Send response"}
         </Button>
       </div>
     </form>
   );
 }
+function RecoveryRequest({
+  id,
+  version,
+  values,
+  requestKey,
+  spam,
+  blocked,
+  restore,
+}) {
+  const [policy, setPolicy] = useState(null),
+    [email, setEmail] = useState(""),
+    [consent, setConsent] = useState(false);
+  const [record, setRecord] = useState(null),
+    [notice, setNotice] = useState(""),
+    [failed, setFailed] = useState(false),
+    [busy, setBusy] = useState(false);
+  const token = useRef(null),
+    confirmation = useRef(null);
+  useEffect(() => {
+    let active = true,
+      generation = 0;
+    request(`/api/forms/${id}/recovery-policy`)
+      .then((r) => {
+        if (active) setPolicy(r.recovery);
+      })
+      .catch(() => {});
+    function loadFragment() {
+      const match = location.hash.match(
+        /^#recover=([a-f0-9]{64})(?:&confirm=([a-f0-9]{64}))?$/,
+      );
+      if (!match) return;
+      history.replaceState(null, "", location.pathname);
+      const current = ++generation;
+      token.current = match[1];
+      confirmation.current = match[2] || null;
+      request(`/api/forms/${id}/recovery/read`, { token: match[1] })
+        .then((r) => {
+          if (!active || current !== generation) return;
+          setRecord(r);
+          setEmail(r.email);
+          setFailed(false);
+          setNotice(
+            "Review this recovery request. Opening a link does not confirm permission or submit a response.",
+          );
+        })
+        .catch((e) => {
+          if (active && current === generation) {
+            setFailed(true);
+            setNotice(e.message);
+          }
+        });
+    }
+    loadFragment();
+    window.addEventListener("hashchange", loadFragment);
+    return () => {
+      active = false;
+      window.removeEventListener("hashchange", loadFragment);
+    };
+  }, [id]);
+  async function action(kind) {
+    setBusy(true);
+    setNotice("");
+    setFailed(false);
+    try {
+      if (kind === "request") {
+        if (!policy || !consent)
+          throw Error("Agree explicitly to the current recovery purpose.");
+        token.current ||= Array.from(
+          crypto.getRandomValues(new Uint8Array(32)),
+          (b) => b.toString(16).padStart(2, "0"),
+        ).join("");
+        const selected = Object.fromEntries(
+          policy.policy.fields
+            .filter((k) => values[k] !== undefined)
+            .map((k) => [k, values[k]]),
+        );
+        const saved = await request(`/api/forms/${id}/recovery`, {
+          token: token.current,
+          version,
+          policy_id: policy.id,
+          request_key: requestKey,
+          email,
+          values: selected,
+          consent: true,
+          ...(spam ? { spam: await proof(`form:${id}`, "") } : {}),
+        });
+        setRecord(saved);
+        setNotice(
+          `Request saved, not submitted. Check your mailbox to confirm permission. Private controls: ${location.origin}/forms/${id}#recover=${token.current}`,
+        );
+      } else if (kind === "confirm") {
+        await request(`/api/forms/${id}/recovery/confirm`, {
+          token: token.current,
+          confirmation: confirmation.current,
+        });
+        setRecord({ ...record, state: "confirmed" });
+        confirmation.current = null;
+        setNotice(
+          "Address and permission confirmed. The owner can review only the selected partial values. One reminder is scheduled for tomorrow.",
+        );
+      } else if (kind === "delete") {
+        await request(`/api/forms/${id}/recovery/delete`, {
+          token: token.current,
+        });
+        setRecord(null);
+        token.current = null;
+        confirmation.current = null;
+        setConsent(false);
+        setNotice(
+          "Recovery permission withdrawn and partial record deleted. Pending reminders are cancelled. Delivered mail and independent backups require separate retention handling.",
+        );
+      } else if (kind === "restore") {
+        restore(record);
+        setNotice(
+          "Selected values restored for review. Sending the form remains a separate action.",
+        );
+      }
+    } catch (e) {
+      setFailed(true);
+      setNotice(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!policy && !record) return null;
+  return (
+    <Disclosure summary="Request response recovery">
+      <p>
+        This is separate from a private draft or marketing subscription. No
+        action is triggered by leaving the page.
+      </p>
+      {policy && (
+        <>
+          <p>Purpose: {policy.policy.purpose}</p>
+          <p>
+            Selected fields shared after address confirmation:{" "}
+            {policy.policy.fields.join(", ")}. The request expires seven days
+            after creation.
+          </p>
+        </>
+      )}
+      {notice && <Notice error={failed}>{notice}</Notice>}
+      {record ? (
+        <>
+          <p>
+            Original recovery purpose: {record.policy?.purpose}. Recovery
+            status: {record.state}. These partial values are not an accepted
+            response.
+          </p>
+          <pre class="offline-original-values">
+            {JSON.stringify(record.values, null, 2)}
+          </pre>
+          {confirmation.current && (
+            <Button
+              busy={busy}
+              disabled={blocked}
+              onClick={() => action("confirm")}
+            >
+              Confirm address and recovery permission
+            </Button>
+          )}
+          <Button
+            busy={busy}
+            disabled={blocked}
+            variant="secondary"
+            onClick={() => action("restore")}
+          >
+            Restore selected values for review
+          </Button>
+          <Button
+            busy={busy}
+            variant="secondary"
+            onClick={() => action("delete")}
+          >
+            Withdraw and delete partial response
+          </Button>
+          <Button
+            busy={busy}
+            variant="secondary"
+            onClick={() => {
+              const blob = new Blob(
+                [
+                  JSON.stringify(
+                    { format: "wpalt-private-recovery-export-v1", ...record },
+                    null,
+                    2,
+                  ),
+                ],
+                { type: "application/json" },
+              );
+              const link = document.createElement("a"),
+                url = URL.createObjectURL(blob);
+              link.href = url;
+              link.download = "partial-response.json";
+              link.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }}
+          >
+            Download my partial response
+          </Button>
+        </>
+      ) : (
+        <>
+          <Field
+            label="Recovery reminder email"
+            type="email"
+            value={email}
+            maxLength={254}
+            onInput={(e) => setEmail(e.currentTarget.value)}
+          />
+          <label>
+            <input
+              type="checkbox"
+              checked={consent}
+              disabled={busy || blocked}
+              onChange={(e) => setConsent(e.currentTarget.checked)}
+            />{" "}
+            I request owner review of only the selected partial values for the
+            stated purpose and one recovery reminder after I confirm my address.
+          </label>
+          <Button
+            busy={busy}
+            disabled={blocked || !consent || !email}
+            variant="secondary"
+            onClick={() => action("request")}
+          >
+            Request partial-response recovery
+          </Button>
+        </>
+      )}
+    </Disclosure>
+  );
+}
+
+document.addEventListener("wpalt:offline-form-remove", (event) => {
+  render(null, event.detail);
+});
+document.addEventListener("wpalt:offline-form", (event) => {
+  render(<VisitorForm host={event.detail} />, event.detail);
+});
 const studio = document.querySelector("#forms-studio");
 if (studio) {
   studio.replaceChildren();

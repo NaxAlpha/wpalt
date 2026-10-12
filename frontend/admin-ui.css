@@ -891,3 +891,9 @@ html[dir="rtl"] .admin .skip {
   outline: 3px solid var(--ui-color-accent);
   outline-offset: 3px;
 }
+
+.offline-original-values {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}

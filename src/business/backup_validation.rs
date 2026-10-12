@@ -317,6 +317,91 @@ pub fn validate(tables: &Tables) -> Result<()> {
             return Err(fail());
         }
     }
+    let forms: HashSet<_> = tables["business_forms"]
+        .iter()
+        .map(|r| text(r, "id"))
+        .collect();
+    let publications: BTreeMap<_, _> = tables["form_publications"]
+        .iter()
+        .map(|r| {
+            (
+                (text(r, "form_id"), number(r, "version")),
+                text(r, "definition"),
+            )
+        })
+        .collect();
+    let mut policy_ids = HashSet::new();
+    let mut policy_forms = HashSet::new();
+    for r in &tables["form_recovery_policies"] {
+        if !forms.contains(text(r, "form_id"))
+            || !id(text(r, "policy_id"))
+            || !policy_ids.insert(text(r, "policy_id"))
+            || !policy_forms.insert(text(r, "form_id"))
+            || text(r, "definition").len() > 4096
+        {
+            return Err(fail());
+        }
+        let raw = publications
+            .get(&(text(r, "form_id"), number(r, "form_version")))
+            .ok_or_else(fail)?;
+        let publication: super::store::PublishedForm =
+            serde_json::from_str(raw).map_err(|_| fail())?;
+        let policy: super::recovery::Policy =
+            serde_json::from_str(text(r, "definition")).map_err(|_| fail())?;
+        policy.validate(&publication.form)?;
+    }
+    let mut recovery_ids = HashSet::new();
+    let mut recovery_tokens = HashSet::new();
+    let mut confirmation_tokens = HashSet::new();
+    let mut requests = HashSet::new();
+    let mut counts = BTreeMap::new();
+    for r in &tables["form_recoveries"] {
+        let count = counts.entry(text(r, "form_id")).or_insert(0);
+        *count += 1;
+        if *count > 1000
+            || !id(text(r, "id"))
+            || !recovery_ids.insert(text(r, "id"))
+            || !id(text(r, "policy_id"))
+            || !id(text(r, "request_key"))
+            || !requests.insert((text(r, "form_id"), text(r, "request_key")))
+            || !hash(text(r, "token_hash"))
+            || !recovery_tokens.insert(text(r, "token_hash"))
+            || !hash(text(r, "confirmation_hash"))
+            || !confirmation_tokens.insert(text(r, "confirmation_hash"))
+            || super::mail::email(text(r, "email"))? != text(r, "email")
+            || !["pending", "confirmed"].contains(&text(r, "state"))
+            || number(r, "created_at") < 0
+            || number(r, "created_at") > crate::now() + 365 * 86400
+            || number(r, "expires_at") != number(r, "created_at") + 7 * 86400
+            || text(r, "values_json").len() > 16 * 1024
+            || text(r, "policy_definition").len() > 4096
+        {
+            return Err(fail());
+        }
+        let raw = publications
+            .get(&(text(r, "form_id"), number(r, "form_version")))
+            .ok_or_else(fail)?;
+        let publication: super::store::PublishedForm =
+            serde_json::from_str(raw).map_err(|_| fail())?;
+        let policy: super::recovery::Policy =
+            serde_json::from_str(text(r, "policy_definition")).map_err(|_| fail())?;
+        policy.validate(&publication.form)?;
+        let values: Value = serde_json::from_str(text(r, "values_json")).map_err(|_| fail())?;
+        if values
+            .as_object()
+            .is_none_or(|m| m.keys().any(|k| !policy.fields.contains(k)))
+        {
+            return Err(fail());
+        }
+        let canonical = publication
+            .form
+            .evaluate(&publication.common(), &values, true)?;
+        for (key, value) in values.as_object().ok_or_else(fail)? {
+            if canonical.get(key) != Some(value) {
+                return Err(fail());
+            }
+        }
+    }
     if tables["business_usage"].len() != 7 {
         return Err(fail());
     }
@@ -344,8 +429,21 @@ pub fn validate(tables: &Tables) -> Result<()> {
                 .map(|r| columns.iter().map(|k| text(r, k).len() as i64).sum::<i64>())
                 .sum()
         };
-        if number(counters[0], "items") != tables[table].len() as i64
-            || number(counters[0], "bytes") != bytes
+        let extra_rows = if kind == "drafts" {
+            tables["form_recoveries"].len() as i64
+        } else {
+            0
+        };
+        let extra_bytes = if kind == "drafts" {
+            tables["form_recoveries"]
+                .iter()
+                .map(|r| text(r, "values_json").len() as i64)
+                .sum()
+        } else {
+            0
+        };
+        if number(counters[0], "items") != tables[table].len() as i64 + extra_rows
+            || number(counters[0], "bytes") != bytes + extra_bytes
         {
             return Err(fail());
         }
