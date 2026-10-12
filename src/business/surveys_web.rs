@@ -82,7 +82,11 @@ async fn csv(
     let (from, until) = query.range()?;
     let report = surveys::report_range(&app, &id, selected, from, until).await?;
     let mut result = String::from(
-        "version,field,label,row_kind,eligible,answered,unanswered,skipped,option_value,option_label,option_responses,option_score,numeric_min,numeric_max,numeric_mean\r\n",
+        "version,field,label,row_kind,eligible,answered,unanswered,skipped,option_value,option_label,option_responses,option_score,numeric_min,numeric_max,numeric_mean,form_id,definition_sha256,from_utc_epoch_inclusive,until_utc_epoch_exclusive\r\n",
+    );
+    let provenance = format!(
+        "{},{},{},{}",
+        report.form_id, report.definition_sha256, report.from, report.until
     );
     for field in &report.fields {
         let numbers = field
@@ -91,7 +95,7 @@ async fn csv(
             .map(|number| format!("{},{},{}", number.minimum, number.maximum, number.mean))
             .unwrap_or_else(|| ",,".into());
         result.push_str(&format!(
-            "{},{},{},field,{},{},{},{},,,,,{}\r\n",
+            "{},{},{},field,{},{},{},{},,,,,{},{provenance}\r\n",
             report.version,
             super::entries::cell(&field.name),
             super::entries::cell(&field.label),
@@ -103,7 +107,7 @@ async fn csv(
         ));
         for option in &field.choices {
             result.push_str(&format!(
-                "{},{},{},option,{},{},{},{},{},{},{},{},,,\r\n",
+                "{},{},{},option,{},{},{},{},{},{},{},{},,,,{provenance}\r\n",
                 report.version,
                 super::entries::cell(&field.name),
                 super::entries::cell(&field.label),
@@ -156,6 +160,15 @@ async fn page(
         .append_pair("from", &query.from)
         .append_pair("until", &query.until)
         .finish();
+    let older_query = format!(
+        "{download_query}&before_version={}",
+        versions
+            .iter()
+            .take(40)
+            .next_back()
+            .map(|row| row.get::<i64, _>("version"))
+            .unwrap_or(0)
+    );
     let selected_on_page = versions
         .iter()
         .take(40)
@@ -176,11 +189,11 @@ async fn page(
                 label {"Until (UTC, exclusive)" input type="datetime-local" name="until" value=(&query.until);}
                 button {"Review responses"}
             }
-            @if versions.len()>40 {p {a href=(format!("/admin/forms/{id}/report?version={selected}&before_version={}",versions[39].get::<i64,_>("version"))) {"Browse older published versions"}}}
+            @if versions.len()>40 {p {a href=(format!("/admin/forms/{id}/report?{older_query}")) {"Browse older published versions"}}}
             @match report {
                 Ok(report) => {
                     h2 {(report.title)}
-                p {a href=(format!("/admin/forms/{id}/report.csv?{download_query}")) {"Download this aggregate report"}}
+                p {a href=(format!("/admin/forms/{id}/report.csv?{download_query}")) {"Download report for selected period"}}
                     p {"Version " (report.version) " · " (report.responses) " responses in this snapshot."}
                     p class="help" {(report.scope)}
                     @if report.responses==0 {p {"No responses in this period."}}

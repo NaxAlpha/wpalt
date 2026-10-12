@@ -28,6 +28,7 @@ pub async fn initialize(tx: &mut Transaction<'_, Any>, postgres: bool) -> Result
         ),
         ("discovery_settings", "definition,version", ""),
         ("themes", "live,published_version", "published_version>0"),
+        ("business_forms", "published_version", "published_version>0"),
         ("site_design", "live_options,published_version", ""),
         ("redirects", "source,target,code,version", ""),
         ("redirect_policy", "definition,version", ""),

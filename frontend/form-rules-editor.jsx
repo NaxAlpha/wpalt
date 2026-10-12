@@ -1,4 +1,4 @@
-import { h } from "preact";
+import { h, Fragment } from "preact";
 import { Button, Field, SelectField as Select } from "./ui.jsx";
 
 const leaf = (fields) => ({
@@ -58,32 +58,49 @@ export function ConditionEditor({
   update,
   depth = 1,
   optional = false,
+  legend = "Visibility rule",
+  fieldLabel = "Show when a previous field has a value",
+  alwaysLabel = "Always visible",
+  clearLabel = "Make always visible",
 }) {
   const group = value && ["All", "Any", "Not"].includes(value.operation);
   const selected = fields.find((field) => field.name === value?.field);
   return (
     <fieldset>
-      <legend>{depth === 1 ? "Visibility rule" : "Nested rule"}</legend>
+      <legend>{depth === 1 ? legend : "Nested rule"}</legend>
       {!group && (
         <Select
-          label={
-            depth === 1
-              ? "Show when a previous field has a value"
-              : "Rule field"
-          }
+          label={depth === 1 ? fieldLabel : "Rule field"}
           value={value?.field || ""}
-          onChange={(event) =>
-            update(
-              event.currentTarget.value
-                ? {
-                    ...(value || leaf(fields)),
-                    field: event.currentTarget.value,
-                  }
-                : null,
+          onChange={(event) => {
+            const name = event.currentTarget.value;
+            if (!name) return update(null);
+            const selected = fields.find((item) => item.name === name);
+            const previous = value || leaf(fields);
+            if (
+              ["Greater", "AtLeast", "Less", "AtMost"].includes(
+                previous.operation,
+              ) &&
+              !numberKinds.includes(selected?.schema.kind)
             )
-          }
+              return update({ operation: "Present", field: name });
+            update({
+              ...previous,
+              field: name,
+              ...(previous.operation === "Equal"
+                ? { value: typed(String(previous.value), selected) }
+                : {}),
+              ...(previous.operation === "OneOf"
+                ? {
+                    values: previous.values.map((item) =>
+                      typed(String(item), selected),
+                    ),
+                  }
+                : {}),
+            });
+          }}
         >
-          {optional && <option value="">Always visible</option>}
+          {optional && <option value="">{alwaysLabel}</option>}
           {fields.map((field) => (
             <option key={field.name} value={field.name}>
               {field.schema.label || field.name}
@@ -103,10 +120,30 @@ export function ConditionEditor({
             <option value="Present">Has a value</option>
             <option value="Equal">Equals a value</option>
             <option value="OneOf">Matches one of the values</option>
-            <option value="Greater">Greater than</option>
-            <option value="AtLeast">At least</option>
-            <option value="Less">Less than</option>
-            <option value="AtMost">At most</option>
+            <option
+              value="Greater"
+              disabled={!numberKinds.includes(selected?.schema.kind)}
+            >
+              Greater than
+            </option>
+            <option
+              value="AtLeast"
+              disabled={!numberKinds.includes(selected?.schema.kind)}
+            >
+              At least
+            </option>
+            <option
+              value="Less"
+              disabled={!numberKinds.includes(selected?.schema.kind)}
+            >
+              Less than
+            </option>
+            <option
+              value="AtMost"
+              disabled={!numberKinds.includes(selected?.schema.kind)}
+            >
+              At most
+            </option>
             {depth < 8 && (
               <>
                 <option value="All">All rules match</option>
@@ -117,28 +154,44 @@ export function ConditionEditor({
           </Select>
           {["Equal", "Greater", "AtLeast", "Less", "AtMost"].includes(
             value.operation,
-          ) && (
-            <Field
-              label="Value to match"
-              value={String(value.value)}
-              type={
-                value.operation !== "Equal" ||
-                numberKinds.includes(selected?.schema.kind)
-                  ? "number"
-                  : "text"
-              }
-              step="any"
-              onInput={(event) =>
-                update({
-                  ...value,
-                  value:
-                    value.operation === "Equal"
-                      ? typed(event.currentTarget.value, selected)
-                      : Number(event.currentTarget.value),
-                })
-              }
-            />
-          )}
+          ) &&
+            (value.operation === "Equal" &&
+            selected?.schema.kind === "boolean" ? (
+              <Select
+                label="Value to match"
+                value={String(value.value)}
+                onChange={(event) =>
+                  update({
+                    ...value,
+                    value: event.currentTarget.value === "true",
+                  })
+                }
+              >
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </Select>
+            ) : (
+              <Field
+                label="Value to match"
+                value={String(value.value)}
+                type={
+                  value.operation !== "Equal" ||
+                  numberKinds.includes(selected?.schema.kind)
+                    ? "number"
+                    : "text"
+                }
+                step="any"
+                onInput={(event) =>
+                  update({
+                    ...value,
+                    value:
+                      value.operation === "Equal"
+                        ? typed(event.currentTarget.value, selected)
+                        : Number(event.currentTarget.value),
+                  })
+                }
+              />
+            ))}
           {value.operation === "OneOf" && (
             <>
               {value.values.map((item, index) => (
@@ -235,7 +288,7 @@ export function ConditionEditor({
           )}
           {optional && (
             <Button variant="quiet" onClick={() => update(null)}>
-              Make always visible
+              {clearLabel}
             </Button>
           )}
         </>

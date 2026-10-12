@@ -162,6 +162,14 @@ jobs:
           name: d07-clean-release-structured-evidence
           path: work/d07-clean-release-structured-observations.json
           retention-days: 30
+      - name: Observe canonical forms and frozen survey report queries
+        run: python3 scripts/advanced_forms_benchmark.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --profile release --output work/d10-clean-release-forms-observations.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d10-clean-release-forms-evidence
+          path: work/d10-clean-release-forms-observations.json
+          retention-days: 30
       - name: Observe populated editorial batches, restart, reuse and selected-copy requests
         run: python3 scripts/editorial_benchmark.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --profile release --output work/d09-clean-release-editorial-observations.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -243,6 +251,10 @@ jobs:
       - run: WPALT_SCRIPTS_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_CLONE_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_SPAM_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Verify advanced forms and execute pinned free Forminator calculator
+        run: |
+          python3 scripts/prepare_forminator_reference.py
+          WPALT_ADVANCED_FORMS_ONLY=1 WPALT_FORMINATOR_REFERENCE=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Verify native editorial observations and execute pinned free Yoast analysis
         run: |
           python3 scripts/prepare_editorial_reference.py
@@ -455,6 +467,15 @@ jobs:
           git show 9931dee6ae89f758a4a06691b1127a56f1d551ec:scripts/release_build.py > work/d08-release-verifier.py
           python3 work/d08-release-verifier.py --directory work/d08-runtime-reference --source 9931dee6ae89f758a4a06691b1127a56f1d551ec --extract work/d08-runtime-app
           python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d08-runtime-app/wpalt" --source-schema 22
+      - name: Verify original D09 stopped migration and fresh old-runtime rollback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download nightly-202610120250-328c302317ce --pattern '*.tar.gz' --pattern SHA256SUMS --dir work/d09-runtime-reference
+          git fetch --depth=1 origin 328c302317ce7767392bbf366c269c79445c1f63
+          git show 328c302317ce7767392bbf366c269c79445c1f63:scripts/release_build.py > work/d09-release-verifier.py
+          python3 work/d09-release-verifier.py --directory work/d09-runtime-reference --source 328c302317ce7767392bbf366c269c79445c1f63 --extract work/d09-runtime-app
+          python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d09-runtime-app/wpalt" --source-schema 23
       - run: frontend/node_modules/.bin/playwright install --with-deps chromium
       - name: Cumulative browser journeys across two processes and one worker
         env:
@@ -469,6 +490,11 @@ jobs:
         env:
           WPALT_LOCAL_PROCESSES: '1'
           WPALT_ELEMENTOR_DESIGN_ONLY: '1'
+        run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Verify advanced forms and surveys across local processes
+        env:
+          WPALT_LOCAL_PROCESSES: '1'
+          WPALT_ADVANCED_FORMS_ONLY: '1'
         run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Verify editorial progress and observations across local processes
         env:

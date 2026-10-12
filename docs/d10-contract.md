@@ -4,7 +4,7 @@ Date2026-10-12. Starts from merged D09 PR25, actual-main328c302317ce7767392bbf36
 
 ## End-user outcome
 
- an owner composes useful conditional questionnaires/calculators in the existing forms workflow; respondents get matching browser/server behavior and meaningful errors; owners review version-specific canonical response aggregates without mixing changed questions or inventing representative-population conclusions.
+An owner composes useful conditional questionnaires/calculators in the existing forms workflow; respondents get matching browser/server behavior and meaningful errors; owners review version-specific canonical response aggregates without mixing changed questions or inventing representative-population conclusions.
 
 ## Functional sequence and authority
 
@@ -16,7 +16,7 @@ Prepare only justified refactoring: share finite rule evaluation with notificati
 
 ## Readable verification clusters
 
- compose/publish a branching calculator; native fallback and browser preview/server submission agree on visible canonical values; forged hidden/computed fields cannot alter notifications/scoring or reviewed commerce; malformed/deep/excess expressions fail before writes; arithmetic edge/missing/division/negative rounding scenarios; changed/reordered question/option versions stay distinct in aggregate denominators; concurrent response quotas/replay/restore remain correct; large data query plans/counts/storage/latency and320/768/1440 keyboard/errors/scoped axe/visual review; real free reference behavior and independently verified delivery.
+Compose/publish a branching calculator; native fallback and browser preview/server submission agree on visible canonical values; forged hidden/computed fields cannot alter notifications/scoring or reviewed commerce; malformed/deep/excess expressions fail before writes; arithmetic edge/missing/division/negative rounding scenarios; changed/reordered question/option versions stay distinct in aggregate denominators; concurrent response quotas/replay/restore remain correct; large data query plans/counts/storage/latency and320/768/1440 keyboard/errors/scoped axe/visual review; real free reference behavior and independently verified delivery.
 
 ## Current primary sources and real reference boundaries
 

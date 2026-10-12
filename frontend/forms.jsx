@@ -758,8 +758,8 @@ function WorkingPreview({ definition, groups, endpoint, csrf }) {
       {error && <Notice error>{error}</Notice>}
       {checked?.source === source && (
         <Notice>
-          Server validation passed. Calculations and visible fields agree with
-          the canonical values below; no response was saved.
+          Server validation passed. Review the authoritative values below; no
+          response was saved.
         </Notice>
       )}
       {checked?.source === source && (
@@ -1382,4 +1382,116 @@ const publicForm = document.querySelector("#public-form");
 if (publicForm) {
   publicForm.replaceChildren();
   render(<VisitorForm host={publicForm} />, publicForm);
+}
+
+function WorkflowCondition({ fields, host }) {
+  const [condition, setCondition] = useState(null);
+  const [invalidRecovery, setInvalidRecovery] = useState(null);
+  useEffect(() => {
+    const form = host.closest("form");
+    const recover = () => {
+      const raw = form.elements.condition_json.value;
+      try {
+        if (new TextEncoder().encode(raw).length > 128 * 1024) throw Error();
+        const rule = JSON.parse(raw);
+        let nodes = 0;
+        const scalar = (value) =>
+          value === null ||
+          typeof value === "boolean" ||
+          typeof value === "string" ||
+          (typeof value === "number" && Number.isFinite(value));
+        function visit(value, depth = 1) {
+          if (++nodes > 128 || depth > 8 || !value || typeof value !== "object")
+            throw Error();
+          if (["All", "Any"].includes(value.operation)) {
+            if (
+              !Array.isArray(value.conditions) ||
+              value.conditions.length < 1 ||
+              value.conditions.length > 32
+            )
+              throw Error();
+            value.conditions.forEach((child) => visit(child, depth + 1));
+          } else if (value.operation === "Not")
+            visit(value.condition, depth + 1);
+          else {
+            if (!fields.some((field) => field.name === value.field))
+              throw Error();
+            if (value.operation === "Present") return;
+            if (value.operation === "OneOf") {
+              if (
+                !Array.isArray(value.values) ||
+                value.values.length < 1 ||
+                value.values.length > 32 ||
+                !value.values.every(scalar)
+              )
+                throw Error();
+            } else if (value.operation === "Equal") {
+              if (!scalar(value.value)) throw Error();
+            } else if (
+              ["Greater", "AtLeast", "Less", "AtMost"].includes(value.operation)
+            ) {
+              if (
+                typeof value.value !== "number" ||
+                !Number.isFinite(value.value)
+              )
+                throw Error();
+            } else throw Error();
+          }
+        }
+        if (rule !== null) visit(rule);
+        setCondition(rule);
+        setInvalidRecovery(null);
+      } catch {
+        setInvalidRecovery(raw);
+      }
+    };
+    form.addEventListener("wpalt:recovery", recover);
+    return () => form.removeEventListener("wpalt:recovery", recover);
+  }, [fields, host]);
+  useEffect(() => {
+    host.closest("form").querySelector("[data-add-notification]").disabled =
+      invalidRecovery !== null;
+  }, [invalidRecovery, host]);
+  return (
+    <>
+      <p>
+        Route using the canonical accepted answers, including calculated values.
+      </p>
+      {invalidRecovery !== null && (
+        <Notice error>
+          The recovered notification rule needs review. Recompose its rule
+          before saving.
+        </Notice>
+      )}
+      <ConditionEditor
+        value={condition}
+        fields={fields}
+        update={(value) => {
+          setCondition(value);
+          setInvalidRecovery(null);
+        }}
+        optional
+        legend="Notification rule"
+        fieldLabel="Notify when an accepted field has a value"
+        alwaysLabel="Every accepted response"
+        clearLabel="Send for every accepted response"
+      />
+      <input
+        type="hidden"
+        name="condition_json"
+        value={invalidRecovery ?? JSON.stringify(condition)}
+      />
+    </>
+  );
+}
+const workflowCondition = document.querySelector("#form-workflow-condition");
+if (workflowCondition) {
+  const fields = JSON.parse(workflowCondition.dataset.fields);
+  render(
+    <WorkflowCondition fields={fields} host={workflowCondition} />,
+    workflowCondition,
+  );
+  workflowCondition
+    .closest("form")
+    .querySelector("[data-simple-condition]").hidden = true;
 }

@@ -3,7 +3,7 @@
 The optional schema-14 fixture removes M9 deployment authority from a current seed;
 --source-schema 15 retains authority. --source-binary uses a real older executable.
 """
-import argparse, hashlib, json, os, socket, time, urllib.request, secrets, shutil, sqlite3, subprocess, tempfile, urllib.parse
+import argparse, hashlib, http.cookiejar, json, os, re, socket, time, urllib.request, secrets, shutil, sqlite3, subprocess, tempfile, urllib.parse
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--binary',required=True);p.add_argument('--source-binary');p.add_argument('--source-schema',type=int,choices=[14,15,16,17,18,19,20,21,22,23],default=14);p.add_argument('--psql',default=shutil.which('psql'));a=p.parse_args()
 binary=str(Path(a.binary).resolve());source_binary=str(Path(a.source_binary).resolve()) if a.source_binary else binary;env={k:v for k,v in os.environ.items() if not k.startswith('WPALT_')}
@@ -17,14 +17,50 @@ def database(root,name,postgres):
 try:
  with tempfile.TemporaryDirectory(prefix='wpalt-maintenance-') as temporary:
   for postgres in [False,*([True] if root_url else [])]:
-   root=Path(temporary)/('postgres' if postgres else 'sqlite');root.mkdir();url=database(root,'source',postgres);data=root/'source';cfg=root/'source.toml';cfg.write_text(f'database_url={json.dumps(url)}\ndata_dir={json.dumps(str(data))}\n');cfg.chmod(0o600)
+   root=Path(temporary)/('postgres' if postgres else 'sqlite');root.mkdir();url=database(root,'source',postgres);data=root/'source';cfg=root/'source.toml'
+   with socket.socket() as socket_:socket_.bind(('127.0.0.1',0));http_port=socket_.getsockname()[1]
+   source_origin=f'http://127.0.0.1:{http_port}'
+   cfg.write_text(f'database_url={json.dumps(url)}\ndata_dir={json.dumps(str(data))}\nlisten="127.0.0.1:{http_port}"\nbase_url="{source_origin}"\n');cfg.chmod(0o600)
    def run(*args,config=cfg,ok=True,stdin=None,executable=binary):
     r=subprocess.run([executable,'--config',str(config),*map(str,args)],input=stdin,capture_output=True,text=True,env=env,timeout=45);assert (r.returncode==0)==ok,(args,r.returncode,r.stderr[:200]);return r
    def sql(statement):
     if postgres:return pg(statement,url)
     with sqlite3.connect(root/'source.db') as c:
      result=c.execute(statement);rows=result.fetchall();return '\n'.join(str(r[0]) for r in rows)
-   run('init','--admin-email','owner@example.test',stdin=secrets.token_urlsafe(24)+'\n',executable=source_binary);run('seed-demo','--posts','10',executable=source_binary);run('shop','seed-demo',executable=source_binary)
+   password=secrets.token_urlsafe(24)
+   run('init','--admin-email','owner@example.test',stdin=password+'\n',executable=source_binary);run('seed-demo','--posts','10',executable=source_binary);run('shop','seed-demo',executable=source_binary)
+   original_form=None
+   if a.source_binary and a.source_schema>=23:
+    # Execute the unchanged original runtime's collection API. SQL is used only
+    # later to compare its persisted graph, never to manufacture old declarations.
+    child=subprocess.Popen([source_binary,'--config',str(cfg),'serve','--external-worker'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env=env)
+    client=urllib.request.build_opener(urllib.request.ProxyHandler({}),urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    def get(path):
+     with client.open(source_origin+path,timeout=10) as response:return response.read().decode()
+    def post(path,body,is_json=False):
+     data=json.dumps(body).encode() if is_json else urllib.parse.urlencode(body).encode()
+     with client.open(urllib.request.Request(source_origin+path,data=data,headers={'Origin':source_origin,'Content-Type':'application/json' if is_json else 'application/x-www-form-urlencoded'}),timeout=15) as response:return response.read().decode(),response.url
+    try:
+     for attempt in range(100):
+      assert child.poll() is None,'Original source failed before readiness'
+      try:get('/health');break
+      except OSError:time.sleep(.05)
+     else:raise AssertionError('Original source readiness timeout')
+     post('/login',{'email':'owner@example.test','password':password})
+     csrf=re.search(r'name="csrf" value="([^"]+)"',get('/admin/forms')).group(1)
+     _,location=post('/admin/forms',{'csrf':csrf,'title':'Original D09 quotation'})
+     original_form=location.rsplit('/',1)[1]
+     definition={'title':'Original D09 quotation','fields':[
+      {'name':'quantity','schema':{'kind':'number','required':True}},
+      {'name':'rate','schema':{'kind':'number','required':True}},
+      {'name':'company','schema':{'kind':'string'},'visible_when':{'operation':'Present','field':'quantity'}},
+      {'name':'total','schema':{'kind':'number','required':True},'calculation':{'operation':'Product','fields':['quantity','rate']}}]}
+     post('/api/admin/forms/'+original_form,{'csrf':csrf,'version':1,'definition':definition,'publish':True},True)
+     post('/api/forms/'+original_form+'/entries',{'version':2,'key':'00000000-0000-4000-8000-000000000001','values':{'quantity':2,'rate':12.5,'company':'Retained original answer','total':999}},True)
+    finally:
+     child.terminate();child.wait(timeout=15);assert child.returncode==0
+    original_values=sql("SELECT values_json FROM form_entries WHERE form_id='"+original_form+"'")
+    assert json.loads(original_values)['total']==25,'Original executable must calculate the value'
    if not a.source_binary:
     # A synthetic old graph must exclude the newer asset grammar, not merely
     # change its version number. Real --source-binary remains the stronger gate.
@@ -58,6 +94,7 @@ try:
    assert result['executed'] and result['recovery_sha256']==hashlib.sha256(point.read_bytes()).hexdigest()
    assert point.stat().st_mode&0o077==0 and sql('SELECT version FROM schema_version')=='24' and sql('SELECT COUNT(*) FROM process_authority')=='1'
    assert sql('SELECT COUNT(*) FROM posts')==before and sql('SELECT COUNT(*) FROM shop_products')==products and sql('SELECT description FROM settings')=='Changed after review'
+   if original_form:assert sql("SELECT values_json FROM form_entries WHERE form_id='"+original_form+"'")==original_values
    run('recovery-inspect',point,'--key-file',key,'--source-format','18' if a.source_schema>=22 else '17' if a.source_schema==21 else '16' if a.source_schema==20 else '15' if a.source_schema==19 else '14' if a.source_schema==18 else '13' if a.source_schema==17 else '12')
    # Interruption/retry: a failed precondition preserves schema/data and an exact
    # subsequent review succeeds. No old executable may open upgraded data.
@@ -71,11 +108,11 @@ try:
    graph=json.loads(json.loads(recovered.read_text())['payload'])
    assert len(graph['tables']['posts'])==int(before) and len(graph['tables']['shop_products'])==int(products)
    assert graph['tables']['settings'][0]['description']=='Changed after review'
+   if original_form:
+    entries=[row for row in graph['tables']['form_entries'] if row['form_id']==original_form]
+    assert len(entries)==1 and entries[0]['values_json']==original_values,'Fresh original runtime must preserve original calculator history'
    unsupported_config=cfg
    if postgres:
-    with socket.socket() as socket_:socket_.bind(('127.0.0.1',0));http_port=socket_.getsockname()[1]
-    source_origin=f'http://127.0.0.1:{http_port}'
-    cfg.write_text(cfg.read_text()+f'listen="127.0.0.1:{http_port}"\nbase_url="{source_origin}"\n')
     rebound=root/'rebound.toml';rebound.write_text(f'database_url={json.dumps(url)}\ndata_dir={json.dumps(str(root/"rebound-directory"))}\nbase_url="{source_origin}"\n');rebound.chmod(0o600)
     child=subprocess.Popen([binary,'--config',str(cfg),'serve','--external-worker'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env=env)
     try:
