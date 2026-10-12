@@ -94,7 +94,7 @@ Verifiable future outcome: An editor reviews useful suggestions alongside conten
 
 ### D10 — Advanced forms and surveys
 
-Origin: **M4** · Catalog: **F038/F042/F044** · Status: **active under the D10 advanced-forms contract**
+Origin: **M4** · Catalog: **F038/F042/F044** · Status: **defined D10 system merged and independently delivered; broader math/widgets/statistics remain**
 
 [D10 contract](d10-contract.md) defines finite grouped rules, typed calculations, native scalar collection and immutable version/time-cohort reporting. PR26 is merged; its exact final source, actual-main seven gates and separately downloaded public release are verified ([receipt](evidence/d10-main-release.json)). Broader mathematical functions (including observed free modulo/power), matrix/ranking and specialized statistical questionnaires, richer reporting visualizations and native structured/upload/signature breadth remain separate follow-up capabilities. No whole-plugin or premium survey parity is claimed.
 
