@@ -1,6 +1,6 @@
 # Running and recovering wpalt
 
-D08 development uses native schema 22 / portable recovery v18. Older sites need a reviewed stopped upgrade and retained old executable/recovery key; explicit archive conversion is separate from ordinary restore. D07 main and its public release are independently verified. See [D08 upgrade guidance](distributed-operations.md#d08-route-policy-and-report-grammar) and [redirect/link controls](redirects-and-links.md). D08 delivery verification is in progress.
+Current D09 development uses native schema23 / portable recoveryv18. D08 actual main and its public release are independently verified in [the delivery receipt](evidence/d08-main-release.json). Older sites need a reviewed stopped upgrade and the retained original executable/configuration/recovery key; portable archive conversion is separate from ordinary restore. D09 preserves thev18 grammar and excludes derived editorial caches from recovery. See [current upgrade guidance](distributed-operations.md#d09-derived-analysis-boundary) and [editorial operations](editorial-insights.md). D09 exact-source delivery gates remain pending.
 
 ## Build and initialize
 

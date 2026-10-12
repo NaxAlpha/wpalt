@@ -83,7 +83,7 @@
     "anchors": 0
   },
   "native": {
-    "html_sha256": "9fa7329346c32af89cc2a9b5a1cf2b45406180e2659aa0995d8c3fcd8bca95c0",
+    "html_sha256": "8a965c1f3d18bb6e04157df6591ee37587a833b5a81fff820e479be519f71612",
     "html_bytes": 2383,
     "observations": {
       "algorithm": "wpalt-editorial-text-v1",

@@ -15,6 +15,9 @@ A complete current run offers paginated sources, observed link issues and inboun
 Add to a TOML configuration (defaults shown):
 
 ```toml
+# Top-level worker setting; also affects the other queues.
+scheduler_seconds = 5
+
 [analysis]
 enabled = true
 max_publications = 5000
@@ -39,7 +42,7 @@ wpalt --config site.toml editorial-analysis cancel RUN_ID CURRENT_VERSION
 wpalt --config site.toml editorial-analysis remove RUN_ID CURRENT_VERSION
 ```
 
-The stopped-host lock applies. The regular worker advances runs automatically. Native forms and owner JSON endpoints under `/api/admin/analysis` use the same primitives; writes require current owner permission, same-origin controls and CSRF. Editor POST `/api/admin/insights/CONTENT_ID` accepts`csrf`, `copy` (`working`/`public`) and optional`focus`. Observations are private administrative output.
+The stopped-host lock applies. The regular worker advances one analysis batch per shared worker cycle. Rendering and classification each visit every source; cadence is controlled by top-level `scheduler_seconds` (1..3600) and `analysis.batch_sources` (1..32). For1006 sources/default8 per batch, at least252 worker cycles are needed; at the default5-second cadence that is about21 minutes before other work, not the continuous manual-batch benchmark time. An owner can choose a shorter shared cadence/larger tested batch after considering foreground load and other queues. Manual advancement still processes one batch. Native forms and owner JSON endpoints under `/api/admin/analysis` use the same primitives; writes require current owner permission, same-origin controls and CSRF. Editor POST `/api/admin/insights/CONTENT_ID` accepts`csrf`, `copy` (`working`/`public`) and optional`focus`. Observations are private administrative output.
 
 ## Privacy, migration and recovery
 
@@ -47,6 +50,6 @@ Native schema23 adds durable source invalidation and derived operational tables.
 
 The source epoch tracks relevant published snapshots, live design, site/models/discovery, current redirects, public media metadata/access, membership restrictions, referenced taxonomy and approved comments. Working-only edits, unused draft terms, pending comments, 404 aggregates and empty publication cycles do not change it. Trigger updates and source writes roll back together. Configuration/algorithm identity also fences results. Future public render dependencies must extend this inventory and its connected regression.
 
-Previously public personal text can remain in the private derived cache until explicit removal or finite expiry; stale suppression is not immediate disk erasure. The running worker performs expiry. Starting a third run removes the oldest previous run, including its page/inbound data. Database allocation/WAL and owner-native backups may retain deleted bytes under their normal storage lifecycle. Offline/disconnected workers cannot perform timed deletion until restarted. Protect database/data-directory access as for other private administrative state.
+Previously public personal text can remain in the private derived cache until explicit removal or finite expiry; stale suppression is not immediate disk erasure. The running worker performs expiry based on run creation time. A very short retention window can discard unfinished work; choose enough time for the intended schedule/workload. Starting a third run removes the oldest previous run, including its page/inbound data. Database allocation/WAL and owner-native backups may retain deleted bytes under their normal storage lifecycle. Offline/disconnected workers cannot perform timed deletion until restarted. Protect database/data-directory access as for other private administrative state.
 
 Reviewed2026-10-12: [Google people-first guidance](https://developers.google.com/search/docs/fundamentals/creating-helpful-content), [crawlable links](https://developers.google.com/search/docs/crawling-indexing/links-crawlable), [Unicode segmentation](https://unicode.org/reports/tr29/), [Yoast analysis overview](https://developer.yoast.com/features/analysis/overview/). Actual free-plugin execution, implementation limits and measured runtime evidence remain separate from vendor capability descriptions and normative guidance.

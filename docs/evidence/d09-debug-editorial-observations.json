@@ -1,9 +1,7 @@
 {
-  "date": "2026-10-12",
-  "status": "verified local runtime observations; delivery gates pending",
   "profile": "debug",
-  "binary_sha256": "c7e28ca175ec6e0b6f622c19b695cc304576bbbc998ff2ef9896200cd72ed959",
-  "binary_bytes": 120213656,
+  "binary_sha256": "87cd2abe4f9ce75169b03412a7142a8ee72c58c7c8601f5e136be69a61d67e19",
+  "binary_bytes": 120214488,
   "scope": "1004 seeded posts plus about publication and language home; actual single-connection database, stopped-CLI batch and restarted HTTP application, finite manual native batches, five warmups/30 serial selected-copy requests. Debug SQL logging enabled even for a release executable. RSS is a warm process sample, neither peak nor per-feature attribution; PostgreSQL process memory excluded. No throughput, TLS, CWV, universal latency or WordPress efficiency claim. Byte budgets describe serialized data, not on-disk or peak allocations.",
   "observations": [
     {
@@ -11,26 +9,27 @@
       "publications": 1005,
       "sources": 1006,
       "edges": 8067,
-      "html_bytes": 3842422,
-      "serialized_derived_bytes": 3121024,
+      "html_bytes": 3842476,
+      "serialized_derived_bytes": 3121169,
       "resumed_after_stopped_cli_batch": true,
+      "debug_secret_and_focus_redaction": true,
       "first_http_batches": {
         "samples": 63,
-        "p50_ms": 50.261,
-        "p95_ms": 228.58,
-        "max_ms": 245.269
+        "p50_ms": 38.501,
+        "p95_ms": 336.223,
+        "max_ms": 354.226
       },
       "identical_html_reuse_batches": {
         "samples": 64,
-        "p50_ms": 58.426,
-        "p95_ms": 172.252,
-        "max_ms": 210.585
+        "p50_ms": 59.423,
+        "p95_ms": 169.905,
+        "max_ms": 196.483
       },
       "individual_public_insight": {
         "samples": 30,
-        "p50_ms": 18.104,
-        "p95_ms": 19.903,
-        "max_ms": 19.95
+        "p50_ms": 20.006,
+        "p95_ms": 21.495,
+        "max_ms": 27.491
       },
       "batch_queries": {
         "first_observed_batch_selects": 394,
@@ -67,9 +66,9 @@
       ],
       "retained_runs": 2,
       "reused_sources": 1006,
-      "warm_application_rss_before_analysis_bytes": 57655296,
-      "warm_application_rss_after_analysis_bytes": 69189632,
-      "database_bytes": 30044864,
+      "warm_application_rss_before_analysis_bytes": 57294848,
+      "warm_application_rss_after_analysis_bytes": 68534272,
+      "database_bytes": 30053272,
       "derived_postgres_relations_bytes": null,
       "database_scope": "SQLite DB/WAL/SHM"
     },
@@ -78,26 +77,27 @@
       "publications": 1005,
       "sources": 1006,
       "edges": 8067,
-      "html_bytes": 3842425,
-      "serialized_derived_bytes": 3121029,
+      "html_bytes": 3842348,
+      "serialized_derived_bytes": 3120793,
       "resumed_after_stopped_cli_batch": true,
+      "debug_secret_and_focus_redaction": true,
       "first_http_batches": {
         "samples": 63,
-        "p50_ms": 38.236,
-        "p95_ms": 191.712,
-        "max_ms": 445.204
+        "p50_ms": 47.466,
+        "p95_ms": 169.881,
+        "max_ms": 190.014
       },
       "identical_html_reuse_batches": {
         "samples": 64,
-        "p50_ms": 57.346,
-        "p95_ms": 171.081,
-        "max_ms": 224.568
+        "p50_ms": 46.613,
+        "p95_ms": 117.031,
+        "max_ms": 123.785
       },
       "individual_public_insight": {
         "samples": 30,
-        "p50_ms": 17.909,
-        "p95_ms": 19.244,
-        "max_ms": 28.112
+        "p50_ms": 17.913,
+        "p95_ms": 18.125,
+        "max_ms": 18.929
       },
       "batch_queries": {
         "first_observed_batch_selects": 394,
@@ -124,13 +124,13 @@
         ],
         "phase": "rendering"
       },
-      "cursor_query_plan": "Limit  (cost=0.28..93.80 rows=32 width=56) (actual time=0.018..0.055 rows=32 loops=1)\n  Buffers: shared hit=66\n  ->  Index Scan using analysis_pages_pkey on analysis_pages  (cost=0.28..1479.10 rows=506 width=56) (actual time=0.018..0.053 rows=32 loops=1)\n        Index Cond: ((job_id = '3311d745-10a6-47fe-920f-b8df97bfdb0a'::text) AND (ordinal >= 500))\n        Buffers: shared hit=66\nPlanning:\n  Buffers: shared hit=190\nPlanning Time: 0.338 ms\nExecution Time: 0.065 ms",
+      "cursor_query_plan": "Limit  (cost=0.28..94.72 rows=32 width=56) (actual time=0.018..0.061 rows=32 loops=1)\n  Buffers: shared hit=68\n  ->  Index Scan using analysis_pages_pkey on analysis_pages  (cost=0.28..1493.64 rows=506 width=56) (actual time=0.017..0.058 rows=32 loops=1)\n        Index Cond: ((job_id = '2f040d57-1b37-4677-b5f5-914134cef865'::text) AND (ordinal >= 500))\n        Buffers: shared hit=68\nPlanning:\n  Buffers: shared hit=185\nPlanning Time: 0.310 ms\nExecution Time: 0.070 ms",
       "retained_runs": 2,
       "reused_sources": 1006,
-      "warm_application_rss_before_analysis_bytes": 55066624,
-      "warm_application_rss_after_analysis_bytes": 58507264,
-      "database_bytes": 23928832,
-      "derived_postgres_relations_bytes": 9011200,
+      "warm_application_rss_before_analysis_bytes": 55181312,
+      "warm_application_rss_after_analysis_bytes": 64045056,
+      "database_bytes": 22454272,
+      "derived_postgres_relations_bytes": 7602176,
       "database_scope": "All fixture PostgreSQL relations/indexes; database process memory excluded"
     }
   ]

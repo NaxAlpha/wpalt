@@ -51,6 +51,7 @@ for engine in ['sqlite', 'postgres'] if a.postgres else ['sqlite']:
             parsed = urllib.parse.urlsplit(a.postgres)
             url = urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(urllib.parse.parse_qsl(parsed.query) + [('options', '-c search_path='+schema)])))
         password = secrets.token_urlsafe(24)
+        private_probe = "EDITORIAL_PROBE" + secrets.token_hex(12)
         config = root/'site.toml'
         config.write_text(f'database_url={json.dumps(url)}\ndata_dir={json.dumps(str(root/"data"))}\nlisten="127.0.0.1:{port}"\nbase_url="{origin}"\ndebug=true\ndatabase_connections=1\n[analysis]\nbatch_sources=32\nbatch_seconds=10\n')
         config.chmod(0o600)
@@ -116,10 +117,10 @@ for engine in ['sqlite', 'postgres'] if a.postgres else ['sqlite']:
             source=next(row for row in pages if row['publication'])
             individual=[]
             for n in range(35):
-                elapsed, result=post('/api/admin/insights/'+source['publication'], {'csrf':csrf,'copy':'public','focus':'local'})
+                elapsed, result=post('/api/admin/insights/'+source['publication'], {'csrf':csrf,'copy':'public','focus':private_probe})
                 assert result['copy']=='public'
                 if n>=5: individual.append(elapsed)
-            _, created=post('/api/admin/analysis', {'csrf':csrf,'focus':'local'})
+            _, created=post('/api/admin/analysis', {'csrf':csrf,'focus':private_probe})
             second, reused_timings, _=finish(created['id'])
             assert second['reused']==1006, 'Identical actual HTML must reuse all parser facts'
             sql("ANALYZE analysis_pages" if engine=='postgres' else 'ANALYZE')
@@ -129,7 +130,14 @@ for engine in ['sqlite', 'postgres'] if a.postgres else ['sqlite']:
             else:
                 database_bytes=int(pg("SELECT SUM(pg_total_relation_size(quote_ident(schemaname)||'.'||quote_ident(tablename))) FROM pg_tables WHERE schemaname='"+schema+"'"))
                 derived_bytes=int(pg("SELECT SUM(pg_total_relation_size(quote_ident(schemaname)||'.'||quote_ident(tablename))) FROM pg_tables WHERE schemaname='"+schema+"' AND tablename IN ('analysis_jobs','analysis_pages','analysis_inbound','analysis_epoch')"))
-            observations.append({'engine':engine,'publications':1005,'sources':first['total'],'edges':first['edge_count'],'html_bytes':first['html_bytes'],'serialized_derived_bytes':first['facts_bytes'],'resumed_after_stopped_cli_batch':True,'first_http_batches':distribution(samples),'identical_html_reuse_batches':distribution(reused_timings),'individual_public_insight':distribution(individual),'batch_queries':query_sample,'cursor_query_plan':plan,'retained_runs':2,'reused_sources':second['reused'],'warm_application_rss_before_analysis_bytes':before_rss,'warm_application_rss_after_analysis_bytes':rss(),'database_bytes':database_bytes,'derived_postgres_relations_bytes':derived_bytes,'database_scope':'SQLite DB/WAL/SHM' if engine=='sqlite' else 'All fixture PostgreSQL relations/indexes; database process memory excluded'})
+            # Debug evidence must not disclose request secrets or a private owner phrase.
+            with (root/'server.log').open() as diagnostics:
+                carry=''
+                while chunk:=diagnostics.read(128*1024):
+                    joined=carry+chunk
+                    assert all(secret not in joined for secret in [password,csrf,private_probe]), 'Debug logs disclose a request secret/private analysis phrase'
+                    carry=joined[-256:]
+            observations.append({'engine':engine,'publications':1005,'sources':first['total'],'edges':first['edge_count'],'html_bytes':first['html_bytes'],'serialized_derived_bytes':first['facts_bytes'],'resumed_after_stopped_cli_batch':True,'debug_secret_and_focus_redaction':True,'first_http_batches':distribution(samples),'identical_html_reuse_batches':distribution(reused_timings),'individual_public_insight':distribution(individual),'batch_queries':query_sample,'cursor_query_plan':plan,'retained_runs':2,'reused_sources':second['reused'],'warm_application_rss_before_analysis_bytes':before_rss,'warm_application_rss_after_analysis_bytes':rss(),'database_bytes':database_bytes,'derived_postgres_relations_bytes':derived_bytes,'database_scope':'SQLite DB/WAL/SHM' if engine=='sqlite' else 'All fixture PostgreSQL relations/indexes; database process memory excluded'})
         finally:
             if server: server.terminate(); server.wait(timeout=15)
             if log: log.close()
