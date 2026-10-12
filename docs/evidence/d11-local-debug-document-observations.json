@@ -1,0 +1,69 @@
+{
+  "profile": "debug",
+  "binary_sha256": "edfd0f14d787d4fddc68ebc71ee6bf25886623d1617658d0e3842faac9ecbcee",
+  "binary_bytes": 122149704,
+  "scope": "1,000 actual serial accepted HTTP acknowledgments, two fields; one database connection. Five warmups/30 measured serial private HTML bundle requests, debug SQL enabled even in release. Actual native signature verification. Warm RSS sample excludes PostgreSQL/scanner/browser workers; not peak, throughput, PDF/scanner latency, feature attribution, TLS/CWV/WordPress efficiency or SLA.",
+  "observations": [
+    {
+      "engine": "sqlite",
+      "actual_http_responses": 1000,
+      "fields": 2,
+      "html_generation": {
+        "samples": 30,
+        "p50_ms": 15.271,
+        "p95_ms": 17.248,
+        "max_ms": 17.827
+      },
+      "artifact_bytes": 1639,
+      "bundle_bytes": 4025,
+      "document_selects": 5,
+      "select_shapes": [
+        "SELECT e.values_json,e.created_at,e.form_version,p.definition FROM form_entries \u2026",
+        "SELECT id,field_name,original_name,mime,size,sha256,filename FROM form_attachments \u2026",
+        "SELECT u.id,u.email,u.name,u.role,s.csrf,COALESCE(p.locale,'en') AS interface_locale \u2026"
+      ],
+      "source_query_plan": [
+        [
+          4,
+          0,
+          14,
+          "SCAN p"
+        ],
+        [
+          10,
+          0,
+          39,
+          "SEARCH e USING INDEX sqlite_autoindex_form_entries_1 (id=?)"
+        ]
+      ],
+      "warm_application_rss_bytes": 65552384,
+      "database_bytes": 7544792,
+      "database_scope": "SQLite DB/WAL/SHM",
+      "debug_secret_and_answer_redaction": true
+    },
+    {
+      "engine": "postgres",
+      "actual_http_responses": 1000,
+      "fields": 2,
+      "html_generation": {
+        "samples": 30,
+        "p50_ms": 15.706,
+        "p95_ms": 17.383,
+        "max_ms": 18.448
+      },
+      "artifact_bytes": 1639,
+      "bundle_bytes": 4025,
+      "document_selects": 5,
+      "select_shapes": [
+        "SELECT e.values_json,e.created_at,e.form_version,p.definition FROM form_entries \u2026",
+        "SELECT id,field_name,original_name,mime,size,sha256,filename FROM form_attachments \u2026",
+        "SELECT u.id,u.email,u.name,u.role,s.csrf,COALESCE(p.locale,'en') AS interface_locale \u2026"
+      ],
+      "source_query_plan": "Nested Loop  (cost=0.43..19.67 rows=1 width=515) (actual time=0.014..0.015 rows=1 loops=1)\n  Buffers: shared hit=5\n  ->  Index Scan using form_entries_pkey on form_entries e  (cost=0.28..8.29 rows=1 width=520) (actual time=0.009..0.010 rows=1 loops=1)\n        Index Cond: (id = 'bb38e1ac-1aff-446d-99ae-759b5824fb8f'::text)\n        Filter: (form_id = '3c0558e5-bce4-4a5f-97b7-cadff9c63e40'::text)\n        Buffers: shared hit=3\n  ->  Index Scan using form_publications_pkey on form_publications p  (cost=0.15..8.17 rows=1 width=72) (actual time=0.004..0.004 rows=1 loops=1)\n        Index Cond: ((form_id = '3c0558e5-bce4-4a5f-97b7-cadff9c63e40'::text) AND (version = e.form_version))\n        Buffers: shared hit=2\nPlanning:\n  Buffers: shared hit=353\nPlanning Time: 0.635 ms\nExecution Time: 0.033 ms",
+      "warm_application_rss_bytes": 60162048,
+      "database_bytes": 9756672,
+      "database_scope": "All fixture PostgreSQL relations/indexes; database process memory excluded",
+      "debug_secret_and_answer_redaction": true
+    }
+  ]
+}

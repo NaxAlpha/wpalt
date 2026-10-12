@@ -746,7 +746,7 @@
       "capability": "Conditional fields / notification routing",
       "deployment": "L",
       "milestone": "M4",
-      "status": "D10-active; defined earlier scopes retained; advanced behavior not yet delivery-verified",
+      "status": "D10-defined-scope-delivered; broader forms/math/widgets/statistics explicitly deferred",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Earlier-field visibility and fixed-recipient canonical notification rules using presence/scalar equality; no arbitrary executable expressions.",
@@ -760,7 +760,7 @@
         "../scripts/workflows_acceptance.cjs",
         "d10-contract.md"
       ],
-      "d10_coverage": "docs/d10-contract.md; bounded composable conditions/calculations and frozen-version survey reporting in development"
+      "d10_coverage": "Defined D10 finite condition/expression composition, canonical preview/native scalar collection and immutable private survey reporting delivered in merged PR26. Exact final source and actual-main seven gates plus separately downloaded public release verified; docs/evidence/d10-main-release.json. Broader mathematical/widget/statistical capabilities remain in docs/deferred-features.md."
     },
     {
       "id": "F039",
@@ -808,7 +808,7 @@
       "capability": "File uploads and protected attachments",
       "deployment": "L",
       "milestone": "M4",
-      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
+      "status": "D11-defined-local-workflow-verified; final-source-CI-and-release-pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Scoped expiring upload capabilities; private UTF-8 text/PDF/image files, bounded decoding/re-encoding, authenticated integrity-checked downloads and backup; no malware scanner.",
@@ -819,8 +819,14 @@
         "../tests/business_rules.rs",
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
-        "../scripts/workflows_acceptance.cjs"
-      ]
+        "../scripts/workflows_acceptance.cjs",
+        "d11-contract.md",
+        "private-documents.md",
+        "evidence/d11-verification.md",
+        "../tests/attested_documents.rs",
+        "../scripts/attested_documents_reference.py"
+      ],
+      "d11_coverage": "Optional owner-hosted fail-closed ClamAV upload/download admission; frozen private response printable HTML/optional actual local PDF, Ed25519 exact-byte server attestation and independent-key native/WebCrypto/OpenSSL verification. No respondent identity certification, PAdES/qualified signature, complete malware guarantee or premium plugin parity."
     },
     {
       "id": "F042",
@@ -828,7 +834,7 @@
       "capability": "Calculations and pricing logic",
       "deployment": "L",
       "milestone": "M4",
-      "status": "D10-active; defined earlier scopes retained; advanced behavior not yet delivery-verified",
+      "status": "D10-defined-scope-delivered; broader forms/math/widgets/statistics explicitly deferred",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Server-authoritative finite sum/product/choice-score calculation; exact currency and payment pricing remain M6.",
@@ -842,7 +848,7 @@
         "../scripts/workflows_acceptance.cjs",
         "d10-contract.md"
       ],
-      "d10_coverage": "docs/d10-contract.md; bounded composable conditions/calculations and frozen-version survey reporting in development"
+      "d10_coverage": "Defined D10 finite condition/expression composition, canonical preview/native scalar collection and immutable private survey reporting delivered in merged PR26. Exact final source and actual-main seven gates plus separately downloaded public release verified; docs/evidence/d10-main-release.json. Broader mathematical/widget/statistical capabilities remain in docs/deferred-features.md."
     },
     {
       "id": "F043",
@@ -850,7 +856,7 @@
       "capability": "Signatures and signed-document records",
       "deployment": "L",
       "milestone": "M4",
-      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
+      "status": "D11-defined-local-workflow-verified; final-source-CI-and-release-pending",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Typed-name signature and acknowledgment with frozen statement and accepted response; no cryptographic signature/identity certification or generated signed PDF.",
@@ -861,8 +867,14 @@
         "../tests/business_rules.rs",
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
-        "../scripts/workflows_acceptance.cjs"
-      ]
+        "../scripts/workflows_acceptance.cjs",
+        "d11-contract.md",
+        "private-documents.md",
+        "evidence/d11-verification.md",
+        "../tests/attested_documents.rs",
+        "../scripts/attested_documents_reference.py"
+      ],
+      "d11_coverage": "Optional owner-hosted fail-closed ClamAV upload/download admission; frozen private response printable HTML/optional actual local PDF, Ed25519 exact-byte server attestation and independent-key native/WebCrypto/OpenSSL verification. No respondent identity certification, PAdES/qualified signature, complete malware guarantee or premium plugin parity."
     },
     {
       "id": "F044",
@@ -870,7 +882,7 @@
       "capability": "Surveys, polls and scoring",
       "deployment": "L",
       "milestone": "M4",
-      "status": "D10-active; defined earlier scopes retained; advanced behavior not yet delivery-verified",
+      "status": "D10-defined-scope-delivered; broader forms/math/widgets/statistics explicitly deferred",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Choice questionnaires, scores and boolean acknowledgment inputs; responses/export support local evaluation, no specialized statistical survey designer.",
@@ -884,7 +896,7 @@
         "../scripts/workflows_acceptance.cjs",
         "d10-contract.md"
       ],
-      "d10_coverage": "docs/d10-contract.md; bounded composable conditions/calculations and frozen-version survey reporting in development"
+      "d10_coverage": "Defined D10 finite condition/expression composition, canonical preview/native scalar collection and immutable private survey reporting delivered in merged PR26. Exact final source and actual-main seven gates plus separately downloaded public release verified; docs/evidence/d10-main-release.json. Broader mathematical/widget/statistical capabilities remain in docs/deferred-features.md."
     },
     {
       "id": "F045",

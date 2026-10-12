@@ -1,0 +1,668 @@
+{
+  "status": "passed",
+  "browser": "155.0.8059.39",
+  "geometry": [
+    {
+      "surface": "private-collection",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "private-collection",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "private-collection",
+      "viewport": 1440,
+      "document_width": 1440
+    },
+    {
+      "surface": "response-review",
+      "viewport": 320,
+      "document_width": 320,
+      "components": [
+        {
+          "kind": "button",
+          "name": "Sign out",
+          "x": 99.515625,
+          "y": 477,
+          "width": 74.328125,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Document format",
+          "x": 16,
+          "y": 1106.015625,
+          "width": 288,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Download attested document",
+          "x": 16,
+          "y": 1150.015625,
+          "width": 235,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Assigned toUnassignedSite owner",
+          "x": 16,
+          "y": 1739.859375,
+          "width": 288,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Save follow-up",
+          "x": 16,
+          "y": 1799.859375,
+          "width": 135.09375,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        }
+      ],
+      "failures": []
+    },
+    {
+      "surface": "response-review",
+      "viewport": 768,
+      "document_width": 768,
+      "components": [
+        {
+          "kind": "button",
+          "name": "Sign out",
+          "x": 16,
+          "y": 1189.796875,
+          "width": 74.328125,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Document format",
+          "x": 256,
+          "y": 469.421875,
+          "width": 480,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Download attested document",
+          "x": 256,
+          "y": 513.421875,
+          "width": 235,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Assigned toUnassignedSite owner",
+          "x": 256,
+          "y": 1047.265625,
+          "width": 480,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Save follow-up",
+          "x": 256,
+          "y": 1107.265625,
+          "width": 135.09375,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        }
+      ],
+      "failures": []
+    },
+    {
+      "surface": "response-review",
+      "viewport": 1440,
+      "document_width": 1440,
+      "components": [
+        {
+          "kind": "button",
+          "name": "Sign out",
+          "x": 16,
+          "y": 1189.796875,
+          "width": 74.328125,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Document format",
+          "x": 256,
+          "y": 406.015625,
+          "width": 1152,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Download attested document",
+          "x": 256,
+          "y": 450.015625,
+          "width": 235,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Assigned toUnassignedSite owner",
+          "x": 256,
+          "y": 911.859375,
+          "width": 1152,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Save follow-up",
+          "x": 256,
+          "y": 971.859375,
+          "width": 135.09375,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        }
+      ],
+      "failures": []
+    },
+    {
+      "surface": "prepared-document",
+      "viewport": 320,
+      "document_width": 320,
+      "components": [
+        {
+          "kind": "button",
+          "name": "Sign out",
+          "x": 99.515625,
+          "y": 477,
+          "width": 74.328125,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Document format",
+          "x": 16,
+          "y": 1106.015625,
+          "width": 288,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Download attested document",
+          "x": 16,
+          "y": 1150.015625,
+          "width": 235,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Assigned toUnassignedSite owner",
+          "x": 16,
+          "y": 1983.859375,
+          "width": 288,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Save follow-up",
+          "x": 16,
+          "y": 2043.859375,
+          "width": 135.09375,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        }
+      ],
+      "failures": []
+    },
+    {
+      "surface": "prepared-document",
+      "viewport": 768,
+      "document_width": 768,
+      "components": [
+        {
+          "kind": "button",
+          "name": "Sign out",
+          "x": 16,
+          "y": 1189.796875,
+          "width": 74.328125,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Document format",
+          "x": 256,
+          "y": 469.421875,
+          "width": 480,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Download attested document",
+          "x": 256,
+          "y": 513.421875,
+          "width": 235,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Assigned toUnassignedSite owner",
+          "x": 256,
+          "y": 1207.265625,
+          "width": 480,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Save follow-up",
+          "x": 256,
+          "y": 1267.265625,
+          "width": 135.09375,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        }
+      ],
+      "failures": []
+    },
+    {
+      "surface": "prepared-document",
+      "viewport": 1440,
+      "document_width": 1440,
+      "components": [
+        {
+          "kind": "button",
+          "name": "Sign out",
+          "x": 16,
+          "y": 1189.796875,
+          "width": 74.328125,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Document format",
+          "x": 256,
+          "y": 406.015625,
+          "width": 1152,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Download attested document",
+          "x": 256,
+          "y": 450.015625,
+          "width": 235,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Assigned toUnassignedSite owner",
+          "x": 256,
+          "y": 1047.859375,
+          "width": 1152,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Save follow-up",
+          "x": 256,
+          "y": 1107.859375,
+          "width": 135.09375,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        }
+      ],
+      "failures": []
+    },
+    {
+      "surface": "document-failure",
+      "viewport": 320,
+      "document_width": 320,
+      "components": [
+        {
+          "kind": "button",
+          "name": "Sign out",
+          "x": 99.515625,
+          "y": 477,
+          "width": 74.328125,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Document format",
+          "x": 16,
+          "y": 1106.015625,
+          "width": 288,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Download attested document",
+          "x": 16,
+          "y": 1150.015625,
+          "width": 235,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Assigned toUnassignedSite owner",
+          "x": 16,
+          "y": 1875.859375,
+          "width": 288,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Save follow-up",
+          "x": 16,
+          "y": 1935.859375,
+          "width": 135.09375,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        }
+      ],
+      "failures": []
+    },
+    {
+      "surface": "document-failure",
+      "viewport": 768,
+      "document_width": 768,
+      "components": [
+        {
+          "kind": "button",
+          "name": "Sign out",
+          "x": 16,
+          "y": 1189.796875,
+          "width": 74.328125,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Document format",
+          "x": 256,
+          "y": 469.421875,
+          "width": 480,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Download attested document",
+          "x": 256,
+          "y": 513.421875,
+          "width": 235,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Assigned toUnassignedSite owner",
+          "x": 256,
+          "y": 1159.265625,
+          "width": 480,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Save follow-up",
+          "x": 256,
+          "y": 1219.265625,
+          "width": 135.09375,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        }
+      ],
+      "failures": []
+    },
+    {
+      "surface": "document-failure",
+      "viewport": 1440,
+      "document_width": 1440,
+      "components": [
+        {
+          "kind": "button",
+          "name": "Sign out",
+          "x": 16,
+          "y": 1189.796875,
+          "width": 74.328125,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Document format",
+          "x": 256,
+          "y": 406.015625,
+          "width": 1152,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Download attested document",
+          "x": 256,
+          "y": 450.015625,
+          "width": 235,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        },
+        {
+          "kind": "select",
+          "name": "Assigned toUnassignedSite owner",
+          "x": 256,
+          "y": 999.859375,
+          "width": 1152,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "normal"
+        },
+        {
+          "kind": "button",
+          "name": "Save follow-up",
+          "x": 256,
+          "y": 1059.859375,
+          "width": 135.09375,
+          "height": 44,
+          "radius": 6,
+          "font": "14px",
+          "line_height": "22px"
+        }
+      ],
+      "failures": []
+    },
+    {
+      "surface": "printable-document",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "printable-document",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "printable-document",
+      "viewport": 1440,
+      "document_width": 1440
+    }
+  ],
+  "accessibility": [
+    {
+      "surface": "private-collection",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 22
+    },
+    {
+      "surface": "response-review",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 25
+    },
+    {
+      "surface": "prepared-document",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 28
+    },
+    {
+      "surface": "document-failure",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 28
+    }
+  ],
+  "assertions": [
+    "Actual html bytes and frozen attachment/acknowledgment manifest verified natively and independently by OpenSSL",
+    "Actual pdf bytes and frozen attachment/acknowledgment manifest verified natively and independently by OpenSSL",
+    "Keyboard focus and prepared/error states retain format and current page; WebCrypto refuses tampered artifacts, signatures and keys before extraction; JavaScript-disabled native bundle verifies independently",
+    "Actual isolated scanner refuses controlled detected upload without recording a response, then admits private clean content",
+    "Original statement survives republication; script-like private text remains literal in HTML/PDF; respondent identity stays unverified"
+  ],
+  "document_observations": [
+    {
+      "kind": "html",
+      "journey_ms": 255.665,
+      "artifact_bytes": 1470,
+      "bundle_bytes": 3741,
+      "scope": "One serial browser preparation, WebCrypto, direct/bundle downloads, native extraction and OpenSSL; not renderer-only latency or throughput."
+    },
+    {
+      "kind": "pdf",
+      "journey_ms": 931.805,
+      "artifact_bytes": 111222,
+      "bundle_bytes": 150089,
+      "scope": "One serial browser preparation, WebCrypto, direct/bundle downloads, native extraction and OpenSSL; not renderer-only latency or throughput."
+    }
+  ],
+  "errors": [],
+  "binary_sha256": "edfd0f14d787d4fddc68ebc71ee6bf25886623d1617658d0e3842faac9ecbcee",
+  "local_processes": {
+    "processes": 2,
+    "workers": 1,
+    "worker_ready": true,
+    "routing": "round-robin-no-retry-no-stickiness",
+    "requests_by_node": [
+      25,
+      24
+    ]
+  }
+}

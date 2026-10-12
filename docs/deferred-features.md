@@ -94,19 +94,19 @@ Verifiable future outcome: An editor reviews useful suggestions alongside conten
 
 ### D10 — Advanced forms and surveys
 
-Origin: **M4** · Catalog: **F038/F042/F044** · Status: **active under the D10 advanced-forms contract**
+Origin: **M4** · Catalog: **F038/F042/F044** · Status: **defined D10 system merged and independently delivered; broader math/widgets/statistics remain**
 
-[D10 contract](d10-contract.md) defines finite grouped rules, typed calculations, native scalar collection and immutable version/time-cohort reporting. PR26 implements and locally verifies that scope; exact delivery gates remain pending. Broader mathematical functions (including observed free modulo/power), matrix/ranking and specialized statistical questionnaires, richer reporting visualizations and native structured/upload/signature breadth remain separate follow-up capabilities. No whole-plugin or premium survey parity is claimed.
+[D10 contract](d10-contract.md) defines finite grouped rules, typed calculations, native scalar collection and immutable version/time-cohort reporting. PR26 is merged; its exact final source, actual-main seven gates and separately downloaded public release are verified ([receipt](evidence/d10-main-release.json)). Broader mathematical functions (including observed free modulo/power), matrix/ranking and specialized statistical questionnaires, richer reporting visualizations and native structured/upload/signature breadth remain separate follow-up capabilities. No whole-plugin or premium survey parity is claimed.
 
 Verifiable future outcome: Server and UI agree on calculations and visibility; expressions cannot execute owner/server code or alter reviewed pricing.
 
 ### D11 — Attachment and signature workflows
 
-Origin: **M4** · Catalog: **F041/F043** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M4** · Catalog: **F041/F043** · Status: **active under [D11 contract](d11-contract.md); delivery not complete**
 
-Optional isolated malware scanning, cryptographic signature/identity integrations and generated signed-document artifacts.
+Defined local D11 implementation: owner-hosted fail-closed ClamAV private admission/download policy, frozen response printable HTML/optional local PDF and exact-byte Ed25519 server attestations with independent verification. Local evidence is in [D11 verification](evidence/d11-verification.md); final-source CI/public delivery remain pending. Certified respondent identity, qualified/legal/PAdES signatures and real identity/provider interoperability remain explicit external follow-ups.
 
-Verifiable future outcome: Untrusted files remain private/quarantined; identity and cryptographic claims require real provider/standard evidence.
+Verifiable outcome: refused uploads issue no file/quota/capability; current scanning governs private downloads. Original frozen statements/attachment digests survive fresh recovery and exact artifacts refuse tampering/wrong trusted keys. Server attestation never upgrades a typed declaration into certified identity.
 
 ### D12 — Offline and resumable workflows
 

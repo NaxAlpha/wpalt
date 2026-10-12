@@ -1,6 +1,6 @@
 # Advanced forms and survey reporting
 
-D10 development; delivery verification pending. Native 24 / portable 19. [Contract](d10-contract.md), [verification](evidence/d10-verification.md). The D09 development release remains the independently delivered version until D10 passes its own gates.
+D10 defined scope delivered in [PR26](https://github.com/NaxAlpha/wpalt/pull/26); [actual-main/public release receipt](evidence/d10-main-release.json). Native 24 / portable 19. [Contract](d10-contract.md), [verification](evidence/d10-verification.md). The D10 development release is independently verified.
 
 Open Business → Forms, create or edit a form, then use each field's Visibility and calculation disclosure. The notification workflow uses the same composer on accepted canonical values. Changes remain a working copy until the form is published. Conditions can combine all/any/not rules, presence, scalar equality/membership and numeric comparisons. References must use earlier fields. Number fields can compose typed calculations from constants, earlier numbers/choice scores, arithmetic, min/max/average, transforms and conditional branches. A conditional branch evaluates only its selected result, allowing an intentional alternative to missing/skipped inputs. Missing is never zero; division by zero and non-finite results refuse. Rounding uses zero to eight decimals and ties away from zero, including −2.5 → −3; a value just below a tie stays below it. Calculations use binary64, not exact commerce currency or order pricing.
 

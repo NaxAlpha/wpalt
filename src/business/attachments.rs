@@ -91,6 +91,8 @@ pub async fn upload(
             "Use a supported file extension that matches its media type.",
         ));
     }
+    super::attachment_scanning::scan(&app, &body).await?;
+    let normalized_image = matches!(mime, "image/png" | "image/jpeg" | "image/webp");
     let (bytes, mime) = match mime {
         "text/plain" if std::str::from_utf8(&body).is_ok() && !body.contains(&0) => {
             (body.to_vec(), "text/plain")
@@ -145,6 +147,9 @@ pub async fn upload(
         return Err(Error::invalid(
             "The processed attachment exceeds the file limit.",
         ));
+    }
+    if normalized_image {
+        super::attachment_scanning::scan(&app, &bytes).await?;
     }
     let id = uuid::Uuid::new_v4().to_string();
     let token = auth::random_token();

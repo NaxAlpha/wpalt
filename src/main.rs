@@ -31,6 +31,16 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Create a new private Ed25519 response-document key and print its public fingerprint.
+    DocumentKey { output: PathBuf },
+    /// Verify exact document bytes using an independently trusted public-key fingerprint.
+    DocumentVerify {
+        bundle: PathBuf,
+        #[arg(long)]
+        trusted_key_sha256: String,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Review stopped-site translation duplication or explicitly selected field sync.
     TranslationPrepare {
         source: String,
@@ -931,6 +941,39 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    if let Command::DocumentKey { output } = &cli.command {
+        let identity =
+            wpalt::business::documents::create_key(output).map_err(|e| anyhow::anyhow!(e.1))?;
+        println!(
+            "{}",
+            serde_json::json!({"public_key_sha256":identity,"scope":"Server attestation; distribute public-key trust independently and back up the private key separately."})
+        );
+        return Ok(());
+    }
+    if let Command::DocumentVerify {
+        bundle,
+        trusted_key_sha256,
+        output,
+    } = &cli.command
+    {
+        let bytes = backup::read_bounded(bundle, 12 * 1024 * 1024)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.1))?;
+        let bundle: wpalt::business::documents::DocumentBundle = serde_json::from_slice(&bytes)
+            .map_err(|_| anyhow::anyhow!("invalid bounded document bundle"))?;
+        let (manifest, artifact) = wpalt::business::documents::verify(&bundle, trusted_key_sha256)
+            .map_err(|e| anyhow::anyhow!(e.1))?;
+        if let Some(path) = output {
+            backup::write_private(path, &artifact).map_err(|_| {
+                anyhow::anyhow!("Choose a new private verified document output file.")
+            })?;
+        }
+        println!(
+            "{}",
+            serde_json::json!({"valid":true,"public_key_sha256":trusted_key_sha256,"media_type":manifest.media_type,"artifact_bytes":manifest.artifact_bytes,"artifact_sha256":manifest.artifact_sha256,"scope":manifest.authority})
+        );
+        return Ok(());
+    }
     let mut config = Config::load(cli.config.as_deref())?;
     if let Some(v) = cli.database_url {
         config.database_url = v;
@@ -1720,7 +1763,9 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
                 )?
             );
         }
-        Command::RecoveryKey { .. } => unreachable!(),
+        Command::RecoveryKey { .. }
+        | Command::DocumentKey { .. }
+        | Command::DocumentVerify { .. } => unreachable!(),
         Command::Backup { output, key_file } => {
             let bytes = backup::capture(&app)
                 .await

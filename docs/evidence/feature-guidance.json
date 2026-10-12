@@ -2673,7 +2673,57 @@
         "rule grammar/rounding/report cohort changes",
         "security finding"
       ],
-      "status": "reviewed primary sources; implementation active, integrated delivery gates pending"
+      "status": "Reviewed; defined D10 system merged in PR26 and independently verified actual-main/public release; broader math/widgets/statistics explicit follow-ups."
+    },
+    {
+      "feature_id": "D11-PRIVATE-DOCUMENTS",
+      "area": "Fail-closed private scanning and exact-byte server response-document attestations",
+      "scope": "D11 F041/F043 defined local system",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://docs.clamav.net/manual/Usage/ClamdProtocol.html",
+        "https://docs.clamav.net/manual/Usage/Configuration.html",
+        "https://www.rfc-editor.org/rfc/rfc8032",
+        "https://datatracker.ietf.org/doc/html/rfc8410",
+        "https://docs.openssl.org/3.0/man1/openssl-pkeyutl/",
+        "https://www.w3.org/TR/WebCryptoAPI/",
+        "https://developer.chrome.com/docs/automation-and-testing/headless",
+        "https://www.w3.org/TR/css-break-3/"
+      ],
+      "applicable_versions": [
+        "ClamAV1.5.4 controlled-signature reference; no current official intelligence claim",
+        "ring0.17.14 Ed25519; exact serialized domain-separated manifest bytes",
+        "Chrome155 browser; separately verified Chromium148 and locked Playwright1.62.1 Chromium151 headless shell PDF on local Mac; actual CI renderer/version recorded separately",
+        "native24 / portable19 unchanged; original frozen source records retained",
+        "CSS Fragmentation Level3 published CR (work in progress), reviewed 2026-10-12; actual renderer pagination is separate verification."
+      ],
+      "last_checked": "2026-10-12",
+      "next_review": "2026-11-11",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Stream original and normalized bytes with explicit framing, finite admission/deadline/reply bounds; malformed/unavailable/detected scanners refuse before storage and current policy protects old private downloads.",
+        "Independently trusted Ed25519 key binds original canonical response/publication/attachments and exact artifact bytes; server attestation never certifies respondent identity.",
+        "Current role and CSRF admission, consistent source snapshot and fresh permission before disclosure; bounded escaped artifacts and optional fixed private Unix worker cleanup.",
+        "Private key backup/rotation is separate from site source backups; changed key bytes cannot join the same process authority.",
+        "Browser verifies source/key/artifact before extraction, preserves errors/choice, and native download supports JavaScript-disabled use. OS memory/network/disk/daemon isolation remain operator requirements."
+      ],
+      "tests": [
+        "configured_scanning_refuses_before_storage_and_guards_existing_private_downloads",
+        "exact_document_bytes_require_independent_key_trust_and_survive_key_rotation",
+        "original_acknowledgments_generate_private_attested_documents_after_republication_and_recovery",
+        "optional_workers_refuse_failure_release_cancelled_work_and_bind_key_rotation",
+        "scripts/attested_documents_acceptance.cjs",
+        "scripts/attested_documents_reference.py",
+        "scripts/attested_documents_benchmark.py"
+      ],
+      "triggers": [
+        "affected release",
+        "crypto/engine/signature-intelligence/renderer update",
+        "new identity/qualified-signature scope or OS containment claim",
+        "security or key-custody finding"
+      ],
+      "status": "reviewed primary guidance; local defined workflow verified; exact final-source CI and public delivery pending"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

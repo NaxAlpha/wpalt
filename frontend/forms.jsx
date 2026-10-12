@@ -800,6 +800,7 @@ function ValueInput({
   formId,
   version,
   uploadActivity,
+  scanning = false,
 }) {
   const label = schema.label || name;
   const [uploading, setUploading] = useState(false);
@@ -851,6 +852,11 @@ function ValueInput({
             }
           }}
         />
+        <p>
+          {scanning
+            ? "Files must pass the configured local malware scanner before they are admitted."
+            : "Malware scanning is disabled for this form's private attachments."}
+        </p>
         {uploading && <p role="status">Uploading private attachment…</p>}
         {value && (
           <p>Private attachment ready. Send your response within 24 hours.</p>
@@ -1347,6 +1353,7 @@ function VisitorForm({ host }) {
                 key={field.name}
                 formId={host.dataset.id}
                 version={Number(host.dataset.version)}
+                scanning={host.dataset.scanning === "true"}
                 uploadActivity={(delta) => setUploads((count) => count + delta)}
               />
             );

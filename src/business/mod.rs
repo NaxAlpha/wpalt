@@ -1,9 +1,13 @@
 //! Shared business workflows; public routes are added as verified vertical slices.
+pub mod attachment_scanning;
 pub mod attachments;
 pub mod audience;
 pub mod audience_web;
 pub mod backup_validation;
 pub mod campaigns;
+pub mod document_pdf;
+pub mod documents;
+pub mod documents_web;
 pub mod drafts;
 pub mod engagement;
 pub mod engagement_web;

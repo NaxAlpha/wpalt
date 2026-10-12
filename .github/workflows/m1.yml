@@ -178,6 +178,14 @@ jobs:
           name: d09-clean-release-editorial-evidence
           path: work/d09-clean-release-editorial-observations.json
           retention-days: 30
+      - name: Observe bounded frozen private HTML document requests
+        run: python3 scripts/attested_documents_benchmark.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --profile release --output work/d11-clean-release-document-observations.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d11-clean-release-document-evidence
+          path: work/d11-clean-release-document-observations.json
+          retention-days: 30
       - name: Package source identity, executable and checksums
         run: python3 scripts/package_build.py --binary "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/wpalt" --target x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -255,6 +263,14 @@ jobs:
         run: |
           python3 scripts/prepare_forminator_reference.py
           WPALT_ADVANCED_FORMS_ONLY=1 WPALT_FORMINATOR_REFERENCE=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Prepare isolated pinned local scanner and PDF fixture tools
+        run: |
+          python3 scripts/prepare_scanner_reference.py
+          sudo apt-get install -y --no-install-recommends poppler-utils
+          if test -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns; then sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0; fi
+      - name: Verify private scanning, exact document signatures and actual local PDF
+        run: |
+          LD_LIBRARY_PATH="$PWD/work/d11-linux-scanner/extracted/usr/local/lib" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" python3 scripts/attested_documents_reference.py --binary work/verified-build/wpalt --clamd work/d11-linux-scanner/extracted/usr/local/sbin/clamd --certs work/d11-linux-scanner/extracted/usr/local/etc/certs --renderer "$(node -e 'process.stdout.write(require("./frontend/node_modules/playwright-core/lib/coreBundle.js").registry.registry.findExecutable("chromium-headless-shell").executablePath())')" --output work/browser-evidence/d11-documents
       - name: Verify native editorial observations and execute pinned free Yoast analysis
         run: |
           python3 scripts/prepare_editorial_reference.py
@@ -476,6 +492,21 @@ jobs:
           git show 328c302317ce7767392bbf366c269c79445c1f63:scripts/release_build.py > work/d09-release-verifier.py
           python3 work/d09-release-verifier.py --directory work/d09-runtime-reference --source 328c302317ce7767392bbf366c269c79445c1f63 --extract work/d09-runtime-app
           python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d09-runtime-app/wpalt" --source-schema 23
+      - name: Verify original D10 responses through fresh document recovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download nightly-202610121006-ca77d2c422d5 --pattern '*.tar.gz' --pattern SHA256SUMS --dir work/d10-runtime-reference
+          git fetch --depth=1 origin ca77d2c422d5135bf889c7fd13329f577fbc83ae
+          git show ca77d2c422d5135bf889c7fd13329f577fbc83ae:scripts/release_build.py > work/d10-release-verifier.py
+          python3 work/d10-release-verifier.py --directory work/d10-runtime-reference --source ca77d2c422d5135bf889c7fd13329f577fbc83ae --extract work/d10-runtime-app
+          python3 scripts/attested_documents_benchmark.py --binary work/verified-build/wpalt --source-binary work/d10-runtime-app/wpalt --profile release --output work/d11-original-d10-recovery-observations.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d11-original-d10-recovery-evidence
+          path: work/d11-original-d10-recovery-observations.json
+          retention-days: 30
       - name: Observe final clean forms workload on SQLite and PostgreSQL
         run: python3 scripts/advanced_forms_benchmark.py --binary "$PWD/work/verified-build/wpalt" --profile release --output work/d10-clean-both-engine-forms-observations.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -504,6 +535,24 @@ jobs:
           WPALT_LOCAL_PROCESSES: '1'
           WPALT_ADVANCED_FORMS_ONLY: '1'
         run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
+      - name: Prepare isolated pinned scanner and PDF fixture tools
+        run: |
+          python3 scripts/prepare_scanner_reference.py
+          sudo apt-get install -y --no-install-recommends poppler-utils
+          if test -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns; then sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0; fi
+      - name: Verify private documents and scanning across two local processes
+        env:
+          WPALT_LOCAL_PROCESSES: '1'
+        run: |
+          LD_LIBRARY_PATH="$PWD/work/d11-linux-scanner/extracted/usr/local/lib" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" python3 scripts/attested_documents_reference.py --binary work/verified-build/wpalt --clamd work/d11-linux-scanner/extracted/usr/local/sbin/clamd --certs work/d11-linux-scanner/extracted/usr/local/etc/certs --renderer "$(node -e 'process.stdout.write(require("./frontend/node_modules/playwright-core/lib/coreBundle.js").registry.registry.findExecutable("chromium-headless-shell").executablePath())')" --output work/browser-evidence/d11-documents
+      - name: Observe populated private document requests on both engines
+        run: python3 scripts/attested_documents_benchmark.py --binary work/verified-build/wpalt --profile release --output work/d11-clean-both-engine-document-observations.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d11-clean-both-engine-document-evidence
+          path: work/d11-clean-both-engine-document-observations.json
+          retention-days: 30
       - name: Verify editorial progress and observations across local processes
         env:
           WPALT_LOCAL_PROCESSES: '1'

@@ -113,3 +113,7 @@ See [commerce-reservations.md](commerce-reservations.md) for authenticated store
 ## Editorial insights and durable analysis
 
 Saved editors offer [editorial insights](editorial-insights.md); the editorial queue connects owners to the larger bounded public-analysis workspace. Native schema23 retains portable grammarv18 and excludes derived job data from fresh recovery. Follow stopped maintenance, keep the original executable/recovery key and verify current delivery evidence before adoption.
+
+## Private response documents and attachment scanning
+
+Optional local scanner admission and exact-byte response attestations are configured in attachment_scanning/documents. See [private document operations](private-documents.md) for key creation/backup/rotation, independent verification, optional Unix PDF/scanner isolation, default-off behavior and delivery limits. Neither optional tool is bundled or required for ordinary publishing.
