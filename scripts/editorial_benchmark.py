@@ -135,7 +135,7 @@ for engine in ['sqlite', 'postgres'] if a.postgres else ['sqlite']:
                 carry=''
                 while chunk:=diagnostics.read(128*1024):
                     joined=carry+chunk
-                    assert all(secret not in joined for secret in [password,csrf,private_probe]), 'Debug logs disclose a request secret/private analysis phrase'
+                    assert all(secret not in joined for secret in [password,csrf,private_probe,private_probe.lower()]), 'Debug logs disclose a request secret/private analysis phrase'
                     carry=joined[-256:]
             observations.append({'engine':engine,'publications':1005,'sources':first['total'],'edges':first['edge_count'],'html_bytes':first['html_bytes'],'serialized_derived_bytes':first['facts_bytes'],'resumed_after_stopped_cli_batch':True,'debug_secret_and_focus_redaction':True,'first_http_batches':distribution(samples),'identical_html_reuse_batches':distribution(reused_timings),'individual_public_insight':distribution(individual),'batch_queries':query_sample,'cursor_query_plan':plan,'retained_runs':2,'reused_sources':second['reused'],'warm_application_rss_before_analysis_bytes':before_rss,'warm_application_rss_after_analysis_bytes':rss(),'database_bytes':database_bytes,'derived_postgres_relations_bytes':derived_bytes,'database_scope':'SQLite DB/WAL/SHM' if engine=='sqlite' else 'All fixture PostgreSQL relations/indexes; database process memory excluded'})
         finally:
