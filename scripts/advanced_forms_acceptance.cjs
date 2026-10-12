@@ -285,6 +285,37 @@ module.exports = async (owner, visitors, origin, output) => {
       "10",
     );
     await measure("notification-routing");
+    await page.evaluate(() => {
+      const form = document
+        .querySelector("#form-workflow-condition")
+        .closest("form");
+      const key = `wpalt:authoring:${form.dataset.owner}:${location.pathname}:main`;
+      const saved = JSON.parse(localStorage.getItem(key));
+      saved.fields.condition_json = JSON.stringify({
+        operation: "Unknown",
+        field: "quantity",
+      });
+      localStorage.setItem(key, JSON.stringify(saved));
+    });
+    await page.reload();
+    await page
+      .getByRole("button", { name: "Restore recovery copy", exact: true })
+      .click();
+    await page
+      .getByRole("alert")
+      .filter({ hasText: "recovered notification rule needs review" })
+      .waitFor();
+    await page.waitForFunction(
+      () => document.querySelector("[data-add-notification]").disabled,
+    );
+    await page
+      .locator("#form-workflow-condition")
+      .getByLabel("Notify when an accepted field has a value", { exact: true })
+      .selectOption({ label: "Total" });
+    await page.waitForFunction(
+      () => !document.querySelector("[data-add-notification]").disabled,
+    );
+
     await page.goto(origin + `/admin/forms/${id}`);
     await page
       .getByRole("button", { name: "Publish form", exact: true })

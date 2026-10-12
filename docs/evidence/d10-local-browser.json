@@ -1,0 +1,126 @@
+{
+  "status": "passed",
+  "browser": "155.0.8059.39",
+  "accessibility": [
+    {
+      "surface": "composer",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 24
+    },
+    {
+      "surface": "working-preview",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 29
+    },
+    {
+      "surface": "notification-routing",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 27
+    },
+    {
+      "surface": "public-calculator",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 22
+    },
+    {
+      "surface": "versioned-report",
+      "viewport": 1440,
+      "violations": [],
+      "incomplete": [],
+      "passed_rules": 22
+    }
+  ],
+  "assertions": [
+    "Visual recursive calculator and all-rules composer save actual typed structure; private working preview is invalidated by edits and records no response",
+    "Actual public calculator and no-JavaScript canonical submission share visibility and arithmetic; reports exclude private response text and distinguish skipped answers",
+    "Private versioned HTML/JSON/CSV require permission; invalid CSRF cannot invoke working preview"
+  ],
+  "errors": [],
+  "binary_sha256": "8db66839105eb2e9f4c8e86726a9bfc3404df009cb8131c4f7ff57eb93a20dba",
+  "geometry": [
+    {
+      "surface": "composer",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "composer",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "composer",
+      "viewport": 1440,
+      "document_width": 1440
+    },
+    {
+      "surface": "working-preview",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "working-preview",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "working-preview",
+      "viewport": 1440,
+      "document_width": 1440
+    },
+    {
+      "surface": "notification-routing",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "notification-routing",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "notification-routing",
+      "viewport": 1440,
+      "document_width": 1440
+    },
+    {
+      "surface": "public-calculator",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "public-calculator",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "public-calculator",
+      "viewport": 1440,
+      "document_width": 1440
+    },
+    {
+      "surface": "versioned-report",
+      "viewport": 320,
+      "document_width": 320
+    },
+    {
+      "surface": "versioned-report",
+      "viewport": 768,
+      "document_width": 768
+    },
+    {
+      "surface": "versioned-report",
+      "viewport": 1440,
+      "document_width": 1440
+    }
+  ],
+  "scope": "Local Chrome fixture with cached debug runtime, not clean Linux delivery; keyboard/error/recovered-rule paths, five scoped axe surfaces, 15 bounded layout checks; not general accessibility or aesthetics proof."
+}

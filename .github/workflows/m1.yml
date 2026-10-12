@@ -476,6 +476,14 @@ jobs:
           git show 328c302317ce7767392bbf366c269c79445c1f63:scripts/release_build.py > work/d09-release-verifier.py
           python3 work/d09-release-verifier.py --directory work/d09-runtime-reference --source 328c302317ce7767392bbf366c269c79445c1f63 --extract work/d09-runtime-app
           python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d09-runtime-app/wpalt" --source-schema 23
+      - name: Observe final clean forms workload on SQLite and PostgreSQL
+        run: python3 scripts/advanced_forms_benchmark.py --binary "$PWD/work/verified-build/wpalt" --profile release --output work/d10-clean-both-engine-forms-observations.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: d10-clean-both-engine-forms-evidence
+          path: work/d10-clean-both-engine-forms-observations.json
+          retention-days: 30
       - run: frontend/node_modules/.bin/playwright install --with-deps chromium
       - name: Cumulative browser journeys across two processes and one worker
         env:

@@ -2661,7 +2661,11 @@
       "tests": [
         "branching_calculators_discard_forgery_and_evaluate_only_the_selected_branch",
         "numeric_boundaries_missing_values_and_rule_budgets_refuse_unsafe_declarations",
-        "versioned_survey_reports_preserve_branch_denominators_and_canonical_notifications"
+        "versioned_survey_reports_preserve_branch_denominators_and_canonical_notifications",
+        "reporting_reads_committed_cohorts_and_refuses_large_or_noncanonical_storage",
+        "scripts/advanced_forms_acceptance.cjs",
+        "scripts/advanced_forms_benchmark.py",
+        "scripts/maintenance_acceptance.py"
       ],
       "triggers": [
         "affected feature/release",
