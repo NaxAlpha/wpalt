@@ -53,11 +53,11 @@ for engine in ['sqlite', 'postgres'] if a.postgres else ['sqlite']:
         password = secrets.token_urlsafe(24)
         private_probe = "EDITORIAL_PROBE" + secrets.token_hex(12)
         config = root/'site.toml'
-        config.write_text(f'database_url={json.dumps(url)}\ndata_dir={json.dumps(str(root/"data"))}\nlisten="127.0.0.1:{port}"\nbase_url="{origin}"\ndebug=true\ndatabase_connections=1\n[analysis]\nbatch_sources=32\nbatch_seconds=10\n')
+        config.write_text(f'database_url={json.dumps(url)}\ndata_dir={json.dumps(str(root/"data"))}\nlisten="127.0.0.1:{port}"\nbase_url="{origin}"\ndebug=true\ndatabase_connections=1\nscheduler_seconds=3600\n[analysis]\nbatch_sources=32\nbatch_seconds=10\n')
         config.chmod(0o600)
         def native(*argv, stdin=None):
             result = subprocess.run([str(binary), '--config', str(config), *argv], input=stdin, text=True, capture_output=True, timeout=120)
-            assert result.returncode == 0, result.stderr.replace(password, '[redacted]')[:1000]
+            assert result.returncode == 0, result.stderr.replace(password, '[redacted]')[-1500:]
             return result.stdout
         def sql(statement):
             if engine == 'postgres': return pg('SET search_path TO '+schema+'; '+statement)
@@ -67,8 +67,25 @@ for engine in ['sqlite', 'postgres'] if a.postgres else ['sqlite']:
             native('init', '--admin-email', 'owner@example.test', stdin=password+'\n')
             native('seed-demo', '--posts', '1004')
             run_id = json.loads(native('editorial-analysis', 'start'))['id']
-            native('editorial-analysis', 'tick')
-            # The application resumes a batch committed by a separate stopped CLI process.
+            # SQLite/single-server PostgreSQL use the normal embedded worker.
+            # The first scheduler cycle runs immediately; later ones are held so
+            # progress/restart evidence stays deterministic without sleeping an hour.
+            log = (root/'worker-stage.log').open('w')
+            server = subprocess.Popen([str(binary), '--config', str(config), 'serve'], stdout=log, stderr=log)
+            history_path = root/'data/background-jobs.json'
+            for _ in range(300):
+                assert server.poll() is None, 'Normal worker server stopped'
+                try: history = json.loads(history_path.read_text())
+                except (OSError, ValueError): history = []
+                if history and history[0]['state'] in ['succeeded','failed']: break
+                time.sleep(.05)
+            else: raise AssertionError('Actual normal worker cycle did not finish')
+            server.terminate(); server.wait(timeout=15); server=None
+            log.close(); log=None
+            history = json.loads(native('job-history'))
+            stage = next(s for s in history[0]['stages'] if s['name']=='editorial-analysis')
+            assert stage['succeeded'] and stage['count']==32, 'Actual normal worker stage must commit the first batch'
+            # The application resumes a batch committed by its prior real worker process.
             log = (root/'server.log').open('w')
             server = subprocess.Popen([str(binary), '--config', str(config), 'serve', '--external-worker'], stdout=log, stderr=log)
             client = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
@@ -137,12 +154,12 @@ for engine in ['sqlite', 'postgres'] if a.postgres else ['sqlite']:
                     joined=carry+chunk
                     assert all(secret not in joined for secret in [password,csrf,private_probe,private_probe.lower()]), 'Debug logs disclose a request secret/private analysis phrase'
                     carry=joined[-256:]
-            observations.append({'engine':engine,'publications':1005,'sources':first['total'],'edges':first['edge_count'],'html_bytes':first['html_bytes'],'serialized_derived_bytes':first['facts_bytes'],'resumed_after_stopped_cli_batch':True,'debug_secret_and_focus_redaction':True,'first_http_batches':distribution(samples),'identical_html_reuse_batches':distribution(reused_timings),'individual_public_insight':distribution(individual),'batch_queries':query_sample,'cursor_query_plan':plan,'retained_runs':2,'reused_sources':second['reused'],'warm_application_rss_before_analysis_bytes':before_rss,'warm_application_rss_after_analysis_bytes':rss(),'database_bytes':database_bytes,'derived_postgres_relations_bytes':derived_bytes,'database_scope':'SQLite DB/WAL/SHM' if engine=='sqlite' else 'All fixture PostgreSQL relations/indexes; database process memory excluded'})
+            observations.append({'engine':engine,'publications':1005,'sources':first['total'],'edges':first['edge_count'],'html_bytes':first['html_bytes'],'serialized_derived_bytes':first['facts_bytes'],'resumed_after_normal_worker_batch':True,'normal_worker_stage_sources':stage['count'],'debug_secret_and_focus_redaction':True,'first_http_batches':distribution(samples),'identical_html_reuse_batches':distribution(reused_timings),'individual_public_insight':distribution(individual),'batch_queries':query_sample,'cursor_query_plan':plan,'retained_runs':2,'reused_sources':second['reused'],'warm_application_rss_before_analysis_bytes':before_rss,'warm_application_rss_after_analysis_bytes':rss(),'database_bytes':database_bytes,'derived_postgres_relations_bytes':derived_bytes,'database_scope':'SQLite DB/WAL/SHM' if engine=='sqlite' else 'All fixture PostgreSQL relations/indexes; database process memory excluded'})
         finally:
             if server: server.terminate(); server.wait(timeout=15)
             if log: log.close()
             if engine=='postgres': pg('DROP SCHEMA '+schema+' CASCADE')
 
-receipt={'profile':a.profile,'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'binary_bytes':binary.stat().st_size,'scope':'1004 seeded posts plus about publication and language home; actual single-connection database, stopped-CLI batch and restarted HTTP application, finite manual native batches, five warmups/30 serial selected-copy requests. Debug SQL logging enabled even for a release executable. RSS is a warm process sample, neither peak nor per-feature attribution; PostgreSQL process memory excluded. No throughput, TLS, CWV, universal latency or WordPress efficiency claim. Byte budgets describe serialized data, not on-disk or peak allocations.','observations':observations}
+receipt={'profile':a.profile,'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'binary_bytes':binary.stat().st_size,'scope':'1004 seeded posts plus about publication and language home; actual single-connection database, real first embedded-worker cycle and restarted HTTP application, finite manual native batches, five warmups/30 serial selected-copy requests. Debug SQL logging enabled even for a release executable. RSS is a warm process sample, neither peak nor per-feature attribution; PostgreSQL process memory excluded. No throughput, TLS, CWV, universal latency or WordPress efficiency claim. Byte budgets describe serialized data, not on-disk or peak allocations.','observations':observations}
 target=Path(a.output);target.parent.mkdir(parents=True,exist_ok=True);target.write_text(json.dumps(receipt,indent=2)+'\n')
 print('PASS: populated editorial analysis, restart, HTML reuse, query/resource observations ('+','.join(o['engine'] for o in observations)+')')

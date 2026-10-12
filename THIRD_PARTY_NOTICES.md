@@ -724,7 +724,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
-Unicode-derived segmentation/normalization tables: Copyright 2012–2018 The Rust Project Developers (segmentation generated-table notice). Unicode data notice, checked2026-10-12 at https://www.unicode.org/license.txt:
+Unicode-derived segmentation/normalization tables: Copyright 2012–2018 The Rust Project Developers (generated-table notices in both crates). Unicode data notice, checked2026-10-12 at https://www.unicode.org/license.txt:
 
 UNICODE LICENSE V3
 
