@@ -57,6 +57,12 @@
       "difference": "Native explicitly rounds ties away from zero"
     },
     {
+      "formula": "round(0.49999999999999994)",
+      "free": 0,
+      "native": 0,
+      "difference": "Controlled result agrees"
+    },
+    {
       "formula": "ceil(-2.3)",
       "free": -2,
       "native": -2,

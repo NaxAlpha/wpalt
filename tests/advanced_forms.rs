@@ -92,6 +92,23 @@ fn numeric_boundaries_missing_values_and_rule_budgets_refuse_unsafe_declarations
         -3.0,
         "Declared ties-away policy differs intentionally from JS Math.round"
     );
+    for value in [0.49999999999999994, -0.49999999999999994] {
+        let below_tie = calculator(
+            json!({"operation":"Round","decimals":0,"operand":{"operation":"Literal","value":value}}),
+        );
+        assert_eq!(
+            below_tie
+                .evaluate(
+                    &common,
+                    &json!({"business":false,"quantity":1,"rate":1}),
+                    false
+                )
+                .unwrap()["total"]
+                .as_f64(),
+            Some(0.0),
+            "A representable value below the rounding tie must remain below it"
+        );
+    }
     let numeric_equal = calculator(
         json!({"operation":"If","condition":{"operation":"Equal","field":"quantity","value":2.0},"then":{"operation":"Literal","value":7},"otherwise":{"operation":"Literal","value":9}}),
     );
@@ -539,6 +556,58 @@ async fn versioned_survey_reports_preserve_branch_denominators_and_canonical_not
             .execute(&app.db.pool)
             .await
             .unwrap();
+        let numeric:FormDefinition=serde_json::from_value(json!({"title":"Native numeric notation","fields":[{"name":"count","schema":{"kind":"number","required":true}}]})).unwrap();
+        let numeric_id = store::create(&app, &owner, &numeric).await.unwrap();
+        store::save(&app, &numeric_id, 1, &numeric, true)
+            .await
+            .unwrap();
+        for (raw, accepted) in [("inf", false), ("1e309", false), ("01.0", true)] {
+            let mut input = url::form_urlencoded::Serializer::new(String::new());
+            input
+                .append_pair("version", "2")
+                .append_pair("action", "submit")
+                .append_pair("key", &uuid::Uuid::new_v4().to_string())
+                .append_pair("value_count", raw);
+            let response = router
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri(format!("/forms/{numeric_id}/native"))
+                        .header("origin", app.config.origin())
+                        .header("content-type", "application/x-www-form-urlencoded")
+                        .body(Body::from(input.finish()))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let body = String::from_utf8(
+                axum::body::to_bytes(response.into_body(), 128 * 1024)
+                    .await
+                    .unwrap()
+                    .to_vec(),
+            )
+            .unwrap();
+            assert_eq!(body.contains("Your response has been received"), accepted);
+            if !accepted {
+                assert!(
+                    body.contains(raw) && body.contains("finite numbers"),
+                    "Invalid numeric work stays visible without a response"
+                );
+            }
+        }
+        let value: String =
+            sqlx::query_scalar("SELECT values_json FROM form_entries WHERE form_id=$1")
+                .bind(&numeric_id)
+                .fetch_one(&app.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&value).unwrap()["count"].as_f64(),
+            Some(1.0),
+            "Native numeric notation preserves the number authority used by browser JSON"
+        );
         let mut blocked_config = (*app.config).clone();
         blocked_config.spam.enabled = true;
         let blocked = App::open(blocked_config).await.unwrap();

@@ -37,7 +37,7 @@ fn supported(app: &App, publication: &store::PublishedForm) -> bool {
         && publication.form.fields.iter().all(|field| {
             matches!(
                 field.schema.kind.as_str(),
-                "string" | "number" | "integer" | "boolean" | "choice"
+                "string" | "number" | "boolean" | "choice"
             ) && !matches!(
                 field.widget,
                 Some(Widget::Upload | Widget::Signature { .. })
@@ -121,13 +121,21 @@ async fn answer(
             .unwrap_or("");
         let value = match field.schema.kind.as_str() {
             "boolean" => Some(Value::Bool(raw == "true")),
-            "number" | "integer" if !raw.is_empty() => match serde_json::from_str::<Value>(raw) {
-                Ok(value) if value.is_number() => Some(value),
-                _ => {
-                    error = Some("Use finite numeric values. Your entries are preserved.");
-                    Some(Value::String(raw.into()))
+            "number" if !raw.is_empty() => {
+                let value = raw
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|number| number.is_finite())
+                    .and_then(serde_json::Number::from_f64)
+                    .map(Value::Number);
+                match value {
+                    Some(value) => Some(value),
+                    None => {
+                        error = Some("Use finite numbers. Your entries are preserved.");
+                        Some(Value::String(raw.into()))
+                    }
                 }
-            },
+            }
             _ if !raw.is_empty() => Some(Value::String(raw.into())),
             _ => None,
         };
@@ -233,5 +241,5 @@ fn control(field: &super::forms::FormField, label: &str, value: Option<&Value>) 
     if matches!(field.widget, Some(Widget::TextArea)) {
         return html! {label {(label) textarea name=(name) required[field.schema.required] maxlength="8000" {(text)}}};
     }
-    html! {label {(label) input name=(name) value=(text) type=(if matches!(field.schema.kind.as_str(),"number"|"integer") && value.is_none_or(|value|value.is_number()) {"number"} else if matches!(field.widget,Some(Widget::Email)) {"email"} else {"text"}) step=(if field.schema.kind=="integer" {"1"}else{"any"}) required[field.schema.required];}}
+    html! {label {(label) input name=(name) value=(text) type=(if field.schema.kind=="number" && value.is_none_or(|value|value.is_number()) {"number"} else if matches!(field.widget,Some(Widget::Email)) {"email"} else {"text"}) step="any" required[field.schema.required];}}
 }

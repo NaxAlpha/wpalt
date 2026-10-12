@@ -159,6 +159,33 @@ module.exports = async (owner, visitors, origin, output) => {
         .locator("summary")
         .getByText("Try the working form", { exact: true }),
     });
+    await preview
+      .getByLabel("Quantity", { exact: true })
+      .fill("0.014999999999999998");
+    await preview.getByLabel("Rate", { exact: true }).fill("1");
+    assert.equal(
+      await preview.locator("output").textContent(),
+      "0",
+      "Browser does not round a value below a binary64 tie upward",
+    );
+    await preview
+      .getByRole("button", {
+        name: "Check working form on server",
+        exact: true,
+      })
+      .click();
+    await preview
+      .getByRole("status")
+      .filter({ hasText: "Server validation passed" })
+      .waitFor();
+    assert.equal(
+      await preview
+        .locator("dt")
+        .filter({ hasText: /^Total$/ })
+        .evaluate((term) => term.nextElementSibling.textContent),
+      "0",
+      "Server canonical total agrees at the rounding boundary",
+    );
     await preview.getByLabel("Quantity", { exact: true }).fill("2");
     await preview.getByLabel("Rate", { exact: true }).fill("12.5");
     await preview.getByLabel("Quantity", { exact: true }).focus();
@@ -360,6 +387,37 @@ module.exports = async (owner, visitors, origin, output) => {
       .getByRole("status")
       .filter({ hasText: "Your response has been received" })
       .waitFor();
+    const numeric_created = await owner.request.post(origin + "/admin/forms", {
+      headers: { Origin: origin },
+      form: { csrf, title: "Native numeric notation" },
+    });
+    assert(numeric_created.ok());
+    const numeric_id = numeric_created.url().split("/").pop();
+    const numeric_saved = await owner.request.post(
+      origin + `/api/admin/forms/${numeric_id}`,
+      {
+        headers: { Origin: origin },
+        data: {
+          csrf,
+          version: 1,
+          publish: true,
+          definition: {
+            title: "Native numeric notation",
+            fields: [
+              {
+                name: "count",
+                schema: {
+                  kind: "number",
+                  label: "Numeric value",
+                  required: true,
+                },
+              },
+            ],
+          },
+        },
+      },
+    );
+    assert(numeric_saved.ok());
     const native = await owner.browser().newContext({
       javaScriptEnabled: false,
       viewport: { width: 320, height: 1000 },
@@ -389,6 +447,29 @@ module.exports = async (owner, visitors, origin, output) => {
           "Your response has been received",
         ),
       );
+      await p.goto(origin + `/forms/${numeric_id}/native`);
+      await p.getByLabel("Numeric value", { exact: true }).fill("01.0");
+      assert(
+        await p
+          .getByLabel("Numeric value", { exact: true })
+          .evaluate((input) => input.checkValidity()),
+        "Leading-zero decimal notation is a valid numeric input",
+      );
+      await submit(
+        p,
+        p.getByRole("button", { name: "Send response", exact: true }),
+      );
+      await p
+        .getByRole("status")
+        .filter({ hasText: "Your response has been received" })
+        .waitFor();
+      const numeric_report = await (
+        await owner.request.get(
+          origin + `/api/admin/forms/${numeric_id}/report?version=2`,
+        )
+      ).json();
+      assert.equal(numeric_report.responses, 1);
+      assert.equal(numeric_report.fields[0].numeric.mean, 1);
     } finally {
       await native.close();
     }

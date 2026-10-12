@@ -40,6 +40,12 @@ module.exports = async (owner, origin, output, id, csrf) => {
     ["avg(2,4,6)", terms("Average", 2, 4, 6), 4, 4],
     ["abs(-3)", unary("Abs", -3), 3, 3],
     ["round(-2.5)", { ...unary("Round", -2.5), decimals: 0 }, -3, -2],
+    [
+      "round(0.49999999999999994)",
+      { ...unary("Round", 0.49999999999999994), decimals: 0 },
+      0,
+      0,
+    ],
     ["ceil(-2.3)", unary("Ceil", -2.3), -2, -2],
     ["floor(-2.3)", unary("Floor", -2.3), -3, -3],
     ["3/0", binary("Divide", literal(3), literal(0)), null, "Infinity"],

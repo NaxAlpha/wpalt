@@ -94,11 +94,9 @@ function expression(node, fields, values) {
     case "Round": {
       const scale = 10 ** node.decimals;
       const scaled = finite(value * scale);
-      // Beyond 2^52 binary64 has no fractional bits; adding .5 could change it.
-      const rounded =
-        Math.abs(scaled) >= 2 ** 52
-          ? scaled
-          : Math.sign(scaled) * Math.floor(Math.abs(scaled) + 0.5);
+      // Math.round observes the real fraction. Adding .5 first can round a
+      // value just below a tie up to the tie itself in binary64.
+      const rounded = Math.sign(scaled) * Math.round(Math.abs(scaled));
       return finite(rounded / scale);
     }
     default:
