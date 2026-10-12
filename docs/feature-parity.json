@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M9 and defined D01\u2013D05 deliveries merged with independently verified releases; D06 publication discovery is undergoing final integrated verification. Full plugin breadth remains tracked.",
+  "milestone": "M9 and defined D01–D05 deliveries merged with independently verified releases; D06 publication discovery is undergoing final integrated verification. Full plugin breadth remains tracked.",
   "capabilities": [
     {
       "id": "F001",
@@ -760,7 +760,7 @@
         "../scripts/workflows_acceptance.cjs",
         "d10-contract.md"
       ],
-      "d10_coverage": "docs/d10-contract.md; bounded composable conditions/calculations and frozen-version survey reporting in development"
+      "d10_coverage": "Defined D10 finite condition/expression composition, canonical preview/native scalar collection and immutable private survey reporting delivered in merged PR26. Exact final source and actual-main seven gates plus separately downloaded public release verified; docs/evidence/d10-main-release.json. Broader mathematical/widget/statistical capabilities remain in docs/deferred-features.md."
     },
     {
       "id": "F039",
@@ -842,7 +842,7 @@
         "../scripts/workflows_acceptance.cjs",
         "d10-contract.md"
       ],
-      "d10_coverage": "docs/d10-contract.md; bounded composable conditions/calculations and frozen-version survey reporting in development"
+      "d10_coverage": "Defined D10 finite condition/expression composition, canonical preview/native scalar collection and immutable private survey reporting delivered in merged PR26. Exact final source and actual-main seven gates plus separately downloaded public release verified; docs/evidence/d10-main-release.json. Broader mathematical/widget/statistical capabilities remain in docs/deferred-features.md."
     },
     {
       "id": "F043",
@@ -884,7 +884,7 @@
         "../scripts/workflows_acceptance.cjs",
         "d10-contract.md"
       ],
-      "d10_coverage": "docs/d10-contract.md; bounded composable conditions/calculations and frozen-version survey reporting in development"
+      "d10_coverage": "Defined D10 finite condition/expression composition, canonical preview/native scalar collection and immutable private survey reporting delivered in merged PR26. Exact final source and actual-main seven gates plus separately downloaded public release verified; docs/evidence/d10-main-release.json. Broader mathematical/widget/statistical capabilities remain in docs/deferred-features.md."
     },
     {
       "id": "F045",
@@ -1080,7 +1080,7 @@
       "status": "verified-local-defined-M5-scope; exact-CI-and-artifact-status-on-PR-10",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2\u20138 choices), 1\u201310 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
+      "m5_coverage": "Authored multiple-choice quizzes (20 questions, 2–8 choices), 1–10 attempts, concurrent idempotency, text assignments, optimistic grading, feedback, resets and edition-specific local certificates. Revoked certificate links remain invalid after reissue; no public credential registry or arbitrary external grader.",
       "evidence": [
         "m5-contract.md",
         "membership-learning.md",
@@ -1383,7 +1383,7 @@
       "status": "M7-verified-defined-scope",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
-      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0\u20133600 seconds, default revalidation. Private/publication browser responses no-store.",
+      "m7_coverage": "Gzip toggle with per-request negotiation outside the uncompressed cache; asset-cache freshness 0–3600 seconds, default revalidation. Private/publication browser responses no-store.",
       "evidence": [
         "resilient-operations.md",
         "../tests/acceptance.rs",

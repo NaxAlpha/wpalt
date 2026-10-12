@@ -1,0 +1,40 @@
+{
+  "actual_main": "ca77d2c422d5135bf889c7fd13329f577fbc83ae",
+  "pr": "https://github.com/NaxAlpha/wpalt/pull/26",
+  "final_head": "32b04a66077f5b07fc40878c2d4a6892de2721b2",
+  "tested_merge": "2cc5f9f8273bdaa41405c32762d5ad956be46214",
+  "identical_tree": "88271b3d169d47959e11b18d4400aaf8e83cbf51",
+  "final_pr_run": 38232503197,
+  "run": 38234188486,
+  "gates": {
+    "application": "passed",
+    "clean-build": "passed",
+    "compiler-floor": "passed",
+    "dependency-audit": "passed",
+    "frontend": "passed",
+    "native-pitr": "passed",
+    "local-processes": "passed",
+    "release": "passed"
+  },
+  "ci_archive_verification": {
+    "source_commit": "ca77d2c422d5135bf889c7fd13329f577fbc83ae",
+    "tag": "nightly-202610121006-ca77d2c422d5",
+    "archive": "wpalt-x86_64-unknown-linux-gnu-ca77d2c422d5.tar.gz",
+    "archive_sha256": "59d6f0c67b6fa63e09051ff6d69ad3587046e1c1bb9dc6160ae42e2cb8088864",
+    "binary_sha256": "6f7fcf5b9d5f38b9313471ccac0c99b10032e9fc5a2602d259333ce167d22464",
+    "binary_bytes": 40970824,
+    "timestamp_basis": "commit time, UTC"
+  },
+  "separate_public_archive_verification": {
+    "source_commit": "ca77d2c422d5135bf889c7fd13329f577fbc83ae",
+    "tag": "nightly-202610121006-ca77d2c422d5",
+    "archive": "wpalt-x86_64-unknown-linux-gnu-ca77d2c422d5.tar.gz",
+    "archive_sha256": "59d6f0c67b6fa63e09051ff6d69ad3587046e1c1bb9dc6160ae42e2cb8088864",
+    "binary_sha256": "6f7fcf5b9d5f38b9313471ccac0c99b10032e9fc5a2602d259333ce167d22464",
+    "binary_bytes": 40970824,
+    "timestamp_basis": "commit time, UTC"
+  },
+  "tag_commit": "ca77d2c422d5135bf889c7fd13329f577fbc83ae",
+  "public_release": "https://github.com/NaxAlpha/wpalt/releases/tag/nightly-202610121006-ca77d2c422d5",
+  "scope": "Separately downloaded CI/public archives pass strict source, lock, embedded assets, guides, file set and checksum verification and match exactly. Linux x86_64/glibc development prerelease; no full plugin parity, certified identity, coverage, peak RSS, physical hosts or SLA claim."
+}

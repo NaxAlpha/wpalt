@@ -96,13 +96,13 @@ Verifiable future outcome: An editor reviews useful suggestions alongside conten
 
 Origin: **M4** · Catalog: **F038/F042/F044** · Status: **active under the D10 advanced-forms contract**
 
-[D10 contract](d10-contract.md) defines finite grouped rules, typed calculations, native scalar collection and immutable version/time-cohort reporting. PR26 implements and locally verifies that scope; exact delivery gates remain pending. Broader mathematical functions (including observed free modulo/power), matrix/ranking and specialized statistical questionnaires, richer reporting visualizations and native structured/upload/signature breadth remain separate follow-up capabilities. No whole-plugin or premium survey parity is claimed.
+[D10 contract](d10-contract.md) defines finite grouped rules, typed calculations, native scalar collection and immutable version/time-cohort reporting. PR26 is merged; its exact final source, actual-main seven gates and separately downloaded public release are verified ([receipt](evidence/d10-main-release.json)). Broader mathematical functions (including observed free modulo/power), matrix/ranking and specialized statistical questionnaires, richer reporting visualizations and native structured/upload/signature breadth remain separate follow-up capabilities. No whole-plugin or premium survey parity is claimed.
 
 Verifiable future outcome: Server and UI agree on calculations and visibility; expressions cannot execute owner/server code or alter reviewed pricing.
 
 ### D11 — Attachment and signature workflows
 
-Origin: **M4** · Catalog: **F041/F043** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M4** · Catalog: **F041/F043** · Status: **active under [D11 contract](d11-contract.md); delivery not complete**
 
 Optional isolated malware scanning, cryptographic signature/identity integrations and generated signed-document artifacts.
 
