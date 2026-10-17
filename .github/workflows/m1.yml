@@ -250,7 +250,11 @@ jobs:
           name: wpalt-clean-linux-x86_64-${{ github.sha }}
           path: work/distribution
       - run: python3 scripts/release_build.py --directory work/distribution --source "$GITHUB_SHA" --extract work/verified-build
-      - run: frontend/node_modules/.bin/playwright install --with-deps chromium
+      - name: Install browser dependencies and native fixture tools once
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg poppler-utils
+          frontend/node_modules/.bin/playwright install --with-deps chromium
       - run: WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Verify reviewed editable Elementor imports
         run: WPALT_ELEMENTOR_DESIGN_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
@@ -266,8 +270,9 @@ jobs:
       - name: Prepare isolated pinned local scanner and PDF fixture tools
         run: |
           python3 scripts/prepare_scanner_reference.py
-          sudo apt-get install -y --no-install-recommends poppler-utils
           if test -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns; then sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0; fi
+      - name: Verify deliberate offline library and confirmed partial recovery
+        run: WPALT_OFFLINE_RECOVERY_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Verify private scanning, exact document signatures and actual local PDF
         run: |
           LD_LIBRARY_PATH="$PWD/work/d11-linux-scanner/extracted/usr/local/lib" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" python3 scripts/attested_documents_reference.py --binary work/verified-build/wpalt --clamd work/d11-linux-scanner/extracted/usr/local/sbin/clamd --certs work/d11-linux-scanner/extracted/usr/local/etc/certs --renderer "$(node -e 'process.stdout.write(require("./frontend/node_modules/playwright-core/lib/coreBundle.js").registry.registry.findExecutable("chromium-headless-shell").executablePath())')" --output work/browser-evidence/d11-documents
@@ -279,8 +284,6 @@ jobs:
         run: WPALT_REDIRECT_LINKS_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Verify typed structured location authoring and visible facts
         run: WPALT_STRUCTURED_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
-      - name: Install optional local video fixture tools
-        run: sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Verify publication discovery previews, playable local video and revocation
         run: WPALT_DISCOVERY_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - run: WPALT_VIDEO_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
@@ -507,6 +510,15 @@ jobs:
           name: d11-original-d10-recovery-evidence
           path: work/d11-original-d10-recovery-observations.json
           retention-days: 30
+      - name: Verify authentic original D11 stopped upgrade and fresh rollback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download nightly-202610121346-22e29f7d3a31 --repo NaxAlpha/wpalt --dir work/d11-original-runtime
+          git fetch --depth=1 origin 22e29f7d3a310f565a97107bbb5b5f328ec1d39b
+          git show 22e29f7d3a310f565a97107bbb5b5f328ec1d39b:scripts/release_build.py > work/d11-original-release-verify.py
+          python3 work/d11-original-release-verify.py --directory work/d11-original-runtime --source 22e29f7d3a310f565a97107bbb5b5f328ec1d39b --extract work/d11-runtime-app
+          python3 scripts/maintenance_acceptance.py --binary "$PWD/work/verified-build/wpalt" --source-binary "$PWD/work/d11-runtime-app/wpalt" --source-schema 24
       - name: Observe final clean forms workload on SQLite and PostgreSQL
         run: python3 scripts/advanced_forms_benchmark.py --binary "$PWD/work/verified-build/wpalt" --profile release --output work/d10-clean-both-engine-forms-observations.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -515,7 +527,11 @@ jobs:
           name: d10-clean-both-engine-forms-evidence
           path: work/d10-clean-both-engine-forms-observations.json
           retention-days: 30
-      - run: frontend/node_modules/.bin/playwright install --with-deps chromium
+      - name: Install browser dependencies and native fixture tools once
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg poppler-utils
+          frontend/node_modules/.bin/playwright install --with-deps chromium
       - name: Cumulative browser journeys across two processes and one worker
         env:
           WPALT_LOCAL_PROCESSES: '1'
@@ -538,8 +554,11 @@ jobs:
       - name: Prepare isolated pinned scanner and PDF fixture tools
         run: |
           python3 scripts/prepare_scanner_reference.py
-          sudo apt-get install -y --no-install-recommends poppler-utils
           if test -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns; then sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0; fi
+      - name: Verify offline and recovery across two processes and one worker
+        env:
+          WPALT_LOCAL_PROCESSES: '1'
+        run: WPALT_OFFLINE_RECOVERY_ONLY=1 WPALT_BINARY="$PWD/work/verified-build/wpalt" PLAYWRIGHT_MODULE="$PWD/frontend/node_modules/playwright" node scripts/browser_acceptance.cjs
       - name: Verify private documents and scanning across two local processes
         env:
           WPALT_LOCAL_PROCESSES: '1'

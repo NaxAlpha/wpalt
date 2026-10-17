@@ -1,5 +1,7 @@
 # wpalt
 
+Development checkpoint: see [the resume guide](docs/RESUME.md) to continue from draft PR28 after recreating the local workspace.
+
 An owner-controlled Rust CMS with a bundled admin panel and public website. The composable publishing system includes multilingual discovery, integrated structured authoring M4 business/audience workflows M5 membership/learning and M6 commerce/reservations on SQLite or PostgreSQL, with no mandatory vendor account or external runtime services.
 
 Create posts and pages, keep drafts separate from live content, autosave, preview, restore revisions and schedule publication. Manage images, typed fields, basic compositions, navigation, Paper/Ink themes, moderated comments and local search. Export content, download a consistent manual backup and recover into a fresh database, including across database engines.

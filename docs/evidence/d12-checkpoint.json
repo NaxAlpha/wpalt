@@ -1,0 +1,36 @@
+{
+  "checkpoint_date": "2026-10-17",
+  "purpose": "Owner-requested intermediate checkpoint before local workspace removal; not merged or publicly released",
+  "pr": "https://github.com/NaxAlpha/wpalt/pull/28",
+  "implementation_head": "27c897a74832c284ef29aeb19f5d87dce1d11fdb",
+  "tested_merge": "c8f7a12bb0a648832114bd2543b42c42b45d0be3",
+  "same_tree": "eb8fda1ebca833eddd6c37859f95e4c5f011ef8f",
+  "retained_tested_merge_tag": "checkpoint/d12-tested-20261017",
+  "ci_run": "https://github.com/NaxAlpha/wpalt/actions/runs/38316460776",
+  "ci_gates": {
+    "compiler-floor": "success",
+    "clean-build": "success",
+    "application": "success",
+    "dependency-audit": "success",
+    "frontend": "success",
+    "local-processes": "success",
+    "native-pitr": "success"
+  },
+  "independently_downloaded_clean_artifact": {
+    "source_commit": "c8f7a12bb0a648832114bd2543b42c42b45d0be3",
+    "tag": "nightly-202610122224-c8f7a12bb0a6",
+    "archive": "wpalt-x86_64-unknown-linux-gnu-c8f7a12bb0a6.tar.gz",
+    "archive_sha256": "c1ff56b9719cae6f1091e80d40fcc56d17a96ccd6a17b109de395f0bb72976c2",
+    "binary_sha256": "93192e78fc8175f55be4217713a6b5fa223d9a3e809e50e08ac163f1ae4580ec",
+    "binary_bytes": 41474792,
+    "timestamp_basis": "commit time, UTC"
+  },
+  "public_release": null,
+  "resume_guide": "../RESUME.md",
+  "limitations": [
+    "This receipt verifies the implementation source above. Subsequent checkpoint documentation has a different complete Git tree.",
+    "Actions artifacts expire; the retained Git tag preserves source and the committed verifier/scripts allow fresh builds.",
+    "Local fixture databases, credentials, tool/model downloads, raw coverage data and local executables are deliberately not committed.",
+    "No whole-plugin parity, coverage percentage, physical-host or SLA claim."
+  ]
+}

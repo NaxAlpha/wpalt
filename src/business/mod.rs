@@ -31,3 +31,6 @@ pub mod registration;
 pub mod registration_web;
 
 pub mod quotas;
+
+pub mod recovery;
+pub mod recovery_web;

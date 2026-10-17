@@ -492,6 +492,20 @@ async fn versioned_survey_reports_preserve_branch_denominators_and_canonical_not
             .await
             .unwrap();
         for path in [format!("/forms/{form}"), format!("/forms/{form}/native")] {
+            let response = router
+                .clone()
+                .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(
+                response.headers()["referrer-policy"],
+                if path.ends_with("/native") {
+                    "strict-origin"
+                } else {
+                    "no-referrer"
+                }
+            );
             assert!(matches!(
                 wpalt::discovery::redirects::route(&app, &discovery, &path)
                     .await
@@ -634,10 +648,18 @@ async fn versioned_survey_reports_preserve_branch_denominators_and_canonical_not
         let archive = wpalt::backup::capture(&app).await.unwrap();
         assert_eq!(
             wpalt::backup::inspect(&app.config, &archive).unwrap()["schema"],
-            19
+            20
         );
         let mut envelope: Value = serde_json::from_slice(&archive).unwrap();
         let mut graph: Value = serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+        graph["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("form_recovery_policies");
+        graph["tables"]
+            .as_object_mut()
+            .unwrap()
+            .remove("form_recoveries");
         graph["schema"] = json!(18);
         let graph = serde_json::to_string(&graph).unwrap();
         envelope["format"] = json!("wpalt-backup-v18");

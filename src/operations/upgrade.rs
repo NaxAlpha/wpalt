@@ -94,6 +94,7 @@ pub async fn apply(
         21,
         22,
         23,
+        24,
         crate::db::SCHEMA_VERSION,
     ]
     .contains(&installed)

@@ -216,7 +216,7 @@ enum Command {
     RecoveryInspect {
         input: PathBuf,
         /// Explicit offline validation of a retained v12–v18 recovery point.
-        #[arg(long, default_value_t=19, value_parser=clap::value_parser!(u8).range(12..=19))]
+        #[arg(long, default_value_t=20, value_parser=clap::value_parser!(u8).range(12..=20))]
         source_format: u8,
         #[arg(long)]
         key_file: Option<PathBuf>,
@@ -304,6 +304,13 @@ enum Command {
     },
     /// Offline v18-to-current conversion into a NEW private archive; preserves supplied encryption.
     MigrateRecoveryV18 {
+        input: PathBuf,
+        output: PathBuf,
+        #[arg(long)]
+        key_file: Option<PathBuf>,
+    },
+    /// Offline original D11 v19-to-current conversion into a NEW private archive.
+    MigrateRecoveryV19 {
         input: PathBuf,
         output: PathBuf,
         #[arg(long)]
@@ -1130,12 +1137,13 @@ async fn main() -> anyhow::Result<()> {
                 16 => backup::migrate_v16(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
                 17 => backup::migrate_v17(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
                 18 => backup::migrate_v18(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
+                19 => backup::migrate_v19(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?,
                 _ => bytes,
             };
             let mut report = backup::inspect(&config, &bytes).map_err(|e| anyhow::anyhow!(e.1))?;
-            if *source_format < 19 {
+            if *source_format < 20 {
                 report["source_schema"] = (*source_format).into();
-                report["boundary"]="Original source validated by explicit offline conversion; ordinary restore requires a separately converted v19 archive.".into();
+                report["boundary"]="Original source validated by explicit offline conversion; ordinary restore requires a separately converted v20 archive.".into();
             }
             println!("{}", serde_json::to_string_pretty(&report)?);
             return Ok(());
@@ -1227,13 +1235,20 @@ async fn main() -> anyhow::Result<()> {
             output,
             key_file,
         }
+        | Command::MigrateRecoveryV19 {
+            input,
+            output,
+            key_file,
+        }
         | Command::MigrateRecoveryV18 {
             input,
             output,
             key_file,
         } => {
             let bytes = recovery_bytes(&config, input, key_file.as_deref()).await?;
-            let mut bytes = if matches!(&cli.command, Command::MigrateRecoveryV18 { .. }) {
+            let mut bytes = if matches!(&cli.command, Command::MigrateRecoveryV19 { .. }) {
+                backup::migrate_v19(&config, &bytes)
+            } else if matches!(&cli.command, Command::MigrateRecoveryV18 { .. }) {
                 backup::migrate_v18(&config, &bytes)
             } else if matches!(&cli.command, Command::MigrateRecoveryV17 { .. }) {
                 backup::migrate_v17(&config, &bytes)
@@ -1257,7 +1272,7 @@ async fn main() -> anyhow::Result<()> {
                     .map_err(|e| anyhow::anyhow!(e.1))?;
             }
             backup::write_private(output, &bytes)?;
-            println!("Converted a new private v19 recovery archive; source retained.");
+            println!("Converted a new private v20 recovery archive; source retained.");
             return Ok(());
         }
         Command::MigrateBackup { input, output } => {
@@ -1620,7 +1635,9 @@ async fn execute(app: App, command: Command) -> anyhow::Result<()> {
         | Command::MigrateRecoveryV14 { .. }
         | Command::MigrateRecoveryV15 { .. }
         | Command::MigrateRecoveryV16 { .. } => unreachable!(),
-        Command::MigrateRecoveryV17 { .. } | Command::MigrateRecoveryV18 { .. } => unreachable!(),
+        Command::MigrateRecoveryV17 { .. }
+        | Command::MigrateRecoveryV18 { .. }
+        | Command::MigrateRecoveryV19 { .. } => unreachable!(),
         Command::CloneActivate { review } => {
             wpalt::operations::clone_hold::activate(&app, &review)
                 .await

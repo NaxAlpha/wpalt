@@ -82,7 +82,7 @@ pub async fn initialize(tx: &mut Transaction<'_, Any>, postgres: bool) -> Result
         ("contacts", "audience_contacts", "0"),
         (
             "drafts",
-            "form_drafts",
+            "(SELECT values_json FROM form_drafts UNION ALL SELECT values_json FROM form_recoveries) draft_storage",
             "COALESCE(SUM(length(values_json)),0)",
         ),
         ("uploads", "form_attachments", "COALESCE(SUM(size),0)"),
@@ -152,6 +152,7 @@ pub async fn cleanup(app: &App) -> Result<()> {
     if !app.config.business_enabled {
         return Ok(());
     }
+    super::recovery::cleanup(app).await?;
     // Capture holds this same single-server coordinator through database and file reads.
     // An expired staged file must not be unlinked from an in-flight recovery point.
     let _guard = app.mutation().await?;

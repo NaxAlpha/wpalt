@@ -307,6 +307,11 @@ const EXPORTS: &[(&str, &str, &str)] = &[
         "user_id",
         "id,course_id,course_version,lesson_id,score,passed,created_at",
     ),
+    (
+        "form_recoveries",
+        "@confirmed_email",
+        "id,form_id,form_version,policy_id,email,policy_definition,request_key,values_json,state,created_at,expires_at",
+    ),
     ("member_referrals", "user_id", "id,title,visits,created_at"),
     (
         "member_commissions",
@@ -381,6 +386,9 @@ pub async fn export(app: &App, subject: &str) -> Result<Vec<u8>> {
             fields[0]
         };
         let predicate = match *key {
+            "@confirmed_email" => {
+                "state='confirmed' AND email=(SELECT email FROM users WHERE id=$1)".to_owned()
+            }
             "@order" => "order_id IN (SELECT id FROM shop_orders WHERE user_id=$1)".to_owned(),
             "@referral" => {
                 "referral_id IN (SELECT id FROM member_referrals WHERE user_id=$1)".to_owned()
