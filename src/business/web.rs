@@ -27,6 +27,7 @@ pub fn routes(app: &App) -> Router<App> {
         .merge(super::native_forms::routes())
         .merge(super::surveys_web::routes())
         .merge(super::documents_web::routes())
+        .merge(super::recovery_web::routes())
         .merge(super::audience_web::routes())
         .merge(super::workflows_web::routes())
         .merge(super::registration_web::routes())
@@ -295,6 +296,7 @@ async fn public(
         None,
         html! {
             h1 {(definition.form.title)}
+            p {a href=(format!("/offline/#form/{id}")) {"Save an offline form draft"}}
             (super::engagement::markup(&settings,false))
             div id="public-form" data-id=(id) data-version=(row.get::<i64,_>("published_version")) data-definition=(raw) data-scanning=(if app.config.attachment_scanning.enabled {"true"} else {"false"}) data-spam=(if app.config.spam.enabled {"true"} else {"false"}) {p {"Loading form…"}noscript {a href=(format!("/forms/{id}/native")) {"Use the server-rendered form"}}}
             script defer src="/assets/forms.js" {}

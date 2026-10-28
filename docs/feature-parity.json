@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M9 and defined D01\u2013D05 deliveries merged with independently verified releases; D06 publication discovery is undergoing final integrated verification. Full plugin breadth remains tracked.",
+  "milestone": "M1\u2013M9 and defined D01\u2013D11 packages delivered; D12 defined implementation closes through PR28. D13\u2013D30 and broader earlier parity remain tracked.",
   "capabilities": [
     {
       "id": "F001",
@@ -808,7 +808,7 @@
       "capability": "File uploads and protected attachments",
       "deployment": "L",
       "milestone": "M4",
-      "status": "D11-defined-local-workflow-verified; final-source-CI-and-release-pending",
+      "status": "D11-defined-local-package-delivered; external-certified-identity explicitly deferred",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Scoped expiring upload capabilities; private UTF-8 text/PDF/image files, bounded decoding/re-encoding, authenticated integrity-checked downloads and backup; no malware scanner.",
@@ -824,7 +824,8 @@
         "private-documents.md",
         "evidence/d11-verification.md",
         "../tests/attested_documents.rs",
-        "../scripts/attested_documents_reference.py"
+        "../scripts/attested_documents_reference.py",
+        "evidence/d11-main-release.json"
       ],
       "d11_coverage": "Optional owner-hosted fail-closed ClamAV upload/download admission; frozen private response printable HTML/optional actual local PDF, Ed25519 exact-byte server attestation and independent-key native/WebCrypto/OpenSSL verification. No respondent identity certification, PAdES/qualified signature, complete malware guarantee or premium plugin parity."
     },
@@ -856,7 +857,7 @@
       "capability": "Signatures and signed-document records",
       "deployment": "L",
       "milestone": "M4",
-      "status": "D11-defined-local-workflow-verified; final-source-CI-and-release-pending",
+      "status": "D11-defined-local-package-delivered; external-certified-identity explicitly deferred",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Typed-name signature and acknowledgment with frozen statement and accepted response; no cryptographic signature/identity certification or generated signed PDF.",
@@ -872,7 +873,8 @@
         "private-documents.md",
         "evidence/d11-verification.md",
         "../tests/attested_documents.rs",
-        "../scripts/attested_documents_reference.py"
+        "../scripts/attested_documents_reference.py",
+        "evidence/d11-main-release.json"
       ],
       "d11_coverage": "Optional owner-hosted fail-closed ClamAV upload/download admission; frozen private response printable HTML/optional actual local PDF, Ed25519 exact-byte server attestation and independent-key native/WebCrypto/OpenSSL verification. No respondent identity certification, PAdES/qualified signature, complete malware guarantee or premium plugin parity."
     },
@@ -904,7 +906,7 @@
       "capability": "Save/resume, partial entries and abandonment",
       "deployment": "L",
       "milestone": "M4",
-      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
+      "status": "defined-D12-implementation; closure and exact-source release tracked in PR28; broader remainder retained",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Seven-day revisioned partial server drafts and explicit device recovery; no covert abandonment tracking or automatic abandoned-response marketing.",
@@ -915,8 +917,14 @@
         "../tests/business_rules.rs",
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
-        "../scripts/workflows_acceptance.cjs"
-      ]
+        "../scripts/workflows_acceptance.cjs",
+        "d12-contract.md",
+        "offline-and-recovery.md",
+        "evidence/d12-verification.md",
+        "../tests/offline_recovery.rs",
+        "../scripts/offline_recovery_acceptance.cjs"
+      ],
+      "d12_coverage": "Deliberate public-text/scalar-form offline snapshots, finite scope/count/bytes/expiry, original-payload conflict/retry and separately requested/address-confirmed safe partial-response recovery. No general site synchronization, private-widget offline submission, covert tracking or paid-runtime parity."
     },
     {
       "id": "F046",
@@ -924,7 +932,7 @@
       "capability": "Offline capture and later synchronization",
       "deployment": "L",
       "milestone": "M4",
-      "status": "verified-local-defined-M4-scope; required-current-head-CI-and-review-on-PR-8",
+      "status": "defined-D12-implementation; closure and exact-source release tracked in PR28; broader remainder retained",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Already-loaded form editing offline and original-payload retry across reload; no uncached offline site navigation or general distributed synchronization.",
@@ -935,8 +943,14 @@
         "../tests/business_rules.rs",
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
-        "../scripts/workflows_acceptance.cjs"
-      ]
+        "../scripts/workflows_acceptance.cjs",
+        "d12-contract.md",
+        "offline-and-recovery.md",
+        "evidence/d12-verification.md",
+        "../tests/offline_recovery.rs",
+        "../scripts/offline_recovery_acceptance.cjs"
+      ],
+      "d12_coverage": "Deliberate public-text/scalar-form offline snapshots, finite scope/count/bytes/expiry, original-payload conflict/retry and separately requested/address-confirmed safe partial-response recovery. No general site synchronization, private-widget offline submission, covert tracking or paid-runtime parity."
     },
     {
       "id": "F047",

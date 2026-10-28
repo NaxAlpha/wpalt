@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = {'wpalt', 'BUILD.json', 'INSTALL.md', 'wpalt.example.toml', 'operations.md',
-         'discovery.md', 'publication-discovery.md', 'structured-data.md', 'redirects-and-links.md', 'editorial-insights.md', 'advanced-forms-and-surveys.md', 'private-documents.md', 'theme-authoring.md', 'elementor-design-import.md', 'membership-learning.md', 'm5-contract.md', 'commerce-reservations.md', 'm6-contract.md', 'resilient-operations.md', 'm7-contract.md', 'migration-and-extensions.md', 'm8-contract.md', 'distributed-operations.md', 'm9-contract.md', 'local_ai_worker.py', 'document_translation_worker.py', 'webhook_worker.py', 'field-journal.json', 'theme-example.md', 'integration-example.md', 'THIRD_PARTY_NOTICES.md'}
+         'discovery.md', 'publication-discovery.md', 'structured-data.md', 'redirects-and-links.md', 'editorial-insights.md', 'advanced-forms-and-surveys.md', 'private-documents.md', 'offline-and-recovery.md', 'theme-authoring.md', 'elementor-design-import.md', 'membership-learning.md', 'm5-contract.md', 'commerce-reservations.md', 'm6-contract.md', 'resilient-operations.md', 'm7-contract.md', 'migration-and-extensions.md', 'm8-contract.md', 'distributed-operations.md', 'm9-contract.md', 'local_ai_worker.py', 'document_translation_worker.py', 'webhook_worker.py', 'field-journal.json', 'theme-example.md', 'integration-example.md', 'THIRD_PARTY_NOTICES.md'}
 
 
 def command(*args):
@@ -51,18 +51,18 @@ def verify(directory, source):
         return subprocess.check_output(['git', 'show', source + ':' + path], cwd=ROOT)
     if digest(source_bytes('Cargo.lock')) != metadata['lockfile_sha256']:
         raise ValueError('Dependency lock mismatch')
-    frontend = {'lockfile_sha256':'frontend/package-lock.json', 'forms_sha256':'assets/generated/forms.js',
+    frontend = {'lockfile_sha256':'frontend/package-lock.json', 'offline_sha256':'assets/generated/offline.js', 'offline_css_sha256':'assets/generated/offline.css', 'offline_worker_sha256':'assets/generated/offline-worker.js', 'forms_sha256':'assets/generated/forms.js',
                 'editor_sha256':'assets/generated/editor.js', 'studio_sha256':'assets/generated/builder.js',
                 'admin_ui_sha256':'assets/generated/admin-ui.css', 'design_tokens_sha256':'frontend/design-tokens.json'}
     for key, path in frontend.items():
         if digest(source_bytes(path)) != metadata['frontend'][key]:
             raise ValueError('Frontend source mismatch: ' + path)
-    for name in ['admin.js', 'app.css', 'engagement.js', 'engagement-review.js', 'form-embed.js']:
+    for name in ['admin.js', 'app.css', 'engagement.js', 'engagement-review.js', 'form-embed.js','offline.html','offline.css']:
         if digest(source_bytes('assets/' + name)) != metadata['business_assets'][name]:
             raise ValueError('Business asset mismatch: ' + name)
     for name, path in [('wpalt.example.toml','wpalt.example.toml'),('operations.md','docs/operations.md'),
                        ('theme-authoring.md','docs/theme-authoring.md'),('elementor-design-import.md','docs/elementor-design-import.md'),('membership-learning.md','docs/membership-learning.md'),
-                       ('discovery.md','docs/discovery.md'),('publication-discovery.md','docs/publication-discovery.md'),('structured-data.md','docs/structured-data.md'),('redirects-and-links.md','docs/redirects-and-links.md'),('editorial-insights.md','docs/editorial-insights.md'),('advanced-forms-and-surveys.md','docs/advanced-forms-and-surveys.md'),('private-documents.md','docs/private-documents.md'),('m5-contract.md','docs/m5-contract.md'),('commerce-reservations.md','docs/commerce-reservations.md'),('m6-contract.md','docs/m6-contract.md'),('resilient-operations.md','docs/resilient-operations.md'),('m7-contract.md','docs/m7-contract.md'),('migration-and-extensions.md','docs/migration-and-extensions.md'),('m8-contract.md','docs/m8-contract.md'),('distributed-operations.md','docs/distributed-operations.md'),('m9-contract.md','docs/m9-contract.md'),('local_ai_worker.py','examples/integrations/local_ai_worker.py'),('document_translation_worker.py','examples/integrations/document_translation_worker.py'),('webhook_worker.py','examples/integrations/webhook_worker.py'),('field-journal.json','examples/themes/field-journal.json'),('theme-example.md','examples/themes/README.md'),('integration-example.md','examples/integrations/README.md'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:
+                       ('discovery.md','docs/discovery.md'),('publication-discovery.md','docs/publication-discovery.md'),('structured-data.md','docs/structured-data.md'),('redirects-and-links.md','docs/redirects-and-links.md'),('editorial-insights.md','docs/editorial-insights.md'),('advanced-forms-and-surveys.md','docs/advanced-forms-and-surveys.md'),('private-documents.md','docs/private-documents.md'),('offline-and-recovery.md','docs/offline-and-recovery.md'),('m5-contract.md','docs/m5-contract.md'),('commerce-reservations.md','docs/commerce-reservations.md'),('m6-contract.md','docs/m6-contract.md'),('resilient-operations.md','docs/resilient-operations.md'),('m7-contract.md','docs/m7-contract.md'),('migration-and-extensions.md','docs/migration-and-extensions.md'),('m8-contract.md','docs/m8-contract.md'),('distributed-operations.md','docs/distributed-operations.md'),('m9-contract.md','docs/m9-contract.md'),('local_ai_worker.py','examples/integrations/local_ai_worker.py'),('document_translation_worker.py','examples/integrations/document_translation_worker.py'),('webhook_worker.py','examples/integrations/webhook_worker.py'),('field-journal.json','examples/themes/field-journal.json'),('theme-example.md','examples/themes/README.md'),('integration-example.md','examples/integrations/README.md'),('THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')]:
         if files[name] != source_bytes(path):
             raise ValueError('Packaged guide mismatch: ' + name)
     timestamp = int(command('git', 'show', '-s', '--format=%ct', source))

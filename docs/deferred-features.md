@@ -102,17 +102,17 @@ Verifiable future outcome: Server and UI agree on calculations and visibility; e
 
 ### D11 — Attachment and signature workflows
 
-Origin: **M4** · Catalog: **F041/F043** · Status: **active under [D11 contract](d11-contract.md); delivery not complete**
+Origin: **M4** · Catalog: **F041/F043** · Status: **defined local package delivered in merged PR27; broader external identity remains**
 
-Defined local D11 implementation: owner-hosted fail-closed ClamAV private admission/download policy, frozen response printable HTML/optional local PDF and exact-byte Ed25519 server attestations with independent verification. Local evidence is in [D11 verification](evidence/d11-verification.md); final-source CI/public delivery remain pending. Certified respondent identity, qualified/legal/PAdES signatures and real identity/provider interoperability remain explicit external follow-ups.
+Defined local D11 implementation: owner-hosted fail-closed ClamAV private admission/download policy, frozen response printable HTML/optional local PDF and exact-byte Ed25519 server attestations with independent verification. Exact final-source, actual-main and separately downloaded public release are verified in [D11 verification](evidence/d11-verification.md) and [delivery receipt](evidence/d11-main-release.json). Certified respondent identity, qualified/legal/PAdES signatures and real identity/provider interoperability remain explicit external follow-ups.
 
 Verifiable outcome: refused uploads issue no file/quota/capability; current scanning governs private downloads. Original frozen statements/attachment digests survive fresh recovery and exact artifacts refuse tampering/wrong trusted keys. Server attestation never upgrades a typed declaration into certified identity.
 
 ### D12 — Offline and resumable workflows
 
-Origin: **M4** · Catalog: **F045/F046** · Status: **queued for dependency-ordered autonomous resumption**
+Origin: **M4** · Catalog: **F045/F046** · Status: **defined implementation closes through [PR28](https://github.com/NaxAlpha/wpalt/pull/28); broader offline breadth retained**
 
-Broader offline site navigation/synchronization and explicit consented abandonment workflows beyond already-loaded form retry and partial drafts.
+D12 supplies a deliberate bounded public-text/scalar-form library and separately requested/address-confirmed owner-visible partial responses. Broader site/media/navigation synchronization, private/account/attachment forms and richer recovery orchestration remain. See [current status](PROJECT_STATUS.md) and [D12 verification](evidence/d12-verification.md) for delivery gates/limits.
 
 Verifiable future outcome: Conflict-aware online reconciliation preserves original reviewed payload and consent; no covert tracking.
 

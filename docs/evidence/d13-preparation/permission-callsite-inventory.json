@@ -1,0 +1,496 @@
+{
+  "date": "2026-10-13",
+  "scope": "Preparation inventory; lexical candidates require semantic review, not proof of complete policy coverage",
+  "callsites": [
+    {
+      "path": "src/discovery.rs",
+      "line": 708,
+      "source": "if !s.is_admin() {"
+    },
+    {
+      "path": "src/theme.rs",
+      "line": 1263,
+      "source": "if !actor.is_admin() || actor.hash.is_empty() || actor.hash.starts_with(\"integration:\") {"
+    },
+    {
+      "path": "src/theme.rs",
+      "line": 1266,
+      "source": "crate::auth::current_editor(app, actor).await?;"
+    },
+    {
+      "path": "src/auth.rs",
+      "line": 302,
+      "source": "pub async fn current_editor(app: &App, session: &Session) -> Result<()> {"
+    },
+    {
+      "path": "src/auth.rs",
+      "line": 306,
+      "source": "let current: i64 = sqlx::query_scalar(\"SELECT COUNT(*) FROM users u WHERE u.id=$1 AND u.role=$2 AND u.role IN ('admin','editor') AND ($3='' OR EXISTS (SELECT 1 FROM sessions s WHERE s.token_hash=$3 AND s.user_id=u.id AND s.expires_at>$4))\")"
+    },
+    {
+      "path": "src/auth.rs",
+      "line": 375,
+      "source": "if current == \"admin\" && role != \"admin\" {"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 539,
+      "source": "if session.user.role == \"subscriber\" {"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 545,
+      "source": "if s.can_edit() {"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 552,
+      "source": "if s.is_admin() {"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 638,
+      "source": "return Ok(Redirect::to(if session.user.role == \"subscriber\" {"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 661,
+      "source": "let mut response = Redirect::to(if session.user.role == \"subscriber\" {"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 709,
+      "source": "@if s.can_edit(){a class=\"button\" href=\"/admin/posts/new\" {\"Create content\"} \" \" a class=\"button secondary\" href=\"/admin/posts\" {\"Browse content\"}}"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 711,
+      "source": "@if s.is_admin(){a href=\"/admin/operations\" {\"Inspect health & recovery \u2192\"}}"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 713,
+      "source": "@if s.can_moderate(){p class=\"muted\" {(r.get::<i64,_>(\"pending\")) \" comments await moderation. \" a href=\"/admin/comments\" {\"Review comments\"}}}"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 1577,
+      "source": "@if s.is_admin(){section class=\"panel\" {h2 {\"Local video processing\"}p {\"Optional owner-installed FFmpeg. MP4/WebM, two minutes maximum, source up to 1920\u00d71080. Produces a bounded 720p MP4; subtitles and metadata are excluded.\"}form method=\"post\" action=\"/admin/media/video\" enctype=\"multipart/form-data\" data-local-video=\"true\" {(view::csrf(&s))label {\"Video source\" input type=\"file\" name=\"file\" accept=\"video/mp4,video/webm\" required disabled[!app.config.video.enabled];}label {\"Video visibility\" select name=\"visibility\" {option value=\"private\" {\"Editors only\"}option value=\"public\" {\"Public\"}}}button disabled[!app.config.video.enabled] {\"Process local video\"}p data-video-status=\"true\" role=\"status\" aria-live=\"polite\" hidden {}} @if !app.config.video.enabled{p class=\"muted\" {\"Disabled. Configure absolute ffmpeg/ffprobe paths and enable [video] to use the local worker.\"}}}}"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 2027,
+      "source": "if !s.can_moderate() {"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 2056,
+      "source": "if !s.can_moderate() {"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 2599,
+      "source": "serde_json::json!({\"redirect\":if s.user.role==\"subscriber\"{\"/account\"}else{\"/admin\"}}),"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 2653,
+      "source": "if session.user.role == \"subscriber\" {"
+    },
+    {
+      "path": "src/web.rs",
+      "line": 2752,
+      "source": "Ok(html_page(\"Your account\",&app.db.settings().await?,None,html!{h1 {\"Your account\"}p {\"Signed in as \" (&s.user.name)}p {\"Role: \" (&s.user.role)}p {a href=\"/account/security\" {\"Account security\"} \" \u00b7 \" a href=\"/account/privacy\" {\"Data and privacy\"}}@if s.user.role==\"subscriber\" {p {\"This subscriber account does not grant access to site administration.\"}} @else {p {a href=\"/admin\" {\"Open site administration\"}}}@if app.config.membership_enabled {p {a href=\"/members\" {\"Open my learning and communities\"}}}form method=\"post\" action=\"/logout\" {(view::csrf(&s))button {\"Sign out\"}}}).into_response())"
+    },
+    {
+      "path": "src/db.rs",
+      "line": 471,
+      "source": "CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,name TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('admin','editor','moderator','subscriber','disabled')),password_hash TEXT NOT NULL,created_at BIGINT NOT NULL);"
+    },
+    {
+      "path": "src/editorial_web.rs",
+      "line": 29,
+      "source": "if !s.can_edit() || s.hash.starts_with(\"integration:\") {"
+    },
+    {
+      "path": "src/editorial_web.rs",
+      "line": 47,
+      "source": "let reviewers=sqlx::query(\"SELECT id,name,email FROM users WHERE role IN ('admin','editor') AND id<>$1 ORDER BY name,id LIMIT 128\").bind(&s.user.id).fetch_all(&app.db.pool).await?;"
+    },
+    {
+      "path": "src/editorial_web.rs",
+      "line": 238,
+      "source": "p {a href=\"/admin/posts\" {\"Choose content for editorial insights\"} @if s.is_admin(){\" \u00b7 \" a href=\"/admin/analysis\" {\"Public site analysis\"}}}"
+    },
+    {
+      "path": "src/editorial.rs",
+      "line": 138,
+      "source": "sqlx::query_scalar(\"SELECT COUNT(*) FROM users WHERE id=$1 AND role IN ('admin','editor')\")"
+    },
+    {
+      "path": "src/editorial.rs",
+      "line": 159,
+      "source": "\"SELECT COUNT(*) FROM users WHERE role IN ('admin','editor') AND id IN (\","
+    },
+    {
+      "path": "src/editorial.rs",
+      "line": 305,
+      "source": "auth::current_editor(app, s).await?;"
+    },
+    {
+      "path": "src/editorial.rs",
+      "line": 342,
+      "source": "auth::current_editor(app, s).await?;"
+    },
+    {
+      "path": "src/builder_web.rs",
+      "line": 64,
+      "source": "if !s.is_admin() {"
+    },
+    {
+      "path": "src/builder_web.rs",
+      "line": 99,
+      "source": "if !s.can_edit() {"
+    },
+    {
+      "path": "src/builder_web.rs",
+      "line": 135,
+      "source": "if s.is_admin() {"
+    },
+    {
+      "path": "src/builder_web.rs",
+      "line": 316,
+      "source": "if !s.can_edit() {"
+    },
+    {
+      "path": "src/builder_web.rs",
+      "line": 361,
+      "source": "if !session.can_edit() {"
+    },
+    {
+      "path": "src/migrations.rs",
+      "line": 241,
+      "source": "sqlx::raw_sql(\"ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check; ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN ('admin','editor','moderator','subscriber','disabled'));\").execute(&mut *tx).await?;"
+    },
+    {
+      "path": "src/migrations.rs",
+      "line": 253,
+      "source": "let result=async {let mut tx=connection.begin().await?;sqlx::raw_sql(\"CREATE TABLE users_m4(id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,name TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('admin','editor','moderator','subscriber','disabled')),password_hash TEXT NOT NULL,created_at BIGINT NOT NULL); INSERT INTO users_m4 SELECT * FROM users; DROP TABLE users; ALTER TABLE users_m4 RENAME TO users;\").execute(&mut *tx).await?;tx.commit().await?;Ok::<(),anyhow::Error>(())}.await;"
+    },
+    {
+      "path": "src/model.rs",
+      "line": 115,
+      "source": "pub fn can_edit(&self) -> bool {"
+    },
+    {
+      "path": "src/model.rs",
+      "line": 116,
+      "source": "self.user.role == \"admin\" || self.user.role == \"editor\""
+    },
+    {
+      "path": "src/model.rs",
+      "line": 118,
+      "source": "pub fn can_moderate(&self) -> bool {"
+    },
+    {
+      "path": "src/model.rs",
+      "line": 119,
+      "source": "self.user.role == \"admin\" || self.user.role == \"moderator\""
+    },
+    {
+      "path": "src/model.rs",
+      "line": 121,
+      "source": "pub fn is_admin(&self) -> bool {"
+    },
+    {
+      "path": "src/model.rs",
+      "line": 122,
+      "source": "self.user.role == \"admin\""
+    },
+    {
+      "path": "src/view.rs",
+      "line": 54,
+      "source": "@if s.can_edit() {a href=\"/admin/posts\" {(catalog.text(\"nav.content\"))} a href=\"/admin/editorial\" {(catalog.text(\"nav.editorial\"))} a href=\"/admin/languages\" {(catalog.text(\"nav.languages\"))} a href=\"/admin/media\" {(catalog.text(\"nav.media\"))} @if settings.business_enabled {a href=\"/admin/forms\" {(catalog.text(\"nav.forms\"))} a href=\"/admin/audience\" {(catalog.text(\"nav.audience\"))} a href=\"/admin/mail\" {(catalog.text(\"nav.mail\"))} @if settings.engagement_available && s.is_admin() {a href=\"/admin/engagement\" {(catalog.text(\"nav.engagement\"))}}}}"
+    },
+    {
+      "path": "src/view.rs",
+      "line": 55,
+      "source": "@if s.is_admin() && settings.membership_enabled {a href=\"/admin/members\" {(catalog.text(\"nav.members\"))}a href=\"/admin/courses\" {(catalog.text(\"nav.courses\"))}}"
+    },
+    {
+      "path": "src/view.rs",
+      "line": 56,
+      "source": "@if s.is_admin() && settings.commerce_enabled {a href=\"/admin/shop\" {(catalog.text(\"nav.commerce\"))}}"
+    },
+    {
+      "path": "src/view.rs",
+      "line": 57,
+      "source": "@if s.can_moderate() {a href=\"/admin/comments\" {(catalog.text(\"nav.comments\"))}}"
+    },
+    {
+      "path": "src/view.rs",
+      "line": 58,
+      "source": "@if s.is_admin() {a href=\"/admin/builder\" {(catalog.text(\"nav.studio\"))} a href=\"/admin/discovery\" {(catalog.text(\"nav.discovery\"))} a href=\"/admin/settings\" {(catalog.text(\"nav.settings\"))} a href=\"/admin/operations\" {(catalog.text(\"nav.operations\"))}}"
+    },
+    {
+      "path": "src/content.rs",
+      "line": 199,
+      "source": "if !session.can_edit() {"
+    },
+    {
+      "path": "src/content.rs",
+      "line": 202,
+      "source": "crate::auth::current_editor(app, session).await?;"
+    },
+    {
+      "path": "src/content.rs",
+      "line": 627,
+      "source": "if !session.can_edit() {"
+    },
+    {
+      "path": "src/commerce/orders.rs",
+      "line": 87,
+      "source": "let count:i64=sqlx::query_scalar(\"SELECT COUNT(*) FROM shop_slots s JOIN shop_resources r ON r.id=s.resource_id WHERE s.id=$1 AND s.variant_id=$2 AND s.active=1 AND r.active=1 AND (r.staff_id='' OR EXISTS(SELECT 1 FROM users staff WHERE staff.id=r.staff_id AND staff.role IN ('admin','editor'))) AND s.starts_at>$3\").bind(slot).bind(variant).bind(now()).fetch_one(&mut *tx).await?;"
+    },
+    {
+      "path": "src/commerce/orders.rs",
+      "line": 167,
+      "source": "let rows=sqlx::query(\"SELECT c.variant_id,c.slot_id,c.quantity,v.title AS variant_title,v.sku,v.price_minor,v.member_price_minor,v.member_key,v.stock_total,v.held,v.sold,v.billing_interval,v.active AS variant_active,p.id AS product_id,p.title,p.kind,p.entitlement,p.access_seconds,p.published,s.id AS slot_exists,s.variant_id AS slot_variant,s.starts_at,s.capacity,s.held AS slot_held,s.booked,s.active AS slot_active,CASE WHEN r.active=1 AND (r.staff_id='' OR EXISTS(SELECT 1 FROM users staff WHERE staff.id=r.staff_id AND staff.role IN ('admin','editor'))) THEN 1 ELSE 0 END AS resource_active,CASE WHEN v.member_price_minor>=0 AND EXISTS(SELECT 1 FROM member_grants g WHERE g.user_id=$1 AND g.entitlement=v.member_key AND g.revoked=0 AND g.starts_at<=$2 AND (g.expires_at=0 OR g.expires_at>$2)) THEN v.member_price_minor ELSE v.price_minor END AS unit_minor FROM shop_cart_lines c JOIN shop_variants v ON v.id=c.variant_id JOIN shop_products p ON p.id=v.product_id LEFT JOIN shop_slots s ON s.id=c.slot_id LEFT JOIN shop_resources r ON r.id=s.resource_id WHERE c.user_id=$1 ORDER BY c.variant_id,c.slot_id LIMIT 21\").bind(user).bind(at).fetch_all(&mut **tx).await?;"
+    },
+    {
+      "path": "src/commerce/orders.rs",
+      "line": 428,
+      "source": "&& sqlx::query(\"UPDATE shop_slots SET held=held+$1 WHERE id=$2 AND variant_id=$3 AND active=1 AND starts_at>$4 AND capacity-held-booked>=$1 AND EXISTS(SELECT 1 FROM shop_resources r WHERE r.id=shop_slots.resource_id AND r.active=1 AND (r.staff_id='' OR EXISTS(SELECT 1 FROM users staff WHERE staff.id=r.staff_id AND staff.role IN ('admin','editor'))))\").bind(line.quantity).bind(&line.slot_id).bind(&line.variant_id).bind(now()).execute(&mut *tx).await?.rows_affected()!=1{return Err(Error::invalid(\"The last slot was taken; no order or payment was created.\"))}"
+    },
+    {
+      "path": "src/commerce/orders.rs",
+      "line": 692,
+      "source": "|| role == \"disabled\";"
+    },
+    {
+      "path": "src/commerce/orders.rs",
+      "line": 710,
+      "source": "let good:i64=sqlx::query_scalar(\"SELECT COUNT(*) FROM shop_slots s JOIN shop_resources r ON r.id=s.resource_id WHERE s.id=$1 AND s.active=1 AND r.active=1 AND (r.staff_id='' OR EXISTS(SELECT 1 FROM users staff WHERE staff.id=r.staff_id AND staff.role IN ('admin','editor'))) AND s.starts_at>$2\").bind(slot).bind(now()).fetch_one(&mut **tx).await?;"
+    },
+    {
+      "path": "src/commerce/booking.rs",
+      "line": 58,
+      "source": "\"SELECT COUNT(*) FROM users WHERE id=$1 AND role IN ('admin','editor')\","
+    },
+    {
+      "path": "src/commerce/web.rs",
+      "line": 403,
+      "source": "let slots=sqlx::query(\"SELECT s.*,r.title FROM shop_slots s JOIN shop_resources r ON r.id=s.resource_id JOIN shop_variants v ON v.id=s.variant_id WHERE v.product_id=$1 AND s.active=1 AND r.active=1 AND (r.staff_id='' OR EXISTS(SELECT 1 FROM users staff WHERE staff.id=r.staff_id AND staff.role IN ('admin','editor'))) AND s.starts_at>$2 AND s.capacity>s.held+s.booked AND (s.starts_at,s.id)>($3,$4) ORDER BY s.starts_at,s.id LIMIT 41\").bind(&id).bind(crate::now()).bind(q.calendar_start).bind(&q.calendar_after).fetch_all(&app.db.pool).await?;"
+    },
+    {
+      "path": "src/platform/integration_web.rs",
+      "line": 28,
+      "source": "if !s.is_admin() {"
+    },
+    {
+      "path": "src/platform/language_web.rs",
+      "line": 31,
+      "source": "if !s.can_edit() || s.hash.starts_with(\"integration:\") {"
+    },
+    {
+      "path": "src/platform/translations.rs",
+      "line": 45,
+      "source": "auth::current_editor(app, session).await?;"
+    },
+    {
+      "path": "src/platform/elementor_design_web.rs",
+      "line": 49,
+      "source": "if !actor.is_admin() || actor.hash.starts_with(\"integration:\") {"
+    },
+    {
+      "path": "src/platform/elementor_design_web.rs",
+      "line": 52,
+      "source": "auth::current_editor(app, &actor).await?;"
+    },
+    {
+      "path": "src/platform/document_translation.rs",
+      "line": 131,
+      "source": "auth::current_editor(app, actor).await?;"
+    },
+    {
+      "path": "src/platform/web.rs",
+      "line": 26,
+      "source": "if !s.is_admin() {"
+    },
+    {
+      "path": "src/platform/integrations.rs",
+      "line": 33,
+      "source": "|| owner.user.role != \"admin\""
+    },
+    {
+      "path": "src/platform/integrations.rs",
+      "line": 44,
+      "source": "auth::current_editor(app, owner).await?;"
+    },
+    {
+      "path": "src/platform/integrations.rs",
+      "line": 65,
+      "source": "\"SELECT id,password_hash FROM users WHERE email=$1 AND role IN ('admin','editor')\","
+    },
+    {
+      "path": "src/platform/integrations.rs",
+      "line": 79,
+      "source": "if owner.hash.starts_with(\"integration:\") || owner.user.role != \"admin\" {"
+    },
+    {
+      "path": "src/platform/integrations.rs",
+      "line": 84,
+      "source": "auth::current_editor(app, owner).await?;"
+    },
+    {
+      "path": "src/platform/integrations.rs",
+      "line": 92,
+      "source": "if owner.hash.starts_with(\"integration:\") || owner.user.role != \"admin\" {"
+    },
+    {
+      "path": "src/platform/integrations.rs",
+      "line": 95,
+      "source": "auth::current_editor(app, owner).await?;"
+    },
+    {
+      "path": "src/platform/integrations.rs",
+      "line": 102,
+      "source": "let r=sqlx::query(\"SELECT u.id,u.email,u.name,u.role,u.password_hash,c.password_fingerprint,c.id AS credential_id FROM integration_credentials c JOIN users u ON u.id=c.user_id WHERE c.token_hash=$1 AND c.expires_at>$2 AND c.read_content=1 AND ($3=0 OR c.draft_content=1) AND u.role IN ('admin','editor') AND c.origin=$4\")"
+    },
+    {
+      "path": "src/platform/integrations.rs",
+      "line": 157,
+      "source": "if current.user.id != session.user.id || current.user.role != session.user.role {"
+    },
+    {
+      "path": "src/business/engagement_web.rs",
+      "line": 42,
+      "source": "if !s.is_admin() {"
+    },
+    {
+      "path": "src/business/registration_web.rs",
+      "line": 50,
+      "source": "if !s.is_admin() {"
+    },
+    {
+      "path": "src/business/registration_web.rs",
+      "line": 74,
+      "source": "if !s.is_admin() {"
+    },
+    {
+      "path": "src/business/workflows_web.rs",
+      "line": 27,
+      "source": "if !s.is_admin() {"
+    },
+    {
+      "path": "src/business/audience_web.rs",
+      "line": 42,
+      "source": "if !s.can_edit() {"
+    },
+    {
+      "path": "src/business/web.rs",
+      "line": 66,
+      "source": "if !session.can_edit() {"
+    },
+    {
+      "path": "src/business/web.rs",
+      "line": 243,
+      "source": "if session.user.role != \"admin\" {"
+    },
+    {
+      "path": "src/business/web.rs",
+      "line": 419,
+      "source": "\"SELECT id,name FROM users WHERE role IN ('admin','editor') ORDER BY name,id LIMIT 100\","
+    },
+    {
+      "path": "src/business/web.rs",
+      "line": 577,
+      "source": "if !session.can_edit() {"
+    },
+    {
+      "path": "src/business/entries.rs",
+      "line": 25,
+      "source": "sqlx::query_scalar(\"SELECT id FROM users WHERE id=$1 AND role IN ('admin','editor')\")"
+    },
+    {
+      "path": "src/business/promotions_web.rs",
+      "line": 30,
+      "source": "if !s.is_admin() {"
+    },
+    {
+      "path": "src/operations/privacy.rs",
+      "line": 180,
+      "source": "if !s.is_admin() {"
+    },
+    {
+      "path": "src/theme/asset_web.rs",
+      "line": 36,
+      "source": "if !actor.is_admin() || actor.hash.starts_with(\"integration:\") {"
+    },
+    {
+      "path": "src/theme/asset_web.rs",
+      "line": 199,
+      "source": "if !actor.is_admin() || actor.hash.starts_with(\"integration:\") {"
+    },
+    {
+      "path": "src/membership/web.rs",
+      "line": 547,
+      "source": "let mut rows=sqlx::query(\"SELECT c.id,c.created_at,c.published_title AS title,c.published_version,(SELECT COUNT(*) FROM member_progress pr WHERE pr.course_id=c.id AND pr.course_version=c.published_version AND pr.user_id=$1 AND pr.completed_at>0) AS completed FROM member_courses c JOIN member_resources cr ON cr.kind='course' AND cr.resource_id=c.id JOIN member_policies p ON p.id=cr.policy_id JOIN users u ON u.id=$1 WHERE c.published_version>0 AND (c.created_at,c.id)<($3,$4) AND (u.role IN ('admin','editor') OR (u.role<>'disabled' AND p.enabled=1 AND (p.entitlement='' OR EXISTS(SELECT 1 FROM member_grants g WHERE g.user_id=$1 AND g.entitlement=p.entitlement AND g.revoked=0 AND g.starts_at<=$2 AND (g.expires_at=0 OR g.expires_at>$2))) AND (p.group_id='' OR EXISTS(SELECT 1 FROM member_group_users gu WHERE gu.group_id=p.group_id AND gu.user_id=$1)))) ORDER BY c.created_at DESC,c.id DESC LIMIT 41\").bind(&s.user.id).bind(now()).bind(time).bind(id).fetch_all(&app.db.pool).await?;"
+    },
+    {
+      "path": "src/membership/web.rs",
+      "line": 677,
+      "source": "if r.get::<String, _>(\"user_id\") != s.user.id && !s.is_admin() {"
+    },
+    {
+      "path": "src/membership/web.rs",
+      "line": 746,
+      "source": "let manager = s.is_admin() || g.get::<String, _>(\"manager_id\") == s.user.id;"
+    },
+    {
+      "path": "src/membership/identity.rs",
+      "line": 308,
+      "source": "let mut response = Redirect::to(if session.user.role == \"subscriber\" {"
+    },
+    {
+      "path": "src/discovery/insights/jobs_web.rs",
+      "line": 34,
+      "source": "if !s.is_admin() || s.hash.starts_with(\"integration:\") {"
+    },
+    {
+      "path": "src/discovery/insights/web.rs",
+      "line": 21,
+      "source": "if !s.can_edit() || s.hash.starts_with(\"integration:\") {"
+    },
+    {
+      "path": "src/discovery/insights/web.rs",
+      "line": 50,
+      "source": "@if s.is_admin(){p {a href=\"/admin/analysis\" {\"Analyze the complete public site\"}}}"
+    },
+    {
+      "path": "src/discovery/insights/mod.rs",
+      "line": 42,
+      "source": "if !session.can_edit() || session.hash.starts_with(\"integration:\") {"
+    },
+    {
+      "path": "src/discovery/insights/mod.rs",
+      "line": 53,
+      "source": "crate::auth::current_editor(app, session).await?;"
+    },
+    {
+      "path": "src/discovery/insights/mod.rs",
+      "line": 101,
+      "source": "crate::auth::current_editor(app, session).await?;"
+    },
+    {
+      "path": "src/discovery/insights/jobs.rs",
+      "line": 126,
+      "source": "if !session.is_admin() || session.hash.starts_with(\"integration:\") {"
+    },
+    {
+      "path": "src/discovery/insights/jobs.rs",
+      "line": 129,
+      "source": "crate::auth::current_editor(app, session).await"
+    }
+  ]
+}

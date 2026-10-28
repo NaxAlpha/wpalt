@@ -1,0 +1,18 @@
+{
+  "advisory_database": {
+    "advisory-count": 1380,
+    "last-commit": "99670cfc0bc574433034b75876a4b791ccaa2efb",
+    "last-updated": "2026-10-27T11:02:42+01:00"
+  },
+  "active_vulnerabilities": [],
+  "inactive_optional_lockfile_findings": [
+    {
+      "advisory": "RUSTSEC-2023-0071",
+      "package": "rsa",
+      "version": "0.9.10",
+      "title": "Marvin Attack: potential key recovery through timing sidechannels"
+    }
+  ],
+  "active_warnings": [],
+  "selection": "cargo tree --target all --edges normal,build,dev (current wpalt features)"
+}

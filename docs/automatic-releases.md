@@ -8,12 +8,14 @@ Only the release job has `contents: write`; PR verification uses read permission
 
 ## Preserve coverage while reducing elapsed time
 
+Current required gates are application, compiler-floor, dependency-audit, clean-build, frontend, native-pitr and local-processes. The last two add actual engine recovery and cumulative same-host process/browser verification to the original pipeline below. Historical timing measurements retain their original scope.
+
 - `application`: real SQLite/PostgreSQL Rust journeys, release safety tests, fmt, warnings-denied Clippy, guidance freshness and all volume evidence.
-- `compiler-floor`: the existing Rust 1.85 source check.
+- `compiler-floor`: the declared Rust 1.88 source check.
 - `dependency-audit`: runs concurrently and caches only the pinned cargo-audit executable/tool installation by OS/architecture/compiler/tool version. The advisory database still fetches on every run; audit results are never cached.
 - `clean-build`: starts concurrently in empty Cargo/target directories, rebuilds locked frontend assets, checks committed output, compiles the release without restored build/dependency caches, and runs the complete CLI install/restart/recovery/configuration/security journey. npm's download cache does not alter the Rust clean-build guarantee.
 - `frontend`: consumes and independently verifies that exact clean archive, then runs frontend format/build reproducibility, npm audit and the entire browser suite, including prior milestones, three viewport sizes, text spacing, keyboard and accessibility evidence.
-- `release`: requires all five jobs to succeed and runs only on main pushes.
+- `release`: requires all seven jobs to succeed and runs only on main pushes.
 
 This removes the second cached release compilation and duplicate invocation of the same CLI journey, while increasing browser confidence by testing the actual clean delivery executable. No Rust tests, database engines, browser surfaces, audits, security assertions or accessibility measurements are removed. No changed-file test skipping or timing-based retries are introduced. Independent jobs use separate runners; cold audit setup can run beside compilation. Parallelism trades additional concurrent runners against latency; measure total runner time as well as wall time.
 

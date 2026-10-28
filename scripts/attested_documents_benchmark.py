@@ -113,7 +113,7 @@ for engine in ['sqlite', 'postgres'] if a.postgres else ['sqlite']:
                     url=urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(urllib.parse.parse_qsl(parsed.query)+[('options','-c search_path='+schema)])))
                 text=config.read_text().replace(json.dumps(previous),json.dumps(url)).replace(json.dumps(str(root/'data')),json.dumps(str(root/'recovered')))
                 config.write_text(text+'\n[documents]\nenabled=true\nkey_file='+json.dumps(str(key))+'\n')
-                running_binary=binary;native('restore',str(snapshot))
+                running_binary=binary;converted=root/'converted-v20.json';native('migrate-recovery-v19',str(snapshot),str(converted));native('restore',str(converted))
                 log.close();log=(root/'server.log').open('w')
                 server=subprocess.Popen([str(binary),'--config',str(config),'serve','--external-worker'],stdout=log,stderr=log)
                 for _ in range(100):

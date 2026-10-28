@@ -1,6 +1,6 @@
 # Running and recovering wpalt
 
-D10 development uses native schema24 / portable recoveryv19 for composable forms and survey reporting. D09 native23/v18 is delivered and its actual-main/public release is independently verified in [the delivery receipt](evidence/d09-main-release.json). Older sites need a reviewed stopped upgrade and the retained original executable/configuration/recovery key; portable archive conversion is separate from ordinary restore. D10 delivery verification is in progress; do not infer full survey-plugin parity. See [D10 contract](d10-contract.md) for grammar, comparison correction, preservation and work budgets. Existing derived editorial caches remain excluded from portable recovery.
+D11 is delivered on native schema24 / portable recoveryv19. Its exact final-source and actual-main checks and separately downloaded public release are independently verified ([delivery receipt](evidence/d11-main-release.json)). Optional private scanning and attested response documents are documented in [private documents](private-documents.md); no whole-plugin or certified-identity claim. Retain the original executable/configuration and independent backup before a reviewed stopped upgrade; portable archive conversion remains separate from ordinary restore.
 
 ## Build and initialize
 

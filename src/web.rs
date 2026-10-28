@@ -28,6 +28,7 @@ pub fn router(app: App) -> Router {
         Router::new()
     };
     Router::new()
+        .merge(crate::operations::offline::routes())
         .merge(crate::builder_web::routes())
         .merge(crate::editorial_web::routes())
         .merge(crate::discovery::insights::web::routes())
@@ -465,6 +466,7 @@ async fn security_and_trace_inner(
         || (route.starts_with("/audience/") || route.starts_with("/registration/"))
         || route.starts_with("/api/forms/")
         || route.starts_with("/forms/")
+        || route.starts_with("/offline/")
         || route.starts_with("/api/engagement/")
     {
         h.insert(
@@ -498,6 +500,7 @@ async fn security_and_trace_inner(
         || (route.starts_with("/audience/") || route.starts_with("/registration/"))
         || route.starts_with("/api/forms/")
         || route.starts_with("/forms/")
+        || route.starts_with("/offline/")
         || route.starts_with("/api/engagement/")
     {
         h.insert("cache-control", HeaderValue::from_static("no-store"));

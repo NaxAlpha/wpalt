@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-13",
+  "plugin": "User Role Editor",
+  "version": "4.66.2",
+  "archive_bytes": 618966,
+  "archive_sha256": "9d1402f4f910410e46b14fab6a9b8015ed5e17819460a4480f1517976ae45f1a",
+  "download": "https://downloads.wordpress.org/plugin/user-role-editor.4.66.2.zip",
+  "scope": "Source inspection only; no WordPress/PHP or premium runtime execution, and no source incorporated into wpalt",
+  "selected_members": [
+    {
+      "archive_path": "user-role-editor/includes/classes/assign-role.php",
+      "sha256": "2bec7bdc21b087351ffa39beda3c8416bff120b94e8cef8762dff38fe9bfbc0e",
+      "bytes": 7267
+    },
+    {
+      "archive_path": "user-role-editor/includes/classes/capabilities-groups-manager.php",
+      "sha256": "92043f10c8138ae8f72f2f9547419fa096bc0533a572750560a9ec61fe3a208d",
+      "bytes": 18221
+    },
+    {
+      "archive_path": "user-role-editor/includes/classes/capabilities.php",
+      "sha256": "6053616aef07704e8ad030ce98da2cb8eb1b70704eaa7e295b3cf464f9dce756",
+      "bytes": 15700
+    },
+    {
+      "archive_path": "user-role-editor/includes/classes/grant-roles.php",
+      "sha256": "5c9e3c1cf96ae697f43e1ba3a2963e1313350f99fe59e6e98a67458bf743eb66",
+      "bytes": 20538
+    },
+    {
+      "archive_path": "user-role-editor/includes/classes/own-capabilities.php",
+      "sha256": "f62eea647b53baa4fb516a0cf1390ed8db985abf6732739f92d0333a485efc88",
+      "bytes": 6197
+    },
+    {
+      "archive_path": "user-role-editor/includes/classes/protect-admin.php",
+      "sha256": "c37f15f064b29927bc7c7fd4a1dd27935ed920db381694cc9ad08b29eb3c8987",
+      "bytes": 8846
+    },
+    {
+      "archive_path": "user-role-editor/includes/classes/woocommerce-capabilities.php",
+      "sha256": "5dbc2ea2f618bb7bebf377dfc3fc5a85653f4c37a3f9df4dad52b1c964030133",
+      "bytes": 5974
+    }
+  ]
+}

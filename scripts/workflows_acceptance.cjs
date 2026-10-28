@@ -185,11 +185,8 @@ module.exports = async function (owner, origin, output) {
       .waitFor();
     await visitor.getByLabel("Receive release notes", { exact: true }).check();
     await visitor.getByText("Save and resume", { exact: true }).click();
-    await visitor
-      .getByLabel("Save this draft on this device for seven days", {
-        exact: true,
-      })
-      .check();
+    assert(await visitor.getByLabel("Save this draft on this device for seven days", {exact:true}).isDisabled(),
+      "Private attachment capabilities and acknowledgments cannot enter device storage; use the explicit private server draft.");
     await visitor
       .getByRole("button", { name: "Save private server draft", exact: true })
       .click();
@@ -223,17 +220,14 @@ module.exports = async function (owner, origin, output) {
       .first()
       .waitFor();
     await context.setOffline(false);
-    await visitor.reload();
-    await visitor
-      .getByRole("status")
-      .filter({ hasText: "device draft is available" })
-      .waitFor();
+    assert.equal(await visitor.evaluate(id=>localStorage.getItem(`wpalt:form:${id}`),id),null,
+      "No upload capability or acknowledgment is retained in device storage. Scalar-only durable reload is verified by D12's separate actual-browser journey.");
     assert.ok(
       await visitor.getByLabel("Your full name", { exact: true }).isDisabled(),
-      "Uncertain submission keeps its original payload frozen across reload.",
+      "Uncertain private-attachment submission keeps its original payload frozen in the loaded page.",
     );
     await visitor
-      .getByRole("button", { name: "Send response", exact: true })
+      .getByRole("button", { name: "Retry original response", exact: true })
       .click();
     await visitor
       .getByRole("status")
