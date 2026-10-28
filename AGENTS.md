@@ -6,4 +6,4 @@ Deliver usable end-user systems. Make each step correct, verify and optimize it,
 
 Use cargo fmt, cargo clippy with warnings denied, and relevant behavioral tests. Validate supported database paths against real SQLite and PostgreSQL. The active resumed-package contract is docs/d12-contract.md; docs/m9-contract.md remains the cumulative deployment contract; docs/frontend-foundations.md governs frontend measurements. M1/M2 journeys remain regression coverage. Read the design/visual review protocol before frontend changes. Rebuild committed frontend assets from the locked frontend toolchain when editing the studio.
 
-For the owner-requested 2026-10-17 development checkpoint, read docs/RESUME.md first. D12 delivery is not merged/released; D13 contains preparation only. The resume guide records exact tested source, remaining delivery steps and fresh-clone setup.
+Read docs/PROJECT_STATUS.md and docs/RESUME.md for the current closure/status handoff. D12 closes through PR28; verify its exact-source/main/public release before starting D13. D13 currently contains preparation only.

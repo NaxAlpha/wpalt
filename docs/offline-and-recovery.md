@@ -1,6 +1,6 @@
 # Offline library and requested response recovery
 
-D12 is in development; verification/delivery is pending. Native25/portable20 introduces publication-bound recovery policy and private intent tables. See [contract](d12-contract.md).
+D12 supplies the defined local offline/recovery system; closure and exact-source release are tracked in [PR28](https://github.com/NaxAlpha/wpalt/pull/28). See [full project status](PROJECT_STATUS.md) and [verification](evidence/d12-verification.md). Native25/portable20 introduces publication-bound recovery policy and private intent tables. See [contract](d12-contract.md).
 
 ## Deliberately save on a private device
 

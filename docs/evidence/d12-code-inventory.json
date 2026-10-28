@@ -1,0 +1,23 @@
+{
+  "basis": "git-tracked physical lines; includes comments/blank lines, not an effective-code metric",
+  "source": "77ab00700b8e478b03a00fa8cdd8c1ddbedda757",
+  "groups": {
+    "rust_application": {
+      "files": 133,
+      "physical_lines": 49278
+    },
+    "rust_tests": {
+      "files": 14,
+      "physical_lines": 21094
+    },
+    "frontend_source": {
+      "files": 23,
+      "physical_lines": 10258
+    },
+    "verification_scripts": {
+      "files": 84,
+      "physical_lines": 11628
+    }
+  },
+  "rust_test_annotations": 148
+}

@@ -110,9 +110,9 @@ Verifiable outcome: refused uploads issue no file/quota/capability; current scan
 
 ### D12 — Offline and resumable workflows
 
-Origin: **M4** · Catalog: **F045/F046** · Status: **active under [D12 contract](d12-contract.md); delivery pending**
+Origin: **M4** · Catalog: **F045/F046** · Status: **defined implementation closes through [PR28](https://github.com/NaxAlpha/wpalt/pull/28); broader offline breadth retained**
 
-Broader offline site navigation/synchronization and explicit consented abandonment workflows beyond already-loaded form retry and partial drafts.
+D12 supplies a deliberate bounded public-text/scalar-form library and separately requested/address-confirmed owner-visible partial responses. Broader site/media/navigation synchronization, private/account/attachment forms and richer recovery orchestration remain. See [current status](PROJECT_STATUS.md) and [D12 verification](evidence/d12-verification.md) for delivery gates/limits.
 
 Verifiable future outcome: Conflict-aware online reconciliation preserves original reviewed payload and consent; no covert tracking.
 

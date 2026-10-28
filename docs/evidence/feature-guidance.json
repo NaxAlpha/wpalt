@@ -2778,6 +2778,44 @@
         "new offline or abandonment scope"
       ],
       "status": "Primary guidance reviewed; implementation verification/delivery in progress."
+    },
+    {
+      "feature_id": "D12-02",
+      "area": "Closure security dependency remediation",
+      "scope": "D12",
+      "basis": "external-and-internal",
+      "sources": [
+        "https://rustsec.org/advisories/RUSTSEC-2026-0346.html",
+        "https://rustsec.org/advisories/RUSTSEC-2026-0347.html",
+        "https://rustsec.org/advisories/RUSTSEC-2026-0348.html",
+        "https://rustsec.org/advisories/RUSTSEC-2026-0349.html",
+        "https://rustsec.org/advisories/RUSTSEC-2026-0373.html",
+        "https://rustsec.org/advisories/RUSTSEC-2026-0381.html",
+        "https://rustsec.org/advisories/RUSTSEC-2026-0382.html",
+        "https://rustsec.org/advisories/RUSTSEC-2026-0386.html"
+      ],
+      "applicable_versions": [
+        "Ammonia4.2.4; Rustls0.23.46; rustls-webpki0.103.16; webpki-roots1.0.10; Tokio1.53.3"
+      ],
+      "last_checked": "2026-10-28",
+      "next_review": "2026-11-27",
+      "review_interval_days": 30,
+      "maintenance_owner": "wpalt maintainers",
+      "requirements": [
+        "Use patched releases; maintain default HTML/CSS rejection and certificate validation. Do not suppress active selected-graph findings or unsoundness warnings.",
+        "Fresh selected all-target dependency auditing plus existing sanitizer/HTTP/SMTP/identity/database, concurrency and recovery journeys validate the resulting application. Optional inactive lock entries remain distinguished from compiled dependencies."
+      ],
+      "tests": [
+        "scripts/audit_dependencies.py",
+        "cargo test --locked with required PostgreSQL",
+        "seven cumulative GitHub gates"
+      ],
+      "triggers": [
+        "dependency/advisory change",
+        "affected release",
+        "new relevant vulnerability"
+      ],
+      "status": "reviewed"
     }
   ],
   "future_features": "Every later milestone adds/refines per-feature records; the 132-group research is a dated discovery baseline, not current normative evidence."

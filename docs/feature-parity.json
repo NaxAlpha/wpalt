@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "core_baseline": "m1-contract.md + m2-contract.md + m3-contract.md + m3-5-contract.md + m4-contract.md; individual coverage/limits are recorded, not blanket premium-plugin parity. + m5-contract.md + m6-contract.md",
-  "milestone": "M1\u2013M9 and defined D01\u2013D11 packages delivered; D12 offline and explicit recovery is active. Broader parity remains tracked.",
+  "milestone": "M1\u2013M9 and defined D01\u2013D11 packages delivered; D12 defined implementation closes through PR28. D13\u2013D30 and broader earlier parity remain tracked.",
   "capabilities": [
     {
       "id": "F001",
@@ -906,7 +906,7 @@
       "capability": "Save/resume, partial entries and abandonment",
       "deployment": "L",
       "milestone": "M4",
-      "status": "D12 active; defined package verification and delivery pending",
+      "status": "defined-D12-implementation; closure and exact-source release tracked in PR28; broader remainder retained",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Seven-day revisioned partial server drafts and explicit device recovery; no covert abandonment tracking or automatic abandoned-response marketing.",
@@ -918,8 +918,13 @@
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
         "../scripts/workflows_acceptance.cjs",
-        "d12-contract.md"
-      ]
+        "d12-contract.md",
+        "offline-and-recovery.md",
+        "evidence/d12-verification.md",
+        "../tests/offline_recovery.rs",
+        "../scripts/offline_recovery_acceptance.cjs"
+      ],
+      "d12_coverage": "Deliberate public-text/scalar-form offline snapshots, finite scope/count/bytes/expiry, original-payload conflict/retry and separately requested/address-confirmed safe partial-response recovery. No general site synchronization, private-widget offline submission, covert tracking or paid-runtime parity."
     },
     {
       "id": "F046",
@@ -927,7 +932,7 @@
       "capability": "Offline capture and later synchronization",
       "deployment": "L",
       "milestone": "M4",
-      "status": "D12 active; defined package verification and delivery pending",
+      "status": "defined-D12-implementation; closure and exact-source release tracked in PR28; broader remainder retained",
       "m1_overlap": "Foundational coverage only where documented in m1-contract; this whole group is not claimed complete.",
       "reference": "research/local-first-plugin-and-cms-data.json",
       "m4_coverage": "Already-loaded form editing offline and original-payload retry across reload; no uncached offline site navigation or general distributed synchronization.",
@@ -939,8 +944,13 @@
         "../scripts/business_acceptance.cjs",
         "../scripts/engagement_acceptance.cjs",
         "../scripts/workflows_acceptance.cjs",
-        "d12-contract.md"
-      ]
+        "d12-contract.md",
+        "offline-and-recovery.md",
+        "evidence/d12-verification.md",
+        "../tests/offline_recovery.rs",
+        "../scripts/offline_recovery_acceptance.cjs"
+      ],
+      "d12_coverage": "Deliberate public-text/scalar-form offline snapshots, finite scope/count/bytes/expiry, original-payload conflict/retry and separately requested/address-confirmed safe partial-response recovery. No general site synchronization, private-widget offline submission, covert tracking or paid-runtime parity."
     },
     {
       "id": "F047",

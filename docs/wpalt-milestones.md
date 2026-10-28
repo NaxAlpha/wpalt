@@ -6,7 +6,7 @@ Companions: [Product goals](wpalt-product-goals.md) · [Development methodology]
 
 ## Delivery rules
 
-Every milestone delivers a substantial end-user system, building on the previous release. The roadmap describes proposed delivery boundaries, not completed functionality or a fixed schedule. M1 and M2 are merged in PRs #1 and #3. Frontend foundation preparation is active before M3; M3–M9 are planned.
+Every milestone delivers a substantial end-user system, building on the previous release. The roadmap describes proposed delivery boundaries, not completed functionality or a fixed schedule. M1–M9, M3.5 and the defined D01–D11 follow-ups are delivered. D12 closes through PR28. The dated sections below retain planning/delivery history; [PROJECT_STATUS.md](PROJECT_STATUS.md) and [the backlog](deferred-features.md) are the current overview.
 
 Each milestone follows the same process: prepare and, where useful, refactor the preceding system; define the milestone contract; make each functional step work; verify and optimize each step; integrate and optimize the complete system; deliver a runnable release with evidence. Working correctly includes baseline security and data integrity from the outset.
 
@@ -374,3 +374,7 @@ PR #24 merges the defined redirect/missing-path/rendered-link workspace after al
 ### D08 released; D09 active — 2026-10-12
 
 Actual-main D08 passes all seven cumulative gates plus automatic release, and separate CI/public archives independently verify. [Release receipt](evidence/d08-main-release.json). D09 now delivers connected editorial insights and bounded durable public analysis under its new contract; broader language/dictionary/provider parity remains explicitly scoped.
+
+## Current closure and next work — 2026-10-28
+
+D12 offline/confirmed-recovery implementation closes through [PR28](https://github.com/NaxAlpha/wpalt/pull/28), with patched security dependencies and cumulative exact-source/main/public-release gates. D13 custom authorization is preparation only; D13–D30 and retained earlier breadth remain. See [full status](PROJECT_STATUS.md). No next-milestone implementation is part of this closure/status update.
